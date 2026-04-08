@@ -2112,3 +2112,1056 @@ func TestSearchReceipts_WithClientIDAndUpdatedAtFrom(t *testing.T) {
 		t.Errorf("updated_at_from param: want %q, got %q", "2026-01-01", gotUpdatedAtFrom)
 	}
 }
+
+// ============================================================
+// M08: vendors エンティティ テスト (T112〜T117)
+// ============================================================
+
+// T112: ListVendors — 正常系（2件）
+func TestListVendors_OK(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`[{"id":1,"name":"発注先A","code":"VA001","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":2,"name":"発注先B","code":"VB002","memo":"","updated_at":"2026-01-02T00:00:00Z","created_at":"2026-01-02T00:00:00Z"}]`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	result, err := c.ListVendors(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result) != 2 {
+		t.Errorf("want 2 vendors, got %d", len(result))
+	}
+	if result[0].ID != 1 || result[0].Name != "発注先A" || result[0].Code != "VA001" {
+		t.Errorf("vendor[0]: got %+v", result[0])
+	}
+}
+
+// T113: ListVendors — APIエラー（401）
+func TestListVendors_Unauthorized(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	_, err := c.ListVendors(context.Background())
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	apiErr, ok := err.(*boardapi.APIError)
+	if !ok {
+		t.Fatalf("expected *APIError, got %T", err)
+	}
+	if apiErr.Code != boardapi.APIErrorUnauthorized {
+		t.Errorf("Code: want %q, got %q", boardapi.APIErrorUnauthorized, apiErr.Code)
+	}
+}
+
+// T114: GetVendor — 正常系
+func TestGetVendor_OK(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/vendors/1" {
+			http.NotFound(w, r)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"id":1,"name":"発注先A","code":"VA001","memo":"テストメモ","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	got, err := c.GetVendor(context.Background(), 1)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got == nil {
+		t.Fatal("got nil VendorEntity")
+	}
+	if got.ID != 1 || got.Name != "発注先A" || got.Code != "VA001" {
+		t.Errorf("GetVendor: got %+v", got)
+	}
+}
+
+// T115: GetVendor — 404 Not Found
+func TestGetVendor_NotFound(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	_, err := c.GetVendor(context.Background(), 999)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	apiErr, ok := err.(*boardapi.APIError)
+	if !ok {
+		t.Fatalf("expected *APIError, got %T", err)
+	}
+	if apiErr.Code != boardapi.APIErrorNotFound {
+		t.Errorf("Code: want %q, got %q", boardapi.APIErrorNotFound, apiErr.Code)
+	}
+}
+
+// T116: SearchVendors — Name パラメータ付き
+func TestSearchVendors_WithName(t *testing.T) {
+	var gotName string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotName = r.URL.Query().Get("name")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`[{"id":1,"name":"株式会社A","code":"A001","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	result, err := c.SearchVendors(context.Background(), boardapi.VendorSearchParams{Name: "株式会社A"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result) != 1 {
+		t.Errorf("want 1 result, got %d", len(result))
+	}
+	if gotName != "株式会社A" {
+		t.Errorf("name param: want %q, got %q", "株式会社A", gotName)
+	}
+}
+
+// T117: SearchVendors — UpdatedAtFrom パラメータ付き
+func TestSearchVendors_WithUpdatedAtFrom(t *testing.T) {
+	var gotUpdatedAtFrom string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotUpdatedAtFrom = r.URL.Query().Get("updated_at_from")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`[]`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	_, err := c.SearchVendors(context.Background(), boardapi.VendorSearchParams{UpdatedAtFrom: "2024-01-01T00:00:00Z"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotUpdatedAtFrom != "2024-01-01T00:00:00Z" {
+		t.Errorf("updated_at_from param: want %q, got %q", "2024-01-01T00:00:00Z", gotUpdatedAtFrom)
+	}
+}
+
+// ============================================================
+// M08: vendor_branches エンティティ テスト (T118〜T123)
+// ============================================================
+
+// T118: ListVendorBranches — 正常系（2件）
+func TestListVendorBranches_OK(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`[{"id":10,"vendor_id":1,"name":"東京支社","postal_code":"100-0001","address":"東京都千代田区","phone":"03-0000-0001","fax":"","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":11,"vendor_id":1,"name":"大阪支社","postal_code":"530-0001","address":"大阪府大阪市","phone":"06-0000-0001","fax":"","memo":"","updated_at":"2026-01-02T00:00:00Z","created_at":"2026-01-02T00:00:00Z"}]`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	result, err := c.ListVendorBranches(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result) != 2 {
+		t.Errorf("want 2 vendor branches, got %d", len(result))
+	}
+	if result[0].ID != 10 || result[0].VendorID != 1 || result[0].PostalCode != "100-0001" {
+		t.Errorf("vendorBranch[0]: got %+v", result[0])
+	}
+}
+
+// T119: ListVendorBranches — APIエラー（401）
+func TestListVendorBranches_Unauthorized(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	_, err := c.ListVendorBranches(context.Background())
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	apiErr, ok := err.(*boardapi.APIError)
+	if !ok {
+		t.Fatalf("expected *APIError, got %T", err)
+	}
+	if apiErr.Code != boardapi.APIErrorUnauthorized {
+		t.Errorf("Code: want %q, got %q", boardapi.APIErrorUnauthorized, apiErr.Code)
+	}
+}
+
+// T120: GetVendorBranch — 正常系
+func TestGetVendorBranch_OK(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/vendor_branches/10" {
+			http.NotFound(w, r)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"id":10,"vendor_id":1,"name":"東京支社","postal_code":"100-0001","address":"東京都千代田区","phone":"03-0000-0001","fax":"","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	got, err := c.GetVendorBranch(context.Background(), 10)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got == nil {
+		t.Fatal("got nil VendorBranchEntity")
+	}
+	if got.ID != 10 || got.PostalCode != "100-0001" {
+		t.Errorf("GetVendorBranch: got %+v", got)
+	}
+}
+
+// T121: GetVendorBranch — 404 Not Found
+func TestGetVendorBranch_NotFound(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	_, err := c.GetVendorBranch(context.Background(), 999)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	apiErr, ok := err.(*boardapi.APIError)
+	if !ok {
+		t.Fatalf("expected *APIError, got %T", err)
+	}
+	if apiErr.Code != boardapi.APIErrorNotFound {
+		t.Errorf("Code: want %q, got %q", boardapi.APIErrorNotFound, apiErr.Code)
+	}
+}
+
+// T122: SearchVendorBranches — VendorID パラメータ付き
+func TestSearchVendorBranches_WithVendorID(t *testing.T) {
+	var gotVendorID string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotVendorID = r.URL.Query().Get("vendor_id")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`[{"id":10,"vendor_id":5,"name":"東京支社","postal_code":"100-0001","address":"東京都千代田区","phone":"","fax":"","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	result, err := c.SearchVendorBranches(context.Background(), boardapi.VendorBranchSearchParams{VendorID: 5})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result) != 1 {
+		t.Errorf("want 1 result, got %d", len(result))
+	}
+	if gotVendorID != "5" {
+		t.Errorf("vendor_id param: want %q, got %q", "5", gotVendorID)
+	}
+}
+
+// T123: SearchVendorBranches — Name パラメータ付き
+func TestSearchVendorBranches_WithName(t *testing.T) {
+	var gotName string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotName = r.URL.Query().Get("name")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`[]`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	_, err := c.SearchVendorBranches(context.Background(), boardapi.VendorBranchSearchParams{Name: "東京支社"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotName != "東京支社" {
+		t.Errorf("name param: want %q, got %q", "東京支社", gotName)
+	}
+}
+
+// ============================================================
+// M08: vendor_contacts エンティティ テスト (T124〜T129)
+// ============================================================
+
+// T124: ListVendorContacts — 正常系（2件）
+func TestListVendorContacts_OK(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`[{"id":1,"vendor_id":1,"vendor_branch_id":10,"name":"山田太郎","name_kana":"ヤマダタロウ","title":"部長","email":"yamada@example.com","phone":"03-0000-0001","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":2,"vendor_id":1,"vendor_branch_id":10,"name":"鈴木花子","name_kana":"スズキハナコ","title":"課長","email":"suzuki@example.com","phone":"03-0000-0002","memo":"","updated_at":"2026-01-02T00:00:00Z","created_at":"2026-01-02T00:00:00Z"}]`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	result, err := c.ListVendorContacts(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result) != 2 {
+		t.Errorf("want 2 vendor contacts, got %d", len(result))
+	}
+	if result[0].ID != 1 || result[0].Email != "yamada@example.com" {
+		t.Errorf("vendorContact[0]: got %+v", result[0])
+	}
+}
+
+// T125: ListVendorContacts — APIエラー（401）
+func TestListVendorContacts_Unauthorized(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	_, err := c.ListVendorContacts(context.Background())
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	apiErr, ok := err.(*boardapi.APIError)
+	if !ok {
+		t.Fatalf("expected *APIError, got %T", err)
+	}
+	if apiErr.Code != boardapi.APIErrorUnauthorized {
+		t.Errorf("Code: want %q, got %q", boardapi.APIErrorUnauthorized, apiErr.Code)
+	}
+}
+
+// T126: GetVendorContact — 正常系
+func TestGetVendorContact_OK(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/vendor_contacts/1" {
+			http.NotFound(w, r)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"id":1,"vendor_id":1,"vendor_branch_id":10,"name":"山田太郎","name_kana":"ヤマダタロウ","title":"部長","email":"yamada@example.com","phone":"03-0000-0001","memo":"テストメモ","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	got, err := c.GetVendorContact(context.Background(), 1)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got == nil {
+		t.Fatal("got nil VendorContactEntity")
+	}
+	if got.ID != 1 || got.Email != "yamada@example.com" {
+		t.Errorf("GetVendorContact: got %+v", got)
+	}
+}
+
+// T127: GetVendorContact — 404 Not Found
+func TestGetVendorContact_NotFound(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	_, err := c.GetVendorContact(context.Background(), 999)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	apiErr, ok := err.(*boardapi.APIError)
+	if !ok {
+		t.Fatalf("expected *APIError, got %T", err)
+	}
+	if apiErr.Code != boardapi.APIErrorNotFound {
+		t.Errorf("Code: want %q, got %q", boardapi.APIErrorNotFound, apiErr.Code)
+	}
+}
+
+// T128: SearchVendorContacts — VendorID + Email パラメータ付き
+func TestSearchVendorContacts_WithVendorIDAndEmail(t *testing.T) {
+	var gotVendorID, gotEmail string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotVendorID = r.URL.Query().Get("vendor_id")
+		gotEmail = r.URL.Query().Get("email")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`[{"id":1,"vendor_id":3,"vendor_branch_id":10,"name":"山田太郎","name_kana":"ヤマダタロウ","title":"部長","email":"test@example.com","phone":"","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	result, err := c.SearchVendorContacts(context.Background(), boardapi.VendorContactSearchParams{VendorID: 3, Email: "test@example.com"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result) != 1 {
+		t.Errorf("want 1 result, got %d", len(result))
+	}
+	if gotVendorID != "3" {
+		t.Errorf("vendor_id param: want %q, got %q", "3", gotVendorID)
+	}
+	if gotEmail != "test@example.com" {
+		t.Errorf("email param: want %q, got %q", "test@example.com", gotEmail)
+	}
+}
+
+// T129: SearchVendorContacts — Name パラメータ付き
+func TestSearchVendorContacts_WithName(t *testing.T) {
+	var gotName string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotName = r.URL.Query().Get("name")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`[]`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	_, err := c.SearchVendorContacts(context.Background(), boardapi.VendorContactSearchParams{Name: "山田"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotName != "山田" {
+		t.Errorf("name param: want %q, got %q", "山田", gotName)
+	}
+}
+
+// ============================================================
+// M08: purchase_orders エンティティ テスト (T130〜T135)
+// ============================================================
+
+// T130: ListPurchaseOrders — 正常系（3件）
+func TestListPurchaseOrders_OK(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`[{"id":1,"vendor_id":1,"project_id":100,"title":"発注書1","total_amount":500000.0,"status":"draft","order_date":"2026-01-01","delivery_date":"2026-02-01","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":2,"vendor_id":1,"project_id":101,"title":"発注書2","total_amount":300000.0,"status":"approved","order_date":"2026-01-05","delivery_date":"2026-02-05","memo":"","updated_at":"2026-01-05T00:00:00Z","created_at":"2026-01-05T00:00:00Z"},{"id":3,"vendor_id":2,"project_id":102,"title":"発注書3","total_amount":150000.0,"status":"sent","order_date":"2026-01-10","delivery_date":"2026-02-10","memo":"","updated_at":"2026-01-10T00:00:00Z","created_at":"2026-01-10T00:00:00Z"}]`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	result, err := c.ListPurchaseOrders(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result) != 3 {
+		t.Errorf("want 3 purchase orders, got %d", len(result))
+	}
+	if result[0].ID != 1 || result[0].TotalAmount != 500000.0 {
+		t.Errorf("purchaseOrder[0]: got %+v", result[0])
+	}
+}
+
+// T131: ListPurchaseOrders — APIエラー（401）
+func TestListPurchaseOrders_Unauthorized(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	_, err := c.ListPurchaseOrders(context.Background())
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	apiErr, ok := err.(*boardapi.APIError)
+	if !ok {
+		t.Fatalf("expected *APIError, got %T", err)
+	}
+	if apiErr.Code != boardapi.APIErrorUnauthorized {
+		t.Errorf("Code: want %q, got %q", boardapi.APIErrorUnauthorized, apiErr.Code)
+	}
+}
+
+// T132: GetPurchaseOrder — 正常系
+func TestGetPurchaseOrder_OK(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/purchase_orders/1" {
+			http.NotFound(w, r)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"id":1,"vendor_id":1,"project_id":100,"title":"発注書1","total_amount":500000.0,"status":"approved","order_date":"2026-01-01","delivery_date":"2026-02-01","memo":"テストメモ","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	got, err := c.GetPurchaseOrder(context.Background(), 1)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got == nil {
+		t.Fatal("got nil PurchaseOrderEntity")
+	}
+	if got.ID != 1 || got.OrderDate != "2026-01-01" || got.DeliveryDate != "2026-02-01" {
+		t.Errorf("GetPurchaseOrder: got %+v", got)
+	}
+}
+
+// T133: GetPurchaseOrder — 404 Not Found
+func TestGetPurchaseOrder_NotFound(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	_, err := c.GetPurchaseOrder(context.Background(), 999)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	apiErr, ok := err.(*boardapi.APIError)
+	if !ok {
+		t.Fatalf("expected *APIError, got %T", err)
+	}
+	if apiErr.Code != boardapi.APIErrorNotFound {
+		t.Errorf("Code: want %q, got %q", boardapi.APIErrorNotFound, apiErr.Code)
+	}
+}
+
+// T134: SearchPurchaseOrders — VendorID + Status パラメータ付き
+func TestSearchPurchaseOrders_WithVendorIDAndStatus(t *testing.T) {
+	var gotVendorID, gotStatus string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotVendorID = r.URL.Query().Get("vendor_id")
+		gotStatus = r.URL.Query().Get("status")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`[{"id":1,"vendor_id":1,"project_id":100,"title":"発注書1","total_amount":500000.0,"status":"approved","order_date":"2026-01-01","delivery_date":"2026-02-01","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	result, err := c.SearchPurchaseOrders(context.Background(), boardapi.PurchaseOrderSearchParams{VendorID: 1, Status: "approved"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result) != 1 {
+		t.Errorf("want 1 result, got %d", len(result))
+	}
+	if gotVendorID != "1" {
+		t.Errorf("vendor_id param: want %q, got %q", "1", gotVendorID)
+	}
+	if gotStatus != "approved" {
+		t.Errorf("status param: want %q, got %q", "approved", gotStatus)
+	}
+}
+
+// T135: SearchPurchaseOrders — ProjectID + UpdatedAtFrom パラメータ付き
+func TestSearchPurchaseOrders_WithProjectIDAndUpdatedAtFrom(t *testing.T) {
+	var gotProjectID, gotUpdatedAtFrom string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotProjectID = r.URL.Query().Get("project_id")
+		gotUpdatedAtFrom = r.URL.Query().Get("updated_at_from")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`[]`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	_, err := c.SearchPurchaseOrders(context.Background(), boardapi.PurchaseOrderSearchParams{ProjectID: 10, UpdatedAtFrom: "2024-06-01T00:00:00Z"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotProjectID != "10" {
+		t.Errorf("project_id param: want %q, got %q", "10", gotProjectID)
+	}
+	if gotUpdatedAtFrom != "2024-06-01T00:00:00Z" {
+		t.Errorf("updated_at_from param: want %q, got %q", "2024-06-01T00:00:00Z", gotUpdatedAtFrom)
+	}
+}
+
+// ============================================================
+// M08: payments エンティティ テスト (T136〜T141)
+// ============================================================
+
+// T136: ListPayments — 正常系（2件）
+func TestListPayments_OK(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`[{"id":1,"vendor_id":1,"purchase_order_id":10,"amount":500000.0,"status":"pending","payment_date":"2026-01-31","memo":"","updated_at":"2026-01-31T00:00:00Z","created_at":"2026-01-31T00:00:00Z"},{"id":2,"vendor_id":1,"purchase_order_id":11,"amount":300000.0,"status":"paid","payment_date":"2026-02-28","memo":"","updated_at":"2026-02-28T00:00:00Z","created_at":"2026-02-28T00:00:00Z"}]`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	result, err := c.ListPayments(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result) != 2 {
+		t.Errorf("want 2 payments, got %d", len(result))
+	}
+	if result[0].ID != 1 || result[0].Amount != 500000.0 {
+		t.Errorf("payment[0]: got %+v", result[0])
+	}
+}
+
+// T137: ListPayments — APIエラー（401）
+func TestListPayments_Unauthorized(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	_, err := c.ListPayments(context.Background())
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	apiErr, ok := err.(*boardapi.APIError)
+	if !ok {
+		t.Fatalf("expected *APIError, got %T", err)
+	}
+	if apiErr.Code != boardapi.APIErrorUnauthorized {
+		t.Errorf("Code: want %q, got %q", boardapi.APIErrorUnauthorized, apiErr.Code)
+	}
+}
+
+// T138: GetPayment — 正常系
+func TestGetPayment_OK(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/payments/1" {
+			http.NotFound(w, r)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"id":1,"vendor_id":1,"purchase_order_id":10,"amount":500000.0,"status":"paid","payment_date":"2026-01-31","memo":"支払済み","updated_at":"2026-01-31T00:00:00Z","created_at":"2026-01-31T00:00:00Z"}`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	got, err := c.GetPayment(context.Background(), 1)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got == nil {
+		t.Fatal("got nil PaymentEntity")
+	}
+	if got.ID != 1 || got.PaymentDate != "2026-01-31" || got.Status != "paid" {
+		t.Errorf("GetPayment: got %+v", got)
+	}
+}
+
+// T139: GetPayment — 404 Not Found
+func TestGetPayment_NotFound(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	_, err := c.GetPayment(context.Background(), 999)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	apiErr, ok := err.(*boardapi.APIError)
+	if !ok {
+		t.Fatalf("expected *APIError, got %T", err)
+	}
+	if apiErr.Code != boardapi.APIErrorNotFound {
+		t.Errorf("Code: want %q, got %q", boardapi.APIErrorNotFound, apiErr.Code)
+	}
+}
+
+// T140: SearchPayments — VendorID + Status パラメータ付き
+func TestSearchPayments_WithVendorIDAndStatus(t *testing.T) {
+	var gotVendorID, gotStatus string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotVendorID = r.URL.Query().Get("vendor_id")
+		gotStatus = r.URL.Query().Get("status")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`[{"id":1,"vendor_id":2,"purchase_order_id":10,"amount":500000.0,"status":"paid","payment_date":"2026-01-31","memo":"","updated_at":"2026-01-31T00:00:00Z","created_at":"2026-01-31T00:00:00Z"}]`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	result, err := c.SearchPayments(context.Background(), boardapi.PaymentSearchParams{VendorID: 2, Status: "paid"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result) != 1 {
+		t.Errorf("want 1 result, got %d", len(result))
+	}
+	if gotVendorID != "2" {
+		t.Errorf("vendor_id param: want %q, got %q", "2", gotVendorID)
+	}
+	if gotStatus != "paid" {
+		t.Errorf("status param: want %q, got %q", "paid", gotStatus)
+	}
+}
+
+// T141: SearchPayments — PurchaseOrderID パラメータ付き
+func TestSearchPayments_WithPurchaseOrderID(t *testing.T) {
+	var gotPurchaseOrderID string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPurchaseOrderID = r.URL.Query().Get("purchase_order_id")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`[]`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	_, err := c.SearchPayments(context.Background(), boardapi.PaymentSearchParams{PurchaseOrderID: 7})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotPurchaseOrderID != "7" {
+		t.Errorf("purchase_order_id param: want %q, got %q", "7", gotPurchaseOrderID)
+	}
+}
+
+// ============================================================
+// M08: クロスカットテスト (T142〜T156)
+// ============================================================
+
+// T142: ListVendors — ページネーション 2ページ（100件 + 50件）
+func TestListVendors_TwoPages(t *testing.T) {
+	page1 := make([]map[string]interface{}, 100)
+	for i := range page1 {
+		page1[i] = map[string]interface{}{"id": i + 1, "name": "発注先", "code": "", "memo": "", "updated_at": "2026-01-01T00:00:00Z", "created_at": "2026-01-01T00:00:00Z"}
+	}
+	page2 := make([]map[string]interface{}, 50)
+	for i := range page2 {
+		page2[i] = map[string]interface{}{"id": i + 101, "name": "発注先", "code": "", "memo": "", "updated_at": "2026-01-01T00:00:00Z", "created_at": "2026-01-01T00:00:00Z"}
+	}
+
+	call := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		call++
+		if call == 1 {
+			b, _ := json.Marshal(page1)
+			w.WriteHeader(http.StatusOK)
+			w.Write(b)
+		} else {
+			b, _ := json.Marshal(page2)
+			w.WriteHeader(http.StatusOK)
+			w.Write(b)
+		}
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	result, err := c.ListVendors(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result) != 150 {
+		t.Errorf("want 150 vendors, got %d", len(result))
+	}
+}
+
+// T143: ListPurchaseOrders — ページネーション 2ページ（100件 + 30件）
+func TestListPurchaseOrders_TwoPages(t *testing.T) {
+	page1 := make([]map[string]interface{}, 100)
+	for i := range page1 {
+		page1[i] = map[string]interface{}{"id": i + 1, "vendor_id": 1, "project_id": 100, "title": "発注書", "total_amount": 100000.0, "status": "draft", "order_date": "2026-01-01", "delivery_date": "2026-02-01", "memo": "", "updated_at": "2026-01-01T00:00:00Z", "created_at": "2026-01-01T00:00:00Z"}
+	}
+	page2 := make([]map[string]interface{}, 30)
+	for i := range page2 {
+		page2[i] = map[string]interface{}{"id": i + 101, "vendor_id": 1, "project_id": 100, "title": "発注書", "total_amount": 100000.0, "status": "draft", "order_date": "2026-01-01", "delivery_date": "2026-02-01", "memo": "", "updated_at": "2026-01-01T00:00:00Z", "created_at": "2026-01-01T00:00:00Z"}
+	}
+
+	call := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		call++
+		if call == 1 {
+			b, _ := json.Marshal(page1)
+			w.WriteHeader(http.StatusOK)
+			w.Write(b)
+		} else {
+			b, _ := json.Marshal(page2)
+			w.WriteHeader(http.StatusOK)
+			w.Write(b)
+		}
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	result, err := c.ListPurchaseOrders(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result) != 130 {
+		t.Errorf("want 130 purchase orders, got %d", len(result))
+	}
+}
+
+// T144: GetVendor — context キャンセル時
+func TestGetVendor_ContextCancel(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"id":1,"name":"発注先A","code":"VA001","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := c.GetVendor(ctx, 1)
+	if err == nil {
+		t.Fatal("expected error from cancelled context, got nil")
+	}
+}
+
+// T145: GetVendorBranch — context キャンセル時
+func TestGetVendorBranch_ContextCancel(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"id":10,"vendor_id":1,"name":"東京支社","postal_code":"100-0001","address":"","phone":"","fax":"","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := c.GetVendorBranch(ctx, 10)
+	if err == nil {
+		t.Fatal("expected error from cancelled context, got nil")
+	}
+}
+
+// T146: GetVendorContact — context キャンセル時
+func TestGetVendorContact_ContextCancel(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"id":1,"vendor_id":1,"vendor_branch_id":10,"name":"山田太郎","name_kana":"","title":"","email":"","phone":"","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := c.GetVendorContact(ctx, 1)
+	if err == nil {
+		t.Fatal("expected error from cancelled context, got nil")
+	}
+}
+
+// T147: GetPurchaseOrder — context キャンセル時
+func TestGetPurchaseOrder_ContextCancel(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"id":1,"vendor_id":1,"project_id":100,"title":"発注書1","total_amount":500000.0,"status":"draft","order_date":"2026-01-01","delivery_date":"2026-02-01","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := c.GetPurchaseOrder(ctx, 1)
+	if err == nil {
+		t.Fatal("expected error from cancelled context, got nil")
+	}
+}
+
+// T148: GetPayment — context キャンセル時
+func TestGetPayment_ContextCancel(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"id":1,"vendor_id":1,"purchase_order_id":10,"amount":500000.0,"status":"paid","payment_date":"2026-01-31","memo":"","updated_at":"2026-01-31T00:00:00Z","created_at":"2026-01-31T00:00:00Z"}`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := c.GetPayment(ctx, 1)
+	if err == nil {
+		t.Fatal("expected error from cancelled context, got nil")
+	}
+}
+
+// T149: ListVendors — 不正 JSON（unmarshal エラー）
+func TestListVendors_UnmarshalError(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`[{"id": "not_an_int"}]`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	_, err := c.ListVendors(context.Background())
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	apiErr, ok := err.(*boardapi.APIError)
+	if !ok {
+		t.Fatalf("expected *APIError, got %T", err)
+	}
+	if !strings.Contains(apiErr.Message, "ListVendors: unmarshal:") {
+		t.Errorf("Message should contain %q, got %q", "ListVendors: unmarshal:", apiErr.Message)
+	}
+}
+
+// T150: ListPurchaseOrders — 不正 JSON（unmarshal エラー）
+func TestListPurchaseOrders_UnmarshalError(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`[{"id": "not_an_int"}]`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	_, err := c.ListPurchaseOrders(context.Background())
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	apiErr, ok := err.(*boardapi.APIError)
+	if !ok {
+		t.Fatalf("expected *APIError, got %T", err)
+	}
+	if !strings.Contains(apiErr.Message, "ListPurchaseOrders: unmarshal:") {
+		t.Errorf("Message should contain %q, got %q", "ListPurchaseOrders: unmarshal:", apiErr.Message)
+	}
+}
+
+// T151: ListPayments — 不正 JSON（unmarshal エラー）
+func TestListPayments_UnmarshalError(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`[{"id": "not_an_int"}]`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	_, err := c.ListPayments(context.Background())
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	apiErr, ok := err.(*boardapi.APIError)
+	if !ok {
+		t.Fatalf("expected *APIError, got %T", err)
+	}
+	if !strings.Contains(apiErr.Message, "ListPayments: unmarshal:") {
+		t.Errorf("Message should contain %q, got %q", "ListPayments: unmarshal:", apiErr.Message)
+	}
+}
+
+// T152: SearchVendors — 全パラメータゼロ値
+func TestSearchVendors_ZeroParams(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`[]`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	result, err := c.SearchVendors(context.Background(), boardapi.VendorSearchParams{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result) != 0 {
+		t.Errorf("want 0 results, got %d", len(result))
+	}
+}
+
+// T153: SearchVendorBranches — 全パラメータゼロ値
+func TestSearchVendorBranches_ZeroParams(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`[]`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	result, err := c.SearchVendorBranches(context.Background(), boardapi.VendorBranchSearchParams{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result) != 0 {
+		t.Errorf("want 0 results, got %d", len(result))
+	}
+}
+
+// T154: SearchPurchaseOrders — 全パラメータゼロ値
+func TestSearchPurchaseOrders_ZeroParams(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`[]`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	result, err := c.SearchPurchaseOrders(context.Background(), boardapi.PurchaseOrderSearchParams{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result) != 0 {
+		t.Errorf("want 0 results, got %d", len(result))
+	}
+}
+
+// T155: SearchPayments — 全パラメータゼロ値
+func TestSearchPayments_ZeroParams(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`[]`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	result, err := c.SearchPayments(context.Background(), boardapi.PaymentSearchParams{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result) != 0 {
+		t.Errorf("want 0 results, got %d", len(result))
+	}
+}
+
+// T156: SearchVendorContacts — 全パラメータゼロ値
+func TestSearchVendorContacts_ZeroParams(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`[]`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	result, err := c.SearchVendorContacts(context.Background(), boardapi.VendorContactSearchParams{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result) != 0 {
+		t.Errorf("want 0 results, got %d", len(result))
+	}
+}
