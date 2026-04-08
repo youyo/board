@@ -1,0 +1,219 @@
+package repository_test
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"time"
+
+	"github.com/youyo/board/internal/boardapi"
+	"github.com/youyo/board/internal/cache"
+	"github.com/youyo/board/internal/refresh"
+	"github.com/youyo/board/internal/repository"
+)
+
+func makePurchaseOrderRepo(t *testing.T, db *cache.DB, apiClient *boardapi.Client, autoRefresh bool) *repository.PurchaseOrderRepository {
+	t.Helper()
+	rc := cache.NewResourceCache(db)
+	ss := cache.NewSyncStateStore(db)
+	refresher := refresh.NewRefresher(rc, ss)
+	lm := refresh.NewLockManager(ss, "test-owner")
+	return repository.NewPurchaseOrderRepository("default", apiClient, rc, ss, refresher, lm, time.UTC, autoRefresh)
+}
+
+func seedPurchaseOrderCache(t *testing.T, db *cache.DB, entities []boardapi.PurchaseOrderEntity) {
+	t.Helper()
+	rc := cache.NewResourceCache(db)
+	ctx := context.Background()
+	for _, e := range entities {
+		raw, _ := json.Marshal(e)
+		var updatedAt sql.NullString
+		if e.UpdatedAt != "" {
+			updatedAt = sql.NullString{Valid: true, String: e.UpdatedAt}
+		}
+		err := rc.Upsert(ctx, cache.Entry{
+			Key: cache.EntityKey{
+				Profile:  "default",
+				Resource: "purchase_orders",
+				EntityID: fmt.Sprintf("%d", e.ID),
+			},
+			PayloadJSON: raw,
+			UpdatedAt:   updatedAt,
+		})
+		if err != nil {
+			t.Fatalf("seedPurchaseOrderCache: %v", err)
+		}
+	}
+}
+
+func newPurchaseOrderAPIServer(t *testing.T, entities []boardapi.PurchaseOrderEntity) *httptest.Server {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(jsonArrayOf(entities))
+	}))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+var samplePurchaseOrders = []boardapi.PurchaseOrderEntity{
+	{ID: 1, VendorID: 10, ProjectID: 100, Title: "発注書A", Status: "draft", UpdatedAt: "2026-01-01T00:00:00Z"},
+	{ID: 2, VendorID: 10, ProjectID: 101, Title: "発注書B", Status: "ordered", UpdatedAt: "2026-01-02T00:00:00Z"},
+	{ID: 3, VendorID: 20, ProjectID: 102, Title: "発注書C", Status: "completed", UpdatedAt: "2026-01-03T00:00:00Z"},
+}
+
+// T_PO01: List - キャッシュあり → キャッシュのデータを返す
+func TestPurchaseOrderRepository_List_CacheHit(t *testing.T) {
+	db := newTestDB(t)
+	seedPurchaseOrderCache(t, db, samplePurchaseOrders)
+	markSynced(t, db, "purchase_orders")
+
+	srv := newPurchaseOrderAPIServer(t, nil)
+	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
+
+	repo := makePurchaseOrderRepo(t, db, apiClient, false)
+	got, err := repo.List(context.Background(), repository.ReadOptions{})
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(got) != len(samplePurchaseOrders) {
+		t.Errorf("len(got) = %d, want %d", len(got), len(samplePurchaseOrders))
+	}
+}
+
+// T_PO02: List - キャッシュなし（初回）→ ForceRefresh 後データを返す
+func TestPurchaseOrderRepository_List_InitialLoad(t *testing.T) {
+	db := newTestDB(t)
+
+	srv := newPurchaseOrderAPIServer(t, samplePurchaseOrders)
+	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
+
+	repo := makePurchaseOrderRepo(t, db, apiClient, false)
+	got, err := repo.List(context.Background(), repository.ReadOptions{})
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(got) != len(samplePurchaseOrders) {
+		t.Errorf("len(got) = %d, want %d", len(got), len(samplePurchaseOrders))
+	}
+}
+
+// T_PO03: GetByID - キャッシュヒット → キャッシュから返す
+func TestPurchaseOrderRepository_GetByID_CacheHit(t *testing.T) {
+	db := newTestDB(t)
+	seedPurchaseOrderCache(t, db, samplePurchaseOrders)
+	markSynced(t, db, "purchase_orders")
+
+	srv := newPurchaseOrderAPIServer(t, nil)
+	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
+
+	repo := makePurchaseOrderRepo(t, db, apiClient, false)
+	got, err := repo.GetByID(context.Background(), 1, repository.ReadOptions{})
+	if err != nil {
+		t.Fatalf("GetByID: %v", err)
+	}
+	if got == nil || got.ID != 1 {
+		t.Errorf("expected ID=1, got %+v", got)
+	}
+}
+
+// T_PO04: GetByID - キャッシュミス、API 成功 → API 取得して返す
+func TestPurchaseOrderRepository_GetByID_CacheMiss_APISuccess(t *testing.T) {
+	db := newTestDB(t)
+	markSynced(t, db, "purchase_orders")
+
+	target := boardapi.PurchaseOrderEntity{ID: 99, Title: "テスト発注書", UpdatedAt: "2026-01-01T00:00:00Z"}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		b, _ := json.Marshal(target)
+		w.Write(b)
+	}))
+	t.Cleanup(srv.Close)
+
+	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
+
+	repo := makePurchaseOrderRepo(t, db, apiClient, false)
+	got, err := repo.GetByID(context.Background(), 99, repository.ReadOptions{})
+	if err != nil {
+		t.Fatalf("GetByID: %v", err)
+	}
+	if got == nil || got.ID != 99 {
+		t.Errorf("expected ID=99, got %+v", got)
+	}
+}
+
+// T_PO05: GetByID - キャッシュミス、API エラー → error を返す
+func TestPurchaseOrderRepository_GetByID_CacheMiss_APIError(t *testing.T) {
+	db := newTestDB(t)
+	markSynced(t, db, "purchase_orders")
+
+	srv := newErrorAPIServer(t)
+	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
+
+	repo := makePurchaseOrderRepo(t, db, apiClient, false)
+	_, err := repo.GetByID(context.Background(), 999, repository.ReadOptions{})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+// T_PO06: Search - VendorID フィルタ → 一致するものを返す
+func TestPurchaseOrderRepository_Search_VendorIDFilter(t *testing.T) {
+	db := newTestDB(t)
+	seedPurchaseOrderCache(t, db, samplePurchaseOrders)
+	markSynced(t, db, "purchase_orders")
+
+	srv := newPurchaseOrderAPIServer(t, nil)
+	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
+
+	repo := makePurchaseOrderRepo(t, db, apiClient, false)
+	got, err := repo.Search(context.Background(), boardapi.PurchaseOrderSearchParams{VendorID: 10}, repository.ReadOptions{})
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+	if len(got) != 2 {
+		t.Errorf("len(got) = %d, want 2", len(got))
+	}
+}
+
+// T_PO07: Search - Status フィルタ → 一致するものを返す
+func TestPurchaseOrderRepository_Search_StatusFilter(t *testing.T) {
+	db := newTestDB(t)
+	seedPurchaseOrderCache(t, db, samplePurchaseOrders)
+	markSynced(t, db, "purchase_orders")
+
+	srv := newPurchaseOrderAPIServer(t, nil)
+	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
+
+	repo := makePurchaseOrderRepo(t, db, apiClient, false)
+	got, err := repo.Search(context.Background(), boardapi.PurchaseOrderSearchParams{Status: "draft"}, repository.ReadOptions{})
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+	if len(got) != 1 || got[0].Status != "draft" {
+		t.Errorf("unexpected result: %+v", got)
+	}
+}
+
+// T_PO08: Search - パラメータなし → 全件返す
+func TestPurchaseOrderRepository_Search_NoFilter(t *testing.T) {
+	db := newTestDB(t)
+	seedPurchaseOrderCache(t, db, samplePurchaseOrders)
+	markSynced(t, db, "purchase_orders")
+
+	srv := newPurchaseOrderAPIServer(t, nil)
+	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
+
+	repo := makePurchaseOrderRepo(t, db, apiClient, false)
+	got, err := repo.Search(context.Background(), boardapi.PurchaseOrderSearchParams{}, repository.ReadOptions{})
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+	if len(got) != len(samplePurchaseOrders) {
+		t.Errorf("len(got) = %d, want %d", len(got), len(samplePurchaseOrders))
+	}
+}

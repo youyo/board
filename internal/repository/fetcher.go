@@ -240,3 +240,263 @@ func (f *projectCostsFetcher) ListUpdatedSince(ctx context.Context, _ string) ([
 	}
 	return entitiesToRaw(entities)
 }
+
+// --- estimates Fetcher ---
+
+// estimatesFetcher は boardapi.Client を refresh.Fetcher に適合させるアダプタ。
+type estimatesFetcher struct {
+	api *boardapi.Client
+}
+
+func (f *estimatesFetcher) ResourceName() string { return "estimates" }
+
+func (f *estimatesFetcher) ListAll(ctx context.Context) ([]json.RawMessage, error) {
+	entities, err := f.api.ListEstimates(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return entitiesToRaw(entities)
+}
+
+func (f *estimatesFetcher) ListUpdatedSince(ctx context.Context, since string) ([]json.RawMessage, error) {
+	params := boardapi.EstimateSearchParams{UpdatedAtFrom: since}
+	entities, err := f.api.SearchEstimates(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+	return entitiesToRaw(entities)
+}
+
+// --- invoices Fetcher ---
+
+// invoicesFetcher は boardapi.Client を refresh.Fetcher に適合させるアダプタ。
+type invoicesFetcher struct {
+	api *boardapi.Client
+}
+
+func (f *invoicesFetcher) ResourceName() string { return "invoices" }
+
+func (f *invoicesFetcher) ListAll(ctx context.Context) ([]json.RawMessage, error) {
+	entities, err := f.api.ListInvoices(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return entitiesToRaw(entities)
+}
+
+func (f *invoicesFetcher) ListUpdatedSince(ctx context.Context, since string) ([]json.RawMessage, error) {
+	params := boardapi.InvoiceSearchParams{UpdatedAtFrom: since}
+	entities, err := f.api.SearchInvoices(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+	return entitiesToRaw(entities)
+}
+
+// --- orders Fetcher ---
+
+// ordersFetcher は boardapi.Client を refresh.Fetcher に適合させるアダプタ。
+type ordersFetcher struct {
+	api *boardapi.Client
+}
+
+func (f *ordersFetcher) ResourceName() string { return "orders" }
+
+func (f *ordersFetcher) ListAll(ctx context.Context) ([]json.RawMessage, error) {
+	entities, err := f.api.ListOrders(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return entitiesToRaw(entities)
+}
+
+func (f *ordersFetcher) ListUpdatedSince(ctx context.Context, since string) ([]json.RawMessage, error) {
+	params := boardapi.OrderSearchParams{UpdatedAtFrom: since}
+	entities, err := f.api.SearchOrders(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+	return entitiesToRaw(entities)
+}
+
+// --- deliveries Fetcher ---
+
+// deliveriesFetcher は boardapi.Client を refresh.Fetcher に適合させるアダプタ。
+type deliveriesFetcher struct {
+	api *boardapi.Client
+}
+
+func (f *deliveriesFetcher) ResourceName() string { return "deliveries" }
+
+func (f *deliveriesFetcher) ListAll(ctx context.Context) ([]json.RawMessage, error) {
+	entities, err := f.api.ListDeliveries(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return entitiesToRaw(entities)
+}
+
+func (f *deliveriesFetcher) ListUpdatedSince(ctx context.Context, since string) ([]json.RawMessage, error) {
+	params := boardapi.DeliverySearchParams{UpdatedAtFrom: since}
+	entities, err := f.api.SearchDeliveries(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+	return entitiesToRaw(entities)
+}
+
+// --- receipts Fetcher ---
+
+// receiptsFetcher は boardapi.Client を refresh.Fetcher に適合させるアダプタ。
+type receiptsFetcher struct {
+	api *boardapi.Client
+}
+
+func (f *receiptsFetcher) ResourceName() string { return "receipts" }
+
+func (f *receiptsFetcher) ListAll(ctx context.Context) ([]json.RawMessage, error) {
+	entities, err := f.api.ListReceipts(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return entitiesToRaw(entities)
+}
+
+func (f *receiptsFetcher) ListUpdatedSince(ctx context.Context, since string) ([]json.RawMessage, error) {
+	params := boardapi.ReceiptSearchParams{UpdatedAtFrom: since}
+	entities, err := f.api.SearchReceipts(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+	return entitiesToRaw(entities)
+}
+
+// --- vendors Fetcher ---
+
+// vendorsFetcher は boardapi.Client を refresh.Fetcher に適合させるアダプタ。
+type vendorsFetcher struct {
+	api *boardapi.Client
+}
+
+func (f *vendorsFetcher) ResourceName() string { return "vendors" }
+
+func (f *vendorsFetcher) ListAll(ctx context.Context) ([]json.RawMessage, error) {
+	entities, err := f.api.ListVendors(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return entitiesToRaw(entities)
+}
+
+func (f *vendorsFetcher) ListUpdatedSince(ctx context.Context, since string) ([]json.RawMessage, error) {
+	params := boardapi.VendorSearchParams{UpdatedAtFrom: since}
+	entities, err := f.api.SearchVendors(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+	return entitiesToRaw(entities)
+}
+
+// --- vendor_branches Fetcher ---
+
+// vendorBranchesFetcher は boardapi.Client を refresh.Fetcher に適合させるアダプタ。
+type vendorBranchesFetcher struct {
+	api *boardapi.Client
+}
+
+func (f *vendorBranchesFetcher) ResourceName() string { return "vendor_branches" }
+
+func (f *vendorBranchesFetcher) ListAll(ctx context.Context) ([]json.RawMessage, error) {
+	entities, err := f.api.ListVendorBranches(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return entitiesToRaw(entities)
+}
+
+// ListUpdatedSince: VendorBranchSearchParams に UpdatedAtFrom がないため全件取得。
+func (f *vendorBranchesFetcher) ListUpdatedSince(ctx context.Context, _ string) ([]json.RawMessage, error) {
+	entities, err := f.api.ListVendorBranches(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return entitiesToRaw(entities)
+}
+
+// --- vendor_contacts Fetcher ---
+
+// vendorContactsFetcher は boardapi.Client を refresh.Fetcher に適合させるアダプタ。
+type vendorContactsFetcher struct {
+	api *boardapi.Client
+}
+
+func (f *vendorContactsFetcher) ResourceName() string { return "vendor_contacts" }
+
+func (f *vendorContactsFetcher) ListAll(ctx context.Context) ([]json.RawMessage, error) {
+	entities, err := f.api.ListVendorContacts(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return entitiesToRaw(entities)
+}
+
+// ListUpdatedSince: VendorContactSearchParams に UpdatedAtFrom がないため全件取得。
+func (f *vendorContactsFetcher) ListUpdatedSince(ctx context.Context, _ string) ([]json.RawMessage, error) {
+	entities, err := f.api.ListVendorContacts(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return entitiesToRaw(entities)
+}
+
+// --- purchase_orders Fetcher ---
+
+// purchaseOrdersFetcher は boardapi.Client を refresh.Fetcher に適合させるアダプタ。
+type purchaseOrdersFetcher struct {
+	api *boardapi.Client
+}
+
+func (f *purchaseOrdersFetcher) ResourceName() string { return "purchase_orders" }
+
+func (f *purchaseOrdersFetcher) ListAll(ctx context.Context) ([]json.RawMessage, error) {
+	entities, err := f.api.ListPurchaseOrders(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return entitiesToRaw(entities)
+}
+
+func (f *purchaseOrdersFetcher) ListUpdatedSince(ctx context.Context, since string) ([]json.RawMessage, error) {
+	params := boardapi.PurchaseOrderSearchParams{UpdatedAtFrom: since}
+	entities, err := f.api.SearchPurchaseOrders(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+	return entitiesToRaw(entities)
+}
+
+// --- payments Fetcher ---
+
+// paymentsFetcher は boardapi.Client を refresh.Fetcher に適合させるアダプタ。
+type paymentsFetcher struct {
+	api *boardapi.Client
+}
+
+func (f *paymentsFetcher) ResourceName() string { return "payments" }
+
+func (f *paymentsFetcher) ListAll(ctx context.Context) ([]json.RawMessage, error) {
+	entities, err := f.api.ListPayments(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return entitiesToRaw(entities)
+}
+
+func (f *paymentsFetcher) ListUpdatedSince(ctx context.Context, since string) ([]json.RawMessage, error) {
+	params := boardapi.PaymentSearchParams{UpdatedAtFrom: since}
+	entities, err := f.api.SearchPayments(ctx, params)
+	if err != nil {
+		return nil, err
+	}
+	return entitiesToRaw(entities)
+}
