@@ -137,3 +137,89 @@ type ReceiptResult struct {
 	Client  *boardapi.ClientEntity  `json:"client,omitempty"`
 	Project *boardapi.ProjectEntity `json:"project,omitempty"`
 }
+
+// FindVendorQuery holds parameters for FindVendor.
+// Field priority: ID > Name > Text. If ID is set, Name and Text are ignored.
+type FindVendorQuery struct {
+	ID    int    // Direct lookup by ID (highest priority, ignores Name/Text)
+	Name  string // Substring match on vendor name (ignores Text)
+	Text  string // Free-text search across name, code, memo (lowest priority)
+	Limit int    // Max results to return (0 = unlimited). Applied at find layer.
+	Opts  repository.ReadOptions
+}
+
+// VendorResult is the aggregated result for a vendor search.
+type VendorResult struct {
+	Vendor   boardapi.VendorEntity          `json:"vendor"`
+	Branches []boardapi.VendorBranchEntity  `json:"branches"`
+	Contacts []boardapi.VendorContactEntity `json:"contacts"`
+}
+
+// FindPurchaseOrderQuery holds parameters for FindPurchaseOrder.
+// Field priority: ID > VendorName > ProjectName > Text > Status(standalone).
+// Status also acts as a post-filter when combined with other criteria.
+type FindPurchaseOrderQuery struct {
+	ID          int    // Direct lookup by ID (highest priority)
+	VendorName  string // Resolve vendor name -> vendor IDs -> search purchase orders
+	ProjectName string // Resolve project name -> project IDs -> search purchase orders
+	Text        string // Free-text search across title, memo
+	Status      string // Standalone filter or post-filter on top of other modes
+	Limit       int    // Max results to return (0 = unlimited). Applied at find layer.
+	Opts        repository.ReadOptions
+}
+
+// PurchaseOrderResult is the aggregated result for a purchase order search.
+type PurchaseOrderResult struct {
+	PurchaseOrder boardapi.PurchaseOrderEntity `json:"purchase_order"`
+	Vendor        *boardapi.VendorEntity       `json:"vendor,omitempty"`
+	Project       *boardapi.ProjectEntity      `json:"project,omitempty"`
+}
+
+// FindPaymentQuery holds parameters for FindPayment.
+// Field priority: ID > VendorName > PurchaseOrderID > Text > Status(standalone).
+// Status also acts as a post-filter when combined with other criteria.
+type FindPaymentQuery struct {
+	ID              int    // Direct lookup by ID (highest priority)
+	VendorName      string // Resolve vendor name -> vendor IDs -> search payments
+	PurchaseOrderID int    // Search payments by purchase order ID
+	Text            string // Free-text search across memo
+	Status          string // Standalone filter or post-filter on top of other modes
+	Limit           int    // Max results to return (0 = unlimited). Applied at find layer.
+	Opts            repository.ReadOptions
+}
+
+// PaymentResult is the aggregated result for a payment search.
+type PaymentResult struct {
+	Payment boardapi.PaymentEntity `json:"payment"`
+	Vendor  *boardapi.VendorEntity `json:"vendor,omitempty"`
+}
+
+// FindUserQuery holds parameters for FindUser.
+// Field priority: ID > Name > Text.
+type FindUserQuery struct {
+	ID    int    // Direct lookup by ID (highest priority, ignores Name/Text)
+	Name  string // Substring match on user name (ignores Text)
+	Text  string // Free-text search across name, email (lowest priority)
+	Limit int    // Max results to return (0 = unlimited). Applied at find layer.
+	Opts  repository.ReadOptions
+}
+
+// UserResult is the result for a user search.
+type UserResult struct {
+	User boardapi.UserEntity `json:"user"`
+}
+
+// FindGroupQuery holds parameters for FindGroup.
+// Field priority: ID > Name > Text.
+type FindGroupQuery struct {
+	ID    int    // Direct lookup by ID (highest priority, ignores Name/Text)
+	Name  string // Substring match on group name (ignores Text)
+	Text  string // Free-text search across name, memo (lowest priority)
+	Limit int    // Max results to return (0 = unlimited). Applied at find layer.
+	Opts  repository.ReadOptions
+}
+
+// GroupResult is the result for a group search.
+type GroupResult struct {
+	Group boardapi.GroupEntity `json:"group"`
+}

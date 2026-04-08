@@ -78,6 +78,41 @@ func assertReceiptResultLen(t *testing.T, got []find.ReceiptResult, want int) {
 	}
 }
 
+func assertVendorResultLen(t *testing.T, got []find.VendorResult, want int) {
+	t.Helper()
+	if len(got) != want {
+		t.Fatalf("VendorResult len = %d, want %d", len(got), want)
+	}
+}
+
+func assertPurchaseOrderResultLen(t *testing.T, got []find.PurchaseOrderResult, want int) {
+	t.Helper()
+	if len(got) != want {
+		t.Fatalf("PurchaseOrderResult len = %d, want %d", len(got), want)
+	}
+}
+
+func assertPaymentResultLen(t *testing.T, got []find.PaymentResult, want int) {
+	t.Helper()
+	if len(got) != want {
+		t.Fatalf("PaymentResult len = %d, want %d", len(got), want)
+	}
+}
+
+func assertUserResultLen(t *testing.T, got []find.UserResult, want int) {
+	t.Helper()
+	if len(got) != want {
+		t.Fatalf("UserResult len = %d, want %d", len(got), want)
+	}
+}
+
+func assertGroupResultLen(t *testing.T, got []find.GroupResult, want int) {
+	t.Helper()
+	if len(got) != want {
+		t.Fatalf("GroupResult len = %d, want %d", len(got), want)
+	}
+}
+
 // --- Stub implementations ---
 
 type stubClientRepo struct {
@@ -233,6 +268,125 @@ func (s *stubReceiptRepo) Search(_ context.Context, _ boardapi.ReceiptSearchPara
 	return s.searchResult, s.err
 }
 
+type stubVendorRepo struct {
+	listResult   []boardapi.VendorEntity
+	getResult    *boardapi.VendorEntity
+	searchResult []boardapi.VendorEntity
+	err          error
+}
+
+func (s *stubVendorRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.VendorEntity, error) {
+	return s.listResult, s.err
+}
+func (s *stubVendorRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.VendorEntity, error) {
+	return s.getResult, s.err
+}
+func (s *stubVendorRepo) Search(_ context.Context, _ boardapi.VendorSearchParams, _ repository.ReadOptions) ([]boardapi.VendorEntity, error) {
+	return s.searchResult, s.err
+}
+
+type stubVendorBranchRepo struct {
+	listResult   []boardapi.VendorBranchEntity
+	getResult    *boardapi.VendorBranchEntity
+	searchResult []boardapi.VendorBranchEntity
+	err          error
+}
+
+func (s *stubVendorBranchRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.VendorBranchEntity, error) {
+	return s.listResult, s.err
+}
+func (s *stubVendorBranchRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.VendorBranchEntity, error) {
+	return s.getResult, s.err
+}
+func (s *stubVendorBranchRepo) Search(_ context.Context, _ boardapi.VendorBranchSearchParams, _ repository.ReadOptions) ([]boardapi.VendorBranchEntity, error) {
+	return s.searchResult, s.err
+}
+
+type stubVendorContactRepo struct {
+	listResult   []boardapi.VendorContactEntity
+	getResult    *boardapi.VendorContactEntity
+	searchResult []boardapi.VendorContactEntity
+	err          error
+}
+
+func (s *stubVendorContactRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.VendorContactEntity, error) {
+	return s.listResult, s.err
+}
+func (s *stubVendorContactRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.VendorContactEntity, error) {
+	return s.getResult, s.err
+}
+func (s *stubVendorContactRepo) Search(_ context.Context, _ boardapi.VendorContactSearchParams, _ repository.ReadOptions) ([]boardapi.VendorContactEntity, error) {
+	return s.searchResult, s.err
+}
+
+type stubPurchaseOrderRepo struct {
+	listResult   []boardapi.PurchaseOrderEntity
+	getResult    *boardapi.PurchaseOrderEntity
+	searchResult []boardapi.PurchaseOrderEntity
+	err          error
+}
+
+func (s *stubPurchaseOrderRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.PurchaseOrderEntity, error) {
+	return s.listResult, s.err
+}
+func (s *stubPurchaseOrderRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.PurchaseOrderEntity, error) {
+	return s.getResult, s.err
+}
+func (s *stubPurchaseOrderRepo) Search(_ context.Context, _ boardapi.PurchaseOrderSearchParams, _ repository.ReadOptions) ([]boardapi.PurchaseOrderEntity, error) {
+	return s.searchResult, s.err
+}
+
+type stubPaymentRepo struct {
+	listResult   []boardapi.PaymentEntity
+	getResult    *boardapi.PaymentEntity
+	searchResult []boardapi.PaymentEntity
+	err          error
+}
+
+func (s *stubPaymentRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.PaymentEntity, error) {
+	return s.listResult, s.err
+}
+func (s *stubPaymentRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.PaymentEntity, error) {
+	return s.getResult, s.err
+}
+func (s *stubPaymentRepo) Search(_ context.Context, _ boardapi.PaymentSearchParams, _ repository.ReadOptions) ([]boardapi.PaymentEntity, error) {
+	return s.searchResult, s.err
+}
+
+type stubUserRepo struct {
+	listResult   []boardapi.UserEntity
+	getResult    *boardapi.UserEntity
+	searchResult []boardapi.UserEntity
+	err          error
+}
+
+func (s *stubUserRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.UserEntity, error) {
+	return s.listResult, s.err
+}
+func (s *stubUserRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.UserEntity, error) {
+	return s.getResult, s.err
+}
+func (s *stubUserRepo) Search(_ context.Context, _ boardapi.UserSearchParams, _ repository.ReadOptions) ([]boardapi.UserEntity, error) {
+	return s.searchResult, s.err
+}
+
+type stubGroupRepo struct {
+	listResult   []boardapi.GroupEntity
+	getResult    *boardapi.GroupEntity
+	searchResult []boardapi.GroupEntity
+	err          error
+}
+
+func (s *stubGroupRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.GroupEntity, error) {
+	return s.listResult, s.err
+}
+func (s *stubGroupRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.GroupEntity, error) {
+	return s.getResult, s.err
+}
+func (s *stubGroupRepo) Search(_ context.Context, _ boardapi.GroupSearchParams, _ repository.ReadOptions) ([]boardapi.GroupEntity, error) {
+	return s.searchResult, s.err
+}
+
 // --- Service constructors ---
 
 func zeroRepos() find.Repos {
@@ -246,6 +400,13 @@ func zeroRepos() find.Repos {
 		Orders:         &stubOrderRepo{},
 		Deliveries:     &stubDeliveryRepo{},
 		Receipts:       &stubReceiptRepo{},
+		Vendors:        &stubVendorRepo{},
+		VendorBranches: &stubVendorBranchRepo{},
+		VendorContacts: &stubVendorContactRepo{},
+		PurchaseOrders: &stubPurchaseOrderRepo{},
+		Payments:       &stubPaymentRepo{},
+		Users:          &stubUserRepo{},
+		Groups:         &stubGroupRepo{},
 	}
 }
 
@@ -271,7 +432,7 @@ func newServiceWith(
 	if projects != nil {
 		r.Projects = projects
 	}
-	// Process optional document repo stubs
+	// Process optional repo stubs
 	for _, opt := range opts {
 		switch v := opt.(type) {
 		case *stubEstimateRepo:
@@ -284,6 +445,20 @@ func newServiceWith(
 			r.Deliveries = v
 		case *stubReceiptRepo:
 			r.Receipts = v
+		case *stubVendorRepo:
+			r.Vendors = v
+		case *stubVendorBranchRepo:
+			r.VendorBranches = v
+		case *stubVendorContactRepo:
+			r.VendorContacts = v
+		case *stubPurchaseOrderRepo:
+			r.PurchaseOrders = v
+		case *stubPaymentRepo:
+			r.Payments = v
+		case *stubUserRepo:
+			r.Users = v
+		case *stubGroupRepo:
+			r.Groups = v
 		}
 	}
 	return find.New(r)

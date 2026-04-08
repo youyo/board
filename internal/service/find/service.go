@@ -71,6 +71,55 @@ type ReceiptRepo interface {
 	Search(ctx context.Context, params boardapi.ReceiptSearchParams, opts repository.ReadOptions) ([]boardapi.ReceiptEntity, error)
 }
 
+// VendorRepo is the repository interface for vendors used by service/find.
+type VendorRepo interface {
+	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.VendorEntity, error)
+	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.VendorEntity, error)
+	Search(ctx context.Context, params boardapi.VendorSearchParams, opts repository.ReadOptions) ([]boardapi.VendorEntity, error)
+}
+
+// VendorBranchRepo is the repository interface for vendor branches.
+type VendorBranchRepo interface {
+	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.VendorBranchEntity, error)
+	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.VendorBranchEntity, error)
+	Search(ctx context.Context, params boardapi.VendorBranchSearchParams, opts repository.ReadOptions) ([]boardapi.VendorBranchEntity, error)
+}
+
+// VendorContactRepo is the repository interface for vendor contacts.
+type VendorContactRepo interface {
+	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.VendorContactEntity, error)
+	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.VendorContactEntity, error)
+	Search(ctx context.Context, params boardapi.VendorContactSearchParams, opts repository.ReadOptions) ([]boardapi.VendorContactEntity, error)
+}
+
+// PurchaseOrderRepo is the repository interface for purchase orders.
+type PurchaseOrderRepo interface {
+	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.PurchaseOrderEntity, error)
+	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.PurchaseOrderEntity, error)
+	Search(ctx context.Context, params boardapi.PurchaseOrderSearchParams, opts repository.ReadOptions) ([]boardapi.PurchaseOrderEntity, error)
+}
+
+// PaymentRepo is the repository interface for payments.
+type PaymentRepo interface {
+	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.PaymentEntity, error)
+	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.PaymentEntity, error)
+	Search(ctx context.Context, params boardapi.PaymentSearchParams, opts repository.ReadOptions) ([]boardapi.PaymentEntity, error)
+}
+
+// UserRepo is the repository interface for users.
+type UserRepo interface {
+	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.UserEntity, error)
+	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.UserEntity, error)
+	Search(ctx context.Context, params boardapi.UserSearchParams, opts repository.ReadOptions) ([]boardapi.UserEntity, error)
+}
+
+// GroupRepo is the repository interface for groups.
+type GroupRepo interface {
+	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.GroupEntity, error)
+	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.GroupEntity, error)
+	Search(ctx context.Context, params boardapi.GroupSearchParams, opts repository.ReadOptions) ([]boardapi.GroupEntity, error)
+}
+
 // Repos holds all repository dependencies for the find service.
 type Repos struct {
 	Clients        ClientRepo
@@ -82,6 +131,13 @@ type Repos struct {
 	Orders         OrderRepo
 	Deliveries     DeliveryRepo
 	Receipts       ReceiptRepo
+	Vendors        VendorRepo
+	VendorBranches VendorBranchRepo
+	VendorContacts VendorContactRepo
+	PurchaseOrders PurchaseOrderRepo
+	Payments       PaymentRepo
+	Users          UserRepo
+	Groups         GroupRepo
 }
 
 // Service is the high-level find service for cross-resource searches.
@@ -95,6 +151,13 @@ type Service struct {
 	orders         OrderRepo
 	deliveries     DeliveryRepo
 	receipts       ReceiptRepo
+	vendors        VendorRepo
+	vendorBranches VendorBranchRepo
+	vendorContacts VendorContactRepo
+	purchaseOrders PurchaseOrderRepo
+	payments       PaymentRepo
+	users          UserRepo
+	groups         GroupRepo
 }
 
 // New creates a new find Service.
@@ -109,6 +172,13 @@ func New(repos Repos) *Service {
 		orders:         repos.Orders,
 		deliveries:     repos.Deliveries,
 		receipts:       repos.Receipts,
+		vendors:        repos.Vendors,
+		vendorBranches: repos.VendorBranches,
+		vendorContacts: repos.VendorContacts,
+		purchaseOrders: repos.PurchaseOrders,
+		payments:       repos.Payments,
+		users:          repos.Users,
+		groups:         repos.Groups,
 	}
 }
 
@@ -130,6 +200,26 @@ func (s *Service) resolveClientAndProject(ctx context.Context, clientID, project
 		}
 	}
 	return client, project
+}
+
+// resolveVendorAndProject resolves the vendor and project for a vendor document.
+// Both resolutions are non-fatal: nil is returned on lookup error.
+func (s *Service) resolveVendorAndProject(ctx context.Context, vendorID, projectID int, opts repository.ReadOptions) (*boardapi.VendorEntity, *boardapi.ProjectEntity) {
+	var vendor *boardapi.VendorEntity
+	var project *boardapi.ProjectEntity
+	if vendorID != 0 {
+		v, err := s.vendors.GetByID(ctx, vendorID, opts)
+		if err == nil {
+			vendor = v
+		}
+	}
+	if projectID != 0 {
+		p, err := s.projects.GetByID(ctx, projectID, opts)
+		if err == nil {
+			project = p
+		}
+	}
+	return vendor, project
 }
 
 // repoOpts returns ReadOptions suitable for passing to repositories.
