@@ -70,6 +70,7 @@ func NewRootCmd(version string) *cobra.Command {
 
 	// サブコマンドを登録
 	rootCmd.AddCommand(NewConfigureCmd())
+	rootCmd.AddCommand(NewAPICmd())
 
 	return rootCmd
 }
