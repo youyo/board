@@ -4,9 +4,9 @@ package config
 
 // Config は config.toml のトップレベル構造体
 type Config struct {
-	CurrentProfile string                    `toml:"current_profile"`
-	Timezone       string                    `toml:"timezone"`
-	Profiles       map[string]ProfileConfig  `toml:"profiles"`
+	CurrentProfile string                   `toml:"current_profile"`
+	Timezone       string                   `toml:"timezone"`
+	Profiles       map[string]ProfileConfig `toml:"profiles"`
 }
 
 // ProfileConfig はプロファイルごとの設定
