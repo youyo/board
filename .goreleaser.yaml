@@ -1,0 +1,76 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+version: 2
+
+project_name: board
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: board
+    main: ./cmd/board/main.go
+    binary: board
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X main.version={{ .Version }}
+
+archives:
+  - id: default
+    ids:
+      - board
+    formats:
+      - tar.gz
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "arm64" }}arm64
+      {{- else }}{{ .Arch }}{{ end }}
+
+checksum:
+  name_template: checksums.txt
+
+snapshot:
+  version_template: "{{incpatch .Version}}-next"
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+
+brews:
+  - name: board
+    repository:
+      owner: youyo
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    directory: Formula
+    homepage: "https://github.com/youyo/board"
+    description: "BOARD API CLI + local MCP server"
+    license: "MIT"
+    install: |
+      bin.install "board"
+    test: |
+      system "#{bin}/board", "--help"
+
+release:
+  github:
+    owner: youyo
+    name: board
+  prerelease: auto

@@ -1,6 +1,9 @@
 # Go binary (root directory only)
 /board
 
+# GoReleaser output
+/dist/
+
 # Go build artifacts
 *.exe
 *.exe~
