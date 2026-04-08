@@ -1704,3 +1704,411 @@ func TestSearchProjectCosts_WithProjectID(t *testing.T) {
 		t.Errorf("project_id param: want %q, got %q", "200", gotProjectID)
 	}
 }
+
+// ============================================================
+// M07: estimates エンティティ テスト (T67〜T69)
+// ============================================================
+
+// T67: ListEstimates — 正常系
+func TestListEstimates_OK(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`[{"id":1,"client_id":10,"project_id":100,"title":"見積書1","total_amount":500000.0,"status":"draft","estimate_date":"2026-01-01","expiration_date":"2026-01-31","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":2,"client_id":10,"project_id":100,"title":"見積書2","total_amount":300000.0,"status":"sent","estimate_date":"2026-01-05","expiration_date":"2026-02-05","memo":"","updated_at":"2026-01-05T00:00:00Z","created_at":"2026-01-05T00:00:00Z"}]`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	result, err := c.ListEstimates(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result) != 2 {
+		t.Errorf("want 2 estimates, got %d", len(result))
+	}
+	if result[0].ID != 1 || result[0].ClientID != 10 || result[0].ProjectID != 100 {
+		t.Errorf("estimate[0]: got %+v", result[0])
+	}
+	if result[0].TotalAmount != 500000.0 {
+		t.Errorf("TotalAmount: want 500000.0, got %f", result[0].TotalAmount)
+	}
+	if result[0].EstimateDate != "2026-01-01" {
+		t.Errorf("EstimateDate: want %q, got %q", "2026-01-01", result[0].EstimateDate)
+	}
+	if result[0].ExpirationDate != "2026-01-31" {
+		t.Errorf("ExpirationDate: want %q, got %q", "2026-01-31", result[0].ExpirationDate)
+	}
+}
+
+// T68: GetEstimate — 正常系
+func TestGetEstimate_OK(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/estimates/42" {
+			http.NotFound(w, r)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"id":42,"client_id":10,"project_id":100,"title":"見積書42","total_amount":750000.0,"status":"approved","estimate_date":"2026-02-01","expiration_date":"2026-03-01","memo":"テストメモ","updated_at":"2026-02-01T00:00:00Z","created_at":"2026-02-01T00:00:00Z"}`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	got, err := c.GetEstimate(context.Background(), 42)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got == nil {
+		t.Fatal("got nil EstimateEntity")
+	}
+	if got.ID != 42 || got.Title != "見積書42" || got.Status != "approved" {
+		t.Errorf("GetEstimate: got %+v", got)
+	}
+	if got.Memo != "テストメモ" {
+		t.Errorf("Memo: want %q, got %q", "テストメモ", got.Memo)
+	}
+}
+
+// T69: SearchEstimates — ClientID + Status パラメータ付き
+func TestSearchEstimates_WithClientIDAndStatus(t *testing.T) {
+	var gotClientID, gotStatus string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotClientID = r.URL.Query().Get("client_id")
+		gotStatus = r.URL.Query().Get("status")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`[{"id":1,"client_id":10,"project_id":100,"title":"見積書1","total_amount":500000.0,"status":"draft","estimate_date":"2026-01-01","expiration_date":"2026-01-31","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	result, err := c.SearchEstimates(context.Background(), boardapi.EstimateSearchParams{ClientID: 10, Status: "draft"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result) != 1 {
+		t.Errorf("want 1 result, got %d", len(result))
+	}
+	if gotClientID != "10" {
+		t.Errorf("client_id param: want %q, got %q", "10", gotClientID)
+	}
+	if gotStatus != "draft" {
+		t.Errorf("status param: want %q, got %q", "draft", gotStatus)
+	}
+}
+
+// ============================================================
+// M07: invoices エンティティ テスト (T70〜T72)
+// ============================================================
+
+// T70: ListInvoices — 正常系
+func TestListInvoices_OK(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`[{"id":1,"client_id":10,"project_id":100,"title":"請求書1","total_amount":500000.0,"status":"draft","invoice_date":"2026-01-31","due_date":"2026-02-28","memo":"","updated_at":"2026-01-31T00:00:00Z","created_at":"2026-01-31T00:00:00Z"},{"id":2,"client_id":10,"project_id":101,"title":"請求書2","total_amount":200000.0,"status":"sent","invoice_date":"2026-02-28","due_date":"2026-03-31","memo":"","updated_at":"2026-02-28T00:00:00Z","created_at":"2026-02-28T00:00:00Z"}]`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	result, err := c.ListInvoices(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result) != 2 {
+		t.Errorf("want 2 invoices, got %d", len(result))
+	}
+	if result[0].ID != 1 || result[0].InvoiceDate != "2026-01-31" || result[0].DueDate != "2026-02-28" {
+		t.Errorf("invoice[0]: got %+v", result[0])
+	}
+}
+
+// T71: GetInvoice — 正常系
+func TestGetInvoice_OK(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/invoices/55" {
+			http.NotFound(w, r)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"id":55,"client_id":10,"project_id":100,"title":"請求書55","total_amount":1000000.0,"status":"paid","invoice_date":"2026-01-31","due_date":"2026-02-28","memo":"支払済み","updated_at":"2026-01-31T00:00:00Z","created_at":"2026-01-31T00:00:00Z"}`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	got, err := c.GetInvoice(context.Background(), 55)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got == nil {
+		t.Fatal("got nil InvoiceEntity")
+	}
+	if got.ID != 55 || got.TotalAmount != 1000000.0 || got.Status != "paid" {
+		t.Errorf("GetInvoice: got %+v", got)
+	}
+}
+
+// T72: SearchInvoices — ProjectID + UpdatedAtFrom パラメータ付き
+func TestSearchInvoices_WithProjectIDAndUpdatedAtFrom(t *testing.T) {
+	var gotProjectID, gotUpdatedAtFrom string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotProjectID = r.URL.Query().Get("project_id")
+		gotUpdatedAtFrom = r.URL.Query().Get("updated_at_from")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`[{"id":1,"client_id":10,"project_id":100,"title":"請求書1","total_amount":500000.0,"status":"draft","invoice_date":"2026-01-31","due_date":"2026-02-28","memo":"","updated_at":"2026-01-31T00:00:00Z","created_at":"2026-01-31T00:00:00Z"}]`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	result, err := c.SearchInvoices(context.Background(), boardapi.InvoiceSearchParams{ProjectID: 100, UpdatedAtFrom: "2026-01-01"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result) != 1 {
+		t.Errorf("want 1 result, got %d", len(result))
+	}
+	if gotProjectID != "100" {
+		t.Errorf("project_id param: want %q, got %q", "100", gotProjectID)
+	}
+	if gotUpdatedAtFrom != "2026-01-01" {
+		t.Errorf("updated_at_from param: want %q, got %q", "2026-01-01", gotUpdatedAtFrom)
+	}
+}
+
+// ============================================================
+// M07: orders エンティティ テスト (T73〜T75)
+// ============================================================
+
+// T73: ListOrders — 正常系
+func TestListOrders_OK(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`[{"id":1,"client_id":10,"project_id":100,"title":"発注書1","total_amount":300000.0,"status":"draft","order_date":"2026-01-10","memo":"","updated_at":"2026-01-10T00:00:00Z","created_at":"2026-01-10T00:00:00Z"},{"id":2,"client_id":10,"project_id":101,"title":"発注書2","total_amount":150000.0,"status":"sent","order_date":"2026-01-15","memo":"","updated_at":"2026-01-15T00:00:00Z","created_at":"2026-01-15T00:00:00Z"}]`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	result, err := c.ListOrders(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result) != 2 {
+		t.Errorf("want 2 orders, got %d", len(result))
+	}
+	if result[0].ID != 1 || result[0].OrderDate != "2026-01-10" {
+		t.Errorf("order[0]: got %+v", result[0])
+	}
+}
+
+// T74: GetOrder — 正常系
+func TestGetOrder_OK(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/orders/77" {
+			http.NotFound(w, r)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"id":77,"client_id":10,"project_id":100,"title":"発注書77","total_amount":800000.0,"status":"approved","order_date":"2026-02-01","memo":"承認済み","updated_at":"2026-02-01T00:00:00Z","created_at":"2026-02-01T00:00:00Z"}`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	got, err := c.GetOrder(context.Background(), 77)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got == nil {
+		t.Fatal("got nil OrderEntity")
+	}
+	if got.ID != 77 || got.Status != "approved" || got.Memo != "承認済み" {
+		t.Errorf("GetOrder: got %+v", got)
+	}
+}
+
+// T75: SearchOrders — ClientID パラメータ付き
+func TestSearchOrders_WithClientID(t *testing.T) {
+	var gotClientID string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotClientID = r.URL.Query().Get("client_id")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`[{"id":1,"client_id":10,"project_id":100,"title":"発注書1","total_amount":300000.0,"status":"draft","order_date":"2026-01-10","memo":"","updated_at":"2026-01-10T00:00:00Z","created_at":"2026-01-10T00:00:00Z"}]`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	result, err := c.SearchOrders(context.Background(), boardapi.OrderSearchParams{ClientID: 10})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result) != 1 {
+		t.Errorf("want 1 result, got %d", len(result))
+	}
+	if gotClientID != "10" {
+		t.Errorf("client_id param: want %q, got %q", "10", gotClientID)
+	}
+}
+
+// ============================================================
+// M07: deliveries エンティティ テスト (T76〜T78)
+// ============================================================
+
+// T76: ListDeliveries — 正常系
+func TestListDeliveries_OK(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`[{"id":1,"client_id":10,"project_id":100,"title":"納品書1","total_amount":500000.0,"status":"draft","delivery_date":"2026-01-20","memo":"","updated_at":"2026-01-20T00:00:00Z","created_at":"2026-01-20T00:00:00Z"},{"id":2,"client_id":10,"project_id":101,"title":"納品書2","total_amount":250000.0,"status":"sent","delivery_date":"2026-02-20","memo":"","updated_at":"2026-02-20T00:00:00Z","created_at":"2026-02-20T00:00:00Z"}]`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	result, err := c.ListDeliveries(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result) != 2 {
+		t.Errorf("want 2 deliveries, got %d", len(result))
+	}
+	if result[0].ID != 1 || result[0].DeliveryDate != "2026-01-20" {
+		t.Errorf("delivery[0]: got %+v", result[0])
+	}
+}
+
+// T77: GetDelivery — 正常系
+func TestGetDelivery_OK(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/deliveries/88" {
+			http.NotFound(w, r)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"id":88,"client_id":10,"project_id":100,"title":"納品書88","total_amount":600000.0,"status":"delivered","delivery_date":"2026-02-15","memo":"納品完了","updated_at":"2026-02-15T00:00:00Z","created_at":"2026-02-15T00:00:00Z"}`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	got, err := c.GetDelivery(context.Background(), 88)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got == nil {
+		t.Fatal("got nil DeliveryEntity")
+	}
+	if got.ID != 88 || got.Status != "delivered" || got.DeliveryDate != "2026-02-15" {
+		t.Errorf("GetDelivery: got %+v", got)
+	}
+}
+
+// T78: SearchDeliveries — ProjectID + Status パラメータ付き
+func TestSearchDeliveries_WithProjectIDAndStatus(t *testing.T) {
+	var gotProjectID, gotStatus string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotProjectID = r.URL.Query().Get("project_id")
+		gotStatus = r.URL.Query().Get("status")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`[{"id":1,"client_id":10,"project_id":100,"title":"納品書1","total_amount":500000.0,"status":"delivered","delivery_date":"2026-01-20","memo":"","updated_at":"2026-01-20T00:00:00Z","created_at":"2026-01-20T00:00:00Z"}]`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	result, err := c.SearchDeliveries(context.Background(), boardapi.DeliverySearchParams{ProjectID: 100, Status: "delivered"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result) != 1 {
+		t.Errorf("want 1 result, got %d", len(result))
+	}
+	if gotProjectID != "100" {
+		t.Errorf("project_id param: want %q, got %q", "100", gotProjectID)
+	}
+	if gotStatus != "delivered" {
+		t.Errorf("status param: want %q, got %q", "delivered", gotStatus)
+	}
+}
+
+// ============================================================
+// M07: receipts エンティティ テスト (T79〜T81)
+// ============================================================
+
+// T79: ListReceipts — 正常系
+func TestListReceipts_OK(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`[{"id":1,"client_id":10,"project_id":100,"title":"領収書1","total_amount":500000.0,"status":"draft","receipt_date":"2026-01-31","memo":"","updated_at":"2026-01-31T00:00:00Z","created_at":"2026-01-31T00:00:00Z"},{"id":2,"client_id":10,"project_id":101,"title":"領収書2","total_amount":200000.0,"status":"issued","receipt_date":"2026-02-28","memo":"","updated_at":"2026-02-28T00:00:00Z","created_at":"2026-02-28T00:00:00Z"}]`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	result, err := c.ListReceipts(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result) != 2 {
+		t.Errorf("want 2 receipts, got %d", len(result))
+	}
+	if result[0].ID != 1 || result[0].ReceiptDate != "2026-01-31" {
+		t.Errorf("receipt[0]: got %+v", result[0])
+	}
+}
+
+// T80: GetReceipt — 正常系
+func TestGetReceipt_OK(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/receipts/99" {
+			http.NotFound(w, r)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"id":99,"client_id":10,"project_id":100,"title":"領収書99","total_amount":900000.0,"status":"issued","receipt_date":"2026-03-31","memo":"発行済み","updated_at":"2026-03-31T00:00:00Z","created_at":"2026-03-31T00:00:00Z"}`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	got, err := c.GetReceipt(context.Background(), 99)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got == nil {
+		t.Fatal("got nil ReceiptEntity")
+	}
+	if got.ID != 99 || got.TotalAmount != 900000.0 || got.ReceiptDate != "2026-03-31" {
+		t.Errorf("GetReceipt: got %+v", got)
+	}
+}
+
+// T81: SearchReceipts — ClientID + UpdatedAtFrom パラメータ付き
+func TestSearchReceipts_WithClientIDAndUpdatedAtFrom(t *testing.T) {
+	var gotClientID, gotUpdatedAtFrom string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotClientID = r.URL.Query().Get("client_id")
+		gotUpdatedAtFrom = r.URL.Query().Get("updated_at_from")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`[{"id":1,"client_id":10,"project_id":100,"title":"領収書1","total_amount":500000.0,"status":"draft","receipt_date":"2026-01-31","memo":"","updated_at":"2026-01-31T00:00:00Z","created_at":"2026-01-31T00:00:00Z"}]`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	result, err := c.SearchReceipts(context.Background(), boardapi.ReceiptSearchParams{ClientID: 10, UpdatedAtFrom: "2026-01-01"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result) != 1 {
+		t.Errorf("want 1 result, got %d", len(result))
+	}
+	if gotClientID != "10" {
+		t.Errorf("client_id param: want %q, got %q", "10", gotClientID)
+	}
+	if gotUpdatedAtFrom != "2026-01-01" {
+		t.Errorf("updated_at_from param: want %q, got %q", "2026-01-01", gotUpdatedAtFrom)
+	}
+}
