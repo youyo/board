@@ -20,7 +20,7 @@ func TestNewAPICmd(t *testing.T) {
 		subNames[sub.Use] = true
 	}
 
-	expects := []string{"clients", "client_branches", "contacts", "projects", "project_costs", "estimates", "invoices", "orders", "deliveries", "receipts", "vendors", "vendor_branches", "vendor_contacts", "purchase_orders", "payments"}
+	expects := []string{"clients", "client_branches", "contacts", "projects", "project_costs", "estimates", "invoices", "orders", "deliveries", "receipts", "vendors", "vendor_branches", "vendor_contacts", "purchase_orders", "payments", "users", "groups", "payment_terms", "project_types", "purchase_types", "accounting_types", "document_send_channels"}
 	for _, name := range expects {
 		if !subNames[name] {
 			t.Errorf("サブコマンド %q が登録されていない", name)
@@ -422,6 +422,85 @@ func TestNewAPIPaymentsCmd(t *testing.T) {
 			t.Errorf("search: --%s フラグが定義されていない", flagName)
 		}
 	}
+}
+
+func testMasterCmd(t *testing.T, cmd *cobra.Command, use string, searchFlags []string) {
+	t.Helper()
+	if cmd.Use != use {
+		t.Errorf("Use = %q, want %q", cmd.Use, use)
+	}
+	subNames := make(map[string]bool)
+	for _, sub := range cmd.Commands() {
+		subNames[sub.Use] = true
+	}
+	for _, name := range []string{"list", "get", "search"} {
+		if !subNames[name] {
+			t.Errorf("サブコマンド %q が登録されていない", name)
+		}
+	}
+
+	var getCmd *cobra.Command
+	for _, sub := range cmd.Commands() {
+		if sub.Use == "get" {
+			getCmd = sub
+		}
+	}
+	if getCmd == nil {
+		t.Fatal("get コマンドが見つからない")
+	}
+	if f := getCmd.Flags().Lookup("id"); f == nil {
+		t.Error("get: --id フラグが定義されていない")
+	}
+
+	var searchCmd *cobra.Command
+	for _, sub := range cmd.Commands() {
+		if sub.Use == "search" {
+			searchCmd = sub
+		}
+	}
+	if searchCmd == nil {
+		t.Fatal("search コマンドが見つからない")
+	}
+	for _, flagName := range searchFlags {
+		if f := searchCmd.Flags().Lookup(flagName); f == nil {
+			t.Errorf("search: --%s フラグが定義されていない", flagName)
+		}
+	}
+}
+
+func TestNewAPIUsersCmd(t *testing.T) {
+	testMasterCmd(t, cli.NewAPIUsersCmd(), "users",
+		[]string{"name", "email", "updated-at-from"})
+}
+
+func TestNewAPIGroupsCmd(t *testing.T) {
+	testMasterCmd(t, cli.NewAPIGroupsCmd(), "groups",
+		[]string{"name", "updated-at-from"})
+}
+
+func TestNewAPIPaymentTermsCmd(t *testing.T) {
+	testMasterCmd(t, cli.NewAPIPaymentTermsCmd(), "payment_terms",
+		[]string{"name", "updated-at-from"})
+}
+
+func TestNewAPIProjectTypesCmd(t *testing.T) {
+	testMasterCmd(t, cli.NewAPIProjectTypesCmd(), "project_types",
+		[]string{"name", "updated-at-from"})
+}
+
+func TestNewAPIPurchaseTypesCmd(t *testing.T) {
+	testMasterCmd(t, cli.NewAPIPurchaseTypesCmd(), "purchase_types",
+		[]string{"name", "updated-at-from"})
+}
+
+func TestNewAPIAccountingTypesCmd(t *testing.T) {
+	testMasterCmd(t, cli.NewAPIAccountingTypesCmd(), "accounting_types",
+		[]string{"name", "updated-at-from"})
+}
+
+func TestNewAPIDocumentSendChannelsCmd(t *testing.T) {
+	testMasterCmd(t, cli.NewAPIDocumentSendChannelsCmd(), "document_send_channels",
+		[]string{"name", "updated-at-from"})
 }
 
 func TestRootCmdHasAPISubcommand(t *testing.T) {
