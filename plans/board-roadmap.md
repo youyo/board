@@ -237,10 +237,10 @@
 ### Phase 4: high-level CLI（M29〜M34）
 
 #### M29: service/find - 顧客・案件横断検索
-- [ ] find_client: 名前 → 顧客 + 支社 + 担当者を横断
-- [ ] find_project: 顧客名 → client 解決 → project 検索
-- [ ] テスト
-- 📄 詳細: plans/board-m29-service-find-core.md（着手時生成）
+- [x] find_client: 名前 → 顧客 + 支社 + 担当者を横断
+- [x] find_project: 顧客名 → client 解決 → project 検索
+- [x] テスト
+- 📄 詳細: plans/board-m29-service-find-core.md
 
 #### M30: service/find - ドキュメント横断検索
 - [ ] find_estimate / find_invoice: 顧客名・案件名から書類検索
