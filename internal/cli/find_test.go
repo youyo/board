@@ -19,7 +19,7 @@ func TestNewFindCmd(t *testing.T) {
 		subNames[sub.Use] = true
 	}
 
-	for _, name := range []string{"client", "project", "estimate", "invoice", "order", "delivery", "receipt"} {
+	for _, name := range []string{"client", "project", "estimate", "invoice", "order", "delivery", "receipt", "vendor", "purchase-order", "payment", "user", "group"} {
 		if !subNames[name] {
 			t.Errorf("subcommand %q not registered", name)
 		}
@@ -210,6 +210,131 @@ func TestFindReceiptCmdRequiresAtLeastOneFlag(t *testing.T) {
 	root.AddCommand(cmd)
 
 	root.SetArgs([]string{"receipt"})
+	err := root.Execute()
+	if err == nil {
+		t.Error("expected error when no flags provided, got nil")
+	}
+}
+
+func TestNewFindVendorCmd(t *testing.T) {
+	cmd := cli.NewFindVendorCmd()
+	if cmd.Use != "vendor" {
+		t.Errorf("Use = %q, want %q", cmd.Use, "vendor")
+	}
+
+	for _, flagName := range []string{"id", "name", "text"} {
+		if f := cmd.Flags().Lookup(flagName); f == nil {
+			t.Errorf("--%s flag not defined", flagName)
+		}
+	}
+}
+
+func TestFindVendorCmdRequiresAtLeastOneFlag(t *testing.T) {
+	cmd := cli.NewFindVendorCmd()
+	root := &cobra.Command{Use: "board"}
+	root.AddCommand(cmd)
+
+	root.SetArgs([]string{"vendor"})
+	err := root.Execute()
+	if err == nil {
+		t.Error("expected error when no flags provided, got nil")
+	}
+}
+
+func TestNewFindPurchaseOrderCmd(t *testing.T) {
+	cmd := cli.NewFindPurchaseOrderCmd()
+	if cmd.Use != "purchase-order" {
+		t.Errorf("Use = %q, want %q", cmd.Use, "purchase-order")
+	}
+
+	for _, flagName := range []string{"id", "vendor-name", "project-name", "text", "status"} {
+		if f := cmd.Flags().Lookup(flagName); f == nil {
+			t.Errorf("--%s flag not defined", flagName)
+		}
+	}
+}
+
+func TestFindPurchaseOrderCmdRequiresAtLeastOneFlag(t *testing.T) {
+	cmd := cli.NewFindPurchaseOrderCmd()
+	root := &cobra.Command{Use: "board"}
+	root.AddCommand(cmd)
+
+	root.SetArgs([]string{"purchase-order"})
+	err := root.Execute()
+	if err == nil {
+		t.Error("expected error when no flags provided, got nil")
+	}
+}
+
+func TestNewFindPaymentCmd(t *testing.T) {
+	cmd := cli.NewFindPaymentCmd()
+	if cmd.Use != "payment" {
+		t.Errorf("Use = %q, want %q", cmd.Use, "payment")
+	}
+
+	for _, flagName := range []string{"id", "vendor-name", "purchase-order-id", "text", "status"} {
+		if f := cmd.Flags().Lookup(flagName); f == nil {
+			t.Errorf("--%s flag not defined", flagName)
+		}
+	}
+}
+
+func TestFindPaymentCmdRequiresAtLeastOneFlag(t *testing.T) {
+	cmd := cli.NewFindPaymentCmd()
+	root := &cobra.Command{Use: "board"}
+	root.AddCommand(cmd)
+
+	root.SetArgs([]string{"payment"})
+	err := root.Execute()
+	if err == nil {
+		t.Error("expected error when no flags provided, got nil")
+	}
+}
+
+func TestNewFindUserCmd(t *testing.T) {
+	cmd := cli.NewFindUserCmd()
+	if cmd.Use != "user" {
+		t.Errorf("Use = %q, want %q", cmd.Use, "user")
+	}
+
+	for _, flagName := range []string{"id", "name", "text"} {
+		if f := cmd.Flags().Lookup(flagName); f == nil {
+			t.Errorf("--%s flag not defined", flagName)
+		}
+	}
+}
+
+func TestFindUserCmdRequiresAtLeastOneFlag(t *testing.T) {
+	cmd := cli.NewFindUserCmd()
+	root := &cobra.Command{Use: "board"}
+	root.AddCommand(cmd)
+
+	root.SetArgs([]string{"user"})
+	err := root.Execute()
+	if err == nil {
+		t.Error("expected error when no flags provided, got nil")
+	}
+}
+
+func TestNewFindGroupCmd(t *testing.T) {
+	cmd := cli.NewFindGroupCmd()
+	if cmd.Use != "group" {
+		t.Errorf("Use = %q, want %q", cmd.Use, "group")
+	}
+
+	for _, flagName := range []string{"id", "name", "text"} {
+		if f := cmd.Flags().Lookup(flagName); f == nil {
+			t.Errorf("--%s flag not defined", flagName)
+		}
+	}
+}
+
+func TestFindGroupCmdRequiresAtLeastOneFlag(t *testing.T) {
+	cmd := cli.NewFindGroupCmd()
+	root := &cobra.Command{Use: "board"}
+	root.AddCommand(cmd)
+
+	root.SetArgs([]string{"group"})
 	err := root.Execute()
 	if err == nil {
 		t.Error("expected error when no flags provided, got nil")
