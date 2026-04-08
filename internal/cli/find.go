@@ -17,6 +17,11 @@ func NewFindCmd() *cobra.Command {
 	cmd.AddCommand(
 		NewFindClientCmd(),
 		NewFindProjectCmd(),
+		NewFindEstimateCmd(),
+		NewFindInvoiceCmd(),
+		NewFindOrderCmd(),
+		NewFindDeliveryCmd(),
+		NewFindReceiptCmd(),
 	)
 
 	return cmd
