@@ -23,6 +23,12 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Run go vet
+        run: go vet ./...
+
+      - name: Run tests
+        run: go test ./...
+
       - name: Generate GitHub App token
         id: app-token
         uses: tibdex/github-app-token@v2
