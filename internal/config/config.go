@@ -20,6 +20,19 @@ type ProfileConfig struct {
 	PrettyDefault         bool   `toml:"pretty_default"`
 }
 
+// String は ProfileConfig の文字列表現を返す。
+// fmt.Println 等でAPIKey/APITokenが平文出力されることを防ぐため、
+// 秘密情報はマスクする。
+func (p ProfileConfig) String() string {
+	return "ProfileConfig{...secrets masked...}"
+}
+
+// GoString は ProfileConfig の Go 構文表現を返す。
+// %#v フォーマットでの秘密情報漏洩を防ぐ。
+func (p ProfileConfig) GoString() string {
+	return "config.ProfileConfig{...secrets masked...}"
+}
+
 // DefaultConfig はデフォルト値を持つ Config を返す
 func DefaultConfig() Config {
 	return Config{
