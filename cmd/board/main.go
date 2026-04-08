@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/youyo/board/internal/cli"
 )
 
 var version = "dev"
@@ -18,6 +19,8 @@ func main() {
 
 	rootCmd.Version = version
 	rootCmd.SetVersionTemplate("board version {{.Version}}\n")
+
+	rootCmd.AddCommand(cli.NewConfigureCmd())
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
