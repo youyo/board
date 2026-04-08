@@ -11,12 +11,13 @@ import (
 const defaultTimeout = 30 * time.Second
 
 // Client は BOARD API への HTTP クライアント。
-// retry / pagination は含まない（M05 スコープ）。
 type Client struct {
 	baseURL    string
 	apiKey     string
 	apiToken   string
 	httpClient *http.Client
+	retryMax   int                  // デフォルト 5（0 でリトライ無効）
+	sleepFn    func(time.Duration)  // テスト差し替え用（デフォルト time.Sleep）
 }
 
 // ClientOption は Client の設定オプション。
@@ -25,6 +26,17 @@ type ClientOption func(*Client)
 // WithHTTPClient はカスタム *http.Client を注入する（主にテスト用途）。
 func WithHTTPClient(hc *http.Client) ClientOption {
 	return func(c *Client) { c.httpClient = hc }
+}
+
+// WithRetryMax はリトライ最大回数を設定する。0 でリトライ無効。
+func WithRetryMax(n int) ClientOption {
+	return func(c *Client) { c.retryMax = n }
+}
+
+// WithSleepFn はテスト用にスリープ関数を差し替える。
+// for testing only: 本番コードでは使用しないこと。
+func WithSleepFn(fn func(time.Duration)) ClientOption {
+	return func(c *Client) { c.sleepFn = fn }
 }
 
 // New は Client を生成する。
@@ -41,6 +53,8 @@ func New(baseURL, apiKey, apiToken string, timeout time.Duration, opts ...Client
 		httpClient: &http.Client{
 			Timeout: timeout,
 		},
+		retryMax: 5,
+		sleepFn:  time.Sleep,
 	}
 	for _, o := range opts {
 		o(c)

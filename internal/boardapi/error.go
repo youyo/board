@@ -3,7 +3,11 @@ package boardapi
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
+	"strconv"
+	"time"
 )
 
 // APIErrorCode はエラー種別を表す文字列定数。
@@ -34,7 +38,8 @@ type APIError struct {
 	Code       APIErrorCode
 	StatusCode int
 	Message    string
-	Body       string // 生レスポンスボディ（デバッグ用）
+	Body       string        // 生レスポンスボディ（デバッグ用）
+	RetryAfter time.Duration // Retry-After ヘッダ値（0 は未指定）
 }
 
 // Error は error インターフェースを実装する。
@@ -81,6 +86,33 @@ func ClassifyStatusCode(statusCode int) APIErrorCode {
 		return APIErrorTemporary
 	default:
 		return APIErrorUnknown
+	}
+}
+
+// parseErrorWithHeader は HTTP レスポンスから *APIError を生成する（Retry-After対応）。
+func parseErrorWithHeader(resp *http.Response, body []byte) *APIError {
+	ae := parseError(resp.StatusCode, body)
+	if ra := resp.Header.Get("Retry-After"); ra != "" {
+		if secs, err := strconv.Atoi(ra); err == nil {
+			ae.RetryAfter = time.Duration(secs) * time.Second
+		}
+	}
+	return ae
+}
+
+// isRetryable はエラーがリトライ対象かどうかを返す。
+// 429、5xx（TEMPORARY）、ネットワークエラー（NETWORK）はリトライ対象。
+// 4xx（UNAUTHORIZED/FORBIDDEN/NOT_FOUND/VALIDATION）は恒久エラーのため非リトライ。
+func isRetryable(err error) bool {
+	var ae *APIError
+	if !errors.As(err, &ae) {
+		return false
+	}
+	switch ae.Code {
+	case APIErrorRateLimit, APIErrorTemporary, APIErrorNetwork:
+		return true
+	default:
+		return false
 	}
 }
 
