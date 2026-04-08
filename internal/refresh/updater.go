@@ -114,6 +114,37 @@ func (u *Updater) MarkForceSuccess(
 	return u.syncStore.Upsert(ctx, *state)
 }
 
+// MarkLockAcquired は refresh_started_at と refresh_owner を設定する。
+// sync_state が存在しない場合は新規作成（upsert）する。
+func (u *Updater) MarkLockAcquired(ctx context.Context, profile, resource, ownerID string, now time.Time) error {
+	state, err := getOrInit(ctx, u.syncStore, profile, resource)
+	if err != nil {
+		return err
+	}
+
+	state.RefreshStartedAt = nullString(now.UTC().Format(time.RFC3339))
+	state.RefreshOwner = nullString(ownerID)
+
+	return u.syncStore.Upsert(ctx, *state)
+}
+
+// MarkLockReleased は refresh_started_at と refresh_owner を NULL に戻す。
+// sync_state が存在しない場合は何もしない（エラーなし）。
+func (u *Updater) MarkLockReleased(ctx context.Context, profile, resource string) error {
+	state, err := u.syncStore.Get(ctx, profile, resource)
+	if err != nil {
+		return err
+	}
+	if state == nil {
+		return nil
+	}
+
+	state.RefreshStartedAt = sql.NullString{Valid: false}
+	state.RefreshOwner = sql.NullString{Valid: false}
+
+	return u.syncStore.Upsert(ctx, *state)
+}
+
 // MarkError は refresh 失敗時に sync_state を更新する。
 //
 // 更新フィールド:
