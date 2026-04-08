@@ -15,10 +15,12 @@ import (
 // App は board CLI の DI コンテナ。
 // New() で初期化し、Close() で DB 接続を閉じる。
 type App struct {
-	Config  config.Config
-	Profile config.ProfileConfig
+	Config      config.Config
+	Profile     config.ProfileConfig
+	ProfileName string
 
-	DB *cache.DB
+	DBPath string
+	DB     *cache.DB
 
 	// cache ストア
 	ResourceCache *cache.ResourceCache
@@ -100,6 +102,8 @@ func New(profileName string) (*App, error) {
 	return &App{
 		Config:        cfg,
 		Profile:       prof,
+		ProfileName:   profileName,
+		DBPath:        dp,
 		DB:            db,
 		ResourceCache: rc,
 		SyncStore:     ss,
