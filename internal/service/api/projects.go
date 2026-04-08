@@ -7,17 +7,17 @@ import (
 	"github.com/youyo/board/internal/repository"
 )
 
-// ListProjects は全案件を返す。
+// ListProjects returns all projects.
 func (s *Service) ListProjects(ctx context.Context, opts repository.ReadOptions) ([]boardapi.ProjectEntity, error) {
 	return s.projects.List(ctx, opts)
 }
 
-// GetProject は指定 ID の案件を返す。
+// GetProject returns a project by ID.
 func (s *Service) GetProject(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.ProjectEntity, error) {
 	return s.projects.GetByID(ctx, id, opts)
 }
 
-// SearchProjects はパラメータでフィルタした案件を返す。
+// SearchProjects returns projects filtered by the given parameters.
 func (s *Service) SearchProjects(ctx context.Context, params boardapi.ProjectSearchParams, opts repository.ReadOptions) ([]boardapi.ProjectEntity, error) {
 	return s.projects.Search(ctx, params, opts)
 }

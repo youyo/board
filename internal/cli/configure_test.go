@@ -11,10 +11,10 @@ import (
 )
 
 func TestConfigureInteractive(t *testing.T) {
-	t.Run("全質問に回答すると config.toml に保存される", func(t *testing.T) {
+	t.Run("answering all questions saves to config.toml", func(t *testing.T) {
 		path := newTempConfig(t)
 
-		// stdin モック: 各プロンプトへの回答
+		// stdin mock: responses to each prompt
 		input := strings.Join([]string{
 			"myprofile",           // profile name
 			"https://example.com", // base_url
@@ -61,10 +61,10 @@ func TestConfigureInteractive(t *testing.T) {
 		}
 	})
 
-	t.Run("空入力でスキップすると既存値が維持される", func(t *testing.T) {
+	t.Run("skipping with empty input preserves existing values", func(t *testing.T) {
 		path := newTempConfig(t)
 
-		// まず値を設定しておく
+		// First, set up initial values.
 		cfg := config.DefaultConfig()
 		prof := config.DefaultProfileConfig()
 		prof.BaseURL = "https://existing.example.com"
@@ -75,7 +75,7 @@ func TestConfigureInteractive(t *testing.T) {
 			t.Fatalf("setup failed: %v", err)
 		}
 
-		// 空入力で全部スキップ
+		// Skip all prompts with empty input.
 		input := "\n\n\n\n\n\n\n"
 
 		root := cli.NewConfigureCmd()
@@ -103,7 +103,7 @@ func TestConfigureInteractive(t *testing.T) {
 		}
 	})
 
-	t.Run("新規プロファイル名を入力すると新規作成される", func(t *testing.T) {
+	t.Run("entering a new profile name creates a new profile", func(t *testing.T) {
 		path := newTempConfig(t)
 
 		input := strings.Join([]string{
@@ -138,7 +138,7 @@ func TestConfigureInteractive(t *testing.T) {
 		}
 	})
 
-	t.Run("対話式結果に secrets がマスクされた JSON が出力される", func(t *testing.T) {
+	t.Run("interactive output contains JSON with masked secrets", func(t *testing.T) {
 		newTempConfig(t)
 
 		input := strings.Join([]string{
@@ -163,7 +163,7 @@ func TestConfigureInteractive(t *testing.T) {
 		}
 
 		out := buf.String()
-		// 対話式出力にはプロンプト文字列が含まれるため、'{' 以降を JSON として解析する
+		// The interactive output includes prompt strings, so parse JSON starting from '{'.
 		jsonStart := strings.Index(out, "{")
 		if jsonStart == -1 {
 			t.Fatalf("no JSON found in output: %s", out)

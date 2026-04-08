@@ -10,7 +10,7 @@ import (
 	"github.com/youyo/board/internal/cache"
 )
 
-// newLockTestDB はテスト用インメモリ DB を開くヘルパー。
+// newLockTestDB is a helper that opens an in-memory DB for testing.
 func newLockTestDB(t *testing.T) (*cache.DB, *cache.SyncStateStore) {
 	t.Helper()
 	db := openRefreshTestDB(t)
@@ -18,16 +18,16 @@ func newLockTestDB(t *testing.T) (*cache.DB, *cache.SyncStateStore) {
 	return db, ss
 }
 
-// newLockManagerWithClock は差し込み可能な時計を持つ LockManager を生成するヘルパー。
+// newLockManagerWithClock is a helper that creates a LockManager with an injectable clock.
 func newLockManagerWithClock(ss *cache.SyncStateStore, ownerID string, nowFn func() time.Time) *LockManager {
 	lm := NewLockManager(ss, ownerID)
 	lm.now = nowFn
 	return lm
 }
 
-// ---- Updater 拡張テスト ----
+// ---- Updater extension tests ----
 
-// TestUpdater_MarkLockAcquired_SetsFields: refresh_started_at と refresh_owner が設定される
+// TestUpdater_MarkLockAcquired_SetsFields: refresh_started_at and refresh_owner are set
 func TestUpdater_MarkLockAcquired_SetsFields(t *testing.T) {
 	_, ss := newLockTestDB(t)
 	u := NewUpdater(ss)
@@ -63,7 +63,7 @@ func TestUpdater_MarkLockAcquired_SetsFields(t *testing.T) {
 	}
 }
 
-// TestUpdater_MarkLockAcquired_NewRecord: sync_state が存在しなくても upsert が成功する
+// TestUpdater_MarkLockAcquired_NewRecord: upsert succeeds even when sync_state does not exist
 func TestUpdater_MarkLockAcquired_NewRecord(t *testing.T) {
 	_, ss := newLockTestDB(t)
 	u := NewUpdater(ss)
@@ -71,7 +71,7 @@ func TestUpdater_MarkLockAcquired_NewRecord(t *testing.T) {
 
 	now := time.Date(2025, 1, 15, 10, 0, 0, 0, time.UTC)
 
-	// 事前状態なし
+	// no pre-existing state
 	err := u.MarkLockAcquired(ctx, "newprofile", "projects", "host:999", now)
 	if err != nil {
 		t.Fatalf("MarkLockAcquired on new record: %v", err)
@@ -89,7 +89,7 @@ func TestUpdater_MarkLockAcquired_NewRecord(t *testing.T) {
 	}
 }
 
-// TestUpdater_MarkLockReleased_ClearsFields: refresh_started_at, refresh_owner が NULL になる
+// TestUpdater_MarkLockReleased_ClearsFields: refresh_started_at, refresh_owner become NULL
 func TestUpdater_MarkLockReleased_ClearsFields(t *testing.T) {
 	_, ss := newLockTestDB(t)
 	u := NewUpdater(ss)
@@ -97,12 +97,12 @@ func TestUpdater_MarkLockReleased_ClearsFields(t *testing.T) {
 
 	now := time.Date(2025, 1, 15, 10, 0, 0, 0, time.UTC)
 
-	// まず取得する
+	// acquire first
 	if err := u.MarkLockAcquired(ctx, "default", "clients", "host:1", now); err != nil {
 		t.Fatalf("MarkLockAcquired: %v", err)
 	}
 
-	// 解放する
+	// release
 	if err := u.MarkLockReleased(ctx, "default", "clients"); err != nil {
 		t.Fatalf("MarkLockReleased: %v", err)
 	}
@@ -122,22 +122,22 @@ func TestUpdater_MarkLockReleased_ClearsFields(t *testing.T) {
 	}
 }
 
-// TestUpdater_MarkLockReleased_NoRecord: sync_state が存在しなくてもエラーなし
+// TestUpdater_MarkLockReleased_NoRecord: no error even when sync_state does not exist
 func TestUpdater_MarkLockReleased_NoRecord(t *testing.T) {
 	_, ss := newLockTestDB(t)
 	u := NewUpdater(ss)
 	ctx := context.Background()
 
-	// 事前状態なしで解放
+	// release without pre-existing state
 	err := u.MarkLockReleased(ctx, "nonexistent", "clients")
 	if err != nil {
 		t.Fatalf("MarkLockReleased on non-existent record: %v", err)
 	}
 }
 
-// ---- LockManager テスト ----
+// ---- LockManager tests ----
 
-// TestLockManager_AcquireLock_Success: DB に sync_state なしで AcquireLock が成功する
+// TestLockManager_AcquireLock_Success: AcquireLock succeeds with no sync_state in DB
 func TestLockManager_AcquireLock_Success(t *testing.T) {
 	_, ss := newLockTestDB(t)
 	now := time.Date(2025, 1, 15, 10, 0, 0, 0, time.UTC)
@@ -149,7 +149,7 @@ func TestLockManager_AcquireLock_Success(t *testing.T) {
 	}
 	defer func() { _ = lm.ReleaseLock(context.Background(), "default", "clients") }()
 
-	// DB に refresh_started_at が設定されているか
+	// is refresh_started_at set in DB?
 	state, err := ss.Get(ctx, "default", "clients")
 	if err != nil {
 		t.Fatalf("Get: %v", err)
@@ -159,7 +159,7 @@ func TestLockManager_AcquireLock_Success(t *testing.T) {
 	}
 }
 
-// TestLockManager_ReleaseLock_ClearsDB: AcquireLock 後に ReleaseLock すると DB がクリアされる
+// TestLockManager_ReleaseLock_ClearsDB: ReleaseLock after AcquireLock clears the DB
 func TestLockManager_ReleaseLock_ClearsDB(t *testing.T) {
 	_, ss := newLockTestDB(t)
 	now := time.Date(2025, 1, 15, 10, 0, 0, 0, time.UTC)
@@ -185,7 +185,7 @@ func TestLockManager_ReleaseLock_ClearsDB(t *testing.T) {
 	}
 }
 
-// TestLockManager_WithLock_FnCalled: fn が呼ばれ、戻り値が fn の戻り値と等しい
+// TestLockManager_WithLock_FnCalled: fn is called and return value equals fn's return value
 func TestLockManager_WithLock_FnCalled(t *testing.T) {
 	_, ss := newLockTestDB(t)
 	now := time.Date(2025, 1, 15, 10, 0, 0, 0, time.UTC)
@@ -206,7 +206,7 @@ func TestLockManager_WithLock_FnCalled(t *testing.T) {
 	}
 }
 
-// TestLockManager_WithLock_ReleasedOnFnError: fn がエラーを返しても DB ロックが解放される
+// TestLockManager_WithLock_ReleasedOnFnError: DB lock is released even when fn returns error
 func TestLockManager_WithLock_ReleasedOnFnError(t *testing.T) {
 	_, ss := newLockTestDB(t)
 	now := time.Date(2025, 1, 15, 10, 0, 0, 0, time.UTC)
@@ -222,14 +222,14 @@ func TestLockManager_WithLock_ReleasedOnFnError(t *testing.T) {
 		t.Errorf("WithLock error = %v, want %v", err, wantErr)
 	}
 
-	// DB ロックが解放されているか
+	// is DB lock released?
 	state, _ := ss.Get(ctx, "default", "clients")
 	if state != nil && state.RefreshStartedAt.Valid {
 		t.Error("RefreshStartedAt should be NULL after fn error")
 	}
 }
 
-// TestLockManager_WithLock_ReleasedOnFnSuccess: fn が成功後に DB ロックが解放される
+// TestLockManager_WithLock_ReleasedOnFnSuccess: DB lock is released after fn succeeds
 func TestLockManager_WithLock_ReleasedOnFnSuccess(t *testing.T) {
 	_, ss := newLockTestDB(t)
 	now := time.Date(2025, 1, 15, 10, 0, 0, 0, time.UTC)
@@ -249,16 +249,16 @@ func TestLockManager_WithLock_ReleasedOnFnSuccess(t *testing.T) {
 	}
 }
 
-// ---- ctx キャンセルテスト ----
+// ---- ctx cancellation tests ----
 
-// TestLockManager_AcquireLock_CanceledContext: キャンセル済み ctx では ErrLockCanceled を返す
+// TestLockManager_AcquireLock_CanceledContext: ErrLockCanceled is returned for cancelled ctx
 func TestLockManager_AcquireLock_CanceledContext(t *testing.T) {
 	_, ss := newLockTestDB(t)
 	now := time.Date(2025, 1, 15, 10, 0, 0, 0, time.UTC)
 	lm := newLockManagerWithClock(ss, "testhost:1", func() time.Time { return now })
 
 	ctx, cancel := context.WithCancel(context.Background())
-	cancel() // 即キャンセル
+	cancel() // cancel immediately
 
 	err := lm.AcquireLock(ctx, "default", "clients")
 	if !errors.Is(err, ErrLockCanceled) {
@@ -266,9 +266,9 @@ func TestLockManager_AcquireLock_CanceledContext(t *testing.T) {
 	}
 }
 
-// ---- stale ロックテスト ----
+// ---- stale lock tests ----
 
-// TestLockManager_isStale_BelowThreshold: 9分前は stale でない
+// TestLockManager_isStale_BelowThreshold: 9 minutes ago is not stale
 func TestLockManager_isStale_BelowThreshold(t *testing.T) {
 	_, ss := newLockTestDB(t)
 	now := time.Date(2025, 1, 15, 10, 0, 0, 0, time.UTC)
@@ -282,7 +282,7 @@ func TestLockManager_isStale_BelowThreshold(t *testing.T) {
 	}
 }
 
-// TestLockManager_isStale_AboveThreshold: 11分前は stale
+// TestLockManager_isStale_AboveThreshold: 11 minutes ago is stale
 func TestLockManager_isStale_AboveThreshold(t *testing.T) {
 	_, ss := newLockTestDB(t)
 	now := time.Date(2025, 1, 15, 10, 0, 0, 0, time.UTC)
@@ -296,26 +296,26 @@ func TestLockManager_isStale_AboveThreshold(t *testing.T) {
 	}
 }
 
-// TestLockManager_isStale_NoStartedAt: RefreshStartedAt が NULL は stale でない
+// TestLockManager_isStale_NoStartedAt: NULL RefreshStartedAt is not stale
 func TestLockManager_isStale_NoStartedAt(t *testing.T) {
 	_, ss := newLockTestDB(t)
 	now := time.Date(2025, 1, 15, 10, 0, 0, 0, time.UTC)
 	lm := newLockManagerWithClock(ss, "testhost:1", func() time.Time { return now })
 
-	state := &cache.SyncState{} // RefreshStartedAt は zero value (Valid=false)
+	state := &cache.SyncState{} // RefreshStartedAt is zero value (Valid=false)
 	if lm.isStale(state) {
 		t.Error("isStale should be false when RefreshStartedAt is NULL")
 	}
 }
 
-// TestLockManager_AcquireLock_StaleDetection_Overrides: 11分前の refresh_started_at を上書きできる
+// TestLockManager_AcquireLock_StaleDetection_Overrides: can overwrite refresh_started_at from 11 minutes ago
 func TestLockManager_AcquireLock_StaleDetection_Overrides(t *testing.T) {
 	_, ss := newLockTestDB(t)
 	now := time.Date(2025, 1, 15, 10, 0, 0, 0, time.UTC)
 	lm := newLockManagerWithClock(ss, "testhost:new", func() time.Time { return now })
 	ctx := context.Background()
 
-	// 11分前の stale ロックを DB に設定
+	// set stale lock from 11 minutes ago in DB
 	staleTime := now.Add(-11 * time.Minute)
 	existing := cache.SyncState{
 		ProfileName:      "default",
@@ -327,13 +327,13 @@ func TestLockManager_AcquireLock_StaleDetection_Overrides(t *testing.T) {
 		t.Fatalf("Upsert: %v", err)
 	}
 
-	// AcquireLock が成功するはず
+	// AcquireLock should succeed
 	if err := lm.AcquireLock(ctx, "default", "clients"); err != nil {
 		t.Fatalf("AcquireLock with stale lock: %v", err)
 	}
 	defer func() { _ = lm.ReleaseLock(context.Background(), "default", "clients") }()
 
-	// refresh_started_at が新しい時刻に更新されているか
+	// is refresh_started_at updated to the new time?
 	state, err := ss.Get(ctx, "default", "clients")
 	if err != nil {
 		t.Fatalf("Get: %v", err)
@@ -347,9 +347,9 @@ func TestLockManager_AcquireLock_StaleDetection_Overrides(t *testing.T) {
 	}
 }
 
-// ---- 並行処理テスト ----
+// ---- concurrency tests ----
 
-// TestLockManager_WithLock_Sequential_SameKey: 同一 key の 2 goroutine が逐次実行される
+// TestLockManager_WithLock_Sequential_SameKey: 2 goroutines with the same key execute sequentially
 func TestLockManager_WithLock_Sequential_SameKey(t *testing.T) {
 	_, ss := newLockTestDB(t)
 	now := time.Date(2025, 1, 15, 10, 0, 0, 0, time.UTC)
@@ -357,7 +357,7 @@ func TestLockManager_WithLock_Sequential_SameKey(t *testing.T) {
 	ctx := context.Background()
 
 	counter := 0
-	var mu sync.Mutex // counter 保護用
+	var mu sync.Mutex // protects counter
 	concurrent := false
 	detected := false
 
@@ -370,7 +370,7 @@ func TestLockManager_WithLock_Sequential_SameKey(t *testing.T) {
 		}
 		mu.Unlock()
 
-		time.Sleep(20 * time.Millisecond) // 重複検出のための待機
+		time.Sleep(20 * time.Millisecond) // wait to detect overlap
 
 		mu.Lock()
 		counter--
@@ -395,14 +395,14 @@ func TestLockManager_WithLock_Sequential_SameKey(t *testing.T) {
 	}
 }
 
-// TestLockManager_WithLock_Parallel_DifferentKeys: 別 key の goroutine は並行実行できる
+// TestLockManager_WithLock_Parallel_DifferentKeys: goroutines with different keys can execute in parallel
 func TestLockManager_WithLock_Parallel_DifferentKeys(t *testing.T) {
 	_, ss := newLockTestDB(t)
 	now := time.Date(2025, 1, 15, 10, 0, 0, 0, time.UTC)
 	lm := newLockManagerWithClock(ss, "testhost:1", func() time.Time { return now })
 	ctx := context.Background()
 
-	// 別 key なら並行実行されるため、同一 key（20ms sleep × 2）より大幅に速いはず
+	// different keys allow parallel execution, so should be significantly faster than same key (20ms sleep × 2)
 	sleepDuration := 30 * time.Millisecond
 
 	start := time.Now()
@@ -425,8 +425,8 @@ func TestLockManager_WithLock_Parallel_DifferentKeys(t *testing.T) {
 	wg.Wait()
 	elapsed := time.Since(start)
 
-	// 並行実行されるなら elapsed ≈ 30ms（直列なら 60ms+）
-	// 余裕を持って 55ms 未満であれば並行実行されたと判断
+	// parallel execution: elapsed ≈ 30ms (sequential would be 60ms+)
+	// if elapsed < 55ms with margin, parallel execution is confirmed
 	if elapsed >= 55*time.Millisecond {
 		t.Errorf("fn for different keys should run in parallel, elapsed=%v (want < 55ms)", elapsed)
 	}

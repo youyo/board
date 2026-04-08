@@ -9,7 +9,7 @@ import (
 )
 
 func TestConfigureUseCmd(t *testing.T) {
-	t.Run("存在するプロファイルを指定すると current_profile が更新される", func(t *testing.T) {
+	t.Run("specifying an existing profile updates current_profile", func(t *testing.T) {
 		path := newTempConfig(t)
 
 		cfg := config.DefaultConfig()
@@ -24,7 +24,7 @@ func TestConfigureUseCmd(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
-		// 保存された config を確認
+		// Verify the saved config.
 		saved, err := config.Load(path)
 		if err != nil {
 			t.Fatalf("load failed: %v", err)
@@ -34,7 +34,7 @@ func TestConfigureUseCmd(t *testing.T) {
 		}
 	})
 
-	t.Run("存在しないプロファイルを指定するとエラー", func(t *testing.T) {
+	t.Run("specifying a non-existent profile returns an error", func(t *testing.T) {
 		newTempConfig(t)
 
 		root := cli.NewConfigureCmd()
@@ -47,7 +47,7 @@ func TestConfigureUseCmd(t *testing.T) {
 		}
 	})
 
-	t.Run("引数なしだと cobra の args エラー", func(t *testing.T) {
+	t.Run("no arguments returns a cobra args error", func(t *testing.T) {
 		newTempConfig(t)
 
 		root := cli.NewConfigureCmd()

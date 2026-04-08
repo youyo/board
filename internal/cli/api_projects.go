@@ -9,11 +9,11 @@ import (
 	"github.com/youyo/board/internal/output"
 )
 
-// NewAPIProjectsCmd は board api projects サブコマンドグループを返す。
+// NewAPIProjectsCmd  returns the board api projects subcommand group.
 func NewAPIProjectsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "projects",
-		Short: "案件（projects）を操作する",
+		Short: "Manage projects",
 	}
 	cmd.AddCommand(
 		newAPIProjectsListCmd(),
@@ -26,7 +26,7 @@ func NewAPIProjectsCmd() *cobra.Command {
 func newAPIProjectsListCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
-		Short: "案件の一覧を取得する",
+		Short: "List all projects",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			svc, err := apiServiceFromCmd(cmd)
 			if err != nil {
@@ -46,10 +46,10 @@ func newAPIProjectsGetCmd() *cobra.Command {
 	var id int
 	cmd := &cobra.Command{
 		Use:   "get",
-		Short: "指定 ID の案件を取得する",
+		Short: "Get a project by ID",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if id == 0 {
-				return fmt.Errorf("--id は必須です")
+				return fmt.Errorf("--id is required")
 			}
 			svc, err := apiServiceFromCmd(cmd)
 			if err != nil {
@@ -63,7 +63,7 @@ func newAPIProjectsGetCmd() *cobra.Command {
 			return output.Write(os.Stdout, result, prettyFromCmd(cmd))
 		},
 	}
-	cmd.Flags().IntVar(&id, "id", 0, "案件 ID（必須）")
+	cmd.Flags().IntVar(&id, "id", 0, "Project ID (required)")
 	return cmd
 }
 
@@ -72,7 +72,7 @@ func newAPIProjectsSearchCmd() *cobra.Command {
 	var name, status, updatedAtFrom string
 	cmd := &cobra.Command{
 		Use:   "search",
-		Short: "案件を条件で検索する",
+		Short: "Search projects by criteria",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			svc, err := apiServiceFromCmd(cmd)
 			if err != nil {
@@ -92,9 +92,9 @@ func newAPIProjectsSearchCmd() *cobra.Command {
 			return output.Write(os.Stdout, result, prettyFromCmd(cmd))
 		},
 	}
-	cmd.Flags().IntVar(&clientID, "client-id", 0, "顧客 ID でフィルタ")
-	cmd.Flags().StringVar(&name, "name", "", "案件名でフィルタ")
-	cmd.Flags().StringVar(&status, "status", "", "ステータスでフィルタ")
-	cmd.Flags().StringVar(&updatedAtFrom, "updated-at-from", "", "更新日時（ISO 8601）以降でフィルタ")
+	cmd.Flags().IntVar(&clientID, "client-id", 0, "Filter by client ID")
+	cmd.Flags().StringVar(&name, "name", "", "Filter by project name")
+	cmd.Flags().StringVar(&status, "status", "", "Filter by status")
+	cmd.Flags().StringVar(&updatedAtFrom, "updated-at-from", "", "Filter by updated_at (ISO 8601, lower bound)")
 	return cmd
 }

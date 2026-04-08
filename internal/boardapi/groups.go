@@ -8,8 +8,8 @@ import (
 	"strconv"
 )
 
-// GroupEntity は BOARD API のグループエンティティ。
-// GET /v1/groups レスポンスの1要素に対応。
+// GroupEntity is a BOARD API group entity.
+// Corresponds to one element in the GET /v1/groups response.
 type GroupEntity struct {
 	ID        int    `json:"id"`
 	Name      string `json:"name"`
@@ -18,14 +18,14 @@ type GroupEntity struct {
 	CreatedAt string `json:"created_at"` // ISO 8601
 }
 
-// GroupSearchParams は SearchGroups のパラメータ。
+// GroupSearchParams is the parameter for SearchGroups.
 type GroupSearchParams struct {
 	Name          string
 	UpdatedAtFrom string
 }
 
-// ListGroups は全グループを取得する。
-// ページネーションは ListAll により自動処理される。
+// ListGroups retrieves all groups.
+// Pagination is automatically handled by ListAll.
 func (c *Client) ListGroups(ctx context.Context) ([]GroupEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/groups", nil)
@@ -53,7 +53,7 @@ func (c *Client) ListGroups(ctx context.Context) ([]GroupEntity, error) {
 	return result, nil
 }
 
-// GetGroup は指定 ID のグループを取得する。
+// GetGroup retrieves the group with the specified ID.
 func (c *Client) GetGroup(ctx context.Context, id int) (*GroupEntity, error) {
 	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/groups/%d", id), nil)
 	if err != nil {
@@ -70,8 +70,8 @@ func (c *Client) GetGroup(ctx context.Context, id int) (*GroupEntity, error) {
 	return &x, nil
 }
 
-// SearchGroups は条件付きでグループを検索する。
-// ページネーションは ListAll により自動処理される。
+// SearchGroups searches groups with the given conditions.
+// Pagination is automatically handled by ListAll.
 func (c *Client) SearchGroups(ctx context.Context, params GroupSearchParams) ([]GroupEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/groups", nil)

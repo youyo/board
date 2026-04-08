@@ -9,11 +9,11 @@ import (
 	"github.com/youyo/board/internal/output"
 )
 
-// NewAPIDocumentSendChannelsCmd は board api document_send_channels サブコマンドグループを返す。
+// NewAPIDocumentSendChannelsCmd  returns the board api document_send_channels subcommand group.
 func NewAPIDocumentSendChannelsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "document_send_channels",
-		Short: "書類送付方法（document_send_channels）を操作する",
+		Short: "Manage document_send_channels",
 	}
 	cmd.AddCommand(
 		newAPIDocumentSendChannelsListCmd(),
@@ -26,7 +26,7 @@ func NewAPIDocumentSendChannelsCmd() *cobra.Command {
 func newAPIDocumentSendChannelsListCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
-		Short: "書類送付方法の一覧を取得する",
+		Short: "List all document_send_channels",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			svc, err := apiServiceFromCmd(cmd)
 			if err != nil {
@@ -46,10 +46,10 @@ func newAPIDocumentSendChannelsGetCmd() *cobra.Command {
 	var id int
 	cmd := &cobra.Command{
 		Use:   "get",
-		Short: "指定 ID の書類送付方法を取得する",
+		Short: "Get a document_send_channel by ID",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if id == 0 {
-				return fmt.Errorf("--id は必須です")
+				return fmt.Errorf("--id is required")
 			}
 			svc, err := apiServiceFromCmd(cmd)
 			if err != nil {
@@ -63,7 +63,7 @@ func newAPIDocumentSendChannelsGetCmd() *cobra.Command {
 			return output.Write(os.Stdout, result, prettyFromCmd(cmd))
 		},
 	}
-	cmd.Flags().IntVar(&id, "id", 0, "書類送付方法 ID（必須）")
+	cmd.Flags().IntVar(&id, "id", 0, "Document send channel ID (required)")
 	return cmd
 }
 
@@ -71,7 +71,7 @@ func newAPIDocumentSendChannelsSearchCmd() *cobra.Command {
 	var name, updatedAtFrom string
 	cmd := &cobra.Command{
 		Use:   "search",
-		Short: "書類送付方法を条件で検索する",
+		Short: "Search document_send_channels by criteria",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			svc, err := apiServiceFromCmd(cmd)
 			if err != nil {
@@ -89,7 +89,7 @@ func newAPIDocumentSendChannelsSearchCmd() *cobra.Command {
 			return output.Write(os.Stdout, result, prettyFromCmd(cmd))
 		},
 	}
-	cmd.Flags().StringVar(&name, "name", "", "書類送付方法名でフィルタ")
-	cmd.Flags().StringVar(&updatedAtFrom, "updated-at-from", "", "更新日時（ISO 8601）以降でフィルタ")
+	cmd.Flags().StringVar(&name, "name", "", "Filter by document send channel name")
+	cmd.Flags().StringVar(&updatedAtFrom, "updated-at-from", "", "Filter by updated_at (ISO 8601, lower bound)")
 	return cmd
 }

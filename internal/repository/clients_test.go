@@ -17,9 +17,9 @@ import (
 	"github.com/youyo/board/internal/repository"
 )
 
-// --- テスト共通ヘルパー ---
+// --- Common test helpers ---
 
-// newTestDB はテスト用 SQLite DB（一時ファイル）を作成する。
+// newTestDB creates a SQLite DB (temporary file) for testing.
 func newTestDB(t *testing.T) *cache.DB {
 	t.Helper()
 	dir := t.TempDir()
@@ -34,13 +34,13 @@ func newTestDB(t *testing.T) *cache.DB {
 	return db
 }
 
-// jsonArrayOf は entities を JSON 配列形式にマーシャルする。
+// jsonArrayOf marshals entities to a JSON array.
 func jsonArrayOf(entities interface{}) []byte {
 	b, _ := json.Marshal(entities)
 	return b
 }
 
-// newClientAPIServer は /v1/clients に対して entities を返す httptest.Server を返す。
+// newClientAPIServer returns an httptest.Server that serves entities for /v1/clients.
 func newClientAPIServer(t *testing.T, entities []boardapi.ClientEntity) *httptest.Server {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -51,7 +51,7 @@ func newClientAPIServer(t *testing.T, entities []boardapi.ClientEntity) *httptes
 	return srv
 }
 
-// newErrorAPIServer は 500 エラーを返す httptest.Server を返す。
+// newErrorAPIServer returns an httptest.Server that responds with 500 errors.
 func newErrorAPIServer(t *testing.T) *httptest.Server {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -62,7 +62,7 @@ func newErrorAPIServer(t *testing.T) *httptest.Server {
 	return srv
 }
 
-// makeClientRepo はテスト用 ClientRepository を構築する。
+// makeClientRepo constructs a ClientRepository for testing.
 func makeClientRepo(t *testing.T, db *cache.DB, apiClient *boardapi.Client, autoRefresh bool) *repository.ClientRepository {
 	t.Helper()
 	rc := cache.NewResourceCache(db)
@@ -73,7 +73,7 @@ func makeClientRepo(t *testing.T, db *cache.DB, apiClient *boardapi.Client, auto
 	return repository.NewClientRepository("default", apiClient, rc, ss, refresher, lm, tz, autoRefresh)
 }
 
-// seedClientCache はキャッシュに ClientEntity を直接書き込む。
+// seedClientCache writes ClientEntity records directly into the cache.
 func seedClientCache(t *testing.T, db *cache.DB, entities []boardapi.ClientEntity) {
 	t.Helper()
 	rc := cache.NewResourceCache(db)
@@ -99,7 +99,7 @@ func seedClientCache(t *testing.T, db *cache.DB, entities []boardapi.ClientEntit
 	}
 }
 
-// markSynced は SyncState を「本日同期済み」に設定する。
+// markSynced sets the SyncState to "synced today".
 func markSynced(t *testing.T, db *cache.DB, resource string) {
 	t.Helper()
 	ss := cache.NewSyncStateStore(db)
@@ -117,18 +117,18 @@ func markSynced(t *testing.T, db *cache.DB, resource string) {
 }
 
 var sampleClients = []boardapi.ClientEntity{
-	{ID: 1, Name: "顧客A", UpdatedAt: "2026-01-01T00:00:00Z"},
-	{ID: 2, Name: "顧客B", UpdatedAt: "2026-01-02T00:00:00Z"},
-	{ID: 3, Name: "別顧客C", UpdatedAt: "2026-01-03T00:00:00Z"},
+	{ID: 1, Name: "ClientA", UpdatedAt: "2026-01-01T00:00:00Z"},
+	{ID: 2, Name: "ClientB", UpdatedAt: "2026-01-02T00:00:00Z"},
+	{ID: 3, Name: "OtherClientC", UpdatedAt: "2026-01-03T00:00:00Z"},
 }
 
-// T_R01: List - キャッシュあり、autoRefresh=false → キャッシュのデータを返す
+// T_R01: List - cache hit, autoRefresh=false -> returns cached data
 func TestClientRepository_List_CacheHit(t *testing.T) {
 	db := newTestDB(t)
 	seedClientCache(t, db, sampleClients)
 	markSynced(t, db, "clients")
 
-	srv := newClientAPIServer(t, nil) // API は呼ばれないはず
+	srv := newClientAPIServer(t, nil) // API should not be called
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeClientRepo(t, db, apiClient, false)
@@ -141,7 +141,7 @@ func TestClientRepository_List_CacheHit(t *testing.T) {
 	}
 }
 
-// T_R02: List - キャッシュなし（初回）、autoRefresh=false → ForceRefresh 後データを返す
+// T_R02: List - no cache (initial load), autoRefresh=false -> returns data after ForceRefresh
 func TestClientRepository_List_InitialLoad(t *testing.T) {
 	db := newTestDB(t)
 
@@ -158,10 +158,10 @@ func TestClientRepository_List_InitialLoad(t *testing.T) {
 	}
 }
 
-// T_R03: List - autoRefresh=true、NeedsDailyRefresh=true → DeltaRefresh 後データを返す
+// T_R03: List - autoRefresh=true, NeedsDailyRefresh=true -> returns data after DeltaRefresh
 func TestClientRepository_List_AutoRefresh(t *testing.T) {
 	db := newTestDB(t)
-	// キャッシュにデータを入れるが SyncState は「昨日」にする
+	// Seed cache with data but set SyncState to "yesterday"
 	seedClientCache(t, db, sampleClients[:1])
 	ss := cache.NewSyncStateStore(db)
 	yesterday := time.Now().UTC().AddDate(0, 0, -1).Format("2006-01-02")
@@ -171,7 +171,7 @@ func TestClientRepository_List_AutoRefresh(t *testing.T) {
 		LastDailyRefreshDate: sql.NullString{Valid: true, String: yesterday},
 	})
 
-	// API は全件返す
+	// API returns all entries
 	srv := newClientAPIServer(t, sampleClients)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
@@ -185,7 +185,7 @@ func TestClientRepository_List_AutoRefresh(t *testing.T) {
 	}
 }
 
-// T_R04: List - opts.ForceRefresh=true → ForceRefresh 後データを返す
+// T_R04: List - opts.ForceRefresh=true -> returns data after ForceRefresh
 func TestClientRepository_List_ForceRefresh(t *testing.T) {
 	db := newTestDB(t)
 
@@ -202,13 +202,13 @@ func TestClientRepository_List_ForceRefresh(t *testing.T) {
 	}
 }
 
-// T_R05: List - opts.Refresh=true → DeltaRefresh 後データを返す
+// T_R05: List - opts.Refresh=true -> returns data after DeltaRefresh
 func TestClientRepository_List_DeltaRefresh(t *testing.T) {
 	db := newTestDB(t)
 	seedClientCache(t, db, sampleClients[:1])
 	markSynced(t, db, "clients")
 
-	// DeltaRefresh は差分（全件）を返す
+	// DeltaRefresh returns delta (all entries)
 	srv := newClientAPIServer(t, sampleClients)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
@@ -222,7 +222,7 @@ func TestClientRepository_List_DeltaRefresh(t *testing.T) {
 	}
 }
 
-// T_R06: List - opts.Limit=2、キャッシュに3件 → 2件のみ返す
+// T_R06: List - opts.Limit=2, 3 entries in cache -> returns only 2
 func TestClientRepository_List_Limit(t *testing.T) {
 	db := newTestDB(t)
 	seedClientCache(t, db, sampleClients)
@@ -241,7 +241,7 @@ func TestClientRepository_List_Limit(t *testing.T) {
 	}
 }
 
-// T_R07: List - opts.Refresh=true、API エラー → stale キャッシュを返す（エラーなし）
+// T_R07: List - opts.Refresh=true, API error -> returns stale cache (no error)
 func TestClientRepository_List_DeltaRefreshAPIError_StaleCache(t *testing.T) {
 	db := newTestDB(t)
 	seedClientCache(t, db, sampleClients)
@@ -260,13 +260,13 @@ func TestClientRepository_List_DeltaRefreshAPIError_StaleCache(t *testing.T) {
 	}
 }
 
-// T_R08: GetByID - キャッシュヒット → キャッシュから返す
+// T_R08: GetByID - cache hit -> returns from cache
 func TestClientRepository_GetByID_CacheHit(t *testing.T) {
 	db := newTestDB(t)
 	seedClientCache(t, db, sampleClients)
 	markSynced(t, db, "clients")
 
-	srv := newClientAPIServer(t, nil) // API 呼ばれないはず
+	srv := newClientAPIServer(t, nil) // API should not be called
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeClientRepo(t, db, apiClient, false)
@@ -279,13 +279,13 @@ func TestClientRepository_GetByID_CacheHit(t *testing.T) {
 	}
 }
 
-// T_R09: GetByID - キャッシュミス、API 成功 → API 取得後 upsert して返す
+// T_R09: GetByID - cache miss, API success -> fetches from API, upserts, and returns
 func TestClientRepository_GetByID_CacheMiss_APISuccess(t *testing.T) {
 	db := newTestDB(t)
 	markSynced(t, db, "clients")
 
-	target := boardapi.ClientEntity{ID: 42, Name: "テスト顧客", UpdatedAt: "2026-01-01T00:00:00Z"}
-	// /v1/clients/42 に対応するレスポンス
+	target := boardapi.ClientEntity{ID: 42, Name: "TestClient", UpdatedAt: "2026-01-01T00:00:00Z"}
+	// response for /v1/clients/42
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		b, _ := json.Marshal(target)
@@ -305,7 +305,7 @@ func TestClientRepository_GetByID_CacheMiss_APISuccess(t *testing.T) {
 	}
 }
 
-// T_R10: GetByID - キャッシュミス、API エラー → error を返す
+// T_R10: GetByID - cache miss, API error -> returns error
 func TestClientRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	db := newTestDB(t)
 	markSynced(t, db, "clients")
@@ -320,7 +320,7 @@ func TestClientRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	}
 }
 
-// T_R11: Search - キャッシュあり、パラメータなし → 全件返す
+// T_R11: Search - cache hit, no params -> returns all
 func TestClientRepository_Search_NoFilter(t *testing.T) {
 	db := newTestDB(t)
 	seedClientCache(t, db, sampleClients)
@@ -339,7 +339,7 @@ func TestClientRepository_Search_NoFilter(t *testing.T) {
 	}
 }
 
-// T_R12: Search - Name フィルタ → 一致するものを返す
+// T_R12: Search - Name filter -> returns matching entries
 func TestClientRepository_Search_NameFilter(t *testing.T) {
 	db := newTestDB(t)
 	seedClientCache(t, db, sampleClients)
@@ -349,19 +349,19 @@ func TestClientRepository_Search_NameFilter(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeClientRepo(t, db, apiClient, false)
-	got, err := repo.Search(context.Background(), boardapi.ClientSearchParams{Name: "顧客A"}, repository.ReadOptions{})
+	got, err := repo.Search(context.Background(), boardapi.ClientSearchParams{Name: "ClientA"}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
 	if len(got) != 1 {
 		t.Errorf("len(got) = %d, want 1", len(got))
 	}
-	if got[0].Name != "顧客A" {
-		t.Errorf("got[0].Name = %q, want 顧客A", got[0].Name)
+	if got[0].Name != "ClientA" {
+		t.Errorf("got[0].Name = %q, want ClientA", got[0].Name)
 	}
 }
 
-// T_R13: Search - opts.ForceRefresh=true → ForceRefresh 後にフィルタ
+// T_R13: Search - opts.ForceRefresh=true -> filters after ForceRefresh
 func TestClientRepository_Search_ForceRefresh(t *testing.T) {
 	db := newTestDB(t)
 
@@ -369,17 +369,17 @@ func TestClientRepository_Search_ForceRefresh(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeClientRepo(t, db, apiClient, false)
-	got, err := repo.Search(context.Background(), boardapi.ClientSearchParams{Name: "顧客"}, repository.ReadOptions{ForceRefresh: true})
+	got, err := repo.Search(context.Background(), boardapi.ClientSearchParams{Name: "Client"}, repository.ReadOptions{ForceRefresh: true})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
-	// 「顧客A」「顧客B」がマッチ（「別顧客C」も「顧客」を含む）
+	// "ClientA" and "ClientB" match ("OtherClientC" also contains "Client")
 	if len(got) == 0 {
 		t.Error("expected at least one result")
 	}
 }
 
-// T_R14: List - Limit=0（無制限） → 全件返す
+// T_R14: List - Limit=0 (unlimited) -> returns all entries
 func TestClientRepository_List_NoLimit(t *testing.T) {
 	db := newTestDB(t)
 	seedClientCache(t, db, sampleClients)
@@ -398,13 +398,13 @@ func TestClientRepository_List_NoLimit(t *testing.T) {
 	}
 }
 
-// T_R15: List - コンテキストキャンセル → context.Canceled を返す
+// T_R15: List - context canceled -> returns context.Canceled
 func TestClientRepository_List_ContextCanceled(t *testing.T) {
 	db := newTestDB(t)
 
-	// API サーバーは遅延させる
+	// API server delays responses
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// コンテキストがキャンセルされるまで待機
+		// Wait until the context is canceled
 		<-r.Context().Done()
 	}))
 	t.Cleanup(srv.Close)
@@ -414,7 +414,7 @@ func TestClientRepository_List_ContextCanceled(t *testing.T) {
 	repo := makeClientRepo(t, db, apiClient, false)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	cancel() // 即座にキャンセル
+	cancel() // cancel immediately
 
 	_, err := repo.List(ctx, repository.ReadOptions{})
 	if err == nil {

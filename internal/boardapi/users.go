@@ -8,8 +8,8 @@ import (
 	"strconv"
 )
 
-// UserEntity は BOARD API のユーザーエンティティ。
-// GET /v1/users レスポンスの1要素に対応。
+// UserEntity is a BOARD API user entity.
+// Corresponds to one element in the GET /v1/users response.
 type UserEntity struct {
 	ID        int    `json:"id"`
 	Name      string `json:"name"`
@@ -18,15 +18,15 @@ type UserEntity struct {
 	CreatedAt string `json:"created_at"` // ISO 8601
 }
 
-// UserSearchParams は SearchUsers のパラメータ。
+// UserSearchParams is the parameter for SearchUsers.
 type UserSearchParams struct {
 	Name          string
 	Email         string
 	UpdatedAtFrom string
 }
 
-// ListUsers は全ユーザーを取得する。
-// ページネーションは ListAll により自動処理される。
+// ListUsers retrieves all users.
+// Pagination is automatically handled by ListAll.
 func (c *Client) ListUsers(ctx context.Context) ([]UserEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/users", nil)
@@ -54,7 +54,7 @@ func (c *Client) ListUsers(ctx context.Context) ([]UserEntity, error) {
 	return result, nil
 }
 
-// GetUser は指定 ID のユーザーを取得する。
+// GetUser retrieves the user with the specified ID.
 func (c *Client) GetUser(ctx context.Context, id int) (*UserEntity, error) {
 	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/users/%d", id), nil)
 	if err != nil {
@@ -71,8 +71,8 @@ func (c *Client) GetUser(ctx context.Context, id int) (*UserEntity, error) {
 	return &x, nil
 }
 
-// SearchUsers は条件付きでユーザーを検索する。
-// ページネーションは ListAll により自動処理される。
+// SearchUsers searches users with the given conditions.
+// Pagination is automatically handled by ListAll.
 func (c *Client) SearchUsers(ctx context.Context, params UserSearchParams) ([]UserEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/users", nil)

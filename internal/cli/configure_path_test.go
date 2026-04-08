@@ -9,7 +9,7 @@ import (
 )
 
 func TestConfigurePathCmd(t *testing.T) {
-	t.Run("BOARD_CONFIG_PATH が設定されている場合その値が返る", func(t *testing.T) {
+	t.Run("returns the value when BOARD_CONFIG_PATH is set", func(t *testing.T) {
 		dir := t.TempDir()
 		expected := filepath.Join(dir, "config.toml")
 		t.Setenv("BOARD_CONFIG_PATH", expected)

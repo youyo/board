@@ -34,9 +34,9 @@ func NewFindVendorCmd() *cobra.Command {
 
 			opts := readOptionsFromCmd(cmd)
 			q := find.FindVendorQuery{
-				ID:   id,
-				Name: name,
-				Text: text,
+				ID:    id,
+				Name:  name,
+				Text:  text,
 				Limit: opts.Limit,
 				Opts: repository.ReadOptions{
 					Refresh:      opts.Refresh,

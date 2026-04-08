@@ -7,11 +7,11 @@ import (
 	"github.com/youyo/board/internal/config"
 )
 
-// NewConfigureUseCmd は configure use コマンドを返す。
+// NewConfigureUseCmd returns the configure use command.
 func NewConfigureUseCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "use PROFILE",
-		Short: "使用するプロファイルを切り替える",
+		Short: "Switch the active profile",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			profileName := args[0]

@@ -7,19 +7,19 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-// DB は SQLite データベース接続を管理する。
+// DB manages a SQLite database connection.
 type DB struct {
 	db *sql.DB
 }
 
-// Open は SQLite データベースを開き、PRAGMA を設定する。
-// dsn が ":memory:" の場合はインメモリ DB を使用する。
+// Open opens a SQLite database and configures PRAGMA settings.
+// If dsn is ":memory:", an in-memory DB is used.
 func Open(dsn string) (*DB, error) {
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("cache: open: %w", err)
 	}
-	// PRAGMA 設定
+	// configure PRAGMAs
 	pragmas := []string{
 		"PRAGMA journal_mode=WAL",
 		"PRAGMA busy_timeout=5000",
@@ -35,13 +35,13 @@ func Open(dsn string) (*DB, error) {
 	return &DB{db: db}, nil
 }
 
-// Close はデータベース接続を閉じる。
+// Close closes the database connection.
 func (d *DB) Close() error {
 	return d.db.Close()
 }
 
-// SQLDB は内部の *sql.DB を返す。
-// 上位パッケージ（repository 等）がクエリを実行する際に使用。
+// SQLDB returns the internal *sql.DB.
+// Used by upper-level packages (e.g., repository) to execute queries.
 func (d *DB) SQLDB() *sql.DB {
 	return d.db
 }

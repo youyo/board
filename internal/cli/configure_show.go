@@ -8,12 +8,12 @@ import (
 	"github.com/youyo/board/internal/config"
 )
 
-// NewConfigureShowCmd は configure show コマンドを返す。
+// NewConfigureShowCmd returns the configure show command.
 func NewConfigureShowCmd() *cobra.Command {
 	var profileFlag string
 	cmd := &cobra.Command{
 		Use:   "show",
-		Short: "現在のプロファイル設定を表示する（secrets はマスク）",
+		Short: "Show the current profile settings (secrets are masked)",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			path := config.ConfigPath()
@@ -57,6 +57,6 @@ func NewConfigureShowCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVarP(&profileFlag, "profile", "p", "", "表示するプロファイル名")
+	cmd.Flags().StringVarP(&profileFlag, "profile", "p", "", "Profile name to display")
 	return cmd
 }

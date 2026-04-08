@@ -6,7 +6,7 @@ import (
 	"fmt"
 )
 
-// SyncState は sync_state テーブルの1行を表す。
+// SyncState represents one row in the sync_state table.
 type SyncState struct {
 	ProfileName          string
 	ResourceName         string
@@ -29,12 +29,12 @@ type SyncState struct {
 	SchemaVersion        int64
 }
 
-// SyncStateStore は sync_state テーブルの CRUD 操作を提供する。
+// SyncStateStore provides CRUD operations for the sync_state table.
 type SyncStateStore struct {
 	db *DB
 }
 
-// NewSyncStateStore は SyncStateStore を生成する。
+// NewSyncStateStore creates a SyncStateStore.
 func NewSyncStateStore(db *DB) *SyncStateStore {
 	return &SyncStateStore{db: db}
 }
@@ -101,7 +101,7 @@ const sqlSyncStateDeleteAll = `
 DELETE FROM sync_state
 WHERE profile_name = ?`
 
-// Get は指定 profile+resource の SyncState を返す。存在しない場合は nil, nil を返す。
+// Get returns the SyncState for the specified profile+resource. Returns nil, nil if not found.
 func (s *SyncStateStore) Get(ctx context.Context, profile, resource string) (*SyncState, error) {
 	row := s.db.db.QueryRowContext(ctx, sqlSyncStateGet, profile, resource)
 
@@ -126,7 +126,7 @@ func (s *SyncStateStore) Get(ctx context.Context, profile, resource string) (*Sy
 	return &st, nil
 }
 
-// Upsert は SyncState を挿入または上書きする（全 19 カラム）。
+// Upsert inserts or overwrites a SyncState (all 19 columns).
 func (s *SyncStateStore) Upsert(ctx context.Context, state SyncState) error {
 	mustFullResync := int64(0)
 	if state.MustFullResync {
@@ -147,7 +147,7 @@ func (s *SyncStateStore) Upsert(ctx context.Context, state SyncState) error {
 	return nil
 }
 
-// Delete は指定 profile+resource の SyncState を削除する。存在しない場合もエラーなし。
+// Delete deletes the SyncState for the specified profile+resource. No error if not found.
 func (s *SyncStateStore) Delete(ctx context.Context, profile, resource string) error {
 	_, err := s.db.db.ExecContext(ctx, sqlSyncStateDelete, profile, resource)
 	if err != nil {
@@ -156,7 +156,7 @@ func (s *SyncStateStore) Delete(ctx context.Context, profile, resource string) e
 	return nil
 }
 
-// ListAll は指定 profile の全 SyncState を resource_name 昇順で返す。
+// ListAll returns all SyncState entries for the specified profile ordered by resource_name ascending.
 func (s *SyncStateStore) ListAll(ctx context.Context, profile string) ([]SyncState, error) {
 	rows, err := s.db.db.QueryContext(ctx, sqlSyncStateListAll, profile)
 	if err != nil {
@@ -185,7 +185,7 @@ func (s *SyncStateStore) ListAll(ctx context.Context, profile string) ([]SyncSta
 	return result, rows.Err()
 }
 
-// Expire は指定 profile+resource の expired_at を now に設定して期限切れにする。
+// Expire sets expired_at to now for the specified profile+resource, marking it expired.
 func (s *SyncStateStore) Expire(ctx context.Context, profile, resource, now string) error {
 	_, err := s.db.db.ExecContext(ctx, sqlSyncStateExpire, now, profile, resource)
 	if err != nil {
@@ -194,7 +194,7 @@ func (s *SyncStateStore) Expire(ctx context.Context, profile, resource, now stri
 	return nil
 }
 
-// ExpireAll は指定 profile の全リソースを期限切れにする。
+// ExpireAll marks all resources for the specified profile as expired.
 func (s *SyncStateStore) ExpireAll(ctx context.Context, profile, now string) error {
 	_, err := s.db.db.ExecContext(ctx, sqlSyncStateExpireAll, now, profile)
 	if err != nil {
@@ -203,7 +203,7 @@ func (s *SyncStateStore) ExpireAll(ctx context.Context, profile, now string) err
 	return nil
 }
 
-// DeleteAll は指定 profile の全 SyncState を削除する。
+// DeleteAll deletes all SyncState entries for the specified profile.
 func (s *SyncStateStore) DeleteAll(ctx context.Context, profile string) error {
 	_, err := s.db.db.ExecContext(ctx, sqlSyncStateDeleteAll, profile)
 	if err != nil {

@@ -5,21 +5,21 @@ import (
 	"time"
 )
 
-// ForceRefreshResult は全件取得の結果サマリ。
+// ForceRefreshResult is a summary of the full fetch result.
 type ForceRefreshResult struct {
 	Profile      string
 	Resource     string
 	FetchedCount int
 }
 
-// ForceRefresh は全件を取得し、既存キャッシュを DeleteAll 後に UpsertMany する。
+// ForceRefresh fetches all items and calls DeleteAll on existing cache then UpsertMany.
 //
-// アルゴリズム:
-//  1. fetcher.ListAll(ctx) で全件取得
-//  2. rawToEntries で Entry スライスに変換
-//  3. ResourceCache.DeleteAll で既存キャッシュを全消去
-//  4. ResourceCache.UpsertMany で全件挿入
-//  5. Updater.MarkForceSuccess で sync_state 更新
+// Algorithm:
+//  1. Fetch all items via fetcher.ListAll(ctx)
+//  2. Convert to Entry slice via rawToEntries
+//  3. Clear existing cache via ResourceCache.DeleteAll
+//  4. Insert all items via ResourceCache.UpsertMany
+//  5. Update sync_state via Updater.MarkForceSuccess
 func (r *Refresher) ForceRefresh(
 	ctx context.Context,
 	profile string,
@@ -29,30 +29,30 @@ func (r *Refresher) ForceRefresh(
 ) (*ForceRefreshResult, error) {
 	resource := fetcher.ResourceName()
 
-	// 1. 全件取得
+	// 1. fetch all items
 	raws, err := fetcher.ListAll(ctx)
 	if err != nil {
 		_ = r.updater.MarkError(ctx, profile, resource, "", err.Error(), now)
 		return nil, err
 	}
 
-	// 2. Entry に変換
+	// 2. convert to Entry
 	entries, err := rawToEntries(profile, resource, raws)
 	if err != nil {
 		return nil, err
 	}
 
-	// 3. 既存キャッシュを全消去
+	// 3. clear existing cache
 	if err := r.resourceCache.DeleteAll(ctx, profile, resource); err != nil {
 		return nil, err
 	}
 
-	// 4. 全件挿入
+	// 4. insert all items
 	if err := r.resourceCache.UpsertMany(ctx, entries); err != nil {
 		return nil, err
 	}
 
-	// 5. sync_state 更新
+	// 5. update sync_state
 	if err := r.updater.MarkForceSuccess(ctx, profile, resource, now, tz); err != nil {
 		return nil, err
 	}

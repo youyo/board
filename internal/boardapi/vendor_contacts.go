@@ -8,8 +8,8 @@ import (
 	"strconv"
 )
 
-// VendorContactEntity は BOARD API の発注先担当者エンティティ。
-// GET /v1/vendor_contacts レスポンスの1要素に対応。
+// VendorContactEntity is a BOARD API vendor contact entity.
+// Corresponds to one element in the GET /v1/vendor_contacts response.
 type VendorContactEntity struct {
 	ID             int    `json:"id"`
 	VendorID       int    `json:"vendor_id"`
@@ -24,7 +24,7 @@ type VendorContactEntity struct {
 	CreatedAt      string `json:"created_at"` // ISO 8601
 }
 
-// VendorContactSearchParams は SearchVendorContacts のパラメータ。
+// VendorContactSearchParams is the parameter for SearchVendorContacts.
 type VendorContactSearchParams struct {
 	VendorID      int
 	Name          string
@@ -32,8 +32,8 @@ type VendorContactSearchParams struct {
 	UpdatedAtFrom string
 }
 
-// ListVendorContacts は全発注先担当者を取得する。
-// ページネーションは ListAll により自動処理される。
+// ListVendorContacts retrieves all vendor contacts.
+// Pagination is automatically handled by ListAll.
 func (c *Client) ListVendorContacts(ctx context.Context) ([]VendorContactEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/vendor_contacts", nil)
@@ -61,7 +61,7 @@ func (c *Client) ListVendorContacts(ctx context.Context) ([]VendorContactEntity,
 	return result, nil
 }
 
-// GetVendorContact は指定 ID の発注先担当者を取得する。
+// GetVendorContact retrieves the vendor contact with the specified ID.
 func (c *Client) GetVendorContact(ctx context.Context, id int) (*VendorContactEntity, error) {
 	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/vendor_contacts/%d", id), nil)
 	if err != nil {
@@ -78,8 +78,8 @@ func (c *Client) GetVendorContact(ctx context.Context, id int) (*VendorContactEn
 	return &x, nil
 }
 
-// SearchVendorContacts は条件付きで発注先担当者を検索する。
-// ページネーションは ListAll により自動処理される。
+// SearchVendorContacts searches vendor contacts with the given conditions.
+// Pagination is automatically handled by ListAll.
 func (c *Client) SearchVendorContacts(ctx context.Context, params VendorContactSearchParams) ([]VendorContactEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/vendor_contacts", nil)

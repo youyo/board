@@ -9,11 +9,11 @@ import (
 	"github.com/youyo/board/internal/output"
 )
 
-// NewAPIProjectTypesCmd は board api project_types サブコマンドグループを返す。
+// NewAPIProjectTypesCmd  returns the board api project_types subcommand group.
 func NewAPIProjectTypesCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "project_types",
-		Short: "プロジェクト種別（project_types）を操作する",
+		Short: "Manage project_types",
 	}
 	cmd.AddCommand(
 		newAPIProjectTypesListCmd(),
@@ -26,7 +26,7 @@ func NewAPIProjectTypesCmd() *cobra.Command {
 func newAPIProjectTypesListCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
-		Short: "プロジェクト種別の一覧を取得する",
+		Short: "List all project_types",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			svc, err := apiServiceFromCmd(cmd)
 			if err != nil {
@@ -46,10 +46,10 @@ func newAPIProjectTypesGetCmd() *cobra.Command {
 	var id int
 	cmd := &cobra.Command{
 		Use:   "get",
-		Short: "指定 ID のプロジェクト種別を取得する",
+		Short: "Get a project_type by ID",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if id == 0 {
-				return fmt.Errorf("--id は必須です")
+				return fmt.Errorf("--id is required")
 			}
 			svc, err := apiServiceFromCmd(cmd)
 			if err != nil {
@@ -63,7 +63,7 @@ func newAPIProjectTypesGetCmd() *cobra.Command {
 			return output.Write(os.Stdout, result, prettyFromCmd(cmd))
 		},
 	}
-	cmd.Flags().IntVar(&id, "id", 0, "プロジェクト種別 ID（必須）")
+	cmd.Flags().IntVar(&id, "id", 0, "Project type ID (required)")
 	return cmd
 }
 
@@ -71,7 +71,7 @@ func newAPIProjectTypesSearchCmd() *cobra.Command {
 	var name, updatedAtFrom string
 	cmd := &cobra.Command{
 		Use:   "search",
-		Short: "プロジェクト種別を条件で検索する",
+		Short: "Search project_types by criteria",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			svc, err := apiServiceFromCmd(cmd)
 			if err != nil {
@@ -89,7 +89,7 @@ func newAPIProjectTypesSearchCmd() *cobra.Command {
 			return output.Write(os.Stdout, result, prettyFromCmd(cmd))
 		},
 	}
-	cmd.Flags().StringVar(&name, "name", "", "プロジェクト種別名でフィルタ")
-	cmd.Flags().StringVar(&updatedAtFrom, "updated-at-from", "", "更新日時（ISO 8601）以降でフィルタ")
+	cmd.Flags().StringVar(&name, "name", "", "Filter by project type name")
+	cmd.Flags().StringVar(&updatedAtFrom, "updated-at-from", "", "Filter by updated_at (ISO 8601, lower bound)")
 	return cmd
 }

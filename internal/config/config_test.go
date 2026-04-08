@@ -8,7 +8,7 @@ import (
 	"github.com/youyo/board/internal/config"
 )
 
-// T01: デフォルト Config 生成
+// T01: Default Config generation
 func TestDefaultConfig(t *testing.T) {
 	cfg := config.DefaultConfig()
 	if cfg.CurrentProfile != "default" {
@@ -25,7 +25,7 @@ func TestDefaultConfig(t *testing.T) {
 	}
 }
 
-// T02: デフォルト ProfileConfig 生成
+// T02: Default ProfileConfig generation
 func TestDefaultProfileConfig(t *testing.T) {
 	p := config.DefaultProfileConfig()
 	if p.BaseURL != "https://api.the-board.jp" {
@@ -45,7 +45,7 @@ func TestDefaultProfileConfig(t *testing.T) {
 	}
 }
 
-// T03: TOML ファイルへの保存（0600 パーミッション確認）
+// T03: Save to TOML file (verify 0600 permissions)
 func TestSave(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.toml")
@@ -64,7 +64,7 @@ func TestSave(t *testing.T) {
 	}
 }
 
-// T04: TOML ファイルからの読み込み
+// T04: Load from TOML file
 func TestLoadRoundtrip(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.toml")
@@ -112,7 +112,7 @@ func TestLoadRoundtrip(t *testing.T) {
 	}
 }
 
-// T05: 複数プロファイル保存/読み込み
+// T05: Save/load multiple profiles
 func TestMultipleProfiles(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.toml")
@@ -144,7 +144,7 @@ func TestMultipleProfiles(t *testing.T) {
 	}
 }
 
-// T06: XDG パス解決（XDG_CONFIG_HOME 設定あり）
+// T06: XDG path resolution (XDG_CONFIG_HOME set)
 func TestConfigPathXDG(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("BOARD_CONFIG_PATH", "")
@@ -158,7 +158,7 @@ func TestConfigPathXDG(t *testing.T) {
 	}
 }
 
-// T07: XDG パス解決（XDG_CONFIG_HOME 未設定）
+// T07: XDG path resolution (XDG_CONFIG_HOME not set)
 func TestConfigPathHome(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("BOARD_CONFIG_PATH", "")
@@ -172,7 +172,7 @@ func TestConfigPathHome(t *testing.T) {
 	}
 }
 
-// T08: BOARD_CONFIG_PATH 環境変数
+// T08: BOARD_CONFIG_PATH environment variable
 func TestConfigPathEnvOverride(t *testing.T) {
 	customPath := "/tmp/custom-board-config.toml"
 	t.Setenv("BOARD_CONFIG_PATH", customPath)
@@ -183,7 +183,7 @@ func TestConfigPathEnvOverride(t *testing.T) {
 	}
 }
 
-// T09: GetCurrentProfile
+// T09: GetCurrentProfile returns the current profile config
 func TestGetCurrentProfile(t *testing.T) {
 	cfg := config.DefaultConfig()
 	cfg.CurrentProfile = "default"
@@ -202,7 +202,7 @@ func TestGetCurrentProfile(t *testing.T) {
 	}
 }
 
-// T10: 存在しないファイルのロード → defaults
+// T10: Load non-existent file returns defaults
 func TestLoadNonExistent(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "nonexistent.toml")
 
@@ -215,7 +215,7 @@ func TestLoadNonExistent(t *testing.T) {
 	}
 }
 
-// T11: 存在しないディレクトリへの Save（親ディレクトリ自動作成）
+// T11: Save to non-existent directory (parent directories created automatically)
 func TestSaveCreatesParentDir(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "subdir", "nested", "config.toml")
@@ -230,7 +230,7 @@ func TestSaveCreatesParentDir(t *testing.T) {
 	}
 }
 
-// E01: 不正な TOML
+// E01: Invalid TOML
 func TestLoadInvalidTOML(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "invalid.toml")
@@ -245,7 +245,7 @@ func TestLoadInvalidTOML(t *testing.T) {
 	}
 }
 
-// E03: 存在しないプロファイルの取得
+// E03: Get non-existent profile
 func TestGetCurrentProfileNotFound(t *testing.T) {
 	cfg := config.Config{
 		CurrentProfile: "nonexistent",
@@ -258,7 +258,7 @@ func TestGetCurrentProfileNotFound(t *testing.T) {
 	}
 }
 
-// E04: CurrentProfile が空文字
+// E04: CurrentProfile is empty string
 func TestGetCurrentProfileEmpty(t *testing.T) {
 	cfg := config.Config{
 		CurrentProfile: "",
@@ -271,7 +271,7 @@ func TestGetCurrentProfileEmpty(t *testing.T) {
 	}
 }
 
-// EC01: 空の Profiles map の TOML ロード
+// EC01: Load TOML with empty Profiles map
 func TestLoadEmptyProfiles(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.toml")
@@ -294,9 +294,9 @@ timezone = "UTC"
 	}
 }
 
-// ApplyDefaults: ゼロ値にデフォルト値を適用
+// ApplyDefaults: apply defaults to zero values
 func TestApplyDefaults(t *testing.T) {
-	p := config.ProfileConfig{} // 全ゼロ値
+	p := config.ProfileConfig{} // all zero values
 
 	result := config.ApplyDefaults(p)
 
@@ -309,13 +309,13 @@ func TestApplyDefaults(t *testing.T) {
 	if result.RetryMax != 5 {
 		t.Errorf("expected RetryMax=5, got %d", result.RetryMax)
 	}
-	// DailyAutoRefresh: ゼロ値(false)は true に補完される
+	// DailyAutoRefresh: zero value (false) is filled in as true
 	if !result.DailyAutoRefresh {
 		t.Error("expected DailyAutoRefresh=true after ApplyDefaults")
 	}
 }
 
-// AddOrUpdateProfile テスト
+// AddOrUpdateProfile test
 func TestAddOrUpdateProfile(t *testing.T) {
 	cfg := config.DefaultConfig()
 	newProfile := config.ProfileConfig{
@@ -334,7 +334,7 @@ func TestAddOrUpdateProfile(t *testing.T) {
 	}
 }
 
-// SetCurrentProfile テスト
+// SetCurrentProfile test
 func TestSetCurrentProfile(t *testing.T) {
 	cfg := config.DefaultConfig()
 	config.SetCurrentProfile(&cfg, "readonly")

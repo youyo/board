@@ -7,17 +7,17 @@ import (
 	"github.com/youyo/board/internal/repository"
 )
 
-// ListVendors は全仕入先を返す。
+// ListVendors returns all vendors.
 func (s *Service) ListVendors(ctx context.Context, opts repository.ReadOptions) ([]boardapi.VendorEntity, error) {
 	return s.vendors.List(ctx, opts)
 }
 
-// GetVendor は指定 ID の仕入先を返す。
+// GetVendor returns a vendor by ID.
 func (s *Service) GetVendor(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.VendorEntity, error) {
 	return s.vendors.GetByID(ctx, id, opts)
 }
 
-// SearchVendors はパラメータでフィルタした仕入先を返す。
+// SearchVendors returns vendors filtered by the given parameters.
 func (s *Service) SearchVendors(ctx context.Context, params boardapi.VendorSearchParams, opts repository.ReadOptions) ([]boardapi.VendorEntity, error) {
 	return s.vendors.Search(ctx, params, opts)
 }

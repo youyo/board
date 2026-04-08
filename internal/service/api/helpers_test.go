@@ -8,9 +8,9 @@ import (
 	svcapi "github.com/youyo/board/internal/service/api"
 )
 
-// --- スタブ: コア系 ---
+// --- Stubs: core ---
 
-// stubClientRepo は ClientRepository のスタブ実装。
+// stubClientRepo is a stub implementation of ClientRepo.
 type stubClientRepo struct {
 	listResult   []boardapi.ClientEntity
 	getResult    *boardapi.ClientEntity
@@ -28,7 +28,7 @@ func (s *stubClientRepo) Search(_ context.Context, _ boardapi.ClientSearchParams
 	return s.searchResult, s.err
 }
 
-// stubClientBranchRepo は ClientBranchRepository のスタブ実装。
+// stubClientBranchRepo is a stub implementation of ClientBranchRepo.
 type stubClientBranchRepo struct {
 	listResult   []boardapi.ClientBranchEntity
 	getResult    *boardapi.ClientBranchEntity
@@ -46,7 +46,7 @@ func (s *stubClientBranchRepo) Search(_ context.Context, _ boardapi.ClientBranch
 	return s.searchResult, s.err
 }
 
-// stubContactRepo は ContactRepository のスタブ実装。
+// stubContactRepo is a stub implementation of ContactRepo.
 type stubContactRepo struct {
 	listResult   []boardapi.ContactEntity
 	getResult    *boardapi.ContactEntity
@@ -64,7 +64,7 @@ func (s *stubContactRepo) Search(_ context.Context, _ boardapi.ContactSearchPara
 	return s.searchResult, s.err
 }
 
-// stubProjectRepo は ProjectRepository のスタブ実装。
+// stubProjectRepo is a stub implementation of ProjectRepo.
 type stubProjectRepo struct {
 	listResult   []boardapi.ProjectEntity
 	getResult    *boardapi.ProjectEntity
@@ -82,7 +82,7 @@ func (s *stubProjectRepo) Search(_ context.Context, _ boardapi.ProjectSearchPara
 	return s.searchResult, s.err
 }
 
-// stubProjectCostRepo は ProjectCostRepository のスタブ実装。
+// stubProjectCostRepo is a stub implementation of ProjectCostRepo.
 type stubProjectCostRepo struct {
 	listResult   []boardapi.ProjectCostEntity
 	getResult    *boardapi.ProjectCostEntity
@@ -100,7 +100,7 @@ func (s *stubProjectCostRepo) Search(_ context.Context, _ boardapi.ProjectCostSe
 	return s.searchResult, s.err
 }
 
-// --- スタブ: ドキュメント系 ---
+// --- Stubs: document ---
 
 type stubEstimateRepo struct {
 	listResult   []boardapi.EstimateEntity
@@ -187,7 +187,7 @@ func (s *stubReceiptRepo) Search(_ context.Context, _ boardapi.ReceiptSearchPara
 	return s.searchResult, s.err
 }
 
-// --- スタブ: ベンダー系 ---
+// --- Stubs: vendor ---
 
 type stubVendorRepo struct {
 	listResult   []boardapi.VendorEntity
@@ -274,7 +274,7 @@ func (s *stubPaymentRepo) Search(_ context.Context, _ boardapi.PaymentSearchPara
 	return s.searchResult, s.err
 }
 
-// --- スタブ: マスタ系 ---
+// --- Stubs: master ---
 
 type stubUserRepo struct {
 	listResult   []boardapi.UserEntity
@@ -395,7 +395,7 @@ func (s *stubDocumentSendChannelRepo) Search(_ context.Context, _ boardapi.Docum
 	return s.searchResult, s.err
 }
 
-// --- ゼロ値 Repos ヘルパー ---
+// --- Zero-value Repos helper ---
 
 func zeroRepos() svcapi.Repos {
 	return svcapi.Repos{
@@ -424,7 +424,7 @@ func zeroRepos() svcapi.Repos {
 	}
 }
 
-// --- helper: コア系 ---
+// --- Helpers: core ---
 
 func newServiceWithClients(stub *stubClientRepo) *svcapi.Service {
 	r := zeroRepos()
@@ -456,7 +456,7 @@ func newServiceWithProjectCosts(stub *stubProjectCostRepo) *svcapi.Service {
 	return svcapi.New(r)
 }
 
-// --- helper: ドキュメント系 ---
+// --- Helpers: document ---
 
 func newServiceWithEstimates(stub *stubEstimateRepo) *svcapi.Service {
 	r := zeroRepos()
@@ -488,7 +488,7 @@ func newServiceWithReceipts(stub *stubReceiptRepo) *svcapi.Service {
 	return svcapi.New(r)
 }
 
-// --- helper: ベンダー系 ---
+// --- Helpers: vendor ---
 
 func newServiceWithVendors(stub *stubVendorRepo) *svcapi.Service {
 	r := zeroRepos()
@@ -520,7 +520,7 @@ func newServiceWithPayments(stub *stubPaymentRepo) *svcapi.Service {
 	return svcapi.New(r)
 }
 
-// --- helper: マスタ系 ---
+// --- Helpers: master ---
 
 func newServiceWithUsers(stub *stubUserRepo) *svcapi.Service {
 	r := zeroRepos()

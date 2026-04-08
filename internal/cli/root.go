@@ -7,7 +7,7 @@ import (
 	"github.com/youyo/board/internal/app"
 )
 
-// globalFlags はルートコマンドで受け取る共通フラグの値を保持する。
+// globalFlags holds the values of common flags received by the root command.
 type globalFlags struct {
 	profile      string
 	refresh      bool
@@ -16,18 +16,18 @@ type globalFlags struct {
 	limit        int
 }
 
-// NewRootCmd は board の root Cobra command を返す。
-// version には埋め込みバージョン文字列を渡す。
+// NewRootCmd returns the root Cobra command for board.
+// version is the embedded version string.
 func NewRootCmd(version string) *cobra.Command {
 	var gf globalFlags
 
 	rootCmd := &cobra.Command{
 		Use:   "board",
 		Short: "BOARD CLI - BOARD API client and MCP server",
-		Long:  "board は BOARD API のクライアント CLI および ローカル HTTP MCP サーバー。",
-		// PersistentPreRunE は configure コマンド群をスキップし、それ以外で App を初期化する。
+		Long:  "board is a CLI client and local HTTP MCP server for the BOARD API.",
+		// PersistentPreRunE skips App initialization for configure commands and initializes App for all others.
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			// configure コマンド群は App 初期化不要（設定ファイルを前提としない）
+			// configure commands do not require App initialization (they do not depend on the config file).
 			if strings.HasPrefix(cmd.CommandPath(), "board configure") {
 				return nil
 			}
@@ -37,14 +37,14 @@ func NewRootCmd(version string) *cobra.Command {
 				return err
 			}
 
-			// Context に App を格納（各サブコマンドで AppFromContext して参照）
+			// Store App in context so subcommands can retrieve it via AppFromContext.
 			ctx := app.WithApp(cmd.Context(), a)
 			cmd.SetContext(ctx)
 			return nil
 		},
-		// PersistentPostRunE は DB 接続を閉じる。RunE がエラーを返した場合も実行される。
+		// PersistentPostRunE closes the DB connection. It also runs when RunE returns an error.
 		PersistentPostRunE: func(cmd *cobra.Command, args []string) error {
-			// configure コマンド群は App を初期化していないのでスキップ
+			// configure commands do not initialize App, so skip closing.
 			if strings.HasPrefix(cmd.CommandPath(), "board configure") {
 				return nil
 			}
@@ -60,15 +60,15 @@ func NewRootCmd(version string) *cobra.Command {
 	rootCmd.Version = version
 	rootCmd.SetVersionTemplate("board version {{.Version}}\n")
 
-	// 共通フラグ（全サブコマンドに継承）
+	// Common flags (inherited by all subcommands).
 	pf := rootCmd.PersistentFlags()
-	pf.StringVarP(&gf.profile, "profile", "p", "", "使用するプロファイル名（デフォルト: current_profile）")
-	pf.BoolVar(&gf.refresh, "refresh", false, "差分リフレッシュを強制実行")
-	pf.BoolVar(&gf.forceRefresh, "force-refresh", false, "全件リフレッシュを強制実行")
-	pf.BoolVar(&gf.pretty, "pretty", false, "JSON を整形表示")
-	pf.IntVar(&gf.limit, "limit", 50, "返却件数上限（0 = 無制限）")
+	pf.StringVarP(&gf.profile, "profile", "p", "", "Profile name to use (default: current_profile)")
+	pf.BoolVar(&gf.refresh, "refresh", false, "Force incremental refresh")
+	pf.BoolVar(&gf.forceRefresh, "force-refresh", false, "Force full refresh")
+	pf.BoolVar(&gf.pretty, "pretty", false, "Pretty-print JSON output")
+	pf.IntVar(&gf.limit, "limit", 50, "Maximum number of results to return (0 = unlimited)")
 
-	// サブコマンドを登録
+	// Register subcommands.
 	rootCmd.AddCommand(NewConfigureCmd())
 	rootCmd.AddCommand(NewAPICmd())
 	rootCmd.AddCommand(NewFindCmd())

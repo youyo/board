@@ -4,11 +4,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// NewCompletionCmd はシェル補完スクリプト生成コマンドを返す。
+// NewCompletionCmd returns the shell completion script generation command.
 func NewCompletionCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "completion",
-		Short: "シェル補完スクリプトを生成",
+		Short: "Generate shell completion scripts",
 	}
 	cmd.AddCommand(newCompletionZshCmd(), newCompletionBashCmd())
 	return cmd
@@ -17,7 +17,7 @@ func NewCompletionCmd() *cobra.Command {
 func newCompletionZshCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "zsh",
-		Short: "zsh 用補完スクリプトを生成",
+		Short: "Generate completion script for zsh",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return cmd.Root().GenZshCompletion(cmd.OutOrStdout())
 		},
@@ -27,7 +27,7 @@ func newCompletionZshCmd() *cobra.Command {
 func newCompletionBashCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "bash",
-		Short: "bash 用補完スクリプトを生成",
+		Short: "Generate completion script for bash",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return cmd.Root().GenBashCompletion(cmd.OutOrStdout())
 		},

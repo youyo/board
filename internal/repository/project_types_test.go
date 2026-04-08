@@ -61,12 +61,12 @@ func newProjectTypeAPIServer(t *testing.T, entities []boardapi.ProjectTypeEntity
 }
 
 var sampleProjectTypes = []boardapi.ProjectTypeEntity{
-	{ID: 1, Name: "受託開発", UpdatedAt: "2026-01-01T00:00:00Z"},
-	{ID: 2, Name: "コンサルティング", UpdatedAt: "2026-01-02T00:00:00Z"},
-	{ID: 3, Name: "保守運用", UpdatedAt: "2026-01-03T00:00:00Z"},
+	{ID: 1, Name: "Contract Development", UpdatedAt: "2026-01-01T00:00:00Z"},
+	{ID: 2, Name: "Consulting", UpdatedAt: "2026-01-02T00:00:00Z"},
+	{ID: 3, Name: "Maintenance", UpdatedAt: "2026-01-03T00:00:00Z"},
 }
 
-// T_PRT01: List - キャッシュあり → キャッシュのデータを返す
+// T_PRT01: List - cache hit -> returns cached data
 func TestProjectTypeRepository_List_CacheHit(t *testing.T) {
 	db := newTestDB(t)
 	seedProjectTypeCache(t, db, sampleProjectTypes)
@@ -85,7 +85,7 @@ func TestProjectTypeRepository_List_CacheHit(t *testing.T) {
 	}
 }
 
-// T_PRT02: List - キャッシュなし（初回）→ ForceRefresh 後データを返す
+// T_PRT02: List - no cache (initial load) -> returns data after ForceRefresh
 func TestProjectTypeRepository_List_InitialLoad(t *testing.T) {
 	db := newTestDB(t)
 
@@ -102,7 +102,7 @@ func TestProjectTypeRepository_List_InitialLoad(t *testing.T) {
 	}
 }
 
-// T_PRT03: GetByID - キャッシュヒット → キャッシュから返す
+// T_PRT03: GetByID - cache hit -> returns from cache
 func TestProjectTypeRepository_GetByID_CacheHit(t *testing.T) {
 	db := newTestDB(t)
 	seedProjectTypeCache(t, db, sampleProjectTypes)
@@ -121,12 +121,12 @@ func TestProjectTypeRepository_GetByID_CacheHit(t *testing.T) {
 	}
 }
 
-// T_PRT04: GetByID - キャッシュミス、API 成功 → API 取得して返す
+// T_PRT04: GetByID - cache miss, API success -> fetches from API and returns
 func TestProjectTypeRepository_GetByID_CacheMiss_APISuccess(t *testing.T) {
 	db := newTestDB(t)
 	markSynced(t, db, "project_types")
 
-	target := boardapi.ProjectTypeEntity{ID: 99, Name: "テスト案件区分", UpdatedAt: "2026-01-01T00:00:00Z"}
+	target := boardapi.ProjectTypeEntity{ID: 99, Name: "Test Project Type", UpdatedAt: "2026-01-01T00:00:00Z"}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		b, _ := json.Marshal(target)
@@ -146,7 +146,7 @@ func TestProjectTypeRepository_GetByID_CacheMiss_APISuccess(t *testing.T) {
 	}
 }
 
-// T_PRT05: GetByID - キャッシュミス、API エラー → error を返す
+// T_PRT05: GetByID - cache miss, API error -> returns error
 func TestProjectTypeRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	db := newTestDB(t)
 	markSynced(t, db, "project_types")
@@ -161,7 +161,7 @@ func TestProjectTypeRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	}
 }
 
-// T_PRT06: Search - Name フィルタ → 一致するものを返す
+// T_PRT06: Search - Name filter -> returns matching items
 func TestProjectTypeRepository_Search_NameFilter(t *testing.T) {
 	db := newTestDB(t)
 	seedProjectTypeCache(t, db, sampleProjectTypes)
@@ -171,16 +171,16 @@ func TestProjectTypeRepository_Search_NameFilter(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeProjectTypeRepo(t, db, apiClient, false)
-	got, err := repo.Search(context.Background(), boardapi.ProjectTypeSearchParams{Name: "受託開発"}, repository.ReadOptions{})
+	got, err := repo.Search(context.Background(), boardapi.ProjectTypeSearchParams{Name: "Contract Development"}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
-	if len(got) != 1 || got[0].Name != "受託開発" {
+	if len(got) != 1 || got[0].Name != "Contract Development" {
 		t.Errorf("unexpected result: %+v", got)
 	}
 }
 
-// T_PRT07: Search - パラメータなし → 全件返す
+// T_PRT07: Search - no filter -> returns all items
 func TestProjectTypeRepository_Search_NoFilter(t *testing.T) {
 	db := newTestDB(t)
 	seedProjectTypeCache(t, db, sampleProjectTypes)

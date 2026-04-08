@@ -9,7 +9,7 @@ import (
 )
 
 func TestConfigureCurrentProfileCmd(t *testing.T) {
-	t.Run("デフォルト config では default が返る", func(t *testing.T) {
+	t.Run("default config returns default profile", func(t *testing.T) {
 		newTempConfig(t)
 
 		root := cli.NewConfigureCmd()
@@ -23,7 +23,7 @@ func TestConfigureCurrentProfileCmd(t *testing.T) {
 		}
 	})
 
-	t.Run("SetCurrentProfile 後は新しい名前が返る", func(t *testing.T) {
+	t.Run("after SetCurrentProfile, the new name is returned", func(t *testing.T) {
 		path := newTempConfig(t)
 
 		cfg := config.DefaultConfig()

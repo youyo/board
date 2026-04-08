@@ -35,12 +35,12 @@ func TestNewRootCmd_LimitDefault(t *testing.T) {
 }
 
 func TestNewRootCmd_Configure_SkipAppInit(t *testing.T) {
-	// configure サブコマンドを実行しても PersistentPreRunE が App 初期化しないことを確認。
-	// configure は設定ファイルがなくても動作する必要がある。
+	// Verify that running a configure subcommand does not trigger App initialization in PersistentPreRunE.
+	// configure must work even without a configuration file.
 	cmd := cli.NewRootCmd("dev")
-	// --help は PersistentPreRunE を呼ばないため configure path を使う
+	// Use configure path instead of --help, since --help does not invoke PersistentPreRunE.
 	cmd.SetArgs([]string{"configure", "path"})
-	// configure path は設定ファイルを読まずにパスを表示するだけ
+	// configure path only prints the path without reading the config file.
 	if err := cmd.Execute(); err != nil {
 		t.Errorf("configure path should not fail: %v", err)
 	}

@@ -15,7 +15,7 @@ import (
 	"github.com/youyo/board/internal/boardapi"
 )
 
-// T18: APIError.Error() の文字列フォーマット確認
+// T18: verify string format of APIError.Error()
 func TestAPIError_Error(t *testing.T) {
 	e := &boardapi.APIError{
 		Code:       boardapi.APIErrorUnauthorized,
@@ -29,7 +29,7 @@ func TestAPIError_Error(t *testing.T) {
 	}
 }
 
-// T19: classifyStatusCode の境界値テスト
+// T19: boundary value test for classifyStatusCode
 func TestClassifyStatusCode_Boundary(t *testing.T) {
 	tests := []struct {
 		statusCode int
@@ -55,7 +55,7 @@ func TestClassifyStatusCode_Boundary(t *testing.T) {
 	}
 }
 
-// T01: nil httpClient 指定時に内部で生成される
+// T01: internally created when nil httpClient is specified
 func TestNew_DefaultHTTPClient(t *testing.T) {
 	c := boardapi.New("https://api.the-board.jp", "key", "token", 30*time.Second)
 	if c == nil {
@@ -63,7 +63,7 @@ func TestNew_DefaultHTTPClient(t *testing.T) {
 	}
 }
 
-// T02: WithHTTPClient オプションで注入したクライアントが使われる
+// T02: injected client is used with WithHTTPClient option
 func TestNew_WithHTTPClient(t *testing.T) {
 	hc := &http.Client{Timeout: 5 * time.Second}
 	c := boardapi.New("https://api.the-board.jp", "key", "token", 30*time.Second,
@@ -73,10 +73,10 @@ func TestNew_WithHTTPClient(t *testing.T) {
 	}
 }
 
-// T03: baseURL 末尾スラッシュが除去される
+// T03: trailing slash is removed from baseURL
 func TestNew_BaseURLNormalization(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// path は /test のみになるはず（baseURL に末尾スラッシュがついていても二重スラッシュにならない）
+		// path should be /test only (no double slash even if baseURL has trailing slash)
 		if r.URL.Path != "/test" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
@@ -85,7 +85,7 @@ func TestNew_BaseURLNormalization(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	// 末尾スラッシュ付きで作成
+	// create with trailing slash
 	c := boardapi.New(ts.URL+"/", "key", "token", 5*time.Second)
 	req, err := c.NewRequest(context.Background(), "GET", "/test", nil)
 	if err != nil {
@@ -97,7 +97,7 @@ func TestNew_BaseURLNormalization(t *testing.T) {
 	}
 }
 
-// T04: baseURL + path が正しく結合される
+// T04: baseURL + path are correctly concatenated
 func TestNewRequest_URLComposition(t *testing.T) {
 	c := boardapi.New("https://api.the-board.jp", "key", "token", 30*time.Second)
 	req, err := c.NewRequest(context.Background(), "GET", "/v1/clients", nil)
@@ -110,7 +110,7 @@ func TestNewRequest_URLComposition(t *testing.T) {
 	}
 }
 
-// T05: x-api-key と Authorization ヘッダが付与される
+// T05: x-api-key and Authorization headers are attached
 func TestDo_AuthHeaders(t *testing.T) {
 	var gotKey, gotToken string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -138,7 +138,7 @@ func TestDo_AuthHeaders(t *testing.T) {
 	}
 }
 
-// T06: 200 レスポンスでボディが返る
+// T06: body is returned on 200 response
 func TestDo_200_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -157,7 +157,7 @@ func TestDo_200_OK(t *testing.T) {
 	}
 }
 
-// T07: 201 Created は成功扱い
+// T07: 201 Created is treated as success
 func TestDo_201_Created(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusCreated)
@@ -176,7 +176,7 @@ func TestDo_201_Created(t *testing.T) {
 	}
 }
 
-// T08: 401 が *APIError{Code:UNAUTHORIZED} に変換される
+// T08: 401 is converted to *APIError{Code:UNAUTHORIZED}
 func TestDo_401_Unauthorized(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -203,7 +203,7 @@ func TestDo_401_Unauthorized(t *testing.T) {
 	}
 }
 
-// T09: 403 が *APIError{Code:FORBIDDEN} に変換される
+// T09: 403 is converted to *APIError{Code:FORBIDDEN}
 func TestDo_403_Forbidden(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
@@ -224,7 +224,7 @@ func TestDo_403_Forbidden(t *testing.T) {
 	}
 }
 
-// T10: 404 が *APIError{Code:NOT_FOUND} に変換される
+// T10: 404 is converted to *APIError{Code:NOT_FOUND}
 func TestDo_404_NotFound(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
@@ -245,7 +245,7 @@ func TestDo_404_NotFound(t *testing.T) {
 	}
 }
 
-// T11: 422 が *APIError{Code:VALIDATION} に変換される
+// T11: 422 is converted to *APIError{Code:VALIDATION}
 func TestDo_422_Validation(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(422)
@@ -266,7 +266,7 @@ func TestDo_422_Validation(t *testing.T) {
 	}
 }
 
-// T12: 429 が *APIError{Code:RATE_LIMIT} に変換される
+// T12: 429 is converted to *APIError{Code:RATE_LIMIT}
 func TestDo_429_RateLimit(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusTooManyRequests)
@@ -287,7 +287,7 @@ func TestDo_429_RateLimit(t *testing.T) {
 	}
 }
 
-// T13: 500 が *APIError{Code:TEMPORARY} に変換される
+// T13: 500 is converted to *APIError{Code:TEMPORARY}
 func TestDo_500_Temporary(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -311,7 +311,7 @@ func TestDo_500_Temporary(t *testing.T) {
 	}
 }
 
-// T14: 503 が *APIError{Code:TEMPORARY} に変換される
+// T14: 503 is converted to *APIError{Code:TEMPORARY}
 func TestDo_503_Temporary(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusServiceUnavailable)
@@ -332,9 +332,9 @@ func TestDo_503_Temporary(t *testing.T) {
 	}
 }
 
-// T15: ネットワークエラーが *APIError{Code:NETWORK} に変換される
+// T15: network error is converted to *APIError{Code:NETWORK}
 func TestDo_NetworkError(t *testing.T) {
-	// 存在しないサーバーへリクエスト
+	// request to non-existent server
 	c := boardapi.New("http://127.0.0.1:19999", "key", "token", 1*time.Second)
 	req, err := c.NewRequest(context.Background(), "GET", "/test", nil)
 	if err != nil {
@@ -354,7 +354,7 @@ func TestDo_NetworkError(t *testing.T) {
 	}
 }
 
-// T16: JSON ボディの message フィールドが APIError.Message に入る
+// T16: message field in JSON body is stored in APIError.Message
 func TestDo_ErrorMessage_JSON(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -375,7 +375,7 @@ func TestDo_ErrorMessage_JSON(t *testing.T) {
 	}
 }
 
-// T16b: error フィールドにフォールバックする
+// T16b: falls back to error field
 func TestDo_ErrorMessage_ErrorField(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -396,7 +396,7 @@ func TestDo_ErrorMessage_ErrorField(t *testing.T) {
 	}
 }
 
-// T17: JSON パース失敗時は Message="" でも panic しない
+// T17: no panic even when Message="" on JSON parse failure
 func TestDo_ErrorMessage_Fallback(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -412,16 +412,16 @@ func TestDo_ErrorMessage_Fallback(t *testing.T) {
 	if !errors.As(err, &apiErr) {
 		t.Fatalf("expected *APIError, got %T: %v", err, err)
 	}
-	// panic しないことと、Body に生ボディが入ることを確認
+	// verify no panic and that Body contains the raw body
 	if apiErr.Body != "not json" {
 		t.Errorf("Body: want %q, got %q", "not json", apiErr.Body)
 	}
 }
 
-// T20: ctx キャンセル時に適切なエラーが返る
+// T20: appropriate error returned on ctx cancellation
 func TestDo_ContextCancellation(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// リクエストが来ても応答を遅延させる（テスト中にキャンセルされる）
+		// delay response even if request comes in (will be cancelled during test)
 		select {
 		case <-r.Context().Done():
 			return
@@ -433,7 +433,7 @@ func TestDo_ContextCancellation(t *testing.T) {
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second)
 	req, _ := c.NewRequest(ctx, "GET", "/test", nil)
 
-	// すぐキャンセル
+	// cancel immediately
 	cancel()
 
 	_, err := c.Do(req)
@@ -450,9 +450,9 @@ func TestDo_ContextCancellation(t *testing.T) {
 	}
 }
 
-// ===== M05: T35 isRetryable テスト =====
+// ===== M05: T35 isRetryable tests =====
 
-// T35: isRetryable の各 APIErrorCode 判定
+// T35: isRetryable judgment for each APIErrorCode
 func TestIsRetryable_Codes(t *testing.T) {
 	tests := []struct {
 		code          boardapi.APIErrorCode
@@ -476,7 +476,7 @@ func TestIsRetryable_Codes(t *testing.T) {
 	}
 }
 
-// T45: parseErrorWithHeader で Retry-After ヘッダが RetryAfter フィールドに入る
+// T45: Retry-After header is stored in RetryAfter field via parseErrorWithHeader
 func TestParseErrorWithHeader_RetryAfter(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Retry-After", "5")
@@ -501,9 +501,9 @@ func TestParseErrorWithHeader_RetryAfter(t *testing.T) {
 	}
 }
 
-// ===== M05: T32-T34 calcBackoff テスト =====
+// ===== M05: T32-T34 calcBackoff tests =====
 
-// T32: calcBackoff の指数的増加（attempt=0,1,2 の待機時間がそれぞれ [0,baseDelay), [0,2*base), [0,4*base) の範囲）
+// T32: calcBackoff exponential increase (attempt=0,1,2 wait times are in ranges [0,baseDelay), [0,2*base), [0,4*base) respectively)
 func TestCalcBackoff_ExponentialGrowth(t *testing.T) {
 	// attempt=0: [0, 500ms)
 	for i := 0; i < 100; i++ {
@@ -521,7 +521,7 @@ func TestCalcBackoff_ExponentialGrowth(t *testing.T) {
 	}
 }
 
-// T33: calcBackoff で Retry-After がある場合はその値が優先される
+// T33: Retry-After value takes priority in calcBackoff when present
 func TestCalcBackoff_RetryAfterPriority(t *testing.T) {
 	ae := &boardapi.APIError{Code: boardapi.APIErrorRateLimit, RetryAfter: 10 * time.Second}
 	d := boardapi.CalcBackoff(0, ae)
@@ -530,7 +530,7 @@ func TestCalcBackoff_RetryAfterPriority(t *testing.T) {
 	}
 }
 
-// T34: calcBackoff は maxDelay(30s) を超えない
+// T34: calcBackoff does not exceed maxDelay(30s)
 func TestCalcBackoff_MaxDelayCap(t *testing.T) {
 	for attempt := 0; attempt <= 20; attempt++ {
 		d := boardapi.CalcBackoff(attempt, &boardapi.APIError{Code: boardapi.APIErrorTemporary})
@@ -540,9 +540,9 @@ func TestCalcBackoff_MaxDelayCap(t *testing.T) {
 	}
 }
 
-// ===== M05: T21-T31 DoWithRetry テスト =====
+// ===== M05: T21-T31 DoWithRetry tests =====
 
-// T21: 1回目成功でリトライなし
+// T21: no retry on first-attempt success
 func TestDoWithRetry_SuccessOnFirstAttempt(t *testing.T) {
 	callCount := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -570,7 +570,7 @@ func TestDoWithRetry_SuccessOnFirstAttempt(t *testing.T) {
 	}
 }
 
-// T22: 429 → リトライ → 成功
+// T22: 429 → retry → success
 func TestDoWithRetry_429_RetryAndSucceed(t *testing.T) {
 	callCount := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -602,7 +602,7 @@ func TestDoWithRetry_429_RetryAndSucceed(t *testing.T) {
 	_ = body
 }
 
-// T23: 500 → リトライ → 成功
+// T23: 500 → retry → success
 func TestDoWithRetry_500_RetryAndSucceed(t *testing.T) {
 	callCount := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -632,14 +632,14 @@ func TestDoWithRetry_500_RetryAndSucceed(t *testing.T) {
 	}
 }
 
-// T24: ネットワークエラー → リトライ → 成功（httptest サーバを再起動パターンは困難なため、
-// 存在しないポートへ→即エラー→retryMax 超過で最後のエラーを返す動作を確認）
+// T24: network error → retry → success (restarting httptest server is difficult,
+// so verify behavior: connect to non-existent port → immediate error → last error returned after retryMax exceeded)
 func TestDoWithRetry_NetworkError_RetryAndSucceed(t *testing.T) {
 	callCount := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		callCount++
 		if callCount <= 2 {
-			// 接続を強制的に閉じてネットワークエラーをシミュレート
+			// force-close connection to simulate network error
 			conn, _, _ := w.(http.Hijacker).Hijack()
 			conn.Close()
 			return
@@ -656,16 +656,16 @@ func TestDoWithRetry_NetworkError_RetryAndSucceed(t *testing.T) {
 	)
 	req, _ := c.NewRequest(context.Background(), "GET", "/test", nil)
 	_, err := c.DoWithRetry(req)
-	// ネットワークエラーはリトライ対象なので retryMax まで試みる
-	// 3回目以降は成功するはずだが、Hijack後の接続断はクライアントからはNETWORKエラーとして見える
-	// テストの目的: 少なくとも callCount > 1 になること
+	// network errors are retryable so retryMax retries are attempted
+	// success after 3rd attempt is expected, but connection close after Hijack appears as NETWORK error to client
+	// test goal: at least callCount > 1
 	if callCount < 2 {
 		t.Errorf("expected retry, callCount=%d", callCount)
 	}
 	_ = err
 }
 
-// T25: 429 がリトライMax 回超えたら最後のエラーを返す
+// T25: last error returned when 429 exceeds retryMax
 func TestDoWithRetry_429_ExceedsRetryMax(t *testing.T) {
 	callCount := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -692,13 +692,13 @@ func TestDoWithRetry_429_ExceedsRetryMax(t *testing.T) {
 	if apiErr.Code != boardapi.APIErrorRateLimit {
 		t.Errorf("Code: want RATE_LIMIT, got %q", apiErr.Code)
 	}
-	// retryMax=3 なので合計 4回呼ばれる（初回 + 3回リトライ）
+	// retryMax=3 so called 4 times total (initial + 3 retries)
 	if callCount != 4 {
 		t.Errorf("callCount: want 4, got %d", callCount)
 	}
 }
 
-// T26: 4xx（401/403/404/422）はリトライしない
+// T26: 4xx (401/403/404/422) are not retried
 func TestDoWithRetry_4xx_NoRetry(t *testing.T) {
 	for _, status := range []int{401, 403, 404, 422} {
 		status := status
@@ -726,7 +726,7 @@ func TestDoWithRetry_4xx_NoRetry(t *testing.T) {
 	}
 }
 
-// T27: Retry-After ヘッダの秒数を待機する
+// T27: waits for seconds specified in Retry-After header
 func TestDoWithRetry_RetryAfterHeader(t *testing.T) {
 	callCount := 0
 	sleepDurations := []time.Duration{}
@@ -763,7 +763,7 @@ func TestDoWithRetry_RetryAfterHeader(t *testing.T) {
 	}
 }
 
-// T28: バックオフ待機中に ctx キャンセルで即返る
+// T28: returns immediately on ctx cancellation during backoff
 func TestDoWithRetry_ContextCancelDuringBackoff(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -788,7 +788,7 @@ func TestDoWithRetry_ContextCancelDuringBackoff(t *testing.T) {
 		done <- err
 	}()
 
-	// sleepFn が呼ばれたらキャンセル
+	// cancel when sleepFn is called
 	<-sleepCalled
 	cancel()
 
@@ -801,7 +801,7 @@ func TestDoWithRetry_ContextCancelDuringBackoff(t *testing.T) {
 	}
 }
 
-// T29: 実際にリトライが retryMax 回行われること
+// T29: retries actually occur retryMax times
 func TestDoWithRetry_RetryCount(t *testing.T) {
 	callCount := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -822,14 +822,14 @@ func TestDoWithRetry_RetryCount(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
-	// 初回 + retryMax 回 = retryMax+1 回
+	// initial + retryMax times = retryMax+1 total
 	want := retryMax + 1
 	if callCount != want {
 		t.Errorf("callCount: want %d, got %d", want, callCount)
 	}
 }
 
-// T30: retryMax=0 はリトライなし（Do() と同等）
+// T30: retryMax=0 means no retry (equivalent to Do())
 func TestDoWithRetry_ZeroRetryMax(t *testing.T) {
 	callCount := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -854,7 +854,7 @@ func TestDoWithRetry_ZeroRetryMax(t *testing.T) {
 	}
 }
 
-// T31: POST ボディがリトライ時に再送される
+// T31: POST body is resent on retry
 func TestDoWithRetry_RequestBodyReusable(t *testing.T) {
 	receivedBodies := []string{}
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -891,9 +891,9 @@ func TestDoWithRetry_RequestBodyReusable(t *testing.T) {
 	}
 }
 
-// ===== M05: T36-T44 ListAll テスト =====
+// ===== M05: T36-T44 ListAll tests =====
 
-// T36: 1ページ（per_page 未満）で終了
+// T36: terminates on 1 page (fewer than per_page items)
 func TestListAll_SinglePage(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -915,7 +915,7 @@ func TestListAll_SinglePage(t *testing.T) {
 	}
 }
 
-// T37: 複数ページを全件取得して結合
+// T37: fetches all items across multiple pages and concatenates
 func TestListAll_MultiPage(t *testing.T) {
 	pageItems := map[int]int{1: 100, 2: 100, 3: 37}
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -954,18 +954,18 @@ func TestListAll_MultiPage(t *testing.T) {
 	}
 }
 
-// T38: ちょうど per_page 件の最終ページ後に空リスト取得で終了
+// T38: terminates after fetching empty list following a full per_page page
 func TestListAll_ExactMultiple(t *testing.T) {
 	callCount := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		callCount++
 		if callCount == 1 {
-			// ちょうど per_page=3 件返す
+			// return exactly per_page=3 items
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte(`[{"id":1},{"id":2},{"id":3}]`))
 			return
 		}
-		// 2回目は空
+		// second call returns empty
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`[]`))
 	}))
@@ -988,7 +988,7 @@ func TestListAll_ExactMultiple(t *testing.T) {
 	}
 }
 
-// T39: 空配列 [] で0件を返す
+// T39: returns 0 items for empty array []
 func TestListAll_EmptyResponse(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -1010,7 +1010,7 @@ func TestListAll_EmptyResponse(t *testing.T) {
 	}
 }
 
-// T40: per_page クエリパラメータが正しく付与される
+// T40: per_page query parameter is correctly attached
 func TestListAll_PerPageQueryParam(t *testing.T) {
 	var gotPerPage string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1035,13 +1035,13 @@ func TestListAll_PerPageQueryParam(t *testing.T) {
 	}
 }
 
-// T41: page=1,2,3... が正しく増分される
+// T41: page=1,2,3... is correctly incremented
 func TestListAll_PageQueryParam(t *testing.T) {
 	var gotPages []string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotPages = append(gotPages, r.URL.Query().Get("page"))
 		if len(gotPages) < 3 {
-			// 3 件/ページ で 3 ページ分
+			// 3 items/page for 3 pages
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte(`[{"id":1},{"id":2},{"id":3}]`))
 			return
@@ -1069,7 +1069,7 @@ func TestListAll_PageQueryParam(t *testing.T) {
 	}
 }
 
-// T42: 途中ページでエラーが発生したら即返す
+// T42: returns immediately when error occurs in a middle page
 func TestListAll_ErrorPropagation(t *testing.T) {
 	callCount := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1086,7 +1086,7 @@ func TestListAll_ErrorPropagation(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second,
-		boardapi.WithRetryMax(0), // リトライなし
+		boardapi.WithRetryMax(0), // no retry
 		boardapi.WithSleepFn(noSleep),
 	)
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
@@ -1105,7 +1105,7 @@ func TestListAll_ErrorPropagation(t *testing.T) {
 	}
 }
 
-// T43: ページループ中に ctx キャンセルで即中断
+// T43: immediately aborts on ctx cancellation during page loop
 func TestListAll_ContextCancellation(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -1133,7 +1133,7 @@ func TestListAll_ContextCancellation(t *testing.T) {
 	}
 }
 
-// T44: WithPerPage(50) でクエリパラメータが変わる
+// T44: query parameter changes with WithPerPage(50)
 func TestListAll_WithPerPageOption(t *testing.T) {
 	var gotPerPage string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1159,17 +1159,17 @@ func TestListAll_WithPerPageOption(t *testing.T) {
 }
 
 // ============================================================
-// M06: clients エンティティ テスト (T46〜T51, T64, T66)
+// M06: clients entity tests (T46-T51, T64, T66)
 // ============================================================
 
-// T46: ListClients — 正常系（2ページ分）
+// T46: ListClients — happy path (2 pages)
 func TestListClients_TwoPages(t *testing.T) {
 	callCount := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		callCount++
 		if callCount == 1 {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`[{"id":1,"name":"顧客A","code":"A001","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":2,"name":"顧客B","code":"B001","memo":"","updated_at":"2026-01-02T00:00:00Z","created_at":"2026-01-02T00:00:00Z"}]`))
+			w.Write([]byte(`[{"id":1,"name":"Client A","code":"A001","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":2,"name":"Client B","code":"B001","memo":"","updated_at":"2026-01-02T00:00:00Z","created_at":"2026-01-02T00:00:00Z"}]`))
 		} else {
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte(`[]`))
@@ -1186,15 +1186,15 @@ func TestListClients_TwoPages(t *testing.T) {
 	if len(clients) != 2 {
 		t.Errorf("want 2 clients, got %d", len(clients))
 	}
-	if clients[0].ID != 1 || clients[0].Name != "顧客A" {
+	if clients[0].ID != 1 || clients[0].Name != "Client A" {
 		t.Errorf("clients[0]: got %+v", clients[0])
 	}
-	if clients[1].ID != 2 || clients[1].Name != "顧客B" {
+	if clients[1].ID != 2 || clients[1].Name != "Client B" {
 		t.Errorf("clients[1]: got %+v", clients[1])
 	}
 }
 
-// T47: ListClients — APIエラー（401）
+// T47: ListClients — API error (401)
 func TestListClients_Unauthorized(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -1220,7 +1220,7 @@ func TestListClients_Unauthorized(t *testing.T) {
 	}
 }
 
-// T48: GetClient — 正常系
+// T48: GetClient — happy path
 func TestGetClient_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/clients/123" {
@@ -1228,7 +1228,7 @@ func TestGetClient_OK(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"id":123,"name":"テスト顧客","code":"T001","memo":"テストメモ","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
+		w.Write([]byte(`{"id":123,"name":"Test Client","code":"T001","memo":"test memo","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
 	}))
 	defer ts.Close()
 
@@ -1241,7 +1241,7 @@ func TestGetClient_OK(t *testing.T) {
 	if got == nil {
 		t.Fatal("got nil ClientEntity")
 	}
-	if got.ID != 123 || got.Name != "テスト顧客" {
+	if got.ID != 123 || got.Name != "Test Client" {
 		t.Errorf("GetClient: got %+v", got)
 	}
 }
@@ -1275,31 +1275,31 @@ func TestGetClient_NotFound(t *testing.T) {
 	}
 }
 
-// T50: SearchClients — Name パラメータ付き
+// T50: SearchClients — with Name parameter
 func TestSearchClients_WithName(t *testing.T) {
 	var gotName string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotName = r.URL.Query().Get("name")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":10,"name":"テスト","code":"","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
+		w.Write([]byte(`[{"id":10,"name":"test","code":"","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
 	}))
 	defer ts.Close()
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.SearchClients(context.Background(), boardapi.ClientSearchParams{Name: "テスト"})
+	result, err := c.SearchClients(context.Background(), boardapi.ClientSearchParams{Name: "test"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(result) != 1 {
 		t.Errorf("want 1 client, got %d", len(result))
 	}
-	if gotName != "テスト" {
-		t.Errorf("name param: want %q, got %q", "テスト", gotName)
+	if gotName != "test" {
+		t.Errorf("name param: want %q, got %q", "test", gotName)
 	}
 }
 
-// T51: SearchClients — 空結果
+// T51: SearchClients — empty result
 func TestSearchClients_EmptyResult(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -1318,7 +1318,7 @@ func TestSearchClients_EmptyResult(t *testing.T) {
 	}
 }
 
-// T64: GetClient — context キャンセル時
+// T64: GetClient — on context cancellation
 func TestGetClient_ContextCancel(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -1327,7 +1327,7 @@ func TestGetClient_ContextCancel(t *testing.T) {
 	defer ts.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())
-	cancel() // 即座にキャンセル
+	cancel() // cancel immediately
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
@@ -1340,7 +1340,7 @@ func TestGetClient_ContextCancel(t *testing.T) {
 	}
 }
 
-// T66: SearchClients — UpdatedAtFrom パラメータ付き
+// T66: SearchClients — with UpdatedAtFrom parameter
 func TestSearchClients_WithUpdatedAtFrom(t *testing.T) {
 	var gotUpdatedAtFrom string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1362,14 +1362,14 @@ func TestSearchClients_WithUpdatedAtFrom(t *testing.T) {
 }
 
 // ============================================================
-// M06: client_branches エンティティ テスト (T52〜T54)
+// M06: client_branches entity tests (T52-T54)
 // ============================================================
 
-// T52: ListClientBranches — 正常系
+// T52: ListClientBranches — happy path
 func TestListClientBranches_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"client_id":10,"name":"東京支社","postal_code":"100-0001","address":"東京都","phone":"03-0000-0000","fax":"","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
+		w.Write([]byte(`[{"id":1,"client_id":10,"name":"Tokyo Branch","postal_code":"100-0001","address":"Tokyo","phone":"03-0000-0000","fax":"","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
 	}))
 	defer ts.Close()
 
@@ -1382,12 +1382,12 @@ func TestListClientBranches_OK(t *testing.T) {
 	if len(result) != 1 {
 		t.Errorf("want 1 client branch, got %d", len(result))
 	}
-	if result[0].ID != 1 || result[0].ClientID != 10 || result[0].Name != "東京支社" {
+	if result[0].ID != 1 || result[0].ClientID != 10 || result[0].Name != "Tokyo Branch" {
 		t.Errorf("result[0]: got %+v", result[0])
 	}
 }
 
-// T53: GetClientBranch — 正常系
+// T53: GetClientBranch — happy path
 func TestGetClientBranch_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/client_branches/1" {
@@ -1395,7 +1395,7 @@ func TestGetClientBranch_OK(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"id":1,"client_id":5,"name":"大阪支社","postal_code":"530-0001","address":"大阪府","phone":"06-0000-0000","fax":"","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
+		w.Write([]byte(`{"id":1,"client_id":5,"name":"Osaka Branch","postal_code":"530-0001","address":"Osaka","phone":"06-0000-0000","fax":"","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
 	}))
 	defer ts.Close()
 
@@ -1408,18 +1408,18 @@ func TestGetClientBranch_OK(t *testing.T) {
 	if got == nil {
 		t.Fatal("got nil ClientBranchEntity")
 	}
-	if got.ID != 1 || got.Name != "大阪支社" {
+	if got.ID != 1 || got.Name != "Osaka Branch" {
 		t.Errorf("GetClientBranch: got %+v", got)
 	}
 }
 
-// T54: SearchClientBranches — ClientID パラメータ付き
+// T54: SearchClientBranches — with ClientID parameter
 func TestSearchClientBranches_WithClientID(t *testing.T) {
 	var gotClientID string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotClientID = r.URL.Query().Get("client_id")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":2,"client_id":10,"name":"名古屋支社","postal_code":"","address":"","phone":"","fax":"","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
+		w.Write([]byte(`[{"id":2,"client_id":10,"name":"Nagoya Branch","postal_code":"","address":"","phone":"","fax":"","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
 	}))
 	defer ts.Close()
 
@@ -1438,14 +1438,14 @@ func TestSearchClientBranches_WithClientID(t *testing.T) {
 }
 
 // ============================================================
-// M06: contacts エンティティ テスト (T55〜T57)
+// M06: contacts entity tests (T55-T57)
 // ============================================================
 
-// T55: ListContacts — 正常系（3件）
+// T55: ListContacts — happy path (3 items)
 func TestListContacts_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"client_id":10,"client_branch_id":2,"name":"田中太郎","name_kana":"たなかたろう","title":"部長","email":"tanaka@example.com","phone":"","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":2,"client_id":10,"client_branch_id":2,"name":"鈴木花子","name_kana":"すずきはなこ","title":"","email":"suzuki@example.com","phone":"","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":3,"client_id":11,"client_branch_id":3,"name":"佐藤次郎","name_kana":"さとうじろう","title":"","email":"sato@example.com","phone":"","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
+		w.Write([]byte(`[{"id":1,"client_id":10,"client_branch_id":2,"name":"Taro Tanaka","name_kana":"tanataro","title":"Manager","email":"tanaka@example.com","phone":"","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":2,"client_id":10,"client_branch_id":2,"name":"Hanako Suzuki","name_kana":"suzukihanako","title":"","email":"suzuki@example.com","phone":"","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":3,"client_id":11,"client_branch_id":3,"name":"Jiro Sato","name_kana":"satojiro","title":"","email":"sato@example.com","phone":"","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
 	}))
 	defer ts.Close()
 
@@ -1460,7 +1460,7 @@ func TestListContacts_OK(t *testing.T) {
 	}
 }
 
-// T56: GetContact — 正常系
+// T56: GetContact — happy path
 func TestGetContact_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/contacts/5" {
@@ -1468,7 +1468,7 @@ func TestGetContact_OK(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"id":5,"client_id":10,"client_branch_id":2,"name":"山田一郎","name_kana":"やまだいちろう","title":"","email":"test@example.com","phone":"","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
+		w.Write([]byte(`{"id":5,"client_id":10,"client_branch_id":2,"name":"Ichiro Yamada","name_kana":"yamadaichiro","title":"","email":"test@example.com","phone":"","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
 	}))
 	defer ts.Close()
 
@@ -1486,13 +1486,13 @@ func TestGetContact_OK(t *testing.T) {
 	}
 }
 
-// T57: SearchContacts — Email パラメータ付き
+// T57: SearchContacts — with Email parameter
 func TestSearchContacts_WithEmail(t *testing.T) {
 	var gotEmail string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotEmail = r.URL.Query().Get("email")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":5,"client_id":10,"client_branch_id":2,"name":"山田一郎","name_kana":"","title":"","email":"test@example.com","phone":"","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
+		w.Write([]byte(`[{"id":5,"client_id":10,"client_branch_id":2,"name":"Ichiro Yamada","name_kana":"","title":"","email":"test@example.com","phone":"","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
 	}))
 	defer ts.Close()
 
@@ -1511,28 +1511,28 @@ func TestSearchContacts_WithEmail(t *testing.T) {
 }
 
 // ============================================================
-// M06: projects エンティティ テスト (T58〜T60, T65)
+// M06: projects entity tests (T58-T60, T65)
 // ============================================================
 
-// T58: ListProjects — 正常系（ページネーション: 2ページ）
-// defaultPerPage=100 のため、page=1 で 100件返して page=2 で残りを返す
+// T58: ListProjects — happy path (pagination: 2 pages)
+// since defaultPerPage=100, return 100 items on page=1 and remainder on page=2
 func TestListProjects_TwoPages(t *testing.T) {
 	callCount := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		callCount++
 		if callCount == 1 {
-			// 100件返す（= perPage と同数 → 次ページあり）
+			// return 100 items (= perPage → next page exists)
 			items := make([]string, 100)
 			for i := range items {
-				items[i] = fmt.Sprintf(`{"id":%d,"client_id":10,"name":"案件%d","code":"P%03d","status":"active","start_date":"2026-01-01","end_date":"2026-12-31","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`, i+1, i+1, i+1)
+				items[i] = fmt.Sprintf(`{"id":%d,"client_id":10,"name":"Project %d","code":"P%03d","status":"active","start_date":"2026-01-01","end_date":"2026-12-31","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`, i+1, i+1, i+1)
 			}
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte("[" + strings.Join(items, ",") + "]"))
 		} else {
-			// page=2: 50件（最終ページ）
+			// page=2: 50 items (final page)
 			items := make([]string, 50)
 			for i := range items {
-				items[i] = fmt.Sprintf(`{"id":%d,"client_id":10,"name":"案件%d","code":"P%03d","status":"active","start_date":"2026-01-01","end_date":"2026-12-31","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`, 100+i+1, 100+i+1, 100+i+1)
+				items[i] = fmt.Sprintf(`{"id":%d,"client_id":10,"name":"Project %d","code":"P%03d","status":"active","start_date":"2026-01-01","end_date":"2026-12-31","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`, 100+i+1, 100+i+1, 100+i+1)
 			}
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte("[" + strings.Join(items, ",") + "]"))
@@ -1551,7 +1551,7 @@ func TestListProjects_TwoPages(t *testing.T) {
 	}
 }
 
-// T59: GetProject — 正常系
+// T59: GetProject — happy path
 func TestGetProject_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/projects/200" {
@@ -1559,7 +1559,7 @@ func TestGetProject_OK(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"id":200,"client_id":10,"name":"開発案件","code":"DEV001","status":"active","start_date":"2026-01-01","end_date":"2026-12-31","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
+		w.Write([]byte(`{"id":200,"client_id":10,"name":"Development Project","code":"DEV001","status":"active","start_date":"2026-01-01","end_date":"2026-12-31","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
 	}))
 	defer ts.Close()
 
@@ -1572,12 +1572,12 @@ func TestGetProject_OK(t *testing.T) {
 	if got == nil {
 		t.Fatal("got nil ProjectEntity")
 	}
-	if got.ID != 200 || got.Name != "開発案件" {
+	if got.ID != 200 || got.Name != "Development Project" {
 		t.Errorf("GetProject: got %+v", got)
 	}
 }
 
-// T60: SearchProjects — Status + UpdatedAtFrom パラメータ
+// T60: SearchProjects — with Status + UpdatedAtFrom parameters
 func TestSearchProjects_WithStatusAndUpdatedAtFrom(t *testing.T) {
 	var gotStatus, gotUpdatedAtFrom string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1605,11 +1605,11 @@ func TestSearchProjects_WithStatusAndUpdatedAtFrom(t *testing.T) {
 	}
 }
 
-// T65: ListProjects — JSONデシリアライズエラー
+// T65: ListProjects — JSON deserialization error
 func TestListProjects_UnmarshalError(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		// 不正な JSON（各要素が不正）
+		// invalid JSON (each element is malformed)
 		w.Write([]byte(`["not-an-object"]`))
 	}))
 	defer ts.Close()
@@ -1633,14 +1633,14 @@ func TestListProjects_UnmarshalError(t *testing.T) {
 }
 
 // ============================================================
-// M06: project_costs エンティティ テスト (T61〜T63)
+// M06: project_costs entity tests (T61-T63)
 // ============================================================
 
-// T61: ListProjectCosts — 正常系（5件）
+// T61: ListProjectCosts — happy path (5 items)
 func TestListProjectCosts_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"project_id":200,"name":"人件費","cost_type":"labor","amount":100000.0,"memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":2,"project_id":200,"name":"外注費","cost_type":"outsource","amount":50000.0,"memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":3,"project_id":200,"name":"交通費","cost_type":"expense","amount":10000.0,"memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":4,"project_id":200,"name":"通信費","cost_type":"expense","amount":5000.0,"memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":5,"project_id":200,"name":"備品費","cost_type":"expense","amount":3000.0,"memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
+		w.Write([]byte(`[{"id":1,"project_id":200,"name":"Labor Cost","cost_type":"labor","amount":100000.0,"memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":2,"project_id":200,"name":"Outsourcing Cost","cost_type":"outsource","amount":50000.0,"memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":3,"project_id":200,"name":"Travel Expense","cost_type":"expense","amount":10000.0,"memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":4,"project_id":200,"name":"Communication Expense","cost_type":"expense","amount":5000.0,"memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":5,"project_id":200,"name":"Equipment Expense","cost_type":"expense","amount":3000.0,"memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
 	}))
 	defer ts.Close()
 
@@ -1655,7 +1655,7 @@ func TestListProjectCosts_OK(t *testing.T) {
 	}
 }
 
-// T62: GetProjectCost — 正常系
+// T62: GetProjectCost — happy path
 func TestGetProjectCost_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/project_costs/50" {
@@ -1663,7 +1663,7 @@ func TestGetProjectCost_OK(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"id":50,"project_id":200,"name":"人件費","cost_type":"labor","amount":100000.0,"memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
+		w.Write([]byte(`{"id":50,"project_id":200,"name":"Labor Cost","cost_type":"labor","amount":100000.0,"memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
 	}))
 	defer ts.Close()
 
@@ -1681,13 +1681,13 @@ func TestGetProjectCost_OK(t *testing.T) {
 	}
 }
 
-// T63: SearchProjectCosts — ProjectID パラメータ付き
+// T63: SearchProjectCosts — with ProjectID parameter
 func TestSearchProjectCosts_WithProjectID(t *testing.T) {
 	var gotProjectID string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotProjectID = r.URL.Query().Get("project_id")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"project_id":200,"name":"人件費","cost_type":"labor","amount":100000.0,"memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
+		w.Write([]byte(`[{"id":1,"project_id":200,"name":"Labor Cost","cost_type":"labor","amount":100000.0,"memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
 	}))
 	defer ts.Close()
 
@@ -1706,14 +1706,14 @@ func TestSearchProjectCosts_WithProjectID(t *testing.T) {
 }
 
 // ============================================================
-// M07: estimates エンティティ テスト (T67〜T69)
+// M07: estimates entity tests (T67-T69)
 // ============================================================
 
-// T67: ListEstimates — 正常系
+// T67: ListEstimates — happy path
 func TestListEstimates_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"client_id":10,"project_id":100,"title":"見積書1","total_amount":500000.0,"status":"draft","estimate_date":"2026-01-01","expiration_date":"2026-01-31","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":2,"client_id":10,"project_id":100,"title":"見積書2","total_amount":300000.0,"status":"sent","estimate_date":"2026-01-05","expiration_date":"2026-02-05","memo":"","updated_at":"2026-01-05T00:00:00Z","created_at":"2026-01-05T00:00:00Z"}]`))
+		w.Write([]byte(`[{"id":1,"client_id":10,"project_id":100,"title":"Estimate 1","total_amount":500000.0,"status":"draft","estimate_date":"2026-01-01","expiration_date":"2026-01-31","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":2,"client_id":10,"project_id":100,"title":"Estimate 2","total_amount":300000.0,"status":"sent","estimate_date":"2026-01-05","expiration_date":"2026-02-05","memo":"","updated_at":"2026-01-05T00:00:00Z","created_at":"2026-01-05T00:00:00Z"}]`))
 	}))
 	defer ts.Close()
 
@@ -1740,7 +1740,7 @@ func TestListEstimates_OK(t *testing.T) {
 	}
 }
 
-// T68: GetEstimate — 正常系
+// T68: GetEstimate — happy path
 func TestGetEstimate_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/estimates/42" {
@@ -1748,7 +1748,7 @@ func TestGetEstimate_OK(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"id":42,"client_id":10,"project_id":100,"title":"見積書42","total_amount":750000.0,"status":"approved","estimate_date":"2026-02-01","expiration_date":"2026-03-01","memo":"テストメモ","updated_at":"2026-02-01T00:00:00Z","created_at":"2026-02-01T00:00:00Z"}`))
+		w.Write([]byte(`{"id":42,"client_id":10,"project_id":100,"title":"Estimate 42","total_amount":750000.0,"status":"approved","estimate_date":"2026-02-01","expiration_date":"2026-03-01","memo":"test memo","updated_at":"2026-02-01T00:00:00Z","created_at":"2026-02-01T00:00:00Z"}`))
 	}))
 	defer ts.Close()
 
@@ -1761,22 +1761,22 @@ func TestGetEstimate_OK(t *testing.T) {
 	if got == nil {
 		t.Fatal("got nil EstimateEntity")
 	}
-	if got.ID != 42 || got.Title != "見積書42" || got.Status != "approved" {
+	if got.ID != 42 || got.Title != "Estimate 42" || got.Status != "approved" {
 		t.Errorf("GetEstimate: got %+v", got)
 	}
-	if got.Memo != "テストメモ" {
-		t.Errorf("Memo: want %q, got %q", "テストメモ", got.Memo)
+	if got.Memo != "test memo" {
+		t.Errorf("Memo: want %q, got %q", "test memo", got.Memo)
 	}
 }
 
-// T69: SearchEstimates — ClientID + Status パラメータ付き
+// T69: SearchEstimates — with ClientID + Status parameters
 func TestSearchEstimates_WithClientIDAndStatus(t *testing.T) {
 	var gotClientID, gotStatus string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotClientID = r.URL.Query().Get("client_id")
 		gotStatus = r.URL.Query().Get("status")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"client_id":10,"project_id":100,"title":"見積書1","total_amount":500000.0,"status":"draft","estimate_date":"2026-01-01","expiration_date":"2026-01-31","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
+		w.Write([]byte(`[{"id":1,"client_id":10,"project_id":100,"title":"Estimate 1","total_amount":500000.0,"status":"draft","estimate_date":"2026-01-01","expiration_date":"2026-01-31","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
 	}))
 	defer ts.Close()
 
@@ -1798,14 +1798,14 @@ func TestSearchEstimates_WithClientIDAndStatus(t *testing.T) {
 }
 
 // ============================================================
-// M07: invoices エンティティ テスト (T70〜T72)
+// M07: invoices entity tests (T70-T72)
 // ============================================================
 
-// T70: ListInvoices — 正常系
+// T70: ListInvoices — happy path
 func TestListInvoices_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"client_id":10,"project_id":100,"title":"請求書1","total_amount":500000.0,"status":"draft","invoice_date":"2026-01-31","due_date":"2026-02-28","memo":"","updated_at":"2026-01-31T00:00:00Z","created_at":"2026-01-31T00:00:00Z"},{"id":2,"client_id":10,"project_id":101,"title":"請求書2","total_amount":200000.0,"status":"sent","invoice_date":"2026-02-28","due_date":"2026-03-31","memo":"","updated_at":"2026-02-28T00:00:00Z","created_at":"2026-02-28T00:00:00Z"}]`))
+		w.Write([]byte(`[{"id":1,"client_id":10,"project_id":100,"title":"Invoice 1","total_amount":500000.0,"status":"draft","invoice_date":"2026-01-31","due_date":"2026-02-28","memo":"","updated_at":"2026-01-31T00:00:00Z","created_at":"2026-01-31T00:00:00Z"},{"id":2,"client_id":10,"project_id":101,"title":"Invoice 2","total_amount":200000.0,"status":"sent","invoice_date":"2026-02-28","due_date":"2026-03-31","memo":"","updated_at":"2026-02-28T00:00:00Z","created_at":"2026-02-28T00:00:00Z"}]`))
 	}))
 	defer ts.Close()
 
@@ -1823,7 +1823,7 @@ func TestListInvoices_OK(t *testing.T) {
 	}
 }
 
-// T71: GetInvoice — 正常系
+// T71: GetInvoice — happy path
 func TestGetInvoice_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/invoices/55" {
@@ -1831,7 +1831,7 @@ func TestGetInvoice_OK(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"id":55,"client_id":10,"project_id":100,"title":"請求書55","total_amount":1000000.0,"status":"paid","invoice_date":"2026-01-31","due_date":"2026-02-28","memo":"支払済み","updated_at":"2026-01-31T00:00:00Z","created_at":"2026-01-31T00:00:00Z"}`))
+		w.Write([]byte(`{"id":55,"client_id":10,"project_id":100,"title":"Invoice 55","total_amount":1000000.0,"status":"paid","invoice_date":"2026-01-31","due_date":"2026-02-28","memo":"Paid","updated_at":"2026-01-31T00:00:00Z","created_at":"2026-01-31T00:00:00Z"}`))
 	}))
 	defer ts.Close()
 
@@ -1849,14 +1849,14 @@ func TestGetInvoice_OK(t *testing.T) {
 	}
 }
 
-// T72: SearchInvoices — ProjectID + UpdatedAtFrom パラメータ付き
+// T72: SearchInvoices — with ProjectID + UpdatedAtFrom parameters
 func TestSearchInvoices_WithProjectIDAndUpdatedAtFrom(t *testing.T) {
 	var gotProjectID, gotUpdatedAtFrom string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotProjectID = r.URL.Query().Get("project_id")
 		gotUpdatedAtFrom = r.URL.Query().Get("updated_at_from")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"client_id":10,"project_id":100,"title":"請求書1","total_amount":500000.0,"status":"draft","invoice_date":"2026-01-31","due_date":"2026-02-28","memo":"","updated_at":"2026-01-31T00:00:00Z","created_at":"2026-01-31T00:00:00Z"}]`))
+		w.Write([]byte(`[{"id":1,"client_id":10,"project_id":100,"title":"Invoice 1","total_amount":500000.0,"status":"draft","invoice_date":"2026-01-31","due_date":"2026-02-28","memo":"","updated_at":"2026-01-31T00:00:00Z","created_at":"2026-01-31T00:00:00Z"}]`))
 	}))
 	defer ts.Close()
 
@@ -1878,14 +1878,14 @@ func TestSearchInvoices_WithProjectIDAndUpdatedAtFrom(t *testing.T) {
 }
 
 // ============================================================
-// M07: orders エンティティ テスト (T73〜T75)
+// M07: orders entity tests (T73-T75)
 // ============================================================
 
-// T73: ListOrders — 正常系
+// T73: ListOrders — happy path
 func TestListOrders_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"client_id":10,"project_id":100,"title":"発注書1","total_amount":300000.0,"status":"draft","order_date":"2026-01-10","memo":"","updated_at":"2026-01-10T00:00:00Z","created_at":"2026-01-10T00:00:00Z"},{"id":2,"client_id":10,"project_id":101,"title":"発注書2","total_amount":150000.0,"status":"sent","order_date":"2026-01-15","memo":"","updated_at":"2026-01-15T00:00:00Z","created_at":"2026-01-15T00:00:00Z"}]`))
+		w.Write([]byte(`[{"id":1,"client_id":10,"project_id":100,"title":"Order 1","total_amount":300000.0,"status":"draft","order_date":"2026-01-10","memo":"","updated_at":"2026-01-10T00:00:00Z","created_at":"2026-01-10T00:00:00Z"},{"id":2,"client_id":10,"project_id":101,"title":"Order 2","total_amount":150000.0,"status":"sent","order_date":"2026-01-15","memo":"","updated_at":"2026-01-15T00:00:00Z","created_at":"2026-01-15T00:00:00Z"}]`))
 	}))
 	defer ts.Close()
 
@@ -1903,7 +1903,7 @@ func TestListOrders_OK(t *testing.T) {
 	}
 }
 
-// T74: GetOrder — 正常系
+// T74: GetOrder — happy path
 func TestGetOrder_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/orders/77" {
@@ -1911,7 +1911,7 @@ func TestGetOrder_OK(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"id":77,"client_id":10,"project_id":100,"title":"発注書77","total_amount":800000.0,"status":"approved","order_date":"2026-02-01","memo":"承認済み","updated_at":"2026-02-01T00:00:00Z","created_at":"2026-02-01T00:00:00Z"}`))
+		w.Write([]byte(`{"id":77,"client_id":10,"project_id":100,"title":"Order 77","total_amount":800000.0,"status":"approved","order_date":"2026-02-01","memo":"Approved","updated_at":"2026-02-01T00:00:00Z","created_at":"2026-02-01T00:00:00Z"}`))
 	}))
 	defer ts.Close()
 
@@ -1924,18 +1924,18 @@ func TestGetOrder_OK(t *testing.T) {
 	if got == nil {
 		t.Fatal("got nil OrderEntity")
 	}
-	if got.ID != 77 || got.Status != "approved" || got.Memo != "承認済み" {
+	if got.ID != 77 || got.Status != "approved" || got.Memo != "Approved" {
 		t.Errorf("GetOrder: got %+v", got)
 	}
 }
 
-// T75: SearchOrders — ClientID パラメータ付き
+// T75: SearchOrders — with ClientID parameter
 func TestSearchOrders_WithClientID(t *testing.T) {
 	var gotClientID string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotClientID = r.URL.Query().Get("client_id")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"client_id":10,"project_id":100,"title":"発注書1","total_amount":300000.0,"status":"draft","order_date":"2026-01-10","memo":"","updated_at":"2026-01-10T00:00:00Z","created_at":"2026-01-10T00:00:00Z"}]`))
+		w.Write([]byte(`[{"id":1,"client_id":10,"project_id":100,"title":"Order 1","total_amount":300000.0,"status":"draft","order_date":"2026-01-10","memo":"","updated_at":"2026-01-10T00:00:00Z","created_at":"2026-01-10T00:00:00Z"}]`))
 	}))
 	defer ts.Close()
 
@@ -1954,14 +1954,14 @@ func TestSearchOrders_WithClientID(t *testing.T) {
 }
 
 // ============================================================
-// M07: deliveries エンティティ テスト (T76〜T78)
+// M07: deliveries entity tests (T76-T78)
 // ============================================================
 
-// T76: ListDeliveries — 正常系
+// T76: ListDeliveries — happy path
 func TestListDeliveries_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"client_id":10,"project_id":100,"title":"納品書1","total_amount":500000.0,"status":"draft","delivery_date":"2026-01-20","memo":"","updated_at":"2026-01-20T00:00:00Z","created_at":"2026-01-20T00:00:00Z"},{"id":2,"client_id":10,"project_id":101,"title":"納品書2","total_amount":250000.0,"status":"sent","delivery_date":"2026-02-20","memo":"","updated_at":"2026-02-20T00:00:00Z","created_at":"2026-02-20T00:00:00Z"}]`))
+		w.Write([]byte(`[{"id":1,"client_id":10,"project_id":100,"title":"Delivery Note 1","total_amount":500000.0,"status":"draft","delivery_date":"2026-01-20","memo":"","updated_at":"2026-01-20T00:00:00Z","created_at":"2026-01-20T00:00:00Z"},{"id":2,"client_id":10,"project_id":101,"title":"Delivery Note 2","total_amount":250000.0,"status":"sent","delivery_date":"2026-02-20","memo":"","updated_at":"2026-02-20T00:00:00Z","created_at":"2026-02-20T00:00:00Z"}]`))
 	}))
 	defer ts.Close()
 
@@ -1979,7 +1979,7 @@ func TestListDeliveries_OK(t *testing.T) {
 	}
 }
 
-// T77: GetDelivery — 正常系
+// T77: GetDelivery — happy path
 func TestGetDelivery_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/deliveries/88" {
@@ -1987,7 +1987,7 @@ func TestGetDelivery_OK(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"id":88,"client_id":10,"project_id":100,"title":"納品書88","total_amount":600000.0,"status":"delivered","delivery_date":"2026-02-15","memo":"納品完了","updated_at":"2026-02-15T00:00:00Z","created_at":"2026-02-15T00:00:00Z"}`))
+		w.Write([]byte(`{"id":88,"client_id":10,"project_id":100,"title":"Delivery Note 88","total_amount":600000.0,"status":"delivered","delivery_date":"2026-02-15","memo":"Delivery Complete","updated_at":"2026-02-15T00:00:00Z","created_at":"2026-02-15T00:00:00Z"}`))
 	}))
 	defer ts.Close()
 
@@ -2005,14 +2005,14 @@ func TestGetDelivery_OK(t *testing.T) {
 	}
 }
 
-// T78: SearchDeliveries — ProjectID + Status パラメータ付き
+// T78: SearchDeliveries — with ProjectID + Status parameters
 func TestSearchDeliveries_WithProjectIDAndStatus(t *testing.T) {
 	var gotProjectID, gotStatus string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotProjectID = r.URL.Query().Get("project_id")
 		gotStatus = r.URL.Query().Get("status")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"client_id":10,"project_id":100,"title":"納品書1","total_amount":500000.0,"status":"delivered","delivery_date":"2026-01-20","memo":"","updated_at":"2026-01-20T00:00:00Z","created_at":"2026-01-20T00:00:00Z"}]`))
+		w.Write([]byte(`[{"id":1,"client_id":10,"project_id":100,"title":"Delivery Note 1","total_amount":500000.0,"status":"delivered","delivery_date":"2026-01-20","memo":"","updated_at":"2026-01-20T00:00:00Z","created_at":"2026-01-20T00:00:00Z"}]`))
 	}))
 	defer ts.Close()
 
@@ -2034,14 +2034,14 @@ func TestSearchDeliveries_WithProjectIDAndStatus(t *testing.T) {
 }
 
 // ============================================================
-// M07: receipts エンティティ テスト (T79〜T81)
+// M07: receipts entity tests (T79-T81)
 // ============================================================
 
-// T79: ListReceipts — 正常系
+// T79: ListReceipts — happy path
 func TestListReceipts_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"client_id":10,"project_id":100,"title":"領収書1","total_amount":500000.0,"status":"draft","receipt_date":"2026-01-31","memo":"","updated_at":"2026-01-31T00:00:00Z","created_at":"2026-01-31T00:00:00Z"},{"id":2,"client_id":10,"project_id":101,"title":"領収書2","total_amount":200000.0,"status":"issued","receipt_date":"2026-02-28","memo":"","updated_at":"2026-02-28T00:00:00Z","created_at":"2026-02-28T00:00:00Z"}]`))
+		w.Write([]byte(`[{"id":1,"client_id":10,"project_id":100,"title":"Receipt 1","total_amount":500000.0,"status":"draft","receipt_date":"2026-01-31","memo":"","updated_at":"2026-01-31T00:00:00Z","created_at":"2026-01-31T00:00:00Z"},{"id":2,"client_id":10,"project_id":101,"title":"Receipt 2","total_amount":200000.0,"status":"issued","receipt_date":"2026-02-28","memo":"","updated_at":"2026-02-28T00:00:00Z","created_at":"2026-02-28T00:00:00Z"}]`))
 	}))
 	defer ts.Close()
 
@@ -2059,7 +2059,7 @@ func TestListReceipts_OK(t *testing.T) {
 	}
 }
 
-// T80: GetReceipt — 正常系
+// T80: GetReceipt — happy path
 func TestGetReceipt_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/receipts/99" {
@@ -2067,7 +2067,7 @@ func TestGetReceipt_OK(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"id":99,"client_id":10,"project_id":100,"title":"領収書99","total_amount":900000.0,"status":"issued","receipt_date":"2026-03-31","memo":"発行済み","updated_at":"2026-03-31T00:00:00Z","created_at":"2026-03-31T00:00:00Z"}`))
+		w.Write([]byte(`{"id":99,"client_id":10,"project_id":100,"title":"Receipt 99","total_amount":900000.0,"status":"issued","receipt_date":"2026-03-31","memo":"Issued","updated_at":"2026-03-31T00:00:00Z","created_at":"2026-03-31T00:00:00Z"}`))
 	}))
 	defer ts.Close()
 
@@ -2085,14 +2085,14 @@ func TestGetReceipt_OK(t *testing.T) {
 	}
 }
 
-// T81: SearchReceipts — ClientID + UpdatedAtFrom パラメータ付き
+// T81: SearchReceipts — with ClientID + UpdatedAtFrom parameters
 func TestSearchReceipts_WithClientIDAndUpdatedAtFrom(t *testing.T) {
 	var gotClientID, gotUpdatedAtFrom string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotClientID = r.URL.Query().Get("client_id")
 		gotUpdatedAtFrom = r.URL.Query().Get("updated_at_from")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"client_id":10,"project_id":100,"title":"領収書1","total_amount":500000.0,"status":"draft","receipt_date":"2026-01-31","memo":"","updated_at":"2026-01-31T00:00:00Z","created_at":"2026-01-31T00:00:00Z"}]`))
+		w.Write([]byte(`[{"id":1,"client_id":10,"project_id":100,"title":"Receipt 1","total_amount":500000.0,"status":"draft","receipt_date":"2026-01-31","memo":"","updated_at":"2026-01-31T00:00:00Z","created_at":"2026-01-31T00:00:00Z"}]`))
 	}))
 	defer ts.Close()
 
@@ -2114,14 +2114,14 @@ func TestSearchReceipts_WithClientIDAndUpdatedAtFrom(t *testing.T) {
 }
 
 // ============================================================
-// M08: vendors エンティティ テスト (T112〜T117)
+// M08: vendors entity tests (T112-T117)
 // ============================================================
 
-// T112: ListVendors — 正常系（2件）
+// T112: ListVendors — happy path (2 items)
 func TestListVendors_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"name":"発注先A","code":"VA001","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":2,"name":"発注先B","code":"VB002","memo":"","updated_at":"2026-01-02T00:00:00Z","created_at":"2026-01-02T00:00:00Z"}]`))
+		w.Write([]byte(`[{"id":1,"name":"Vendor A","code":"VA001","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":2,"name":"Vendor B","code":"VB002","memo":"","updated_at":"2026-01-02T00:00:00Z","created_at":"2026-01-02T00:00:00Z"}]`))
 	}))
 	defer ts.Close()
 
@@ -2134,12 +2134,12 @@ func TestListVendors_OK(t *testing.T) {
 	if len(result) != 2 {
 		t.Errorf("want 2 vendors, got %d", len(result))
 	}
-	if result[0].ID != 1 || result[0].Name != "発注先A" || result[0].Code != "VA001" {
+	if result[0].ID != 1 || result[0].Name != "Vendor A" || result[0].Code != "VA001" {
 		t.Errorf("vendor[0]: got %+v", result[0])
 	}
 }
 
-// T113: ListVendors — APIエラー（401）
+// T113: ListVendors — API error (401)
 func TestListVendors_Unauthorized(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -2161,7 +2161,7 @@ func TestListVendors_Unauthorized(t *testing.T) {
 	}
 }
 
-// T114: GetVendor — 正常系
+// T114: GetVendor — happy path
 func TestGetVendor_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/vendors/1" {
@@ -2169,7 +2169,7 @@ func TestGetVendor_OK(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"id":1,"name":"発注先A","code":"VA001","memo":"テストメモ","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
+		w.Write([]byte(`{"id":1,"name":"Vendor A","code":"VA001","memo":"test memo","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
 	}))
 	defer ts.Close()
 
@@ -2182,7 +2182,7 @@ func TestGetVendor_OK(t *testing.T) {
 	if got == nil {
 		t.Fatal("got nil VendorEntity")
 	}
-	if got.ID != 1 || got.Name != "発注先A" || got.Code != "VA001" {
+	if got.ID != 1 || got.Name != "Vendor A" || got.Code != "VA001" {
 		t.Errorf("GetVendor: got %+v", got)
 	}
 }
@@ -2209,31 +2209,31 @@ func TestGetVendor_NotFound(t *testing.T) {
 	}
 }
 
-// T116: SearchVendors — Name パラメータ付き
+// T116: SearchVendors — with Name parameter
 func TestSearchVendors_WithName(t *testing.T) {
 	var gotName string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotName = r.URL.Query().Get("name")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"name":"株式会社A","code":"A001","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
+		w.Write([]byte(`[{"id":1,"name":"Company A","code":"A001","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
 	}))
 	defer ts.Close()
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.SearchVendors(context.Background(), boardapi.VendorSearchParams{Name: "株式会社A"})
+	result, err := c.SearchVendors(context.Background(), boardapi.VendorSearchParams{Name: "Company A"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(result) != 1 {
 		t.Errorf("want 1 result, got %d", len(result))
 	}
-	if gotName != "株式会社A" {
-		t.Errorf("name param: want %q, got %q", "株式会社A", gotName)
+	if gotName != "Company A" {
+		t.Errorf("name param: want %q, got %q", "Company A", gotName)
 	}
 }
 
-// T117: SearchVendors — UpdatedAtFrom パラメータ付き
+// T117: SearchVendors — with UpdatedAtFrom parameter
 func TestSearchVendors_WithUpdatedAtFrom(t *testing.T) {
 	var gotUpdatedAtFrom string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -2255,14 +2255,14 @@ func TestSearchVendors_WithUpdatedAtFrom(t *testing.T) {
 }
 
 // ============================================================
-// M08: vendor_branches エンティティ テスト (T118〜T123)
+// M08: vendor_branches entity tests (T118-T123)
 // ============================================================
 
-// T118: ListVendorBranches — 正常系（2件）
+// T118: ListVendorBranches — happy path (2 items)
 func TestListVendorBranches_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":10,"vendor_id":1,"name":"東京支社","postal_code":"100-0001","address":"東京都千代田区","phone":"03-0000-0001","fax":"","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":11,"vendor_id":1,"name":"大阪支社","postal_code":"530-0001","address":"大阪府大阪市","phone":"06-0000-0001","fax":"","memo":"","updated_at":"2026-01-02T00:00:00Z","created_at":"2026-01-02T00:00:00Z"}]`))
+		w.Write([]byte(`[{"id":10,"vendor_id":1,"name":"Tokyo Branch","postal_code":"100-0001","address":"Chiyoda, Tokyo","phone":"03-0000-0001","fax":"","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":11,"vendor_id":1,"name":"Osaka Branch","postal_code":"530-0001","address":"Osaka City, Osaka","phone":"06-0000-0001","fax":"","memo":"","updated_at":"2026-01-02T00:00:00Z","created_at":"2026-01-02T00:00:00Z"}]`))
 	}))
 	defer ts.Close()
 
@@ -2280,7 +2280,7 @@ func TestListVendorBranches_OK(t *testing.T) {
 	}
 }
 
-// T119: ListVendorBranches — APIエラー（401）
+// T119: ListVendorBranches — API error (401)
 func TestListVendorBranches_Unauthorized(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -2302,7 +2302,7 @@ func TestListVendorBranches_Unauthorized(t *testing.T) {
 	}
 }
 
-// T120: GetVendorBranch — 正常系
+// T120: GetVendorBranch — happy path
 func TestGetVendorBranch_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/vendor_branches/10" {
@@ -2310,7 +2310,7 @@ func TestGetVendorBranch_OK(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"id":10,"vendor_id":1,"name":"東京支社","postal_code":"100-0001","address":"東京都千代田区","phone":"03-0000-0001","fax":"","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
+		w.Write([]byte(`{"id":10,"vendor_id":1,"name":"Tokyo Branch","postal_code":"100-0001","address":"Chiyoda, Tokyo","phone":"03-0000-0001","fax":"","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
 	}))
 	defer ts.Close()
 
@@ -2350,13 +2350,13 @@ func TestGetVendorBranch_NotFound(t *testing.T) {
 	}
 }
 
-// T122: SearchVendorBranches — VendorID パラメータ付き
+// T122: SearchVendorBranches — with VendorID parameter
 func TestSearchVendorBranches_WithVendorID(t *testing.T) {
 	var gotVendorID string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotVendorID = r.URL.Query().Get("vendor_id")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":10,"vendor_id":5,"name":"東京支社","postal_code":"100-0001","address":"東京都千代田区","phone":"","fax":"","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
+		w.Write([]byte(`[{"id":10,"vendor_id":5,"name":"Tokyo Branch","postal_code":"100-0001","address":"Chiyoda, Tokyo","phone":"","fax":"","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
 	}))
 	defer ts.Close()
 
@@ -2374,7 +2374,7 @@ func TestSearchVendorBranches_WithVendorID(t *testing.T) {
 	}
 }
 
-// T123: SearchVendorBranches — Name パラメータ付き
+// T123: SearchVendorBranches — with Name parameter
 func TestSearchVendorBranches_WithName(t *testing.T) {
 	var gotName string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -2386,24 +2386,24 @@ func TestSearchVendorBranches_WithName(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	_, err := c.SearchVendorBranches(context.Background(), boardapi.VendorBranchSearchParams{Name: "東京支社"})
+	_, err := c.SearchVendorBranches(context.Background(), boardapi.VendorBranchSearchParams{Name: "Tokyo Branch"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if gotName != "東京支社" {
-		t.Errorf("name param: want %q, got %q", "東京支社", gotName)
+	if gotName != "Tokyo Branch" {
+		t.Errorf("name param: want %q, got %q", "Tokyo Branch", gotName)
 	}
 }
 
 // ============================================================
-// M08: vendor_contacts エンティティ テスト (T124〜T129)
+// M08: vendor_contacts entity tests (T124-T129)
 // ============================================================
 
-// T124: ListVendorContacts — 正常系（2件）
+// T124: ListVendorContacts — happy path (2 items)
 func TestListVendorContacts_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"vendor_id":1,"vendor_branch_id":10,"name":"山田太郎","name_kana":"ヤマダタロウ","title":"部長","email":"yamada@example.com","phone":"03-0000-0001","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":2,"vendor_id":1,"vendor_branch_id":10,"name":"鈴木花子","name_kana":"スズキハナコ","title":"課長","email":"suzuki@example.com","phone":"03-0000-0002","memo":"","updated_at":"2026-01-02T00:00:00Z","created_at":"2026-01-02T00:00:00Z"}]`))
+		w.Write([]byte(`[{"id":1,"vendor_id":1,"vendor_branch_id":10,"name":"Taro Yamada","name_kana":"YAMADATARO","title":"Manager","email":"yamada@example.com","phone":"03-0000-0001","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":2,"vendor_id":1,"vendor_branch_id":10,"name":"Hanako Suzuki","name_kana":"SUZUKIHANAKO","title":"Section Chief","email":"suzuki@example.com","phone":"03-0000-0002","memo":"","updated_at":"2026-01-02T00:00:00Z","created_at":"2026-01-02T00:00:00Z"}]`))
 	}))
 	defer ts.Close()
 
@@ -2421,7 +2421,7 @@ func TestListVendorContacts_OK(t *testing.T) {
 	}
 }
 
-// T125: ListVendorContacts — APIエラー（401）
+// T125: ListVendorContacts — API error (401)
 func TestListVendorContacts_Unauthorized(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -2443,7 +2443,7 @@ func TestListVendorContacts_Unauthorized(t *testing.T) {
 	}
 }
 
-// T126: GetVendorContact — 正常系
+// T126: GetVendorContact — happy path
 func TestGetVendorContact_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/vendor_contacts/1" {
@@ -2451,7 +2451,7 @@ func TestGetVendorContact_OK(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"id":1,"vendor_id":1,"vendor_branch_id":10,"name":"山田太郎","name_kana":"ヤマダタロウ","title":"部長","email":"yamada@example.com","phone":"03-0000-0001","memo":"テストメモ","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
+		w.Write([]byte(`{"id":1,"vendor_id":1,"vendor_branch_id":10,"name":"Taro Yamada","name_kana":"YAMADATARO","title":"Manager","email":"yamada@example.com","phone":"03-0000-0001","memo":"test memo","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
 	}))
 	defer ts.Close()
 
@@ -2491,14 +2491,14 @@ func TestGetVendorContact_NotFound(t *testing.T) {
 	}
 }
 
-// T128: SearchVendorContacts — VendorID + Email パラメータ付き
+// T128: SearchVendorContacts — with VendorID + Email parameters
 func TestSearchVendorContacts_WithVendorIDAndEmail(t *testing.T) {
 	var gotVendorID, gotEmail string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotVendorID = r.URL.Query().Get("vendor_id")
 		gotEmail = r.URL.Query().Get("email")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"vendor_id":3,"vendor_branch_id":10,"name":"山田太郎","name_kana":"ヤマダタロウ","title":"部長","email":"test@example.com","phone":"","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
+		w.Write([]byte(`[{"id":1,"vendor_id":3,"vendor_branch_id":10,"name":"Taro Yamada","name_kana":"YAMADATARO","title":"Manager","email":"test@example.com","phone":"","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
 	}))
 	defer ts.Close()
 
@@ -2519,7 +2519,7 @@ func TestSearchVendorContacts_WithVendorIDAndEmail(t *testing.T) {
 	}
 }
 
-// T129: SearchVendorContacts — Name パラメータ付き
+// T129: SearchVendorContacts — with Name parameter
 func TestSearchVendorContacts_WithName(t *testing.T) {
 	var gotName string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -2531,24 +2531,24 @@ func TestSearchVendorContacts_WithName(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	_, err := c.SearchVendorContacts(context.Background(), boardapi.VendorContactSearchParams{Name: "山田"})
+	_, err := c.SearchVendorContacts(context.Background(), boardapi.VendorContactSearchParams{Name: "Yamada"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if gotName != "山田" {
-		t.Errorf("name param: want %q, got %q", "山田", gotName)
+	if gotName != "Yamada" {
+		t.Errorf("name param: want %q, got %q", "Yamada", gotName)
 	}
 }
 
 // ============================================================
-// M08: purchase_orders エンティティ テスト (T130〜T135)
+// M08: purchase_orders entity tests (T130-T135)
 // ============================================================
 
-// T130: ListPurchaseOrders — 正常系（3件）
+// T130: ListPurchaseOrders — happy path (3 items)
 func TestListPurchaseOrders_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"vendor_id":1,"project_id":100,"title":"発注書1","total_amount":500000.0,"status":"draft","order_date":"2026-01-01","delivery_date":"2026-02-01","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":2,"vendor_id":1,"project_id":101,"title":"発注書2","total_amount":300000.0,"status":"approved","order_date":"2026-01-05","delivery_date":"2026-02-05","memo":"","updated_at":"2026-01-05T00:00:00Z","created_at":"2026-01-05T00:00:00Z"},{"id":3,"vendor_id":2,"project_id":102,"title":"発注書3","total_amount":150000.0,"status":"sent","order_date":"2026-01-10","delivery_date":"2026-02-10","memo":"","updated_at":"2026-01-10T00:00:00Z","created_at":"2026-01-10T00:00:00Z"}]`))
+		w.Write([]byte(`[{"id":1,"vendor_id":1,"project_id":100,"title":"Order 1","total_amount":500000.0,"status":"draft","order_date":"2026-01-01","delivery_date":"2026-02-01","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":2,"vendor_id":1,"project_id":101,"title":"Order 2","total_amount":300000.0,"status":"approved","order_date":"2026-01-05","delivery_date":"2026-02-05","memo":"","updated_at":"2026-01-05T00:00:00Z","created_at":"2026-01-05T00:00:00Z"},{"id":3,"vendor_id":2,"project_id":102,"title":"Order 3","total_amount":150000.0,"status":"sent","order_date":"2026-01-10","delivery_date":"2026-02-10","memo":"","updated_at":"2026-01-10T00:00:00Z","created_at":"2026-01-10T00:00:00Z"}]`))
 	}))
 	defer ts.Close()
 
@@ -2566,7 +2566,7 @@ func TestListPurchaseOrders_OK(t *testing.T) {
 	}
 }
 
-// T131: ListPurchaseOrders — APIエラー（401）
+// T131: ListPurchaseOrders — API error (401)
 func TestListPurchaseOrders_Unauthorized(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -2588,7 +2588,7 @@ func TestListPurchaseOrders_Unauthorized(t *testing.T) {
 	}
 }
 
-// T132: GetPurchaseOrder — 正常系
+// T132: GetPurchaseOrder — happy path
 func TestGetPurchaseOrder_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/purchase_orders/1" {
@@ -2596,7 +2596,7 @@ func TestGetPurchaseOrder_OK(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"id":1,"vendor_id":1,"project_id":100,"title":"発注書1","total_amount":500000.0,"status":"approved","order_date":"2026-01-01","delivery_date":"2026-02-01","memo":"テストメモ","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
+		w.Write([]byte(`{"id":1,"vendor_id":1,"project_id":100,"title":"Order 1","total_amount":500000.0,"status":"approved","order_date":"2026-01-01","delivery_date":"2026-02-01","memo":"test memo","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
 	}))
 	defer ts.Close()
 
@@ -2636,14 +2636,14 @@ func TestGetPurchaseOrder_NotFound(t *testing.T) {
 	}
 }
 
-// T134: SearchPurchaseOrders — VendorID + Status パラメータ付き
+// T134: SearchPurchaseOrders — with VendorID + Status parameters
 func TestSearchPurchaseOrders_WithVendorIDAndStatus(t *testing.T) {
 	var gotVendorID, gotStatus string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotVendorID = r.URL.Query().Get("vendor_id")
 		gotStatus = r.URL.Query().Get("status")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"vendor_id":1,"project_id":100,"title":"発注書1","total_amount":500000.0,"status":"approved","order_date":"2026-01-01","delivery_date":"2026-02-01","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
+		w.Write([]byte(`[{"id":1,"vendor_id":1,"project_id":100,"title":"Order 1","total_amount":500000.0,"status":"approved","order_date":"2026-01-01","delivery_date":"2026-02-01","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
 	}))
 	defer ts.Close()
 
@@ -2664,7 +2664,7 @@ func TestSearchPurchaseOrders_WithVendorIDAndStatus(t *testing.T) {
 	}
 }
 
-// T135: SearchPurchaseOrders — ProjectID + UpdatedAtFrom パラメータ付き
+// T135: SearchPurchaseOrders — with ProjectID + UpdatedAtFrom parameters
 func TestSearchPurchaseOrders_WithProjectIDAndUpdatedAtFrom(t *testing.T) {
 	var gotProjectID, gotUpdatedAtFrom string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -2690,10 +2690,10 @@ func TestSearchPurchaseOrders_WithProjectIDAndUpdatedAtFrom(t *testing.T) {
 }
 
 // ============================================================
-// M08: payments エンティティ テスト (T136〜T141)
+// M08: payments entity tests (T136-T141)
 // ============================================================
 
-// T136: ListPayments — 正常系（2件）
+// T136: ListPayments — happy path (2 items)
 func TestListPayments_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -2715,7 +2715,7 @@ func TestListPayments_OK(t *testing.T) {
 	}
 }
 
-// T137: ListPayments — APIエラー（401）
+// T137: ListPayments — API error (401)
 func TestListPayments_Unauthorized(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -2737,7 +2737,7 @@ func TestListPayments_Unauthorized(t *testing.T) {
 	}
 }
 
-// T138: GetPayment — 正常系
+// T138: GetPayment — happy path
 func TestGetPayment_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/payments/1" {
@@ -2745,7 +2745,7 @@ func TestGetPayment_OK(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"id":1,"vendor_id":1,"purchase_order_id":10,"amount":500000.0,"status":"paid","payment_date":"2026-01-31","memo":"支払済み","updated_at":"2026-01-31T00:00:00Z","created_at":"2026-01-31T00:00:00Z"}`))
+		w.Write([]byte(`{"id":1,"vendor_id":1,"purchase_order_id":10,"amount":500000.0,"status":"paid","payment_date":"2026-01-31","memo":"Paid","updated_at":"2026-01-31T00:00:00Z","created_at":"2026-01-31T00:00:00Z"}`))
 	}))
 	defer ts.Close()
 
@@ -2785,7 +2785,7 @@ func TestGetPayment_NotFound(t *testing.T) {
 	}
 }
 
-// T140: SearchPayments — VendorID + Status パラメータ付き
+// T140: SearchPayments — with VendorID + Status parameters
 func TestSearchPayments_WithVendorIDAndStatus(t *testing.T) {
 	var gotVendorID, gotStatus string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -2813,7 +2813,7 @@ func TestSearchPayments_WithVendorIDAndStatus(t *testing.T) {
 	}
 }
 
-// T141: SearchPayments — PurchaseOrderID パラメータ付き
+// T141: SearchPayments — with PurchaseOrderID parameter
 func TestSearchPayments_WithPurchaseOrderID(t *testing.T) {
 	var gotPurchaseOrderID string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -2835,18 +2835,18 @@ func TestSearchPayments_WithPurchaseOrderID(t *testing.T) {
 }
 
 // ============================================================
-// M08: クロスカットテスト (T142〜T156)
+// M08: cross-cutting tests (T142-T156)
 // ============================================================
 
-// T142: ListVendors — ページネーション 2ページ（100件 + 50件）
+// T142: ListVendors — pagination 2 pages (100 + 50 items)
 func TestListVendors_TwoPages(t *testing.T) {
 	page1 := make([]map[string]interface{}, 100)
 	for i := range page1 {
-		page1[i] = map[string]interface{}{"id": i + 1, "name": "発注先", "code": "", "memo": "", "updated_at": "2026-01-01T00:00:00Z", "created_at": "2026-01-01T00:00:00Z"}
+		page1[i] = map[string]interface{}{"id": i + 1, "name": "Vendor", "code": "", "memo": "", "updated_at": "2026-01-01T00:00:00Z", "created_at": "2026-01-01T00:00:00Z"}
 	}
 	page2 := make([]map[string]interface{}, 50)
 	for i := range page2 {
-		page2[i] = map[string]interface{}{"id": i + 101, "name": "発注先", "code": "", "memo": "", "updated_at": "2026-01-01T00:00:00Z", "created_at": "2026-01-01T00:00:00Z"}
+		page2[i] = map[string]interface{}{"id": i + 101, "name": "Vendor", "code": "", "memo": "", "updated_at": "2026-01-01T00:00:00Z", "created_at": "2026-01-01T00:00:00Z"}
 	}
 
 	call := 0
@@ -2875,15 +2875,15 @@ func TestListVendors_TwoPages(t *testing.T) {
 	}
 }
 
-// T143: ListPurchaseOrders — ページネーション 2ページ（100件 + 30件）
+// T143: ListPurchaseOrders — pagination 2 pages (100 + 30 items)
 func TestListPurchaseOrders_TwoPages(t *testing.T) {
 	page1 := make([]map[string]interface{}, 100)
 	for i := range page1 {
-		page1[i] = map[string]interface{}{"id": i + 1, "vendor_id": 1, "project_id": 100, "title": "発注書", "total_amount": 100000.0, "status": "draft", "order_date": "2026-01-01", "delivery_date": "2026-02-01", "memo": "", "updated_at": "2026-01-01T00:00:00Z", "created_at": "2026-01-01T00:00:00Z"}
+		page1[i] = map[string]interface{}{"id": i + 1, "vendor_id": 1, "project_id": 100, "title": "Purchase Order", "total_amount": 100000.0, "status": "draft", "order_date": "2026-01-01", "delivery_date": "2026-02-01", "memo": "", "updated_at": "2026-01-01T00:00:00Z", "created_at": "2026-01-01T00:00:00Z"}
 	}
 	page2 := make([]map[string]interface{}, 30)
 	for i := range page2 {
-		page2[i] = map[string]interface{}{"id": i + 101, "vendor_id": 1, "project_id": 100, "title": "発注書", "total_amount": 100000.0, "status": "draft", "order_date": "2026-01-01", "delivery_date": "2026-02-01", "memo": "", "updated_at": "2026-01-01T00:00:00Z", "created_at": "2026-01-01T00:00:00Z"}
+		page2[i] = map[string]interface{}{"id": i + 101, "vendor_id": 1, "project_id": 100, "title": "Purchase Order", "total_amount": 100000.0, "status": "draft", "order_date": "2026-01-01", "delivery_date": "2026-02-01", "memo": "", "updated_at": "2026-01-01T00:00:00Z", "created_at": "2026-01-01T00:00:00Z"}
 	}
 
 	call := 0
@@ -2912,11 +2912,11 @@ func TestListPurchaseOrders_TwoPages(t *testing.T) {
 	}
 }
 
-// T144: GetVendor — context キャンセル時
+// T144: GetVendor — on context cancellation
 func TestGetVendor_ContextCancel(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"id":1,"name":"発注先A","code":"VA001","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
+		w.Write([]byte(`{"id":1,"name":"Vendor A","code":"VA001","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
 	}))
 	defer ts.Close()
 
@@ -2930,11 +2930,11 @@ func TestGetVendor_ContextCancel(t *testing.T) {
 	}
 }
 
-// T145: GetVendorBranch — context キャンセル時
+// T145: GetVendorBranch — on context cancellation
 func TestGetVendorBranch_ContextCancel(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"id":10,"vendor_id":1,"name":"東京支社","postal_code":"100-0001","address":"","phone":"","fax":"","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
+		w.Write([]byte(`{"id":10,"vendor_id":1,"name":"Tokyo Branch","postal_code":"100-0001","address":"","phone":"","fax":"","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
 	}))
 	defer ts.Close()
 
@@ -2948,11 +2948,11 @@ func TestGetVendorBranch_ContextCancel(t *testing.T) {
 	}
 }
 
-// T146: GetVendorContact — context キャンセル時
+// T146: GetVendorContact — on context cancellation
 func TestGetVendorContact_ContextCancel(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"id":1,"vendor_id":1,"vendor_branch_id":10,"name":"山田太郎","name_kana":"","title":"","email":"","phone":"","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
+		w.Write([]byte(`{"id":1,"vendor_id":1,"vendor_branch_id":10,"name":"Taro Yamada","name_kana":"","title":"","email":"","phone":"","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
 	}))
 	defer ts.Close()
 
@@ -2966,11 +2966,11 @@ func TestGetVendorContact_ContextCancel(t *testing.T) {
 	}
 }
 
-// T147: GetPurchaseOrder — context キャンセル時
+// T147: GetPurchaseOrder — on context cancellation
 func TestGetPurchaseOrder_ContextCancel(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"id":1,"vendor_id":1,"project_id":100,"title":"発注書1","total_amount":500000.0,"status":"draft","order_date":"2026-01-01","delivery_date":"2026-02-01","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
+		w.Write([]byte(`{"id":1,"vendor_id":1,"project_id":100,"title":"Order 1","total_amount":500000.0,"status":"draft","order_date":"2026-01-01","delivery_date":"2026-02-01","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
 	}))
 	defer ts.Close()
 
@@ -2984,7 +2984,7 @@ func TestGetPurchaseOrder_ContextCancel(t *testing.T) {
 	}
 }
 
-// T148: GetPayment — context キャンセル時
+// T148: GetPayment — on context cancellation
 func TestGetPayment_ContextCancel(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -3002,7 +3002,7 @@ func TestGetPayment_ContextCancel(t *testing.T) {
 	}
 }
 
-// T149: ListVendors — 不正 JSON（unmarshal エラー）
+// T149: ListVendors — invalid JSON (unmarshal error)
 func TestListVendors_UnmarshalError(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -3025,7 +3025,7 @@ func TestListVendors_UnmarshalError(t *testing.T) {
 	}
 }
 
-// T150: ListPurchaseOrders — 不正 JSON（unmarshal エラー）
+// T150: ListPurchaseOrders — invalid JSON (unmarshal error)
 func TestListPurchaseOrders_UnmarshalError(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -3048,7 +3048,7 @@ func TestListPurchaseOrders_UnmarshalError(t *testing.T) {
 	}
 }
 
-// T151: ListPayments — 不正 JSON（unmarshal エラー）
+// T151: ListPayments — invalid JSON (unmarshal error)
 func TestListPayments_UnmarshalError(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -3071,7 +3071,7 @@ func TestListPayments_UnmarshalError(t *testing.T) {
 	}
 }
 
-// T152: SearchVendors — 全パラメータゼロ値
+// T152: SearchVendors — all parameters zero value
 func TestSearchVendors_ZeroParams(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -3090,7 +3090,7 @@ func TestSearchVendors_ZeroParams(t *testing.T) {
 	}
 }
 
-// T153: SearchVendorBranches — 全パラメータゼロ値
+// T153: SearchVendorBranches — all parameters zero value
 func TestSearchVendorBranches_ZeroParams(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -3109,7 +3109,7 @@ func TestSearchVendorBranches_ZeroParams(t *testing.T) {
 	}
 }
 
-// T154: SearchPurchaseOrders — 全パラメータゼロ値
+// T154: SearchPurchaseOrders — all parameters zero value
 func TestSearchPurchaseOrders_ZeroParams(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -3128,7 +3128,7 @@ func TestSearchPurchaseOrders_ZeroParams(t *testing.T) {
 	}
 }
 
-// T155: SearchPayments — 全パラメータゼロ値
+// T155: SearchPayments — all parameters zero value
 func TestSearchPayments_ZeroParams(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -3147,7 +3147,7 @@ func TestSearchPayments_ZeroParams(t *testing.T) {
 	}
 }
 
-// T156: SearchVendorContacts — 全パラメータゼロ値
+// T156: SearchVendorContacts — all parameters zero value
 func TestSearchVendorContacts_ZeroParams(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -3167,14 +3167,14 @@ func TestSearchVendorContacts_ZeroParams(t *testing.T) {
 }
 
 // ============================================================
-// M09: マスタ系エンティティ テスト (T157〜T177)
+// M09: master entity tests (T157-T177)
 // ============================================================
 
-// T157: ListUsers — 正常系（2件）
+// T157: ListUsers — happy path (2 items)
 func TestListUsers_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"name":"山田太郎","email":"yamada@example.com","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":2,"name":"鈴木花子","email":"suzuki@example.com","updated_at":"2026-01-02T00:00:00Z","created_at":"2026-01-02T00:00:00Z"}]`))
+		w.Write([]byte(`[{"id":1,"name":"Taro Yamada","email":"yamada@example.com","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":2,"name":"Hanako Suzuki","email":"suzuki@example.com","updated_at":"2026-01-02T00:00:00Z","created_at":"2026-01-02T00:00:00Z"}]`))
 	}))
 	defer ts.Close()
 
@@ -3187,12 +3187,12 @@ func TestListUsers_OK(t *testing.T) {
 	if len(result) != 2 {
 		t.Errorf("want 2 users, got %d", len(result))
 	}
-	if result[0].ID != 1 || result[0].Name != "山田太郎" || result[0].Email != "yamada@example.com" {
+	if result[0].ID != 1 || result[0].Name != "Taro Yamada" || result[0].Email != "yamada@example.com" {
 		t.Errorf("user[0]: got %+v", result[0])
 	}
 }
 
-// T158: GetUser — 正常系
+// T158: GetUser — happy path
 func TestGetUser_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/users/1" {
@@ -3200,7 +3200,7 @@ func TestGetUser_OK(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"id":1,"name":"山田太郎","email":"yamada@example.com","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
+		w.Write([]byte(`{"id":1,"name":"Taro Yamada","email":"yamada@example.com","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
 	}))
 	defer ts.Close()
 
@@ -3213,40 +3213,40 @@ func TestGetUser_OK(t *testing.T) {
 	if got == nil {
 		t.Fatal("got nil UserEntity")
 	}
-	if got.ID != 1 || got.Name != "山田太郎" || got.Email != "yamada@example.com" {
+	if got.ID != 1 || got.Name != "Taro Yamada" || got.Email != "yamada@example.com" {
 		t.Errorf("GetUser: got %+v", got)
 	}
 }
 
-// T159: SearchUsers — Name パラメータ付き
+// T159: SearchUsers — with Name parameter
 func TestSearchUsers_WithName(t *testing.T) {
 	var gotName string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotName = r.URL.Query().Get("name")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"name":"山田太郎","email":"yamada@example.com","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
+		w.Write([]byte(`[{"id":1,"name":"Taro Yamada","email":"yamada@example.com","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
 	}))
 	defer ts.Close()
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.SearchUsers(context.Background(), boardapi.UserSearchParams{Name: "山田太郎"})
+	result, err := c.SearchUsers(context.Background(), boardapi.UserSearchParams{Name: "Taro Yamada"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(result) != 1 {
 		t.Errorf("want 1 result, got %d", len(result))
 	}
-	if gotName != "山田太郎" {
-		t.Errorf("name param: want %q, got %q", "山田太郎", gotName)
+	if gotName != "Taro Yamada" {
+		t.Errorf("name param: want %q, got %q", "Taro Yamada", gotName)
 	}
 }
 
-// T160: ListGroups — 正常系（2件）
+// T160: ListGroups — happy path (2 items)
 func TestListGroups_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"name":"営業部","memo":"営業担当グループ","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":2,"name":"開発部","memo":"開発担当グループ","updated_at":"2026-01-02T00:00:00Z","created_at":"2026-01-02T00:00:00Z"}]`))
+		w.Write([]byte(`[{"id":1,"name":"Sales Dept","memo":"Sales Group","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":2,"name":"Dev Dept","memo":"Dev Group","updated_at":"2026-01-02T00:00:00Z","created_at":"2026-01-02T00:00:00Z"}]`))
 	}))
 	defer ts.Close()
 
@@ -3259,12 +3259,12 @@ func TestListGroups_OK(t *testing.T) {
 	if len(result) != 2 {
 		t.Errorf("want 2 groups, got %d", len(result))
 	}
-	if result[0].ID != 1 || result[0].Name != "営業部" || result[0].Memo != "営業担当グループ" {
+	if result[0].ID != 1 || result[0].Name != "Sales Dept" || result[0].Memo != "Sales Group" {
 		t.Errorf("group[0]: got %+v", result[0])
 	}
 }
 
-// T161: GetGroup — 正常系
+// T161: GetGroup — happy path
 func TestGetGroup_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/groups/1" {
@@ -3272,7 +3272,7 @@ func TestGetGroup_OK(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"id":1,"name":"営業部","memo":"営業担当グループ","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
+		w.Write([]byte(`{"id":1,"name":"Sales Dept","memo":"Sales Group","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
 	}))
 	defer ts.Close()
 
@@ -3285,40 +3285,40 @@ func TestGetGroup_OK(t *testing.T) {
 	if got == nil {
 		t.Fatal("got nil GroupEntity")
 	}
-	if got.ID != 1 || got.Name != "営業部" || got.Memo != "営業担当グループ" {
+	if got.ID != 1 || got.Name != "Sales Dept" || got.Memo != "Sales Group" {
 		t.Errorf("GetGroup: got %+v", got)
 	}
 }
 
-// T162: SearchGroups — Name パラメータ付き
+// T162: SearchGroups — with Name parameter
 func TestSearchGroups_WithName(t *testing.T) {
 	var gotName string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotName = r.URL.Query().Get("name")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"name":"営業部","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
+		w.Write([]byte(`[{"id":1,"name":"Sales Dept","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
 	}))
 	defer ts.Close()
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.SearchGroups(context.Background(), boardapi.GroupSearchParams{Name: "営業部"})
+	result, err := c.SearchGroups(context.Background(), boardapi.GroupSearchParams{Name: "Sales Dept"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(result) != 1 {
 		t.Errorf("want 1 result, got %d", len(result))
 	}
-	if gotName != "営業部" {
-		t.Errorf("name param: want %q, got %q", "営業部", gotName)
+	if gotName != "Sales Dept" {
+		t.Errorf("name param: want %q, got %q", "Sales Dept", gotName)
 	}
 }
 
-// T163: ListPaymentTerms — 正常系（2件）
+// T163: ListPaymentTerms — happy path (2 items)
 func TestListPaymentTerms_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"name":"月末締め翌月払い","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":2,"name":"都度払い","memo":"","updated_at":"2026-01-02T00:00:00Z","created_at":"2026-01-02T00:00:00Z"}]`))
+		w.Write([]byte(`[{"id":1,"name":"End of Month Payment","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":2,"name":"Per-Transaction Payment","memo":"","updated_at":"2026-01-02T00:00:00Z","created_at":"2026-01-02T00:00:00Z"}]`))
 	}))
 	defer ts.Close()
 
@@ -3331,12 +3331,12 @@ func TestListPaymentTerms_OK(t *testing.T) {
 	if len(result) != 2 {
 		t.Errorf("want 2 payment_terms, got %d", len(result))
 	}
-	if result[0].ID != 1 || result[0].Name != "月末締め翌月払い" {
+	if result[0].ID != 1 || result[0].Name != "End of Month Payment" {
 		t.Errorf("payment_term[0]: got %+v", result[0])
 	}
 }
 
-// T164: GetPaymentTerm — 正常系
+// T164: GetPaymentTerm — happy path
 func TestGetPaymentTerm_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/payment_terms/1" {
@@ -3344,7 +3344,7 @@ func TestGetPaymentTerm_OK(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"id":1,"name":"月末締め翌月払い","memo":"標準支払条件","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
+		w.Write([]byte(`{"id":1,"name":"End of Month Payment","memo":"Standard Payment Terms","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
 	}))
 	defer ts.Close()
 
@@ -3357,40 +3357,40 @@ func TestGetPaymentTerm_OK(t *testing.T) {
 	if got == nil {
 		t.Fatal("got nil PaymentTermEntity")
 	}
-	if got.ID != 1 || got.Name != "月末締め翌月払い" || got.Memo != "標準支払条件" {
+	if got.ID != 1 || got.Name != "End of Month Payment" || got.Memo != "Standard Payment Terms" {
 		t.Errorf("GetPaymentTerm: got %+v", got)
 	}
 }
 
-// T165: SearchPaymentTerms — Name パラメータ付き
+// T165: SearchPaymentTerms — with Name parameter
 func TestSearchPaymentTerms_WithName(t *testing.T) {
 	var gotName string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotName = r.URL.Query().Get("name")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"name":"月末締め翌月払い","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
+		w.Write([]byte(`[{"id":1,"name":"End of Month Payment","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
 	}))
 	defer ts.Close()
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.SearchPaymentTerms(context.Background(), boardapi.PaymentTermSearchParams{Name: "月末締め翌月払い"})
+	result, err := c.SearchPaymentTerms(context.Background(), boardapi.PaymentTermSearchParams{Name: "End of Month Payment"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(result) != 1 {
 		t.Errorf("want 1 result, got %d", len(result))
 	}
-	if gotName != "月末締め翌月払い" {
-		t.Errorf("name param: want %q, got %q", "月末締め翌月払い", gotName)
+	if gotName != "End of Month Payment" {
+		t.Errorf("name param: want %q, got %q", "End of Month Payment", gotName)
 	}
 }
 
-// T166: ListProjectTypes — 正常系（2件）
+// T166: ListProjectTypes — happy path (2 items)
 func TestListProjectTypes_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"name":"受託開発","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":2,"name":"自社開発","memo":"","updated_at":"2026-01-02T00:00:00Z","created_at":"2026-01-02T00:00:00Z"}]`))
+		w.Write([]byte(`[{"id":1,"name":"Contract Development","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":2,"name":"In-House Development","memo":"","updated_at":"2026-01-02T00:00:00Z","created_at":"2026-01-02T00:00:00Z"}]`))
 	}))
 	defer ts.Close()
 
@@ -3403,12 +3403,12 @@ func TestListProjectTypes_OK(t *testing.T) {
 	if len(result) != 2 {
 		t.Errorf("want 2 project_types, got %d", len(result))
 	}
-	if result[0].ID != 1 || result[0].Name != "受託開発" {
+	if result[0].ID != 1 || result[0].Name != "Contract Development" {
 		t.Errorf("project_type[0]: got %+v", result[0])
 	}
 }
 
-// T167: GetProjectType — 正常系
+// T167: GetProjectType — happy path
 func TestGetProjectType_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/project_types/1" {
@@ -3416,7 +3416,7 @@ func TestGetProjectType_OK(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"id":1,"name":"受託開発","memo":"外部受託案件","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
+		w.Write([]byte(`{"id":1,"name":"Contract Development","memo":"External Contract Project","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
 	}))
 	defer ts.Close()
 
@@ -3429,40 +3429,40 @@ func TestGetProjectType_OK(t *testing.T) {
 	if got == nil {
 		t.Fatal("got nil ProjectTypeEntity")
 	}
-	if got.ID != 1 || got.Name != "受託開発" || got.Memo != "外部受託案件" {
+	if got.ID != 1 || got.Name != "Contract Development" || got.Memo != "External Contract Project" {
 		t.Errorf("GetProjectType: got %+v", got)
 	}
 }
 
-// T168: SearchProjectTypes — Name パラメータ付き
+// T168: SearchProjectTypes — with Name parameter
 func TestSearchProjectTypes_WithName(t *testing.T) {
 	var gotName string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotName = r.URL.Query().Get("name")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"name":"受託開発","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
+		w.Write([]byte(`[{"id":1,"name":"Contract Development","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
 	}))
 	defer ts.Close()
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.SearchProjectTypes(context.Background(), boardapi.ProjectTypeSearchParams{Name: "受託開発"})
+	result, err := c.SearchProjectTypes(context.Background(), boardapi.ProjectTypeSearchParams{Name: "Contract Development"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(result) != 1 {
 		t.Errorf("want 1 result, got %d", len(result))
 	}
-	if gotName != "受託開発" {
-		t.Errorf("name param: want %q, got %q", "受託開発", gotName)
+	if gotName != "Contract Development" {
+		t.Errorf("name param: want %q, got %q", "Contract Development", gotName)
 	}
 }
 
-// T169: ListPurchaseTypes — 正常系（2件）
+// T169: ListPurchaseTypes — happy path (2 items)
 func TestListPurchaseTypes_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"name":"外注費","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":2,"name":"備品購入","memo":"","updated_at":"2026-01-02T00:00:00Z","created_at":"2026-01-02T00:00:00Z"}]`))
+		w.Write([]byte(`[{"id":1,"name":"Outsourcing Cost","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":2,"name":"Equipment Purchase","memo":"","updated_at":"2026-01-02T00:00:00Z","created_at":"2026-01-02T00:00:00Z"}]`))
 	}))
 	defer ts.Close()
 
@@ -3475,12 +3475,12 @@ func TestListPurchaseTypes_OK(t *testing.T) {
 	if len(result) != 2 {
 		t.Errorf("want 2 purchase_types, got %d", len(result))
 	}
-	if result[0].ID != 1 || result[0].Name != "外注費" {
+	if result[0].ID != 1 || result[0].Name != "Outsourcing Cost" {
 		t.Errorf("purchase_type[0]: got %+v", result[0])
 	}
 }
 
-// T170: GetPurchaseType — 正常系
+// T170: GetPurchaseType — happy path
 func TestGetPurchaseType_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/purchase_types/1" {
@@ -3488,7 +3488,7 @@ func TestGetPurchaseType_OK(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"id":1,"name":"外注費","memo":"外注業務費用","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
+		w.Write([]byte(`{"id":1,"name":"Outsourcing Cost","memo":"Outsourcing Expense","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
 	}))
 	defer ts.Close()
 
@@ -3501,40 +3501,40 @@ func TestGetPurchaseType_OK(t *testing.T) {
 	if got == nil {
 		t.Fatal("got nil PurchaseTypeEntity")
 	}
-	if got.ID != 1 || got.Name != "外注費" || got.Memo != "外注業務費用" {
+	if got.ID != 1 || got.Name != "Outsourcing Cost" || got.Memo != "Outsourcing Expense" {
 		t.Errorf("GetPurchaseType: got %+v", got)
 	}
 }
 
-// T171: SearchPurchaseTypes — Name パラメータ付き
+// T171: SearchPurchaseTypes — with Name parameter
 func TestSearchPurchaseTypes_WithName(t *testing.T) {
 	var gotName string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotName = r.URL.Query().Get("name")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"name":"外注費","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
+		w.Write([]byte(`[{"id":1,"name":"Outsourcing Cost","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
 	}))
 	defer ts.Close()
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.SearchPurchaseTypes(context.Background(), boardapi.PurchaseTypeSearchParams{Name: "外注費"})
+	result, err := c.SearchPurchaseTypes(context.Background(), boardapi.PurchaseTypeSearchParams{Name: "Outsourcing Cost"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(result) != 1 {
 		t.Errorf("want 1 result, got %d", len(result))
 	}
-	if gotName != "外注費" {
-		t.Errorf("name param: want %q, got %q", "外注費", gotName)
+	if gotName != "Outsourcing Cost" {
+		t.Errorf("name param: want %q, got %q", "Outsourcing Cost", gotName)
 	}
 }
 
-// T172: ListAccountingTypes — 正常系（2件）
+// T172: ListAccountingTypes — happy path (2 items)
 func TestListAccountingTypes_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"name":"売上","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":2,"name":"費用","memo":"","updated_at":"2026-01-02T00:00:00Z","created_at":"2026-01-02T00:00:00Z"}]`))
+		w.Write([]byte(`[{"id":1,"name":"Revenue","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":2,"name":"Expense","memo":"","updated_at":"2026-01-02T00:00:00Z","created_at":"2026-01-02T00:00:00Z"}]`))
 	}))
 	defer ts.Close()
 
@@ -3547,12 +3547,12 @@ func TestListAccountingTypes_OK(t *testing.T) {
 	if len(result) != 2 {
 		t.Errorf("want 2 accounting_types, got %d", len(result))
 	}
-	if result[0].ID != 1 || result[0].Name != "売上" {
+	if result[0].ID != 1 || result[0].Name != "Revenue" {
 		t.Errorf("accounting_type[0]: got %+v", result[0])
 	}
 }
 
-// T173: GetAccountingType — 正常系
+// T173: GetAccountingType — happy path
 func TestGetAccountingType_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/accounting_types/1" {
@@ -3560,7 +3560,7 @@ func TestGetAccountingType_OK(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"id":1,"name":"売上","memo":"売上計上区分","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
+		w.Write([]byte(`{"id":1,"name":"Revenue","memo":"Revenue Category","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
 	}))
 	defer ts.Close()
 
@@ -3573,40 +3573,40 @@ func TestGetAccountingType_OK(t *testing.T) {
 	if got == nil {
 		t.Fatal("got nil AccountingTypeEntity")
 	}
-	if got.ID != 1 || got.Name != "売上" || got.Memo != "売上計上区分" {
+	if got.ID != 1 || got.Name != "Revenue" || got.Memo != "Revenue Category" {
 		t.Errorf("GetAccountingType: got %+v", got)
 	}
 }
 
-// T174: SearchAccountingTypes — Name パラメータ付き
+// T174: SearchAccountingTypes — with Name parameter
 func TestSearchAccountingTypes_WithName(t *testing.T) {
 	var gotName string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotName = r.URL.Query().Get("name")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"name":"売上","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
+		w.Write([]byte(`[{"id":1,"name":"Revenue","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
 	}))
 	defer ts.Close()
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.SearchAccountingTypes(context.Background(), boardapi.AccountingTypeSearchParams{Name: "売上"})
+	result, err := c.SearchAccountingTypes(context.Background(), boardapi.AccountingTypeSearchParams{Name: "Revenue"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(result) != 1 {
 		t.Errorf("want 1 result, got %d", len(result))
 	}
-	if gotName != "売上" {
-		t.Errorf("name param: want %q, got %q", "売上", gotName)
+	if gotName != "Revenue" {
+		t.Errorf("name param: want %q, got %q", "Revenue", gotName)
 	}
 }
 
-// T175: ListDocumentSendChannels — 正常系（2件）
+// T175: ListDocumentSendChannels — happy path (2 items)
 func TestListDocumentSendChannels_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"name":"郵送","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":2,"name":"メール","memo":"","updated_at":"2026-01-02T00:00:00Z","created_at":"2026-01-02T00:00:00Z"}]`))
+		w.Write([]byte(`[{"id":1,"name":"Mail","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":2,"name":"Email","memo":"","updated_at":"2026-01-02T00:00:00Z","created_at":"2026-01-02T00:00:00Z"}]`))
 	}))
 	defer ts.Close()
 
@@ -3619,12 +3619,12 @@ func TestListDocumentSendChannels_OK(t *testing.T) {
 	if len(result) != 2 {
 		t.Errorf("want 2 document_send_channels, got %d", len(result))
 	}
-	if result[0].ID != 1 || result[0].Name != "郵送" {
+	if result[0].ID != 1 || result[0].Name != "Mail" {
 		t.Errorf("document_send_channel[0]: got %+v", result[0])
 	}
 }
 
-// T176: GetDocumentSendChannel — 正常系
+// T176: GetDocumentSendChannel — happy path
 func TestGetDocumentSendChannel_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/document_send_channels/1" {
@@ -3632,7 +3632,7 @@ func TestGetDocumentSendChannel_OK(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"id":1,"name":"郵送","memo":"書類郵送チャンネル","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
+		w.Write([]byte(`{"id":1,"name":"Mail","memo":"Document Mail Channel","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
 	}))
 	defer ts.Close()
 
@@ -3645,31 +3645,31 @@ func TestGetDocumentSendChannel_OK(t *testing.T) {
 	if got == nil {
 		t.Fatal("got nil DocumentSendChannelEntity")
 	}
-	if got.ID != 1 || got.Name != "郵送" || got.Memo != "書類郵送チャンネル" {
+	if got.ID != 1 || got.Name != "Mail" || got.Memo != "Document Mail Channel" {
 		t.Errorf("GetDocumentSendChannel: got %+v", got)
 	}
 }
 
-// T177: SearchDocumentSendChannels — Name パラメータ付き
+// T177: SearchDocumentSendChannels — with Name parameter
 func TestSearchDocumentSendChannels_WithName(t *testing.T) {
 	var gotName string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotName = r.URL.Query().Get("name")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"name":"郵送","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
+		w.Write([]byte(`[{"id":1,"name":"Mail","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
 	}))
 	defer ts.Close()
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.SearchDocumentSendChannels(context.Background(), boardapi.DocumentSendChannelSearchParams{Name: "郵送"})
+	result, err := c.SearchDocumentSendChannels(context.Background(), boardapi.DocumentSendChannelSearchParams{Name: "Mail"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(result) != 1 {
 		t.Errorf("want 1 result, got %d", len(result))
 	}
-	if gotName != "郵送" {
-		t.Errorf("name param: want %q, got %q", "郵送", gotName)
+	if gotName != "Mail" {
+		t.Errorf("name param: want %q, got %q", "Mail", gotName)
 	}
 }

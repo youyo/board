@@ -9,11 +9,11 @@ import (
 	"github.com/youyo/board/internal/output"
 )
 
-// NewAPIProjectCostsCmd は board api project_costs サブコマンドグループを返す。
+// NewAPIProjectCostsCmd  returns the board api project_costs subcommand group.
 func NewAPIProjectCostsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "project_costs",
-		Short: "案件原価（project_costs）を操作する",
+		Short: "Manage project_costs",
 	}
 	cmd.AddCommand(
 		newAPIProjectCostsListCmd(),
@@ -26,7 +26,7 @@ func NewAPIProjectCostsCmd() *cobra.Command {
 func newAPIProjectCostsListCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
-		Short: "案件原価の一覧を取得する",
+		Short: "List all project_costs",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			svc, err := apiServiceFromCmd(cmd)
 			if err != nil {
@@ -46,10 +46,10 @@ func newAPIProjectCostsGetCmd() *cobra.Command {
 	var id int
 	cmd := &cobra.Command{
 		Use:   "get",
-		Short: "指定 ID の案件原価を取得する",
+		Short: "Get a project_cost by ID",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if id == 0 {
-				return fmt.Errorf("--id は必須です")
+				return fmt.Errorf("--id is required")
 			}
 			svc, err := apiServiceFromCmd(cmd)
 			if err != nil {
@@ -63,7 +63,7 @@ func newAPIProjectCostsGetCmd() *cobra.Command {
 			return output.Write(os.Stdout, result, prettyFromCmd(cmd))
 		},
 	}
-	cmd.Flags().IntVar(&id, "id", 0, "案件原価 ID（必須）")
+	cmd.Flags().IntVar(&id, "id", 0, "Project cost ID (required)")
 	return cmd
 }
 
@@ -71,7 +71,7 @@ func newAPIProjectCostsSearchCmd() *cobra.Command {
 	var projectID int
 	cmd := &cobra.Command{
 		Use:   "search",
-		Short: "案件原価を条件で検索する",
+		Short: "Search project_costs by criteria",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			svc, err := apiServiceFromCmd(cmd)
 			if err != nil {
@@ -88,6 +88,6 @@ func newAPIProjectCostsSearchCmd() *cobra.Command {
 			return output.Write(os.Stdout, result, prettyFromCmd(cmd))
 		},
 	}
-	cmd.Flags().IntVar(&projectID, "project-id", 0, "案件 ID でフィルタ")
+	cmd.Flags().IntVar(&projectID, "project-id", 0, "Filter by project ID")
 	return cmd
 }

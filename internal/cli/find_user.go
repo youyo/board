@@ -34,9 +34,9 @@ func NewFindUserCmd() *cobra.Command {
 
 			opts := readOptionsFromCmd(cmd)
 			q := find.FindUserQuery{
-				ID:   id,
-				Name: name,
-				Text: text,
+				ID:    id,
+				Name:  name,
+				Text:  text,
 				Limit: opts.Limit,
 				Opts: repository.ReadOptions{
 					Refresh:      opts.Refresh,

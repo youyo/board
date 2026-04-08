@@ -13,7 +13,7 @@ import (
 	"github.com/youyo/board/internal/refresh"
 )
 
-// entitiesToRaw は任意のエンティティスライスを []json.RawMessage に変換する。
+// entitiesToRaw converts a slice of entities of any type to []json.RawMessage.
 func entitiesToRaw[T any](entities []T) ([]json.RawMessage, error) {
 	result := make([]json.RawMessage, 0, len(entities))
 	for _, e := range entities {
@@ -26,7 +26,7 @@ func entitiesToRaw[T any](entities []T) ([]json.RawMessage, error) {
 	return result, nil
 }
 
-// decodeEntries は []cache.Entry を []T に変換する。
+// decodeEntries converts []cache.Entry to []T.
 func decodeEntries[T any](entries []cache.Entry) ([]T, error) {
 	result := make([]T, 0, len(entries))
 	for _, e := range entries {
@@ -39,8 +39,8 @@ func decodeEntries[T any](entries []cache.Entry) ([]T, error) {
 	return result, nil
 }
 
-// upsertRaw は json.RawMessage をキャッシュに upsert する。
-// id と updated_at を raw から抽出する。
+// upsertRaw upserts a json.RawMessage into the cache.
+// It extracts id and updated_at from raw.
 func upsertRaw(ctx context.Context, rc *cache.ResourceCache, profile, resource string, raw json.RawMessage) error {
 	var idHolder struct {
 		ID int `json:"id"`
@@ -69,11 +69,11 @@ func upsertRaw(ctx context.Context, rc *cache.ResourceCache, profile, resource s
 	})
 }
 
-// maybeRefresh はリフレッシュ要否を判定し、必要なら実行する。
-// ForceRefresh が true なら ForceRefresh を優先。
-// Refresh が true または autoRefresh かつ NeedsDailyRefresh なら DeltaRefresh。
-// DeltaRefresh エラー時は stale 返却（ログのみ）。
-// ForceRefresh エラー時はエラーを伝播。
+// maybeRefresh determines whether a refresh is needed and executes it if so.
+// If ForceRefresh is true, ForceRefresh takes priority.
+// If Refresh is true or autoRefresh and NeedsDailyRefresh, DeltaRefresh is performed.
+// On DeltaRefresh error, stale data is returned (logged only).
+// On ForceRefresh error, the error is propagated.
 func maybeRefresh(
 	ctx context.Context,
 	profile, resource string,
@@ -98,7 +98,7 @@ func maybeRefresh(
 			return err
 		})
 		if opts.Refresh && err != nil {
-			// DeltaRefresh 失敗は stale 返却（ログのみ）
+			// DeltaRefresh failure returns stale data (log only)
 			slog.Warn("DeltaRefresh failed, returning stale cache",
 				"profile", profile,
 				"resource", resource,
@@ -113,7 +113,7 @@ func maybeRefresh(
 
 // --- clients Fetcher ---
 
-// clientsFetcher は boardapi.Client を refresh.Fetcher に適合させるアダプタ。
+// clientsFetcher is an adapter that makes boardapi.Client conform to refresh.Fetcher.
 type clientsFetcher struct {
 	api *boardapi.Client
 }
@@ -139,7 +139,7 @@ func (f *clientsFetcher) ListUpdatedSince(ctx context.Context, since string) ([]
 
 // --- client_branches Fetcher ---
 
-// clientBranchesFetcher は boardapi.Client を refresh.Fetcher に適合させるアダプタ。
+// clientBranchesFetcher is an adapter that makes boardapi.Client conform to refresh.Fetcher.
 type clientBranchesFetcher struct {
 	api *boardapi.Client
 }
@@ -154,7 +154,7 @@ func (f *clientBranchesFetcher) ListAll(ctx context.Context) ([]json.RawMessage,
 	return entitiesToRaw(entities)
 }
 
-// ListUpdatedSince: ClientBranchSearchParams に UpdatedAtFrom がないため全件取得。
+// ListUpdatedSince: ClientBranchSearchParams has no UpdatedAtFrom, so all entries are fetched.
 func (f *clientBranchesFetcher) ListUpdatedSince(ctx context.Context, _ string) ([]json.RawMessage, error) {
 	entities, err := f.api.ListClientBranches(ctx)
 	if err != nil {
@@ -165,7 +165,7 @@ func (f *clientBranchesFetcher) ListUpdatedSince(ctx context.Context, _ string) 
 
 // --- contacts Fetcher ---
 
-// contactsFetcher は boardapi.Client を refresh.Fetcher に適合させるアダプタ。
+// contactsFetcher is an adapter that makes boardapi.Client conform to refresh.Fetcher.
 type contactsFetcher struct {
 	api *boardapi.Client
 }
@@ -180,7 +180,7 @@ func (f *contactsFetcher) ListAll(ctx context.Context) ([]json.RawMessage, error
 	return entitiesToRaw(entities)
 }
 
-// ListUpdatedSince: ContactSearchParams に UpdatedAtFrom がないため全件取得。
+// ListUpdatedSince: ContactSearchParams has no UpdatedAtFrom, so all entries are fetched.
 func (f *contactsFetcher) ListUpdatedSince(ctx context.Context, _ string) ([]json.RawMessage, error) {
 	entities, err := f.api.ListContacts(ctx)
 	if err != nil {
@@ -191,7 +191,7 @@ func (f *contactsFetcher) ListUpdatedSince(ctx context.Context, _ string) ([]jso
 
 // --- projects Fetcher ---
 
-// projectsFetcher は boardapi.Client を refresh.Fetcher に適合させるアダプタ。
+// projectsFetcher is an adapter that makes boardapi.Client conform to refresh.Fetcher.
 type projectsFetcher struct {
 	api *boardapi.Client
 }
@@ -217,7 +217,7 @@ func (f *projectsFetcher) ListUpdatedSince(ctx context.Context, since string) ([
 
 // --- project_costs Fetcher ---
 
-// projectCostsFetcher は boardapi.Client を refresh.Fetcher に適合させるアダプタ。
+// projectCostsFetcher is an adapter that makes boardapi.Client conform to refresh.Fetcher.
 type projectCostsFetcher struct {
 	api *boardapi.Client
 }
@@ -232,7 +232,7 @@ func (f *projectCostsFetcher) ListAll(ctx context.Context) ([]json.RawMessage, e
 	return entitiesToRaw(entities)
 }
 
-// ListUpdatedSince: ProjectCostSearchParams に UpdatedAtFrom がないため全件取得。
+// ListUpdatedSince: ProjectCostSearchParams has no UpdatedAtFrom, so all entries are fetched.
 func (f *projectCostsFetcher) ListUpdatedSince(ctx context.Context, _ string) ([]json.RawMessage, error) {
 	entities, err := f.api.ListProjectCosts(ctx)
 	if err != nil {
@@ -243,7 +243,7 @@ func (f *projectCostsFetcher) ListUpdatedSince(ctx context.Context, _ string) ([
 
 // --- estimates Fetcher ---
 
-// estimatesFetcher は boardapi.Client を refresh.Fetcher に適合させるアダプタ。
+// estimatesFetcher is an adapter that makes boardapi.Client conform to refresh.Fetcher.
 type estimatesFetcher struct {
 	api *boardapi.Client
 }
@@ -269,7 +269,7 @@ func (f *estimatesFetcher) ListUpdatedSince(ctx context.Context, since string) (
 
 // --- invoices Fetcher ---
 
-// invoicesFetcher は boardapi.Client を refresh.Fetcher に適合させるアダプタ。
+// invoicesFetcher is an adapter that makes boardapi.Client conform to refresh.Fetcher.
 type invoicesFetcher struct {
 	api *boardapi.Client
 }
@@ -295,7 +295,7 @@ func (f *invoicesFetcher) ListUpdatedSince(ctx context.Context, since string) ([
 
 // --- orders Fetcher ---
 
-// ordersFetcher は boardapi.Client を refresh.Fetcher に適合させるアダプタ。
+// ordersFetcher is an adapter that makes boardapi.Client conform to refresh.Fetcher.
 type ordersFetcher struct {
 	api *boardapi.Client
 }
@@ -321,7 +321,7 @@ func (f *ordersFetcher) ListUpdatedSince(ctx context.Context, since string) ([]j
 
 // --- deliveries Fetcher ---
 
-// deliveriesFetcher は boardapi.Client を refresh.Fetcher に適合させるアダプタ。
+// deliveriesFetcher is an adapter that makes boardapi.Client conform to refresh.Fetcher.
 type deliveriesFetcher struct {
 	api *boardapi.Client
 }
@@ -347,7 +347,7 @@ func (f *deliveriesFetcher) ListUpdatedSince(ctx context.Context, since string) 
 
 // --- receipts Fetcher ---
 
-// receiptsFetcher は boardapi.Client を refresh.Fetcher に適合させるアダプタ。
+// receiptsFetcher is an adapter that makes boardapi.Client conform to refresh.Fetcher.
 type receiptsFetcher struct {
 	api *boardapi.Client
 }
@@ -373,7 +373,7 @@ func (f *receiptsFetcher) ListUpdatedSince(ctx context.Context, since string) ([
 
 // --- vendors Fetcher ---
 
-// vendorsFetcher は boardapi.Client を refresh.Fetcher に適合させるアダプタ。
+// vendorsFetcher is an adapter that makes boardapi.Client conform to refresh.Fetcher.
 type vendorsFetcher struct {
 	api *boardapi.Client
 }
@@ -399,7 +399,7 @@ func (f *vendorsFetcher) ListUpdatedSince(ctx context.Context, since string) ([]
 
 // --- vendor_branches Fetcher ---
 
-// vendorBranchesFetcher は boardapi.Client を refresh.Fetcher に適合させるアダプタ。
+// vendorBranchesFetcher is an adapter that makes boardapi.Client conform to refresh.Fetcher.
 type vendorBranchesFetcher struct {
 	api *boardapi.Client
 }
@@ -414,7 +414,7 @@ func (f *vendorBranchesFetcher) ListAll(ctx context.Context) ([]json.RawMessage,
 	return entitiesToRaw(entities)
 }
 
-// ListUpdatedSince: VendorBranchSearchParams に UpdatedAtFrom がないため全件取得。
+// ListUpdatedSince: VendorBranchSearchParams has no UpdatedAtFrom, so all entries are fetched.
 func (f *vendorBranchesFetcher) ListUpdatedSince(ctx context.Context, _ string) ([]json.RawMessage, error) {
 	entities, err := f.api.ListVendorBranches(ctx)
 	if err != nil {
@@ -425,7 +425,7 @@ func (f *vendorBranchesFetcher) ListUpdatedSince(ctx context.Context, _ string) 
 
 // --- vendor_contacts Fetcher ---
 
-// vendorContactsFetcher は boardapi.Client を refresh.Fetcher に適合させるアダプタ。
+// vendorContactsFetcher is an adapter that makes boardapi.Client conform to refresh.Fetcher.
 type vendorContactsFetcher struct {
 	api *boardapi.Client
 }
@@ -440,7 +440,7 @@ func (f *vendorContactsFetcher) ListAll(ctx context.Context) ([]json.RawMessage,
 	return entitiesToRaw(entities)
 }
 
-// ListUpdatedSince: VendorContactSearchParams に UpdatedAtFrom がないため全件取得。
+// ListUpdatedSince: VendorContactSearchParams has no UpdatedAtFrom, so all entries are fetched.
 func (f *vendorContactsFetcher) ListUpdatedSince(ctx context.Context, _ string) ([]json.RawMessage, error) {
 	entities, err := f.api.ListVendorContacts(ctx)
 	if err != nil {
@@ -451,7 +451,7 @@ func (f *vendorContactsFetcher) ListUpdatedSince(ctx context.Context, _ string) 
 
 // --- users Fetcher ---
 
-// usersFetcher は boardapi.Client を refresh.Fetcher に適合させるアダプタ。
+// usersFetcher is an adapter that makes boardapi.Client conform to refresh.Fetcher.
 type usersFetcher struct {
 	api *boardapi.Client
 }
@@ -477,7 +477,7 @@ func (f *usersFetcher) ListUpdatedSince(ctx context.Context, since string) ([]js
 
 // --- groups Fetcher ---
 
-// groupsFetcher は boardapi.Client を refresh.Fetcher に適合させるアダプタ。
+// groupsFetcher is an adapter that makes boardapi.Client conform to refresh.Fetcher.
 type groupsFetcher struct {
 	api *boardapi.Client
 }
@@ -503,7 +503,7 @@ func (f *groupsFetcher) ListUpdatedSince(ctx context.Context, since string) ([]j
 
 // --- payment_terms Fetcher ---
 
-// paymentTermsFetcher は boardapi.Client を refresh.Fetcher に適合させるアダプタ。
+// paymentTermsFetcher is an adapter that makes boardapi.Client conform to refresh.Fetcher.
 type paymentTermsFetcher struct {
 	api *boardapi.Client
 }
@@ -529,7 +529,7 @@ func (f *paymentTermsFetcher) ListUpdatedSince(ctx context.Context, since string
 
 // --- project_types Fetcher ---
 
-// projectTypesFetcher は boardapi.Client を refresh.Fetcher に適合させるアダプタ。
+// projectTypesFetcher is an adapter that makes boardapi.Client conform to refresh.Fetcher.
 type projectTypesFetcher struct {
 	api *boardapi.Client
 }
@@ -555,7 +555,7 @@ func (f *projectTypesFetcher) ListUpdatedSince(ctx context.Context, since string
 
 // --- purchase_types Fetcher ---
 
-// purchaseTypesFetcher は boardapi.Client を refresh.Fetcher に適合させるアダプタ。
+// purchaseTypesFetcher is an adapter that makes boardapi.Client conform to refresh.Fetcher.
 type purchaseTypesFetcher struct {
 	api *boardapi.Client
 }
@@ -581,7 +581,7 @@ func (f *purchaseTypesFetcher) ListUpdatedSince(ctx context.Context, since strin
 
 // --- accounting_types Fetcher ---
 
-// accountingTypesFetcher は boardapi.Client を refresh.Fetcher に適合させるアダプタ。
+// accountingTypesFetcher is an adapter that makes boardapi.Client conform to refresh.Fetcher.
 type accountingTypesFetcher struct {
 	api *boardapi.Client
 }
@@ -607,7 +607,7 @@ func (f *accountingTypesFetcher) ListUpdatedSince(ctx context.Context, since str
 
 // --- document_send_channels Fetcher ---
 
-// documentSendChannelsFetcher は boardapi.Client を refresh.Fetcher に適合させるアダプタ。
+// documentSendChannelsFetcher is an adapter that makes boardapi.Client conform to refresh.Fetcher.
 type documentSendChannelsFetcher struct {
 	api *boardapi.Client
 }
@@ -633,7 +633,7 @@ func (f *documentSendChannelsFetcher) ListUpdatedSince(ctx context.Context, sinc
 
 // --- purchase_orders Fetcher ---
 
-// purchaseOrdersFetcher は boardapi.Client を refresh.Fetcher に適合させるアダプタ。
+// purchaseOrdersFetcher is an adapter that makes boardapi.Client conform to refresh.Fetcher.
 type purchaseOrdersFetcher struct {
 	api *boardapi.Client
 }
@@ -659,7 +659,7 @@ func (f *purchaseOrdersFetcher) ListUpdatedSince(ctx context.Context, since stri
 
 // --- payments Fetcher ---
 
-// paymentsFetcher は boardapi.Client を refresh.Fetcher に適合させるアダプタ。
+// paymentsFetcher is an adapter that makes boardapi.Client conform to refresh.Fetcher.
 type paymentsFetcher struct {
 	api *boardapi.Client
 }

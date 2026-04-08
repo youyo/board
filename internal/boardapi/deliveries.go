@@ -8,8 +8,8 @@ import (
 	"strconv"
 )
 
-// DeliveryEntity は BOARD API の納品エンティティ。
-// GET /v1/deliveries レスポンスの1要素に対応。
+// DeliveryEntity is a BOARD API delivery entity.
+// Corresponds to one element in the GET /v1/deliveries response.
 type DeliveryEntity struct {
 	ID           int     `json:"id"`
 	ClientID     int     `json:"client_id"`
@@ -23,7 +23,7 @@ type DeliveryEntity struct {
 	CreatedAt    string  `json:"created_at"` // ISO 8601
 }
 
-// DeliverySearchParams は SearchDeliveries のパラメータ。
+// DeliverySearchParams is the parameter for SearchDeliveries.
 type DeliverySearchParams struct {
 	ClientID      int
 	ProjectID     int
@@ -31,8 +31,8 @@ type DeliverySearchParams struct {
 	UpdatedAtFrom string
 }
 
-// ListDeliveries は全納品を取得する。
-// ページネーションは ListAll により自動処理される。
+// ListDeliveries retrieves all deliveries.
+// Pagination is automatically handled by ListAll.
 func (c *Client) ListDeliveries(ctx context.Context) ([]DeliveryEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/deliveries", nil)
@@ -60,7 +60,7 @@ func (c *Client) ListDeliveries(ctx context.Context) ([]DeliveryEntity, error) {
 	return result, nil
 }
 
-// GetDelivery は指定 ID の納品を取得する。
+// GetDelivery retrieves the delivery with the specified ID.
 func (c *Client) GetDelivery(ctx context.Context, id int) (*DeliveryEntity, error) {
 	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/deliveries/%d", id), nil)
 	if err != nil {
@@ -77,8 +77,8 @@ func (c *Client) GetDelivery(ctx context.Context, id int) (*DeliveryEntity, erro
 	return &x, nil
 }
 
-// SearchDeliveries は条件付きで納品を検索する。
-// ページネーションは ListAll により自動処理される。
+// SearchDeliveries searches deliveries with the given conditions.
+// Pagination is automatically handled by ListAll.
 func (c *Client) SearchDeliveries(ctx context.Context, params DeliverySearchParams) ([]DeliveryEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/deliveries", nil)

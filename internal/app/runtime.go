@@ -1,22 +1,22 @@
-// Package app は board CLI の DI コンテナと共通ランタイムを提供する。
+// Package app provides the DI container and common runtime for the board CLI.
 package app
 
 import "context"
 
-// contextKey は Context へのキー型。
+// contextKey is the key type for Context values.
 type contextKey string
 
-// appKey は Context に *App を格納するキー。
+// appKey is the key used to store *App in a Context.
 const appKey contextKey = "board_app"
 
-// WithApp は *App を Context に格納して返す。
-// PersistentPreRunE で格納し、各サブコマンドが AppFromContext で取り出す。
+// WithApp stores *App in the Context and returns the updated Context.
+// It is stored in PersistentPreRunE and retrieved by subcommands via AppFromContext.
 func WithApp(ctx context.Context, a *App) context.Context {
 	return context.WithValue(ctx, appKey, a)
 }
 
-// AppFromContext は Context から *App を取り出す。
-// 格納されていない場合は (nil, false) を返す。
+// AppFromContext retrieves *App from the Context.
+// Returns (nil, false) if not stored.
 func AppFromContext(ctx context.Context) (*App, bool) {
 	a, ok := ctx.Value(appKey).(*App)
 	return a, ok

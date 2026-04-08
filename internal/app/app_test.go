@@ -8,14 +8,14 @@ import (
 	"github.com/youyo/board/internal/app"
 )
 
-// newTestApp はテスト用の App を生成するヘルパー。
-// 一時ディレクトリに最小限の config.toml を書き込み、DBはテンポラリファイルを使う。
+// newTestApp is a helper that creates a test App.
+// It writes a minimal config.toml to a temporary directory and uses a temporary file for the DB.
 func newTestApp(t *testing.T) *app.App {
 	t.Helper()
 
 	tmpDir := t.TempDir()
 
-	// 最小限の config.toml を書き込む
+	// Write a minimal config.toml
 	cfgContent := `
 current_profile = "default"
 timezone = "Asia/Tokyo"
@@ -32,7 +32,7 @@ daily_auto_refresh = false
 	}
 	t.Setenv("BOARD_CONFIG_PATH", cfgPath)
 
-	// DB を一時ファイルに設定
+	// Set DB to a temporary file
 	dbPath := filepath.Join(tmpDir, "cache.db")
 	t.Setenv("BOARD_CACHE_PATH", dbPath)
 
@@ -92,8 +92,8 @@ daily_auto_refresh = false
 
 func TestClose_CloseDB(t *testing.T) {
 	a := newTestApp(t)
-	// Cleanup で Close が呼ばれるが、明示的に呼んでもエラーなし
-	// (注: Cleanup でも呼ばれるため二重 Close になるが、エラーは無視)
+	// Close is also called in Cleanup, but calling it explicitly should not error.
+	// (Note: double Close occurs since Cleanup also calls it, but the error is ignored.)
 	if err := a.Close(); err != nil {
 		t.Errorf("Close() error: %v", err)
 	}
@@ -116,7 +116,7 @@ daily_auto_refresh = false
 		t.Fatalf("write config: %v", err)
 	}
 	t.Setenv("BOARD_CONFIG_PATH", cfgPath)
-	// DB パスを読み取り専用ディレクトリに設定して open 失敗を誘発
+	// Set DB path to a read-only directory to trigger open failure
 	roDir := filepath.Join(tmpDir, "readonly")
 	if err := os.MkdirAll(roDir, 0o555); err != nil {
 		t.Fatalf("mkdir readonly: %v", err)
@@ -173,7 +173,7 @@ daily_auto_refresh = false
 	t.Setenv("BOARD_CONFIG_PATH", cfgPath)
 	t.Setenv("BOARD_CACHE_PATH", filepath.Join(tmpDir, "cache.db"))
 
-	// Invalid timezone は UTC フォールバックで error なし
+	// Invalid timezone falls back to UTC without error
 	a, err := app.New("")
 	if err != nil {
 		t.Fatalf("expected no error with invalid timezone (fallback to UTC), got: %v", err)

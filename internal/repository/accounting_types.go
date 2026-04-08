@@ -12,7 +12,7 @@ import (
 	"github.com/youyo/board/internal/refresh"
 )
 
-// AccountingTypeRepository は accounting_types リソースのキャッシュ → リフレッシュ → API フォールバックを管理する。
+// AccountingTypeRepository manages cache -> refresh -> API fallback for the accounting_types resource.
 type AccountingTypeRepository struct {
 	profile     string
 	api         *boardapi.Client
@@ -24,7 +24,7 @@ type AccountingTypeRepository struct {
 	autoRefresh bool
 }
 
-// NewAccountingTypeRepository は AccountingTypeRepository を生成する。
+// NewAccountingTypeRepository creates a new AccountingTypeRepository.
 func NewAccountingTypeRepository(
 	profile string,
 	api *boardapi.Client,
@@ -49,7 +49,7 @@ func NewAccountingTypeRepository(
 
 const accountingTypesResource = "accounting_types"
 
-// List は全勘定科目をキャッシュから返す。
+// List returns all accounting types from the cache.
 func (r *AccountingTypeRepository) List(ctx context.Context, opts ReadOptions) ([]boardapi.AccountingTypeEntity, error) {
 	fetcher := &accountingTypesFetcher{api: r.api}
 	now := time.Now()
@@ -92,8 +92,8 @@ func (r *AccountingTypeRepository) List(ctx context.Context, opts ReadOptions) (
 	return entities, nil
 }
 
-// GetByID は指定 ID の勘定科目をキャッシュから返す。
-// キャッシュミス時は API から単体取得して upsert する。
+// GetByID returns the accounting type with the given ID from the cache.
+// On cache miss, it fetches from the API and upserts the result.
 func (r *AccountingTypeRepository) GetByID(ctx context.Context, id int, opts ReadOptions) (*boardapi.AccountingTypeEntity, error) {
 	fetcher := &accountingTypesFetcher{api: r.api}
 	now := time.Now()
@@ -121,7 +121,7 @@ func (r *AccountingTypeRepository) GetByID(ctx context.Context, id int, opts Rea
 		return &entity, nil
 	}
 
-	// キャッシュミス → API 単体取得
+	// Cache miss → fetch single entity from API
 	entity, err := r.api.GetAccountingType(ctx, id)
 	if err != nil {
 		return nil, err
@@ -138,7 +138,7 @@ func (r *AccountingTypeRepository) GetByID(ctx context.Context, id int, opts Rea
 	return entity, nil
 }
 
-// Search はパラメータでフィルタした勘定科目をキャッシュから返す。
+// Search returns accounting types filtered by the given parameters from the cache.
 func (r *AccountingTypeRepository) Search(ctx context.Context, params boardapi.AccountingTypeSearchParams, opts ReadOptions) ([]boardapi.AccountingTypeEntity, error) {
 	all, err := r.List(ctx, opts)
 	if err != nil {
@@ -147,8 +147,8 @@ func (r *AccountingTypeRepository) Search(ctx context.Context, params boardapi.A
 	return filterAccountingTypes(all, params), nil
 }
 
-// filterAccountingTypes はインメモリフィルタリングを行う。
-// UpdatedAtFrom は差分取得カーソルとして使用するためフィルタには含めない。
+// filterAccountingTypes performs in-memory filtering.
+// UpdatedAtFrom is used as a delta fetch cursor and is not included in the filter.
 func filterAccountingTypes(entities []boardapi.AccountingTypeEntity, params boardapi.AccountingTypeSearchParams) []boardapi.AccountingTypeEntity {
 	var result []boardapi.AccountingTypeEntity
 	for _, e := range entities {

@@ -7,17 +7,17 @@ import (
 	"github.com/youyo/board/internal/repository"
 )
 
-// ListDocumentSendChannels は全送付方法を返す。
+// ListDocumentSendChannels returns all document send channels.
 func (s *Service) ListDocumentSendChannels(ctx context.Context, opts repository.ReadOptions) ([]boardapi.DocumentSendChannelEntity, error) {
 	return s.documentSendChannels.List(ctx, opts)
 }
 
-// GetDocumentSendChannel は指定 ID の送付方法を返す。
+// GetDocumentSendChannel returns a document send channel by ID.
 func (s *Service) GetDocumentSendChannel(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.DocumentSendChannelEntity, error) {
 	return s.documentSendChannels.GetByID(ctx, id, opts)
 }
 
-// SearchDocumentSendChannels はパラメータでフィルタした送付方法を返す。
+// SearchDocumentSendChannels returns document send channels filtered by the given parameters.
 func (s *Service) SearchDocumentSendChannels(ctx context.Context, params boardapi.DocumentSendChannelSearchParams, opts repository.ReadOptions) ([]boardapi.DocumentSendChannelEntity, error) {
 	return s.documentSendChannels.Search(ctx, params, opts)
 }

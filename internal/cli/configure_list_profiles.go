@@ -8,11 +8,11 @@ import (
 	"github.com/youyo/board/internal/config"
 )
 
-// NewConfigureListProfilesCmd は configure list-profiles コマンドを返す。
+// NewConfigureListProfilesCmd returns the configure list-profiles command.
 func NewConfigureListProfilesCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list-profiles",
-		Short: "プロファイル一覧を表示する",
+		Short: "List all profiles",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			path := config.ConfigPath()

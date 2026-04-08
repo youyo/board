@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// makeSyncState はテスト用 SyncState を生成する。
+// makeSyncState creates a test SyncState.
 func makeSyncState(profile, resource string) SyncState {
 	return SyncState{
 		ProfileName:          profile,
@@ -31,7 +31,7 @@ func makeSyncState(profile, resource string) SyncState {
 	}
 }
 
-// T_SS01: NewSyncStateStore が non-nil を返す
+// T_SS01: NewSyncStateStore returns non-nil
 func TestNewSyncStateStore(t *testing.T) {
 	db := openTestDB(t)
 	s := NewSyncStateStore(db)
@@ -40,7 +40,7 @@ func TestNewSyncStateStore(t *testing.T) {
 	}
 }
 
-// T_SS02: Get が存在しないキーに対して nil, nil を返す
+// T_SS02: Get returns nil, nil for non-existent key
 func TestSyncState_GetNotFound(t *testing.T) {
 	db := openTestDB(t)
 	s := NewSyncStateStore(db)
@@ -55,7 +55,7 @@ func TestSyncState_GetNotFound(t *testing.T) {
 	}
 }
 
-// T_SS03: Upsert→Get が正しく値を返す
+// T_SS03: Upsert→Get returns correct values
 func TestSyncState_UpsertAndGet(t *testing.T) {
 	db := openTestDB(t)
 	s := NewSyncStateStore(db)
@@ -87,7 +87,7 @@ func TestSyncState_UpsertAndGet(t *testing.T) {
 	}
 }
 
-// T_SS04: Upsert が既存エントリを上書きする
+// T_SS04: Upsert overwrites an existing entry
 func TestSyncState_UpsertOverwrite(t *testing.T) {
 	db := openTestDB(t)
 	s := NewSyncStateStore(db)
@@ -116,7 +116,7 @@ func TestSyncState_UpsertOverwrite(t *testing.T) {
 	}
 }
 
-// T_SS05: Delete が指定エントリを削除する
+// T_SS05: Delete deletes the specified entry
 func TestSyncState_Delete(t *testing.T) {
 	db := openTestDB(t)
 	s := NewSyncStateStore(db)
@@ -139,7 +139,7 @@ func TestSyncState_Delete(t *testing.T) {
 	}
 }
 
-// T_SS06: MustFullResync の bool→INTEGER→bool 変換が正しく動作する
+// T_SS06: bool→INTEGER→bool conversion for MustFullResync works correctly
 func TestSyncState_MustFullResync(t *testing.T) {
 	db := openTestDB(t)
 	s := NewSyncStateStore(db)
@@ -162,7 +162,7 @@ func TestSyncState_MustFullResync(t *testing.T) {
 		t.Error("MustFullResync: got false, want true")
 	}
 
-	// false に更新
+	// update to false
 	state.MustFullResync = false
 	if err := s.Upsert(ctx, state); err != nil {
 		t.Fatalf("Upsert false: %v", err)
@@ -177,7 +177,7 @@ func TestSyncState_MustFullResync(t *testing.T) {
 	}
 }
 
-// T_SS07: NULL 許容フィールドが正しくスキャンされる
+// T_SS07: nullable fields are correctly scanned
 func TestSyncState_NullFields(t *testing.T) {
 	db := openTestDB(t)
 	s := NewSyncStateStore(db)
@@ -189,7 +189,7 @@ func TestSyncState_NullFields(t *testing.T) {
 		ConsecutiveFailures: 0,
 		CacheVersion:        1,
 		SchemaVersion:       1,
-		// 残りは全て NullString{Valid: false}
+		// all remaining fields are NullString{Valid: false}
 	}
 	if err := s.Upsert(ctx, state); err != nil {
 		t.Fatalf("Upsert: %v", err)

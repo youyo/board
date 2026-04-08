@@ -2,7 +2,7 @@ package boardapi
 
 import "net/http"
 
-// applyAuthHeaders は BOARD API の認証ヘッダを付与する。
+// applyAuthHeaders attaches authentication headers for the BOARD API.
 //
 //	x-api-key: <APIKey>
 //	Authorization: Bearer <APIToken>

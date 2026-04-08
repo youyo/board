@@ -8,8 +8,8 @@ import (
 	"strconv"
 )
 
-// InvoiceEntity は BOARD API の請求エンティティ。
-// GET /v1/invoices レスポンスの1要素に対応。
+// InvoiceEntity is a BOARD API invoice entity.
+// Corresponds to one element in the GET /v1/invoices response.
 type InvoiceEntity struct {
 	ID          int     `json:"id"`
 	ClientID    int     `json:"client_id"`
@@ -24,7 +24,7 @@ type InvoiceEntity struct {
 	CreatedAt   string  `json:"created_at"` // ISO 8601
 }
 
-// InvoiceSearchParams は SearchInvoices のパラメータ。
+// InvoiceSearchParams is the parameter for SearchInvoices.
 type InvoiceSearchParams struct {
 	ClientID      int
 	ProjectID     int
@@ -32,8 +32,8 @@ type InvoiceSearchParams struct {
 	UpdatedAtFrom string
 }
 
-// ListInvoices は全請求を取得する。
-// ページネーションは ListAll により自動処理される。
+// ListInvoices retrieves all invoices.
+// Pagination is automatically handled by ListAll.
 func (c *Client) ListInvoices(ctx context.Context) ([]InvoiceEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/invoices", nil)
@@ -61,7 +61,7 @@ func (c *Client) ListInvoices(ctx context.Context) ([]InvoiceEntity, error) {
 	return result, nil
 }
 
-// GetInvoice は指定 ID の請求を取得する。
+// GetInvoice retrieves the invoice with the specified ID.
 func (c *Client) GetInvoice(ctx context.Context, id int) (*InvoiceEntity, error) {
 	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/invoices/%d", id), nil)
 	if err != nil {
@@ -78,8 +78,8 @@ func (c *Client) GetInvoice(ctx context.Context, id int) (*InvoiceEntity, error)
 	return &x, nil
 }
 
-// SearchInvoices は条件付きで請求を検索する。
-// ページネーションは ListAll により自動処理される。
+// SearchInvoices searches invoices with the given conditions.
+// Pagination is automatically handled by ListAll.
 func (c *Client) SearchInvoices(ctx context.Context, params InvoiceSearchParams) ([]InvoiceEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/invoices", nil)

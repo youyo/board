@@ -12,8 +12,8 @@ import (
 	"github.com/youyo/board/internal/refresh"
 )
 
-// App は board CLI の DI コンテナ。
-// New() で初期化し、Close() で DB 接続を閉じる。
+// App is the DI container for the board CLI.
+// Initialize with New() and close the DB connection with Close().
 type App struct {
 	Config      config.Config
 	Profile     config.ProfileConfig
@@ -22,31 +22,31 @@ type App struct {
 	DBPath string
 	DB     *cache.DB
 
-	// cache ストア
+	// cache stores
 	ResourceCache *cache.ResourceCache
 	SyncStore     *cache.SyncStateStore
 
-	// refresh エンジン
+	// refresh engine
 	Refresher   *refresh.Refresher
 	LockManager *refresh.LockManager
 
-	// boardapi クライアント
+	// boardapi client
 	APIClient *boardapi.Client
 
-	// 全22リソース Repository
+	// Repositories for all 22 resources
 	Repos *Repositories
 }
 
-// New は App を初期化して返す。
-// profileName が空の場合は config.CurrentProfile を使用する。
+// New initializes and returns an App.
+// If profileName is empty, config.CurrentProfile is used.
 func New(profileName string) (*App, error) {
-	// 1. config をロード
+	// 1. Load config
 	cfg, err := config.Load(config.ConfigPath())
 	if err != nil {
 		return nil, fmt.Errorf("app: load config: %w", err)
 	}
 
-	// 2. プロファイルを解決
+	// 2. Resolve profile
 	if profileName == "" {
 		profileName = cfg.CurrentProfile
 	}
@@ -56,7 +56,7 @@ func New(profileName string) (*App, error) {
 	}
 	prof = config.ApplyDefaults(prof)
 
-	// 3. DB パスを解決してオープン
+	// 3. Resolve DB path and open
 	dp := dbPath()
 	if err := os.MkdirAll(filepath.Dir(dp), 0o700); err != nil {
 		return nil, fmt.Errorf("app: mkdir db dir: %w", err)
@@ -66,27 +66,27 @@ func New(profileName string) (*App, error) {
 		return nil, fmt.Errorf("app: open db: %w", err)
 	}
 
-	// 4. マイグレーション
+	// 4. Migrate
 	if err := cache.Migrate(db); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("app: migrate: %w", err)
 	}
 
-	// 5. cache ストアを初期化
+	// 5. Initialize cache stores
 	rc := cache.NewResourceCache(db)
 	ss := cache.NewSyncStateStore(db)
 
-	// 6. refresh エンジンを初期化
+	// 6. Initialize refresh engine
 	refresher := refresh.NewRefresher(rc, ss)
 	lm := refresh.NewLockManager(ss, "")
 
-	// 7. タイムゾーンを解決（失敗時は UTC フォールバック）
+	// 7. Resolve timezone (fallback to UTC on failure)
 	tz, err := time.LoadLocation(cfg.Timezone)
 	if err != nil {
 		tz = time.UTC
 	}
 
-	// 8. boardapi クライアントを初期化
+	// 8. Initialize boardapi client
 	timeout := time.Duration(prof.RequestTimeoutSeconds) * time.Second
 	apiClient := boardapi.New(
 		prof.BaseURL,
@@ -96,7 +96,7 @@ func New(profileName string) (*App, error) {
 		boardapi.WithRetryMax(prof.RetryMax),
 	)
 
-	// 9. 全22リポジトリを初期化
+	// 9. Initialize all 22 repositories
 	repos := newRepositories(profileName, apiClient, rc, ss, refresher, lm, tz, prof.DailyAutoRefresh)
 
 	return &App{
@@ -114,19 +114,19 @@ func New(profileName string) (*App, error) {
 	}, nil
 }
 
-// Close は DB 接続を閉じる。
+// Close closes the DB connection.
 func (a *App) Close() error {
 	return a.DB.Close()
 }
 
-// dbPath は SQLite DB のファイルパスを返す。
+// dbPath returns the file path for the SQLite DB.
 //
-// 優先順位:
-//  1. BOARD_CACHE_PATH 環境変数
+// Resolution order:
+//  1. BOARD_CACHE_PATH environment variable
 //  2. XDG_DATA_HOME/board/cache.db
 //  3. HOME/.local/share/board/cache.db
 //  4. os.UserCacheDir()/board/cache.db
-//  5. $TMPDIR/board/cache.db（フォールバック）
+//  5. $TMPDIR/board/cache.db (fallback)
 func dbPath() string {
 	if p := os.Getenv("BOARD_CACHE_PATH"); p != "" {
 		return p

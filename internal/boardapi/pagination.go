@@ -8,25 +8,25 @@ import (
 
 const defaultPerPage = 100
 
-// PagedRequest は ListAll が各ページに使うリクエスト生成関数の型。
-// page と per_page クエリパラメータを付与して *http.Request を返す。
+// PagedRequest is the type of a request factory function used by ListAll for each page.
+// It attaches page and per_page query parameters and returns a *http.Request.
 type PagedRequest func(ctx context.Context, page, perPage int) (*http.Request, error)
 
-// ListAllOption は ListAll の設定オプション。
+// ListAllOption is a configuration option for ListAll.
 type ListAllOption func(*listAllConfig)
 
 type listAllConfig struct {
 	perPage int
 }
 
-// WithPerPage は1ページあたりの件数を指定する。デフォルト 100。
+// WithPerPage specifies the number of items per page. Default is 100.
 func WithPerPage(n int) ListAllOption {
 	return func(c *listAllConfig) { c.perPage = n }
 }
 
-// ListAll は全ページを取得して []json.RawMessage を返す。
-// 各要素は API レスポンスのトップレベル JSON 配列の1要素に対応する。
-// ページの終了条件: レスポンスの件数 < perPage。
+// ListAll fetches all pages and returns []json.RawMessage.
+// Each element corresponds to one element in the top-level JSON array of the API response.
+// End condition: number of items in response < perPage.
 func (c *Client) ListAll(ctx context.Context, makeReq PagedRequest, opts ...ListAllOption) ([]json.RawMessage, error) {
 	cfg := &listAllConfig{perPage: defaultPerPage}
 	for _, o := range opts {
@@ -62,7 +62,7 @@ func (c *Client) ListAll(ctx context.Context, makeReq PagedRequest, opts ...List
 		all = append(all, items...)
 
 		if len(items) < cfg.perPage {
-			break // 最終ページ
+			break // last page
 		}
 	}
 	return all, nil

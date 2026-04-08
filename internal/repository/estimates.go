@@ -11,7 +11,7 @@ import (
 	"github.com/youyo/board/internal/refresh"
 )
 
-// EstimateRepository は estimates リソースのキャッシュ → リフレッシュ → API フォールバックを管理する。
+// EstimateRepository manages cache -> refresh -> API fallback for the estimates resource.
 type EstimateRepository struct {
 	profile     string
 	api         *boardapi.Client
@@ -23,7 +23,7 @@ type EstimateRepository struct {
 	autoRefresh bool
 }
 
-// NewEstimateRepository は EstimateRepository を生成する。
+// NewEstimateRepository creates a new EstimateRepository.
 func NewEstimateRepository(
 	profile string,
 	api *boardapi.Client,
@@ -48,7 +48,7 @@ func NewEstimateRepository(
 
 const estimatesResource = "estimates"
 
-// List は全見積をキャッシュから返す。
+// List returns all estimates from the cache.
 func (r *EstimateRepository) List(ctx context.Context, opts ReadOptions) ([]boardapi.EstimateEntity, error) {
 	fetcher := &estimatesFetcher{api: r.api}
 	now := time.Now()
@@ -91,8 +91,8 @@ func (r *EstimateRepository) List(ctx context.Context, opts ReadOptions) ([]boar
 	return entities, nil
 }
 
-// GetByID は指定 ID の見積をキャッシュから返す。
-// キャッシュミス時は API から単体取得して upsert する。
+// GetByID returns the estimate with the given ID from the cache.
+// On cache miss, it fetches from the API and upserts the result.
 func (r *EstimateRepository) GetByID(ctx context.Context, id int, opts ReadOptions) (*boardapi.EstimateEntity, error) {
 	fetcher := &estimatesFetcher{api: r.api}
 	now := time.Now()
@@ -120,7 +120,7 @@ func (r *EstimateRepository) GetByID(ctx context.Context, id int, opts ReadOptio
 		return &entity, nil
 	}
 
-	// キャッシュミス → API 単体取得
+	// Cache miss → fetch single entity from API
 	entity, err := r.api.GetEstimate(ctx, id)
 	if err != nil {
 		return nil, err
@@ -137,7 +137,7 @@ func (r *EstimateRepository) GetByID(ctx context.Context, id int, opts ReadOptio
 	return entity, nil
 }
 
-// Search はパラメータでフィルタした見積をキャッシュから返す。
+// Search returns estimates filtered by the given parameters from the cache.
 func (r *EstimateRepository) Search(ctx context.Context, params boardapi.EstimateSearchParams, opts ReadOptions) ([]boardapi.EstimateEntity, error) {
 	all, err := r.List(ctx, opts)
 	if err != nil {
@@ -146,8 +146,8 @@ func (r *EstimateRepository) Search(ctx context.Context, params boardapi.Estimat
 	return filterEstimates(all, params), nil
 }
 
-// filterEstimates はインメモリフィルタリングを行う。
-// UpdatedAtFrom は差分取得カーソルとして使用するためフィルタには含めない。
+// filterEstimates performs in-memory filtering.
+// UpdatedAtFrom is used as a delta fetch cursor and is not included in the filter.
 func filterEstimates(entities []boardapi.EstimateEntity, params boardapi.EstimateSearchParams) []boardapi.EstimateEntity {
 	var result []boardapi.EstimateEntity
 	for _, e := range entities {

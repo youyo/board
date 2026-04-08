@@ -9,11 +9,11 @@ import (
 	"github.com/youyo/board/internal/output"
 )
 
-// NewAPIEstimatesCmd は board api estimates サブコマンドグループを返す。
+// NewAPIEstimatesCmd  returns the board api estimates subcommand group.
 func NewAPIEstimatesCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "estimates",
-		Short: "見積（estimates）を操作する",
+		Short: "Manage estimates",
 	}
 	cmd.AddCommand(
 		newAPIEstimatesListCmd(),
@@ -26,7 +26,7 @@ func NewAPIEstimatesCmd() *cobra.Command {
 func newAPIEstimatesListCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
-		Short: "見積の一覧を取得する",
+		Short: "List all estimates",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			svc, err := apiServiceFromCmd(cmd)
 			if err != nil {
@@ -46,10 +46,10 @@ func newAPIEstimatesGetCmd() *cobra.Command {
 	var id int
 	cmd := &cobra.Command{
 		Use:   "get",
-		Short: "指定 ID の見積を取得する",
+		Short: "Get a estimate by ID",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if id == 0 {
-				return fmt.Errorf("--id は必須です")
+				return fmt.Errorf("--id is required")
 			}
 			svc, err := apiServiceFromCmd(cmd)
 			if err != nil {
@@ -63,7 +63,7 @@ func newAPIEstimatesGetCmd() *cobra.Command {
 			return output.Write(os.Stdout, result, prettyFromCmd(cmd))
 		},
 	}
-	cmd.Flags().IntVar(&id, "id", 0, "見積 ID（必須）")
+	cmd.Flags().IntVar(&id, "id", 0, "Estimate ID (required)")
 	return cmd
 }
 
@@ -73,7 +73,7 @@ func newAPIEstimatesSearchCmd() *cobra.Command {
 	var status, updatedAtFrom string
 	cmd := &cobra.Command{
 		Use:   "search",
-		Short: "見積を条件で検索する",
+		Short: "Search estimates by criteria",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			svc, err := apiServiceFromCmd(cmd)
 			if err != nil {
@@ -93,9 +93,9 @@ func newAPIEstimatesSearchCmd() *cobra.Command {
 			return output.Write(os.Stdout, result, prettyFromCmd(cmd))
 		},
 	}
-	cmd.Flags().IntVar(&clientID, "client-id", 0, "顧客 ID でフィルタ")
-	cmd.Flags().IntVar(&projectID, "project-id", 0, "案件 ID でフィルタ")
-	cmd.Flags().StringVar(&status, "status", "", "ステータスでフィルタ")
-	cmd.Flags().StringVar(&updatedAtFrom, "updated-at-from", "", "更新日時（ISO 8601）以降でフィルタ")
+	cmd.Flags().IntVar(&clientID, "client-id", 0, "Filter by client ID")
+	cmd.Flags().IntVar(&projectID, "project-id", 0, "Filter by project ID")
+	cmd.Flags().StringVar(&status, "status", "", "Filter by status")
+	cmd.Flags().StringVar(&updatedAtFrom, "updated-at-from", "", "Filter by updated_at (ISO 8601, lower bound)")
 	return cmd
 }

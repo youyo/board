@@ -8,8 +8,8 @@ import (
 	"strconv"
 )
 
-// ProjectTypeEntity は BOARD API の案件区分エンティティ。
-// GET /v1/project_types レスポンスの1要素に対応。
+// ProjectTypeEntity is a BOARD API project type entity.
+// Corresponds to one element in the GET /v1/project_types response.
 type ProjectTypeEntity struct {
 	ID        int    `json:"id"`
 	Name      string `json:"name"`
@@ -18,14 +18,14 @@ type ProjectTypeEntity struct {
 	CreatedAt string `json:"created_at"` // ISO 8601
 }
 
-// ProjectTypeSearchParams は SearchProjectTypes のパラメータ。
+// ProjectTypeSearchParams is the parameter for SearchProjectTypes.
 type ProjectTypeSearchParams struct {
 	Name          string
 	UpdatedAtFrom string
 }
 
-// ListProjectTypes は全案件区分を取得する。
-// ページネーションは ListAll により自動処理される。
+// ListProjectTypes retrieves all project types.
+// Pagination is automatically handled by ListAll.
 func (c *Client) ListProjectTypes(ctx context.Context) ([]ProjectTypeEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/project_types", nil)
@@ -53,7 +53,7 @@ func (c *Client) ListProjectTypes(ctx context.Context) ([]ProjectTypeEntity, err
 	return result, nil
 }
 
-// GetProjectType は指定 ID の案件区分を取得する。
+// GetProjectType retrieves the project type with the specified ID.
 func (c *Client) GetProjectType(ctx context.Context, id int) (*ProjectTypeEntity, error) {
 	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/project_types/%d", id), nil)
 	if err != nil {
@@ -70,8 +70,8 @@ func (c *Client) GetProjectType(ctx context.Context, id int) (*ProjectTypeEntity
 	return &x, nil
 }
 
-// SearchProjectTypes は条件付きで案件区分を検索する。
-// ページネーションは ListAll により自動処理される。
+// SearchProjectTypes searches project types with the given conditions.
+// Pagination is automatically handled by ListAll.
 func (c *Client) SearchProjectTypes(ctx context.Context, params ProjectTypeSearchParams) ([]ProjectTypeEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/project_types", nil)

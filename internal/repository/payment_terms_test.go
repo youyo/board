@@ -61,12 +61,12 @@ func newPaymentTermAPIServer(t *testing.T, entities []boardapi.PaymentTermEntity
 }
 
 var samplePaymentTerms = []boardapi.PaymentTermEntity{
-	{ID: 1, Name: "月末締め翌月払い", UpdatedAt: "2026-01-01T00:00:00Z"},
-	{ID: 2, Name: "即時払い", UpdatedAt: "2026-01-02T00:00:00Z"},
-	{ID: 3, Name: "翌々月払い", UpdatedAt: "2026-01-03T00:00:00Z"},
+	{ID: 1, Name: "End of month, next month payment", UpdatedAt: "2026-01-01T00:00:00Z"},
+	{ID: 2, Name: "Immediate payment", UpdatedAt: "2026-01-02T00:00:00Z"},
+	{ID: 3, Name: "Two months later payment", UpdatedAt: "2026-01-03T00:00:00Z"},
 }
 
-// T_PT01: List - キャッシュあり → キャッシュのデータを返す
+// T_PT01: List - cache hit -> returns cached data
 func TestPaymentTermRepository_List_CacheHit(t *testing.T) {
 	db := newTestDB(t)
 	seedPaymentTermCache(t, db, samplePaymentTerms)
@@ -85,7 +85,7 @@ func TestPaymentTermRepository_List_CacheHit(t *testing.T) {
 	}
 }
 
-// T_PT02: List - キャッシュなし（初回）→ ForceRefresh 後データを返す
+// T_PT02: List - no cache (initial load) -> returns data after ForceRefresh
 func TestPaymentTermRepository_List_InitialLoad(t *testing.T) {
 	db := newTestDB(t)
 
@@ -102,7 +102,7 @@ func TestPaymentTermRepository_List_InitialLoad(t *testing.T) {
 	}
 }
 
-// T_PT03: GetByID - キャッシュヒット → キャッシュから返す
+// T_PT03: GetByID - cache hit -> returns from cache
 func TestPaymentTermRepository_GetByID_CacheHit(t *testing.T) {
 	db := newTestDB(t)
 	seedPaymentTermCache(t, db, samplePaymentTerms)
@@ -121,12 +121,12 @@ func TestPaymentTermRepository_GetByID_CacheHit(t *testing.T) {
 	}
 }
 
-// T_PT04: GetByID - キャッシュミス、API 成功 → API 取得して返す
+// T_PT04: GetByID - cache miss, API success -> fetches from API and returns
 func TestPaymentTermRepository_GetByID_CacheMiss_APISuccess(t *testing.T) {
 	db := newTestDB(t)
 	markSynced(t, db, "payment_terms")
 
-	target := boardapi.PaymentTermEntity{ID: 99, Name: "テスト支払条件", UpdatedAt: "2026-01-01T00:00:00Z"}
+	target := boardapi.PaymentTermEntity{ID: 99, Name: "Test Payment Term", UpdatedAt: "2026-01-01T00:00:00Z"}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		b, _ := json.Marshal(target)
@@ -146,7 +146,7 @@ func TestPaymentTermRepository_GetByID_CacheMiss_APISuccess(t *testing.T) {
 	}
 }
 
-// T_PT05: GetByID - キャッシュミス、API エラー → error を返す
+// T_PT05: GetByID - cache miss, API error -> returns error
 func TestPaymentTermRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	db := newTestDB(t)
 	markSynced(t, db, "payment_terms")
@@ -161,7 +161,7 @@ func TestPaymentTermRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	}
 }
 
-// T_PT06: Search - Name フィルタ → 一致するものを返す
+// T_PT06: Search - Name filter -> returns matching items
 func TestPaymentTermRepository_Search_NameFilter(t *testing.T) {
 	db := newTestDB(t)
 	seedPaymentTermCache(t, db, samplePaymentTerms)
@@ -171,16 +171,16 @@ func TestPaymentTermRepository_Search_NameFilter(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makePaymentTermRepo(t, db, apiClient, false)
-	got, err := repo.Search(context.Background(), boardapi.PaymentTermSearchParams{Name: "即時払い"}, repository.ReadOptions{})
+	got, err := repo.Search(context.Background(), boardapi.PaymentTermSearchParams{Name: "Immediate payment"}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
-	if len(got) != 1 || got[0].Name != "即時払い" {
+	if len(got) != 1 || got[0].Name != "Immediate payment" {
 		t.Errorf("unexpected result: %+v", got)
 	}
 }
 
-// T_PT07: Search - パラメータなし → 全件返す
+// T_PT07: Search - no filter -> returns all items
 func TestPaymentTermRepository_Search_NoFilter(t *testing.T) {
 	db := newTestDB(t)
 	seedPaymentTermCache(t, db, samplePaymentTerms)

@@ -7,11 +7,11 @@ import (
 	"github.com/youyo/board/internal/config"
 )
 
-// NewConfigurePathCmd は configure path コマンドを返す。
+// NewConfigurePathCmd returns the configure path command.
 func NewConfigurePathCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "path",
-		Short: "設定ファイルのパスを表示する",
+		Short: "Show the path to the configuration file",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			fmt.Fprintln(cmd.OutOrStdout(), config.ConfigPath())

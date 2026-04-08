@@ -12,7 +12,7 @@ import (
 	"github.com/youyo/board/internal/refresh"
 )
 
-// DocumentSendChannelRepository は document_send_channels リソースのキャッシュ → リフレッシュ → API フォールバックを管理する。
+// DocumentSendChannelRepository manages cache -> refresh -> API fallback for the document_send_channels resource.
 type DocumentSendChannelRepository struct {
 	profile     string
 	api         *boardapi.Client
@@ -24,7 +24,7 @@ type DocumentSendChannelRepository struct {
 	autoRefresh bool
 }
 
-// NewDocumentSendChannelRepository は DocumentSendChannelRepository を生成する。
+// NewDocumentSendChannelRepository creates a new DocumentSendChannelRepository.
 func NewDocumentSendChannelRepository(
 	profile string,
 	api *boardapi.Client,
@@ -49,7 +49,7 @@ func NewDocumentSendChannelRepository(
 
 const documentSendChannelsResource = "document_send_channels"
 
-// List は全書類送付方法をキャッシュから返す。
+// List returns all document send channels from the cache.
 func (r *DocumentSendChannelRepository) List(ctx context.Context, opts ReadOptions) ([]boardapi.DocumentSendChannelEntity, error) {
 	fetcher := &documentSendChannelsFetcher{api: r.api}
 	now := time.Now()
@@ -92,8 +92,8 @@ func (r *DocumentSendChannelRepository) List(ctx context.Context, opts ReadOptio
 	return entities, nil
 }
 
-// GetByID は指定 ID の書類送付方法をキャッシュから返す。
-// キャッシュミス時は API から単体取得して upsert する。
+// GetByID returns the document send channel with the given ID from the cache.
+// On cache miss, it fetches from the API and upserts the result.
 func (r *DocumentSendChannelRepository) GetByID(ctx context.Context, id int, opts ReadOptions) (*boardapi.DocumentSendChannelEntity, error) {
 	fetcher := &documentSendChannelsFetcher{api: r.api}
 	now := time.Now()
@@ -121,7 +121,7 @@ func (r *DocumentSendChannelRepository) GetByID(ctx context.Context, id int, opt
 		return &entity, nil
 	}
 
-	// キャッシュミス → API 単体取得
+	// Cache miss → fetch single entity from API
 	entity, err := r.api.GetDocumentSendChannel(ctx, id)
 	if err != nil {
 		return nil, err
@@ -138,7 +138,7 @@ func (r *DocumentSendChannelRepository) GetByID(ctx context.Context, id int, opt
 	return entity, nil
 }
 
-// Search はパラメータでフィルタした書類送付方法をキャッシュから返す。
+// Search returns document send channels filtered by the given parameters from the cache.
 func (r *DocumentSendChannelRepository) Search(ctx context.Context, params boardapi.DocumentSendChannelSearchParams, opts ReadOptions) ([]boardapi.DocumentSendChannelEntity, error) {
 	all, err := r.List(ctx, opts)
 	if err != nil {
@@ -147,8 +147,8 @@ func (r *DocumentSendChannelRepository) Search(ctx context.Context, params board
 	return filterDocumentSendChannels(all, params), nil
 }
 
-// filterDocumentSendChannels はインメモリフィルタリングを行う。
-// UpdatedAtFrom は差分取得カーソルとして使用するためフィルタには含めない。
+// filterDocumentSendChannels performs in-memory filtering.
+// UpdatedAtFrom is used as a delta fetch cursor and is not included in the filter.
 func filterDocumentSendChannels(entities []boardapi.DocumentSendChannelEntity, params boardapi.DocumentSendChannelSearchParams) []boardapi.DocumentSendChannelEntity {
 	var result []boardapi.DocumentSendChannelEntity
 	for _, e := range entities {

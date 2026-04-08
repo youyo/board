@@ -9,11 +9,11 @@ import (
 	"github.com/youyo/board/internal/output"
 )
 
-// NewAPIClientsCmd は board api clients サブコマンドグループを返す。
+// NewAPIClientsCmd  returns the board api clients subcommand group.
 func NewAPIClientsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "clients",
-		Short: "顧客（clients）を操作する",
+		Short: "Manage clients",
 	}
 	cmd.AddCommand(
 		newAPIClientsListCmd(),
@@ -26,7 +26,7 @@ func NewAPIClientsCmd() *cobra.Command {
 func newAPIClientsListCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
-		Short: "顧客の一覧を取得する",
+		Short: "List all clients",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			svc, err := apiServiceFromCmd(cmd)
 			if err != nil {
@@ -46,10 +46,10 @@ func newAPIClientsGetCmd() *cobra.Command {
 	var id int
 	cmd := &cobra.Command{
 		Use:   "get",
-		Short: "指定 ID の顧客を取得する",
+		Short: "Get a client by ID",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if id == 0 {
-				return fmt.Errorf("--id は必須です")
+				return fmt.Errorf("--id is required")
 			}
 			svc, err := apiServiceFromCmd(cmd)
 			if err != nil {
@@ -63,7 +63,7 @@ func newAPIClientsGetCmd() *cobra.Command {
 			return output.Write(os.Stdout, result, prettyFromCmd(cmd))
 		},
 	}
-	cmd.Flags().IntVar(&id, "id", 0, "顧客 ID（必須）")
+	cmd.Flags().IntVar(&id, "id", 0, "Client ID (required)")
 	return cmd
 }
 
@@ -71,7 +71,7 @@ func newAPIClientsSearchCmd() *cobra.Command {
 	var name, updatedAtFrom string
 	cmd := &cobra.Command{
 		Use:   "search",
-		Short: "顧客を条件で検索する",
+		Short: "Search clients by criteria",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			svc, err := apiServiceFromCmd(cmd)
 			if err != nil {
@@ -89,7 +89,7 @@ func newAPIClientsSearchCmd() *cobra.Command {
 			return output.Write(os.Stdout, result, prettyFromCmd(cmd))
 		},
 	}
-	cmd.Flags().StringVar(&name, "name", "", "顧客名でフィルタ")
-	cmd.Flags().StringVar(&updatedAtFrom, "updated-at-from", "", "更新日時（ISO 8601）以降でフィルタ")
+	cmd.Flags().StringVar(&name, "name", "", "Filter by client name")
+	cmd.Flags().StringVar(&updatedAtFrom, "updated-at-from", "", "Filter by updated_at (ISO 8601, lower bound)")
 	return cmd
 }

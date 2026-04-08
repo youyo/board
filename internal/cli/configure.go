@@ -1,4 +1,4 @@
-// Package cli は board CLI のコマンド定義を提供する。
+// Package cli provides command definitions for the board CLI.
 package cli
 
 import (
@@ -12,19 +12,19 @@ import (
 	"github.com/youyo/board/internal/config"
 )
 
-// NewConfigureCmd は configure コマンドを返す。
-// サブコマンド未指定の場合は対話式設定を実行する。
+// NewConfigureCmd returns the configure command.
+// When invoked without a subcommand, it runs the interactive configuration wizard.
 func NewConfigureCmd() *cobra.Command {
 	var profileFlag string
 	cmd := &cobra.Command{
 		Use:   "configure",
-		Short: "設定を管理する",
-		Long:  "board CLI の設定を管理する。サブコマンドなしで実行すると対話式設定を開始する。",
+		Short: "Manage configuration",
+		Long:  "Manage board CLI configuration. Running without a subcommand starts the interactive setup.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runConfigure(cmd, cmd.InOrStdin(), profileFlag)
 		},
 	}
-	cmd.Flags().StringVarP(&profileFlag, "profile", "p", "", "対象プロファイル名")
+	cmd.Flags().StringVarP(&profileFlag, "profile", "p", "", "Target profile name")
 
 	cmd.AddCommand(
 		NewConfigureSetCmd(),
@@ -38,8 +38,8 @@ func NewConfigureCmd() *cobra.Command {
 	return cmd
 }
 
-// runConfigure は対話式設定を実行する。
-// in を io.Reader で受け取ることでテスト時に差し替え可能にする。
+// runConfigure runs the interactive configuration wizard.
+// in is accepted as io.Reader so it can be replaced during testing.
 func runConfigure(cmd *cobra.Command, in io.Reader, profileName string) error {
 	path := config.ConfigPath()
 	cfg, err := config.Load(path)
@@ -51,7 +51,7 @@ func runConfigure(cmd *cobra.Command, in io.Reader, profileName string) error {
 		profileName = cfg.CurrentProfile
 	}
 
-	// 既存プロファイルを取得（なければデフォルト値）
+	// Retrieve the existing profile, or use defaults if it does not exist.
 	prof, ok := cfg.Profiles[profileName]
 	if !ok {
 		prof = config.DefaultProfileConfig()
@@ -61,7 +61,7 @@ func runConfigure(cmd *cobra.Command, in io.Reader, profileName string) error {
 
 	scanner := bufio.NewScanner(in)
 
-	// 質問ヘルパー: 空入力の場合は defaultVal を返す
+	// ask helper: returns defaultVal when input is empty.
 	ask := func(prompt string, defaultVal string) string {
 		fmt.Fprintf(cmd.OutOrStdout(), "%s [%s]: ", prompt, defaultVal)
 		if scanner.Scan() {
@@ -73,13 +73,13 @@ func runConfigure(cmd *cobra.Command, in io.Reader, profileName string) error {
 		return defaultVal
 	}
 
-	// 質問1: プロファイル名
+	// Question 1: profile name
 	newProfileName := ask("Profile name", profileName)
 
-	// 質問2: base_url
+	// Question 2: base_url
 	prof.BaseURL = ask("Base URL", prof.BaseURL)
 
-	// 質問3: api_key（現在値はマスク表示）
+	// Question 3: api_key (current value is masked)
 	maskedKey := maskSecret(prof.APIKey)
 	fmt.Fprintf(cmd.OutOrStdout(), "API Key [%s]: ", maskedKey)
 	if scanner.Scan() {
@@ -89,7 +89,7 @@ func runConfigure(cmd *cobra.Command, in io.Reader, profileName string) error {
 		}
 	}
 
-	// 質問4: api_token（現在値はマスク表示）
+	// Question 4: api_token (current value is masked)
 	maskedToken := maskSecret(prof.APIToken)
 	fmt.Fprintf(cmd.OutOrStdout(), "API Token [%s]: ", maskedToken)
 	if scanner.Scan() {
@@ -99,7 +99,7 @@ func runConfigure(cmd *cobra.Command, in io.Reader, profileName string) error {
 		}
 	}
 
-	// 質問5: daily_auto_refresh
+	// Question 5: daily_auto_refresh
 	darDefault := "true"
 	if !prof.DailyAutoRefresh {
 		darDefault = "false"
@@ -107,14 +107,14 @@ func runConfigure(cmd *cobra.Command, in io.Reader, profileName string) error {
 	darStr := ask("Daily auto refresh (true/false)", darDefault)
 	prof.DailyAutoRefresh = darStr == "true" || darStr == "1" || darStr == "yes"
 
-	// 質問6: timezone（グローバル）
+	// Question 6: timezone (global)
 	cfg.Timezone = ask("Timezone", cfg.Timezone)
 
-	// 質問7: current profile にするか
+	// Question 7: whether to set as current profile
 	setCurrentStr := ask(fmt.Sprintf("Set %q as current profile? (yes/no)", newProfileName), "yes")
 	setAsCurrent := setCurrentStr == "yes" || setCurrentStr == "y" || setCurrentStr == "true"
 
-	// 保存
+	// Save configuration.
 	config.AddOrUpdateProfile(&cfg, newProfileName, prof)
 	if setAsCurrent {
 		config.SetCurrentProfile(&cfg, newProfileName)
@@ -124,7 +124,7 @@ func runConfigure(cmd *cobra.Command, in io.Reader, profileName string) error {
 		return err
 	}
 
-	// 結果表示
+	// Display the result.
 	out := map[string]interface{}{
 		"profile": newProfileName,
 		"config": map[string]interface{}{
@@ -149,18 +149,18 @@ func runConfigure(cmd *cobra.Command, in io.Reader, profileName string) error {
 	return nil
 }
 
-// MaskSecret は maskSecret のエクスポート版（テスト用）。
+// MaskSecret is the exported version of maskSecret (for testing).
 func MaskSecret(s string) string {
 	return maskSecret(s)
 }
 
-// maskSecret はシークレット文字列をマスクする。
+// maskSecret masks a secret string.
 //
-// マスク仕様:
-//   - 長さ 0: "" (空文字)
-//   - 長さ 1〜3: "****" (固定4文字マスク)
-//   - 長さ 4〜7: 先頭1文字 + "****" + 末尾1文字
-//   - 長さ 8〜: 先頭2文字 + "****" + 末尾2文字
+// Masking rules:
+//   - length 0: "" (empty string)
+//   - length 1–3: "****" (fixed 4-character mask)
+//   - length 4–7: first 1 char + "****" + last 1 char
+//   - length 8+: first 2 chars + "****" + last 2 chars
 func maskSecret(s string) string {
 	n := len(s)
 	switch {

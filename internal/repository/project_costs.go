@@ -11,7 +11,7 @@ import (
 	"github.com/youyo/board/internal/refresh"
 )
 
-// ProjectCostRepository は project_costs リソースのキャッシュ → リフレッシュ → API フォールバックを管理する。
+// ProjectCostRepository manages cache -> refresh -> API fallback for the project_costs resource.
 type ProjectCostRepository struct {
 	profile     string
 	api         *boardapi.Client
@@ -23,7 +23,7 @@ type ProjectCostRepository struct {
 	autoRefresh bool
 }
 
-// NewProjectCostRepository は ProjectCostRepository を生成する。
+// NewProjectCostRepository creates a new ProjectCostRepository.
 func NewProjectCostRepository(
 	profile string,
 	api *boardapi.Client,
@@ -48,7 +48,7 @@ func NewProjectCostRepository(
 
 const projectCostsResource = "project_costs"
 
-// List は全案件原価をキャッシュから返す。
+// List returns all project costs from the cache.
 func (r *ProjectCostRepository) List(ctx context.Context, opts ReadOptions) ([]boardapi.ProjectCostEntity, error) {
 	fetcher := &projectCostsFetcher{api: r.api}
 	now := time.Now()
@@ -91,7 +91,7 @@ func (r *ProjectCostRepository) List(ctx context.Context, opts ReadOptions) ([]b
 	return entities, nil
 }
 
-// GetByID は指定 ID の案件原価をキャッシュから返す。
+// GetByID returns the project cost with the given ID from the cache.
 func (r *ProjectCostRepository) GetByID(ctx context.Context, id int, opts ReadOptions) (*boardapi.ProjectCostEntity, error) {
 	fetcher := &projectCostsFetcher{api: r.api}
 	now := time.Now()
@@ -119,7 +119,7 @@ func (r *ProjectCostRepository) GetByID(ctx context.Context, id int, opts ReadOp
 		return &entity, nil
 	}
 
-	// キャッシュミス → API 単体取得
+	// Cache miss -> fetch single entry from API
 	entity, err := r.api.GetProjectCost(ctx, id)
 	if err != nil {
 		return nil, err
@@ -136,7 +136,7 @@ func (r *ProjectCostRepository) GetByID(ctx context.Context, id int, opts ReadOp
 	return entity, nil
 }
 
-// Search はパラメータでフィルタした案件原価をキャッシュから返す。
+// Search returns project costs filtered by the given parameters from the cache.
 func (r *ProjectCostRepository) Search(ctx context.Context, params boardapi.ProjectCostSearchParams, opts ReadOptions) ([]boardapi.ProjectCostEntity, error) {
 	all, err := r.List(ctx, opts)
 	if err != nil {
@@ -145,7 +145,7 @@ func (r *ProjectCostRepository) Search(ctx context.Context, params boardapi.Proj
 	return filterProjectCosts(all, params), nil
 }
 
-// filterProjectCosts はインメモリフィルタリングを行う。
+// filterProjectCosts performs in-memory filtering.
 func filterProjectCosts(entities []boardapi.ProjectCostEntity, params boardapi.ProjectCostSearchParams) []boardapi.ProjectCostEntity {
 	var result []boardapi.ProjectCostEntity
 	for _, e := range entities {

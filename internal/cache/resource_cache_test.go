@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// openTestDB はテスト用インメモリ DB を開き、マイグレーションを適用する。
+// openTestDB opens an in-memory DB for testing and applies migration.
 func openTestDB(t *testing.T) *DB {
 	t.Helper()
 	db, err := Open(":memory:")
@@ -21,7 +21,7 @@ func openTestDB(t *testing.T) *DB {
 	return db
 }
 
-// makeEntry はテスト用 Entry を生成する。
+// makeEntry creates a test Entry.
 func makeEntry(profile, resource, entityID string, payload string) Entry {
 	return Entry{
 		Key:         NewEntityKey(profile, resource, entityID),
@@ -30,7 +30,7 @@ func makeEntry(profile, resource, entityID string, payload string) Entry {
 	}
 }
 
-// T_RC01: NewResourceCache が non-nil を返す
+// T_RC01: NewResourceCache returns non-nil
 func TestNewResourceCache(t *testing.T) {
 	db := openTestDB(t)
 	rc := NewResourceCache(db)
@@ -39,7 +39,7 @@ func TestNewResourceCache(t *testing.T) {
 	}
 }
 
-// T_RC02: Upsert が新規エントリを挿入する
+// T_RC02: Upsert inserts a new entry
 func TestUpsert_Insert(t *testing.T) {
 	db := openTestDB(t)
 	rc := NewResourceCache(db)
@@ -62,7 +62,7 @@ func TestUpsert_Insert(t *testing.T) {
 	}
 }
 
-// T_RC03: Upsert が既存エントリを上書き（REPLACE）する
+// T_RC03: Upsert overwrites (REPLACE) an existing entry
 func TestUpsert_Replace(t *testing.T) {
 	db := openTestDB(t)
 	rc := NewResourceCache(db)
@@ -87,7 +87,7 @@ func TestUpsert_Replace(t *testing.T) {
 	}
 }
 
-// T_RC04: Upsert が FetchedAt を自動設定する
+// T_RC04: Upsert automatically sets FetchedAt
 func TestUpsert_FetchedAt(t *testing.T) {
 	db := openTestDB(t)
 	rc := NewResourceCache(db)
@@ -107,7 +107,7 @@ func TestUpsert_FetchedAt(t *testing.T) {
 	}
 }
 
-// T_RC05: Get が存在しないキーに対して nil, nil を返す
+// T_RC05: Get returns nil, nil for non-existent key
 func TestGet_NotFound(t *testing.T) {
 	db := openTestDB(t)
 	rc := NewResourceCache(db)
@@ -122,7 +122,7 @@ func TestGet_NotFound(t *testing.T) {
 	}
 }
 
-// T_RC06: Get が updated_at NULL を正しくスキャンする
+// T_RC06: Get correctly scans NULL updated_at
 func TestGet_NullUpdatedAt(t *testing.T) {
 	db := openTestDB(t)
 	rc := NewResourceCache(db)
@@ -146,7 +146,7 @@ func TestGet_NullUpdatedAt(t *testing.T) {
 	}
 }
 
-// T_RC07: List が指定 profile+resource のエントリをすべて返す
+// T_RC07: List returns all entries for the specified profile+resource
 func TestList_All(t *testing.T) {
 	db := openTestDB(t)
 	rc := NewResourceCache(db)
@@ -172,7 +172,7 @@ func TestList_All(t *testing.T) {
 	}
 }
 
-// T_RC08: List が別 resource のエントリを除外する
+// T_RC08: List excludes entries from a different resource
 func TestList_FilterByResource(t *testing.T) {
 	db := openTestDB(t)
 	rc := NewResourceCache(db)
@@ -194,7 +194,7 @@ func TestList_FilterByResource(t *testing.T) {
 	}
 }
 
-// T_RC09: List が空のときに空スライスを返す
+// T_RC09: List returns empty slice when empty
 func TestList_Empty(t *testing.T) {
 	db := openTestDB(t)
 	rc := NewResourceCache(db)
@@ -212,7 +212,7 @@ func TestList_Empty(t *testing.T) {
 	}
 }
 
-// T_RC10: Delete が指定エントリを削除する
+// T_RC10: Delete deletes the specified entry
 func TestDelete(t *testing.T) {
 	db := openTestDB(t)
 	rc := NewResourceCache(db)
@@ -235,7 +235,7 @@ func TestDelete(t *testing.T) {
 	}
 }
 
-// T_RC11: Delete が存在しないキーに対してエラーなし
+// T_RC11: Delete returns no error for non-existent key
 func TestDelete_NotFound(t *testing.T) {
 	db := openTestDB(t)
 	rc := NewResourceCache(db)
@@ -247,7 +247,7 @@ func TestDelete_NotFound(t *testing.T) {
 	}
 }
 
-// T_RC12: DeleteAll が指定 profile+resource のエントリを全削除する
+// T_RC12: DeleteAll deletes all entries for the specified profile+resource
 func TestDeleteAll(t *testing.T) {
 	db := openTestDB(t)
 	rc := NewResourceCache(db)
@@ -273,7 +273,7 @@ func TestDeleteAll(t *testing.T) {
 	}
 }
 
-// T_RC13: UpsertMany が複数エントリをトランザクションで挿入する
+// T_RC13: UpsertMany inserts multiple entries in a transaction
 func TestUpsertMany(t *testing.T) {
 	db := openTestDB(t)
 	rc := NewResourceCache(db)
@@ -297,21 +297,21 @@ func TestUpsertMany(t *testing.T) {
 	}
 }
 
-// T_RC14: UpsertMany がエラー時にロールバックする
-// entity_id に空文字列（NOT NULL 制約は満たすが PRIMARY KEY 制約は満たす）は問題ない。
-// ここでは payload_json に NULL を直接 INSERT して NOT NULL 制約違反を起こす。
+// T_RC14: UpsertMany rolls back on error
+// empty string in entity_id is fine (satisfies NOT NULL and PRIMARY KEY constraints).
+// Here we directly INSERT NULL into payload_json to trigger a NOT NULL constraint violation.
 func TestUpsertMany_RollbackOnError(t *testing.T) {
 	db := openTestDB(t)
 	rc := NewResourceCache(db)
 	ctx := context.Background()
 
-	// 1件目は正常
+	// first entry is valid
 	good := makeEntry("default", "clients", "1", `{"id":1}`)
-	// 2件目: entity_id が空文字（NOT NULL を満たすが空文字）→ PRIMARY KEY として有効
-	// payload_json に nil をセットして NOT NULL 制約違反を起こす
+	// second entry: entity_id is empty string (satisfies NOT NULL, valid as PRIMARY KEY)
+	// set payload_json to nil to trigger NOT NULL constraint violation
 	bad := Entry{
 		Key:         NewEntityKey("default", "clients", ""),
-		PayloadJSON: nil, // NOT NULL 違反
+		PayloadJSON: nil, // NOT NULL violation
 		UpdatedAt:   sql.NullString{Valid: false},
 	}
 
@@ -320,7 +320,7 @@ func TestUpsertMany_RollbackOnError(t *testing.T) {
 		t.Fatal("UpsertMany should return error for nil PayloadJSON")
 	}
 
-	// ロールバックされているので good も挿入されていないはず
+	// rolled back, so good entry should not be inserted either
 	got, err2 := rc.Get(ctx, good.Key)
 	if err2 != nil {
 		t.Fatalf("Get: %v", err2)
@@ -330,7 +330,7 @@ func TestUpsertMany_RollbackOnError(t *testing.T) {
 	}
 }
 
-// T_RC15: UpsertMany が空スライスに対してエラーなし
+// T_RC15: UpsertMany returns no error for empty slice
 func TestUpsertMany_Empty(t *testing.T) {
 	db := openTestDB(t)
 	rc := NewResourceCache(db)

@@ -5,15 +5,15 @@ import (
 	"strconv"
 )
 
-// Migrate はスキーマバージョンを確認し、必要に応じて DDL を適用する。
-// 冪等に設計: 複数回呼んでも安全。
+// Migrate checks the schema version and applies DDL as needed.
+// Designed to be idempotent: safe to call multiple times.
 func Migrate(db *DB) error {
-	// まず cache_meta テーブルを作成（これがないとバージョン確認できない）
+	// first create the cache_meta table (needed to check version)
 	if _, err := db.db.Exec(ddlCacheMeta); err != nil {
 		return fmt.Errorf("cache: migrate: create cache_meta: %w", err)
 	}
 
-	// 現在のバージョンを取得
+	// get current version
 	current := 0
 	var val string
 	err := db.db.QueryRow("SELECT value FROM cache_meta WHERE key = 'db_schema_version'").Scan(&val)
@@ -22,10 +22,10 @@ func Migrate(db *DB) error {
 	}
 
 	if current >= schemaVersion {
-		return nil // 既に最新
+		return nil // already up to date
 	}
 
-	// マイグレーション適用
+	// apply migrations
 	migrations := []struct {
 		version int
 		ddl     string
@@ -42,7 +42,7 @@ func Migrate(db *DB) error {
 		}
 	}
 
-	// バージョン更新
+	// update version
 	_, err = db.db.Exec(
 		"INSERT OR REPLACE INTO cache_meta (key, value) VALUES ('db_schema_version', ?)",
 		strconv.Itoa(schemaVersion),

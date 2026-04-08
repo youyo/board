@@ -9,7 +9,7 @@ import (
 )
 
 func TestConfigureListProfilesCmd(t *testing.T) {
-	t.Run("プロファイルが1つの場合その名前が返る", func(t *testing.T) {
+	t.Run("a single profile returns its name", func(t *testing.T) {
 		newTempConfig(t)
 
 		root := cli.NewConfigureCmd()
@@ -23,7 +23,7 @@ func TestConfigureListProfilesCmd(t *testing.T) {
 		}
 	})
 
-	t.Run("プロファイルが複数の場合改行区切りでソート済みで全名前が返る", func(t *testing.T) {
+	t.Run("multiple profiles return all names sorted and newline-separated", func(t *testing.T) {
 		path := newTempConfig(t)
 
 		cfg := config.DefaultConfig()

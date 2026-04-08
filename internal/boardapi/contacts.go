@@ -8,8 +8,8 @@ import (
 	"strconv"
 )
 
-// ContactEntity は BOARD API の担当者エンティティ。
-// GET /v1/contacts レスポンスの1要素に対応。
+// ContactEntity is a BOARD API contact entity.
+// Corresponds to one element in the GET /v1/contacts response.
 type ContactEntity struct {
 	ID             int    `json:"id"`
 	ClientID       int    `json:"client_id"`
@@ -24,15 +24,15 @@ type ContactEntity struct {
 	CreatedAt      string `json:"created_at"` // ISO 8601
 }
 
-// ContactSearchParams は SearchContacts のパラメータ。
+// ContactSearchParams is the parameter for SearchContacts.
 type ContactSearchParams struct {
 	ClientID int
 	Name     string
 	Email    string
 }
 
-// ListContacts は全担当者を取得する。
-// ページネーションは ListAll により自動処理される。
+// ListContacts retrieves all contacts.
+// Pagination is automatically handled by ListAll.
 func (c *Client) ListContacts(ctx context.Context) ([]ContactEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/contacts", nil)
@@ -60,7 +60,7 @@ func (c *Client) ListContacts(ctx context.Context) ([]ContactEntity, error) {
 	return result, nil
 }
 
-// GetContact は指定 ID の担当者を取得する。
+// GetContact retrieves the contact with the specified ID.
 func (c *Client) GetContact(ctx context.Context, id int) (*ContactEntity, error) {
 	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/contacts/%d", id), nil)
 	if err != nil {
@@ -77,8 +77,8 @@ func (c *Client) GetContact(ctx context.Context, id int) (*ContactEntity, error)
 	return &x, nil
 }
 
-// SearchContacts は条件付きで担当者を検索する。
-// ページネーションは ListAll により自動処理される。
+// SearchContacts searches contacts with the given conditions.
+// Pagination is automatically handled by ListAll.
 func (c *Client) SearchContacts(ctx context.Context, params ContactSearchParams) ([]ContactEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/contacts", nil)

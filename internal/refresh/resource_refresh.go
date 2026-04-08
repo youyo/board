@@ -11,35 +11,35 @@ import (
 	"github.com/youyo/board/internal/cache"
 )
 
-// Fetcher は refresh エンジンが API から entity を取得するための抽象。
-// resource ごとに実装を提供する（clients, projects, ...）。
+// Fetcher is an abstraction for the refresh engine to fetch entities from the API.
+// An implementation is provided per resource (clients, projects, ...).
 type Fetcher interface {
-	// ResourceName はリソース識別子（例: "clients"）を返す。
+	// ResourceName returns the resource identifier (e.g., "clients").
 	ResourceName() string
-	// ListAll は全件取得する。
-	// 戻り値は json.RawMessage のスライス（各要素が1 entity）。
+	// ListAll fetches all items.
+	// Returns a slice of json.RawMessage (each element is one entity).
 	ListAll(ctx context.Context) ([]json.RawMessage, error)
-	// ListUpdatedSince は updated_at >= since の entity を取得する。
-	// since が空文字の場合は全件取得と同等とする。
+	// ListUpdatedSince fetches entities where updated_at >= since.
+	// If since is empty, it is equivalent to fetching all items.
 	ListUpdatedSince(ctx context.Context, since string) ([]json.RawMessage, error)
 }
 
-// DeltaRefreshResult は差分取得の結果サマリ。
+// DeltaRefreshResult is a summary of the delta fetch result.
 type DeltaRefreshResult struct {
 	Profile      string
 	Resource     string
 	FetchedCount int
-	NewCursor    string // 更新後のカーソル値（空 = 変化なし）
+	NewCursor    string // updated cursor value (empty = no change)
 }
 
-// Refresher は差分・全件リフレッシュの実行エンジン。
+// Refresher is the execution engine for delta and full refresh.
 type Refresher struct {
 	resourceCache *cache.ResourceCache
 	syncStore     *cache.SyncStateStore
 	updater       *Updater
 }
 
-// NewRefresher は Refresher を生成する。
+// NewRefresher creates a Refresher.
 func NewRefresher(rc *cache.ResourceCache, ss *cache.SyncStateStore) *Refresher {
 	return &Refresher{
 		resourceCache: rc,
@@ -48,7 +48,7 @@ func NewRefresher(rc *cache.ResourceCache, ss *cache.SyncStateStore) *Refresher 
 	}
 }
 
-// extractID は json.RawMessage から "id" フィールドを文字列で返す。
+// extractID returns the "id" field from a json.RawMessage as a string.
 func extractID(raw json.RawMessage) (string, error) {
 	var v struct {
 		ID int `json:"id"`
@@ -62,8 +62,8 @@ func extractID(raw json.RawMessage) (string, error) {
 	return strconv.Itoa(v.ID), nil
 }
 
-// extractUpdatedAt は json.RawMessage から "updated_at" フィールドを返す。
-// 存在しない場合は空文字を返す。
+// extractUpdatedAt returns the "updated_at" field from a json.RawMessage.
+// Returns empty string if not present.
 func extractUpdatedAt(raw json.RawMessage) string {
 	var v struct {
 		UpdatedAt string `json:"updated_at"`
@@ -72,7 +72,7 @@ func extractUpdatedAt(raw json.RawMessage) string {
 	return v.UpdatedAt
 }
 
-// rawToEntries は []json.RawMessage を []cache.Entry に変換する。
+// rawToEntries converts []json.RawMessage to []cache.Entry.
 func rawToEntries(profile, resource string, raws []json.RawMessage) ([]cache.Entry, error) {
 	entries := make([]cache.Entry, 0, len(raws))
 	for _, raw := range raws {
@@ -98,9 +98,9 @@ func rawToEntries(profile, resource string, raws []json.RawMessage) ([]cache.Ent
 	return entries, nil
 }
 
-// maxUpdatedAt は []json.RawMessage の中から最大の updated_at を文字列で返す。
-// updated_at が存在しない entity はスキップする。
-// 全 entity に updated_at がない場合は空文字を返す。
+// maxUpdatedAt returns the maximum updated_at string among []json.RawMessage.
+// Entities without updated_at are skipped.
+// Returns empty string if no entity has updated_at.
 func maxUpdatedAt(raws []json.RawMessage) string {
 	max := ""
 	for _, raw := range raws {
@@ -115,8 +115,8 @@ func maxUpdatedAt(raws []json.RawMessage) string {
 	return max
 }
 
-// cursorFromState は SyncState から現在のカーソル値を返す。
-// state が nil またはカーソルが無効な場合は空文字を返す。
+// cursorFromState returns the current cursor value from SyncState.
+// Returns empty string if state is nil or cursor is invalid.
 func cursorFromState(state *cache.SyncState) string {
 	if state == nil {
 		return ""
@@ -127,15 +127,15 @@ func cursorFromState(state *cache.SyncState) string {
 	return state.CursorUpdatedAt.String
 }
 
-// DeltaRefresh は cursor_updated_at 以降の差分を取得し、キャッシュへ upsert する。
+// DeltaRefresh fetches incremental changes since cursor_updated_at and upserts them into cache.
 //
-// アルゴリズム:
-//  1. SyncState.cursor_updated_at を読む（nil なら "" = 全件）
-//  2. fetcher.ListUpdatedSince(ctx, cursor) で差分取得
-//  3. rawToEntries で Entry スライスに変換
-//  4. ResourceCache.UpsertMany でキャッシュ更新
-//  5. 取得結果中の最大 updated_at を新カーソルとして算出
-//  6. Updater.MarkDeltaSuccess で sync_state 更新
+// Algorithm:
+//  1. Read SyncState.cursor_updated_at (nil means "" = fetch all)
+//  2. Fetch delta via fetcher.ListUpdatedSince(ctx, cursor)
+//  3. Convert to Entry slice via rawToEntries
+//  4. Update cache via ResourceCache.UpsertMany
+//  5. Calculate new cursor as maximum updated_at from fetched results
+//  6. Update sync_state via Updater.MarkDeltaSuccess
 func (r *Refresher) DeltaRefresh(
 	ctx context.Context,
 	profile string,
@@ -145,35 +145,35 @@ func (r *Refresher) DeltaRefresh(
 ) (*DeltaRefreshResult, error) {
 	resource := fetcher.ResourceName()
 
-	// 1. 現在のカーソルを取得
+	// 1. get current cursor
 	state, err := r.syncStore.Get(ctx, profile, resource)
 	if err != nil {
 		return nil, err
 	}
 	cursor := cursorFromState(state)
 
-	// 2. 差分取得
+	// 2. fetch delta
 	raws, err := fetcher.ListUpdatedSince(ctx, cursor)
 	if err != nil {
 		_ = r.updater.MarkError(ctx, profile, resource, "", err.Error(), now)
 		return nil, err
 	}
 
-	// 3. Entry に変換
+	// 3. convert to Entry
 	entries, err := rawToEntries(profile, resource, raws)
 	if err != nil {
 		return nil, err
 	}
 
-	// 4. キャッシュ更新
+	// 4. update cache
 	if err := r.resourceCache.UpsertMany(ctx, entries); err != nil {
 		return nil, err
 	}
 
-	// 5. 新カーソル算出
+	// 5. calculate new cursor
 	newCursor := maxUpdatedAt(raws)
 
-	// 6. sync_state 更新
+	// 6. update sync_state
 	if err := r.updater.MarkDeltaSuccess(ctx, profile, resource, newCursor, now, tz); err != nil {
 		return nil, err
 	}

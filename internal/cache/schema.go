@@ -1,10 +1,10 @@
 package cache
 
-// schemaVersion は現在のスキーマバージョン。
+// schemaVersion is the current schema version.
 const schemaVersion = 1
 
 // DDL for resource_cache, sync_state, cache_meta tables.
-// スペック §14-16 準拠。
+// Conforms to spec §14-16.
 
 const ddlResourceCache = `
 CREATE TABLE IF NOT EXISTS resource_cache (

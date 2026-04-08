@@ -66,7 +66,7 @@ var samplePayments = []boardapi.PaymentEntity{
 	{ID: 3, VendorID: 20, PurchaseOrderID: 102, Amount: 30000, Status: "paid", UpdatedAt: "2026-01-03T00:00:00Z"},
 }
 
-// T_PAY01: List - キャッシュあり → キャッシュのデータを返す
+// T_PAY01: List - cache hit -> returns cached data
 func TestPaymentRepository_List_CacheHit(t *testing.T) {
 	db := newTestDB(t)
 	seedPaymentCache(t, db, samplePayments)
@@ -85,7 +85,7 @@ func TestPaymentRepository_List_CacheHit(t *testing.T) {
 	}
 }
 
-// T_PAY02: List - キャッシュなし（初回）→ ForceRefresh 後データを返す
+// T_PAY02: List - no cache (initial load) -> returns data after ForceRefresh
 func TestPaymentRepository_List_InitialLoad(t *testing.T) {
 	db := newTestDB(t)
 
@@ -102,7 +102,7 @@ func TestPaymentRepository_List_InitialLoad(t *testing.T) {
 	}
 }
 
-// T_PAY03: GetByID - キャッシュヒット → キャッシュから返す
+// T_PAY03: GetByID - cache hit -> returns from cache
 func TestPaymentRepository_GetByID_CacheHit(t *testing.T) {
 	db := newTestDB(t)
 	seedPaymentCache(t, db, samplePayments)
@@ -121,7 +121,7 @@ func TestPaymentRepository_GetByID_CacheHit(t *testing.T) {
 	}
 }
 
-// T_PAY04: GetByID - キャッシュミス、API 成功 → API 取得して返す
+// T_PAY04: GetByID - cache miss, API success -> fetches from API and returns
 func TestPaymentRepository_GetByID_CacheMiss_APISuccess(t *testing.T) {
 	db := newTestDB(t)
 	markSynced(t, db, "payments")
@@ -146,7 +146,7 @@ func TestPaymentRepository_GetByID_CacheMiss_APISuccess(t *testing.T) {
 	}
 }
 
-// T_PAY05: GetByID - キャッシュミス、API エラー → error を返す
+// T_PAY05: GetByID - cache miss, API error -> returns error
 func TestPaymentRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	db := newTestDB(t)
 	markSynced(t, db, "payments")
@@ -161,7 +161,7 @@ func TestPaymentRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	}
 }
 
-// T_PAY06: Search - VendorID フィルタ → 一致するものを返す
+// T_PAY06: Search - VendorID filter -> returns matching items
 func TestPaymentRepository_Search_VendorIDFilter(t *testing.T) {
 	db := newTestDB(t)
 	seedPaymentCache(t, db, samplePayments)
@@ -180,7 +180,7 @@ func TestPaymentRepository_Search_VendorIDFilter(t *testing.T) {
 	}
 }
 
-// T_PAY07: Search - Status フィルタ → 一致するものを返す
+// T_PAY07: Search - Status filter -> returns matching items
 func TestPaymentRepository_Search_StatusFilter(t *testing.T) {
 	db := newTestDB(t)
 	seedPaymentCache(t, db, samplePayments)
@@ -199,7 +199,7 @@ func TestPaymentRepository_Search_StatusFilter(t *testing.T) {
 	}
 }
 
-// T_PAY08: Search - パラメータなし → 全件返す
+// T_PAY08: Search - no filter -> returns all items
 func TestPaymentRepository_Search_NoFilter(t *testing.T) {
 	db := newTestDB(t)
 	seedPaymentCache(t, db, samplePayments)

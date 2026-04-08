@@ -12,7 +12,7 @@ import (
 	"github.com/youyo/board/internal/refresh"
 )
 
-// PaymentTermRepository は payment_terms リソースのキャッシュ → リフレッシュ → API フォールバックを管理する。
+// PaymentTermRepository manages cache -> refresh -> API fallback for the payment_terms resource.
 type PaymentTermRepository struct {
 	profile     string
 	api         *boardapi.Client
@@ -24,7 +24,7 @@ type PaymentTermRepository struct {
 	autoRefresh bool
 }
 
-// NewPaymentTermRepository は PaymentTermRepository を生成する。
+// NewPaymentTermRepository creates a new PaymentTermRepository.
 func NewPaymentTermRepository(
 	profile string,
 	api *boardapi.Client,
@@ -49,7 +49,7 @@ func NewPaymentTermRepository(
 
 const paymentTermsResource = "payment_terms"
 
-// List は全支払条件をキャッシュから返す。
+// List returns all payment terms from the cache.
 func (r *PaymentTermRepository) List(ctx context.Context, opts ReadOptions) ([]boardapi.PaymentTermEntity, error) {
 	fetcher := &paymentTermsFetcher{api: r.api}
 	now := time.Now()
@@ -92,8 +92,8 @@ func (r *PaymentTermRepository) List(ctx context.Context, opts ReadOptions) ([]b
 	return entities, nil
 }
 
-// GetByID は指定 ID の支払条件をキャッシュから返す。
-// キャッシュミス時は API から単体取得して upsert する。
+// GetByID returns the payment term with the given ID from the cache.
+// On cache miss, it fetches from the API and upserts the result.
 func (r *PaymentTermRepository) GetByID(ctx context.Context, id int, opts ReadOptions) (*boardapi.PaymentTermEntity, error) {
 	fetcher := &paymentTermsFetcher{api: r.api}
 	now := time.Now()
@@ -121,7 +121,7 @@ func (r *PaymentTermRepository) GetByID(ctx context.Context, id int, opts ReadOp
 		return &entity, nil
 	}
 
-	// キャッシュミス → API 単体取得
+	// Cache miss → fetch single entity from API
 	entity, err := r.api.GetPaymentTerm(ctx, id)
 	if err != nil {
 		return nil, err
@@ -138,7 +138,7 @@ func (r *PaymentTermRepository) GetByID(ctx context.Context, id int, opts ReadOp
 	return entity, nil
 }
 
-// Search はパラメータでフィルタした支払条件をキャッシュから返す。
+// Search returns payment terms filtered by the given parameters from the cache.
 func (r *PaymentTermRepository) Search(ctx context.Context, params boardapi.PaymentTermSearchParams, opts ReadOptions) ([]boardapi.PaymentTermEntity, error) {
 	all, err := r.List(ctx, opts)
 	if err != nil {
@@ -147,8 +147,8 @@ func (r *PaymentTermRepository) Search(ctx context.Context, params boardapi.Paym
 	return filterPaymentTerms(all, params), nil
 }
 
-// filterPaymentTerms はインメモリフィルタリングを行う。
-// UpdatedAtFrom は差分取得カーソルとして使用するためフィルタには含めない。
+// filterPaymentTerms performs in-memory filtering.
+// UpdatedAtFrom is used as a delta fetch cursor and is not included in the filter.
 func filterPaymentTerms(entities []boardapi.PaymentTermEntity, params boardapi.PaymentTermSearchParams) []boardapi.PaymentTermEntity {
 	var result []boardapi.PaymentTermEntity
 	for _, e := range entities {

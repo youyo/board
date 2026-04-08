@@ -12,7 +12,7 @@ import (
 	"github.com/youyo/board/internal/refresh"
 )
 
-// ProjectTypeRepository は project_types リソースのキャッシュ → リフレッシュ → API フォールバックを管理する。
+// ProjectTypeRepository manages cache -> refresh -> API fallback for the project_types resource.
 type ProjectTypeRepository struct {
 	profile     string
 	api         *boardapi.Client
@@ -24,7 +24,7 @@ type ProjectTypeRepository struct {
 	autoRefresh bool
 }
 
-// NewProjectTypeRepository は ProjectTypeRepository を生成する。
+// NewProjectTypeRepository creates a new ProjectTypeRepository.
 func NewProjectTypeRepository(
 	profile string,
 	api *boardapi.Client,
@@ -49,7 +49,7 @@ func NewProjectTypeRepository(
 
 const projectTypesResource = "project_types"
 
-// List は全案件区分をキャッシュから返す。
+// List returns all project types from the cache.
 func (r *ProjectTypeRepository) List(ctx context.Context, opts ReadOptions) ([]boardapi.ProjectTypeEntity, error) {
 	fetcher := &projectTypesFetcher{api: r.api}
 	now := time.Now()
@@ -92,8 +92,8 @@ func (r *ProjectTypeRepository) List(ctx context.Context, opts ReadOptions) ([]b
 	return entities, nil
 }
 
-// GetByID は指定 ID の案件区分をキャッシュから返す。
-// キャッシュミス時は API から単体取得して upsert する。
+// GetByID returns the project type with the given ID from the cache.
+// On cache miss, it fetches from the API and upserts the result.
 func (r *ProjectTypeRepository) GetByID(ctx context.Context, id int, opts ReadOptions) (*boardapi.ProjectTypeEntity, error) {
 	fetcher := &projectTypesFetcher{api: r.api}
 	now := time.Now()
@@ -121,7 +121,7 @@ func (r *ProjectTypeRepository) GetByID(ctx context.Context, id int, opts ReadOp
 		return &entity, nil
 	}
 
-	// キャッシュミス → API 単体取得
+	// Cache miss → fetch single entity from API
 	entity, err := r.api.GetProjectType(ctx, id)
 	if err != nil {
 		return nil, err
@@ -138,7 +138,7 @@ func (r *ProjectTypeRepository) GetByID(ctx context.Context, id int, opts ReadOp
 	return entity, nil
 }
 
-// Search はパラメータでフィルタした案件区分をキャッシュから返す。
+// Search returns project types filtered by the given parameters from the cache.
 func (r *ProjectTypeRepository) Search(ctx context.Context, params boardapi.ProjectTypeSearchParams, opts ReadOptions) ([]boardapi.ProjectTypeEntity, error) {
 	all, err := r.List(ctx, opts)
 	if err != nil {
@@ -147,8 +147,8 @@ func (r *ProjectTypeRepository) Search(ctx context.Context, params boardapi.Proj
 	return filterProjectTypes(all, params), nil
 }
 
-// filterProjectTypes はインメモリフィルタリングを行う。
-// UpdatedAtFrom は差分取得カーソルとして使用するためフィルタには含めない。
+// filterProjectTypes performs in-memory filtering.
+// UpdatedAtFrom is used as a delta fetch cursor and is not included in the filter.
 func filterProjectTypes(entities []boardapi.ProjectTypeEntity, params boardapi.ProjectTypeSearchParams) []boardapi.ProjectTypeEntity {
 	var result []boardapi.ProjectTypeEntity
 	for _, e := range entities {

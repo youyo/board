@@ -2,9 +2,9 @@ package config
 
 import "fmt"
 
-// GetCurrentProfile は cfg.CurrentProfile に対応する ProfileConfig を返す。
-// CurrentProfile が空文字の場合は ErrInvalidConfig を返す。
-// 対応するプロファイルが存在しない場合は ErrProfileNotFound を返す。
+// GetCurrentProfile returns the ProfileConfig corresponding to cfg.CurrentProfile.
+// Returns ErrInvalidConfig if CurrentProfile is empty.
+// Returns ErrProfileNotFound if the corresponding profile does not exist.
 func GetCurrentProfile(cfg Config) (ProfileConfig, error) {
 	if cfg.CurrentProfile == "" {
 		return ProfileConfig{}, fmt.Errorf("%w: current_profile is empty", ErrInvalidConfig)
@@ -18,12 +18,12 @@ func GetCurrentProfile(cfg Config) (ProfileConfig, error) {
 	return p, nil
 }
 
-// SetCurrentProfile は cfg.CurrentProfile を name に更新する。
+// SetCurrentProfile updates cfg.CurrentProfile to name.
 func SetCurrentProfile(cfg *Config, name string) {
 	cfg.CurrentProfile = name
 }
 
-// AddOrUpdateProfile はプロファイルを追加または更新する。
+// AddOrUpdateProfile adds or updates a profile.
 func AddOrUpdateProfile(cfg *Config, name string, profile ProfileConfig) {
 	if cfg.Profiles == nil {
 		cfg.Profiles = make(map[string]ProfileConfig)
@@ -31,13 +31,13 @@ func AddOrUpdateProfile(cfg *Config, name string, profile ProfileConfig) {
 	cfg.Profiles[name] = profile
 }
 
-// ApplyDefaults はゼロ値フィールドにデフォルト値を適用した ProfileConfig を返す。
-// TOMLパーサーはゼロ値と「未指定」を区別できないため、
-// ロード後にこの関数を呼び出してデフォルト値を補完する。
+// ApplyDefaults returns a ProfileConfig with default values applied to zero-value fields.
+// Because the TOML parser cannot distinguish between a zero value and "not specified",
+// call this function after loading to fill in default values.
 //
-// 注意: DailyAutoRefresh のデフォルトは true だが、
-// TOML ゼロ値は false であるため、このフィールドは常に true に補完される。
-// 明示的に false を設定したい場合はこの関数を呼び出さないこと。
+// Note: The default for DailyAutoRefresh is true, but the TOML zero value is false,
+// so this field is always filled in as true.
+// Do not call this function if you want to explicitly set it to false.
 func ApplyDefaults(p ProfileConfig) ProfileConfig {
 	defaults := DefaultProfileConfig()
 
@@ -50,8 +50,8 @@ func ApplyDefaults(p ProfileConfig) ProfileConfig {
 	if p.RetryMax == 0 {
 		p.RetryMax = defaults.RetryMax
 	}
-	// DailyAutoRefresh: ゼロ値(false)はデフォルト(true)に補完
-	// 将来的には *bool ポインタ型への移行を検討
+	// DailyAutoRefresh: zero value (false) is filled in with the default (true).
+	// Consider migrating to *bool pointer type in the future.
 	if !p.DailyAutoRefresh {
 		p.DailyAutoRefresh = defaults.DailyAutoRefresh
 	}

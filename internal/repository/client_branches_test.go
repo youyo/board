@@ -16,7 +16,7 @@ import (
 	"github.com/youyo/board/internal/repository"
 )
 
-// makeClientBranchRepo はテスト用 ClientBranchRepository を構築する。
+// makeClientBranchRepo constructs a ClientBranchRepository for testing.
 func makeClientBranchRepo(t *testing.T, db *cache.DB, apiClient *boardapi.Client, autoRefresh bool) *repository.ClientBranchRepository {
 	t.Helper()
 	rc := cache.NewResourceCache(db)
@@ -27,7 +27,7 @@ func makeClientBranchRepo(t *testing.T, db *cache.DB, apiClient *boardapi.Client
 	return repository.NewClientBranchRepository("default", apiClient, rc, ss, refresher, lm, tz, autoRefresh)
 }
 
-// seedClientBranchCache はキャッシュに ClientBranchEntity を直接書き込む。
+// seedClientBranchCache writes ClientBranchEntity records directly into the cache.
 func seedClientBranchCache(t *testing.T, db *cache.DB, entities []boardapi.ClientBranchEntity) {
 	t.Helper()
 	rc := cache.NewResourceCache(db)
@@ -53,7 +53,7 @@ func seedClientBranchCache(t *testing.T, db *cache.DB, entities []boardapi.Clien
 	}
 }
 
-// newClientBranchAPIServer は /v1/client_branches に対して entities を返す httptest.Server を返す。
+// newClientBranchAPIServer returns an httptest.Server that serves entities for /v1/client_branches.
 func newClientBranchAPIServer(t *testing.T, entities []boardapi.ClientBranchEntity) *httptest.Server {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -65,12 +65,12 @@ func newClientBranchAPIServer(t *testing.T, entities []boardapi.ClientBranchEnti
 }
 
 var sampleClientBranches = []boardapi.ClientBranchEntity{
-	{ID: 1, ClientID: 10, Name: "東京支社", UpdatedAt: "2026-01-01T00:00:00Z"},
-	{ID: 2, ClientID: 10, Name: "大阪支社", UpdatedAt: "2026-01-02T00:00:00Z"},
-	{ID: 3, ClientID: 20, Name: "名古屋支社", UpdatedAt: "2026-01-03T00:00:00Z"},
+	{ID: 1, ClientID: 10, Name: "Tokyo Branch", UpdatedAt: "2026-01-01T00:00:00Z"},
+	{ID: 2, ClientID: 10, Name: "Osaka Branch", UpdatedAt: "2026-01-02T00:00:00Z"},
+	{ID: 3, ClientID: 20, Name: "Nagoya Branch", UpdatedAt: "2026-01-03T00:00:00Z"},
 }
 
-// T_R16: List - キャッシュあり、autoRefresh=false → キャッシュのデータを返す
+// T_R16: List - cache hit, autoRefresh=false -> returns cached data
 func TestClientBranchRepository_List_CacheHit(t *testing.T) {
 	db := newTestDB(t)
 	seedClientBranchCache(t, db, sampleClientBranches)
@@ -89,7 +89,7 @@ func TestClientBranchRepository_List_CacheHit(t *testing.T) {
 	}
 }
 
-// T_R17: List - キャッシュなし（初回） → ForceRefresh 後データを返す
+// T_R17: List - no cache (initial load) -> returns data after ForceRefresh
 func TestClientBranchRepository_List_InitialLoad(t *testing.T) {
 	db := newTestDB(t)
 
@@ -106,7 +106,7 @@ func TestClientBranchRepository_List_InitialLoad(t *testing.T) {
 	}
 }
 
-// T_R18: List - autoRefresh=true、NeedsDailyRefresh=true → DeltaRefresh 後データを返す
+// T_R18: List - autoRefresh=true, NeedsDailyRefresh=true -> returns data after DeltaRefresh
 func TestClientBranchRepository_List_AutoRefresh(t *testing.T) {
 	db := newTestDB(t)
 	seedClientBranchCache(t, db, sampleClientBranches[:1])
@@ -131,7 +131,7 @@ func TestClientBranchRepository_List_AutoRefresh(t *testing.T) {
 	}
 }
 
-// T_R19: List - opts.ForceRefresh=true → ForceRefresh 後データを返す
+// T_R19: List - opts.ForceRefresh=true -> returns data after ForceRefresh
 func TestClientBranchRepository_List_ForceRefresh(t *testing.T) {
 	db := newTestDB(t)
 
@@ -148,7 +148,7 @@ func TestClientBranchRepository_List_ForceRefresh(t *testing.T) {
 	}
 }
 
-// T_R20: List - opts.Refresh=true → DeltaRefresh 後データを返す
+// T_R20: List - opts.Refresh=true -> returns data after DeltaRefresh
 func TestClientBranchRepository_List_DeltaRefresh(t *testing.T) {
 	db := newTestDB(t)
 	seedClientBranchCache(t, db, sampleClientBranches[:1])
@@ -167,7 +167,7 @@ func TestClientBranchRepository_List_DeltaRefresh(t *testing.T) {
 	}
 }
 
-// T_R21: List - opts.Limit=2、キャッシュに3件 → 2件のみ返す
+// T_R21: List - opts.Limit=2, 3 items in cache -> returns only 2
 func TestClientBranchRepository_List_Limit(t *testing.T) {
 	db := newTestDB(t)
 	seedClientBranchCache(t, db, sampleClientBranches)
@@ -186,7 +186,7 @@ func TestClientBranchRepository_List_Limit(t *testing.T) {
 	}
 }
 
-// T_R22: List - opts.Refresh=true、API エラー → stale キャッシュを返す
+// T_R22: List - opts.Refresh=true, API error -> returns stale cache
 func TestClientBranchRepository_List_DeltaRefreshAPIError_StaleCache(t *testing.T) {
 	db := newTestDB(t)
 	seedClientBranchCache(t, db, sampleClientBranches)
@@ -205,7 +205,7 @@ func TestClientBranchRepository_List_DeltaRefreshAPIError_StaleCache(t *testing.
 	}
 }
 
-// T_R23: Search - ClientID フィルタ → ClientID が一致するものを返す
+// T_R23: Search - ClientID filter -> returns items matching ClientID
 func TestClientBranchRepository_Search_ClientIDFilter(t *testing.T) {
 	db := newTestDB(t)
 	seedClientBranchCache(t, db, sampleClientBranches)
@@ -224,7 +224,7 @@ func TestClientBranchRepository_Search_ClientIDFilter(t *testing.T) {
 	}
 }
 
-// T_R24: Search - Name フィルタ → 一致するものを返す
+// T_R24: Search - Name filter -> returns matching items
 func TestClientBranchRepository_Search_NameFilter(t *testing.T) {
 	db := newTestDB(t)
 	seedClientBranchCache(t, db, sampleClientBranches)
@@ -234,16 +234,16 @@ func TestClientBranchRepository_Search_NameFilter(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeClientBranchRepo(t, db, apiClient, false)
-	got, err := repo.Search(context.Background(), boardapi.ClientBranchSearchParams{Name: "東京"}, repository.ReadOptions{})
+	got, err := repo.Search(context.Background(), boardapi.ClientBranchSearchParams{Name: "Tokyo"}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
-	if len(got) != 1 || got[0].Name != "東京支社" {
+	if len(got) != 1 || got[0].Name != "Tokyo Branch" {
 		t.Errorf("unexpected result: %+v", got)
 	}
 }
 
-// T_R25: GetByID - キャッシュヒット → キャッシュから返す
+// T_R25: GetByID - cache hit -> returns from cache
 func TestClientBranchRepository_GetByID_CacheHit(t *testing.T) {
 	db := newTestDB(t)
 	seedClientBranchCache(t, db, sampleClientBranches)
@@ -262,12 +262,12 @@ func TestClientBranchRepository_GetByID_CacheHit(t *testing.T) {
 	}
 }
 
-// T_R26: GetByID - キャッシュミス、API 成功 → API 取得後 upsert して返す
+// T_R26: GetByID - cache miss, API success -> fetches from API, upserts, and returns
 func TestClientBranchRepository_GetByID_CacheMiss_APISuccess(t *testing.T) {
 	db := newTestDB(t)
 	markSynced(t, db, "client_branches")
 
-	target := boardapi.ClientBranchEntity{ID: 99, ClientID: 10, Name: "テスト支社"}
+	target := boardapi.ClientBranchEntity{ID: 99, ClientID: 10, Name: "Test Branch"}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		b, _ := json.Marshal(target)
@@ -287,7 +287,7 @@ func TestClientBranchRepository_GetByID_CacheMiss_APISuccess(t *testing.T) {
 	}
 }
 
-// T_R27: GetByID - キャッシュミス、API エラー → error を返す
+// T_R27: GetByID - cache miss, API error -> returns error
 func TestClientBranchRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	db := newTestDB(t)
 	markSynced(t, db, "client_branches")
@@ -302,7 +302,7 @@ func TestClientBranchRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	}
 }
 
-// T_R28: List - Limit=0（無制限） → 全件返す
+// T_R28: List - Limit=0 (unlimited) -> returns all items
 func TestClientBranchRepository_List_NoLimit(t *testing.T) {
 	db := newTestDB(t)
 	seedClientBranchCache(t, db, sampleClientBranches)

@@ -12,7 +12,7 @@ import (
 	"github.com/youyo/board/internal/refresh"
 )
 
-// PurchaseTypeRepository は purchase_types リソースのキャッシュ → リフレッシュ → API フォールバックを管理する。
+// PurchaseTypeRepository manages cache -> refresh -> API fallback for the purchase_types resource.
 type PurchaseTypeRepository struct {
 	profile     string
 	api         *boardapi.Client
@@ -24,7 +24,7 @@ type PurchaseTypeRepository struct {
 	autoRefresh bool
 }
 
-// NewPurchaseTypeRepository は PurchaseTypeRepository を生成する。
+// NewPurchaseTypeRepository creates a new PurchaseTypeRepository.
 func NewPurchaseTypeRepository(
 	profile string,
 	api *boardapi.Client,
@@ -49,7 +49,7 @@ func NewPurchaseTypeRepository(
 
 const purchaseTypesResource = "purchase_types"
 
-// List は全発注区分をキャッシュから返す。
+// List returns all purchase types from the cache.
 func (r *PurchaseTypeRepository) List(ctx context.Context, opts ReadOptions) ([]boardapi.PurchaseTypeEntity, error) {
 	fetcher := &purchaseTypesFetcher{api: r.api}
 	now := time.Now()
@@ -92,8 +92,8 @@ func (r *PurchaseTypeRepository) List(ctx context.Context, opts ReadOptions) ([]
 	return entities, nil
 }
 
-// GetByID は指定 ID の発注区分をキャッシュから返す。
-// キャッシュミス時は API から単体取得して upsert する。
+// GetByID returns the purchase type with the given ID from the cache.
+// On cache miss, it fetches from the API and upserts the result.
 func (r *PurchaseTypeRepository) GetByID(ctx context.Context, id int, opts ReadOptions) (*boardapi.PurchaseTypeEntity, error) {
 	fetcher := &purchaseTypesFetcher{api: r.api}
 	now := time.Now()
@@ -121,7 +121,7 @@ func (r *PurchaseTypeRepository) GetByID(ctx context.Context, id int, opts ReadO
 		return &entity, nil
 	}
 
-	// キャッシュミス → API 単体取得
+	// Cache miss → fetch single entity from API
 	entity, err := r.api.GetPurchaseType(ctx, id)
 	if err != nil {
 		return nil, err
@@ -138,7 +138,7 @@ func (r *PurchaseTypeRepository) GetByID(ctx context.Context, id int, opts ReadO
 	return entity, nil
 }
 
-// Search はパラメータでフィルタした発注区分をキャッシュから返す。
+// Search returns purchase types filtered by the given parameters from the cache.
 func (r *PurchaseTypeRepository) Search(ctx context.Context, params boardapi.PurchaseTypeSearchParams, opts ReadOptions) ([]boardapi.PurchaseTypeEntity, error) {
 	all, err := r.List(ctx, opts)
 	if err != nil {
@@ -147,8 +147,8 @@ func (r *PurchaseTypeRepository) Search(ctx context.Context, params boardapi.Pur
 	return filterPurchaseTypes(all, params), nil
 }
 
-// filterPurchaseTypes はインメモリフィルタリングを行う。
-// UpdatedAtFrom は差分取得カーソルとして使用するためフィルタには含めない。
+// filterPurchaseTypes performs in-memory filtering.
+// UpdatedAtFrom is used as a delta fetch cursor and is not included in the filter.
 func filterPurchaseTypes(entities []boardapi.PurchaseTypeEntity, params boardapi.PurchaseTypeSearchParams) []boardapi.PurchaseTypeEntity {
 	var result []boardapi.PurchaseTypeEntity
 	for _, e := range entities {

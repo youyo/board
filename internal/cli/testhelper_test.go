@@ -8,8 +8,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// newTempConfig はテスト用の一時 config パスをセットアップし、
-// BOARD_CONFIG_PATH 環境変数でその値を使うよう設定する。
+// newTempConfig sets up a temporary config path for testing and
+// configures the BOARD_CONFIG_PATH environment variable to use it.
 func newTempConfig(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -18,7 +18,7 @@ func newTempConfig(t *testing.T) string {
 	return path
 }
 
-// executeCmd はコマンドを実行し、stdout の内容を返す。
+// executeCmd executes a command and returns its stdout content.
 func executeCmd(t *testing.T, cmd *cobra.Command, args ...string) (string, error) {
 	t.Helper()
 	buf := &bytes.Buffer{}

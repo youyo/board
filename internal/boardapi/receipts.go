@@ -8,8 +8,8 @@ import (
 	"strconv"
 )
 
-// ReceiptEntity は BOARD API の領収エンティティ。
-// GET /v1/receipts レスポンスの1要素に対応。
+// ReceiptEntity is a BOARD API receipt entity.
+// Corresponds to one element in the GET /v1/receipts response.
 type ReceiptEntity struct {
 	ID          int     `json:"id"`
 	ClientID    int     `json:"client_id"`
@@ -23,7 +23,7 @@ type ReceiptEntity struct {
 	CreatedAt   string  `json:"created_at"` // ISO 8601
 }
 
-// ReceiptSearchParams は SearchReceipts のパラメータ。
+// ReceiptSearchParams is the parameter for SearchReceipts.
 type ReceiptSearchParams struct {
 	ClientID      int
 	ProjectID     int
@@ -31,8 +31,8 @@ type ReceiptSearchParams struct {
 	UpdatedAtFrom string
 }
 
-// ListReceipts は全領収を取得する。
-// ページネーションは ListAll により自動処理される。
+// ListReceipts retrieves all receipts.
+// Pagination is automatically handled by ListAll.
 func (c *Client) ListReceipts(ctx context.Context) ([]ReceiptEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/receipts", nil)
@@ -60,7 +60,7 @@ func (c *Client) ListReceipts(ctx context.Context) ([]ReceiptEntity, error) {
 	return result, nil
 }
 
-// GetReceipt は指定 ID の領収を取得する。
+// GetReceipt retrieves the receipt with the specified ID.
 func (c *Client) GetReceipt(ctx context.Context, id int) (*ReceiptEntity, error) {
 	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/receipts/%d", id), nil)
 	if err != nil {
@@ -77,8 +77,8 @@ func (c *Client) GetReceipt(ctx context.Context, id int) (*ReceiptEntity, error)
 	return &x, nil
 }
 
-// SearchReceipts は条件付きで領収を検索する。
-// ページネーションは ListAll により自動処理される。
+// SearchReceipts searches receipts with the given conditions.
+// Pagination is automatically handled by ListAll.
 func (c *Client) SearchReceipts(ctx context.Context, params ReceiptSearchParams) ([]ReceiptEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/receipts", nil)

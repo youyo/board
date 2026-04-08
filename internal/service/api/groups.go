@@ -7,17 +7,17 @@ import (
 	"github.com/youyo/board/internal/repository"
 )
 
-// ListGroups は全グループを返す。
+// ListGroups returns all groups.
 func (s *Service) ListGroups(ctx context.Context, opts repository.ReadOptions) ([]boardapi.GroupEntity, error) {
 	return s.groups.List(ctx, opts)
 }
 
-// GetGroup は指定 ID のグループを返す。
+// GetGroup returns a group by ID.
 func (s *Service) GetGroup(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.GroupEntity, error) {
 	return s.groups.GetByID(ctx, id, opts)
 }
 
-// SearchGroups はパラメータでフィルタしたグループを返す。
+// SearchGroups returns groups filtered by the given parameters.
 func (s *Service) SearchGroups(ctx context.Context, params boardapi.GroupSearchParams, opts repository.ReadOptions) ([]boardapi.GroupEntity, error) {
 	return s.groups.Search(ctx, params, opts)
 }

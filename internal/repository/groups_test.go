@@ -61,12 +61,12 @@ func newGroupAPIServer(t *testing.T, entities []boardapi.GroupEntity) *httptest.
 }
 
 var sampleGroups = []boardapi.GroupEntity{
-	{ID: 1, Name: "グループA", UpdatedAt: "2026-01-01T00:00:00Z"},
-	{ID: 2, Name: "グループB", UpdatedAt: "2026-01-02T00:00:00Z"},
-	{ID: 3, Name: "別グループC", UpdatedAt: "2026-01-03T00:00:00Z"},
+	{ID: 1, Name: "GroupA", UpdatedAt: "2026-01-01T00:00:00Z"},
+	{ID: 2, Name: "GroupB", UpdatedAt: "2026-01-02T00:00:00Z"},
+	{ID: 3, Name: "OtherGroupC", UpdatedAt: "2026-01-03T00:00:00Z"},
 }
 
-// T_GRP01: List - キャッシュあり → キャッシュのデータを返す
+// T_GRP01: List - cache hit -> returns cached data
 func TestGroupRepository_List_CacheHit(t *testing.T) {
 	db := newTestDB(t)
 	seedGroupCache(t, db, sampleGroups)
@@ -85,7 +85,7 @@ func TestGroupRepository_List_CacheHit(t *testing.T) {
 	}
 }
 
-// T_GRP02: List - キャッシュなし（初回）→ ForceRefresh 後データを返す
+// T_GRP02: List - no cache (initial load) -> returns data after ForceRefresh
 func TestGroupRepository_List_InitialLoad(t *testing.T) {
 	db := newTestDB(t)
 
@@ -102,7 +102,7 @@ func TestGroupRepository_List_InitialLoad(t *testing.T) {
 	}
 }
 
-// T_GRP03: GetByID - キャッシュヒット → キャッシュから返す
+// T_GRP03: GetByID - cache hit -> returns from cache
 func TestGroupRepository_GetByID_CacheHit(t *testing.T) {
 	db := newTestDB(t)
 	seedGroupCache(t, db, sampleGroups)
@@ -121,12 +121,12 @@ func TestGroupRepository_GetByID_CacheHit(t *testing.T) {
 	}
 }
 
-// T_GRP04: GetByID - キャッシュミス、API 成功 → API 取得して返す
+// T_GRP04: GetByID - cache miss, API success -> fetches from API and returns
 func TestGroupRepository_GetByID_CacheMiss_APISuccess(t *testing.T) {
 	db := newTestDB(t)
 	markSynced(t, db, "groups")
 
-	target := boardapi.GroupEntity{ID: 99, Name: "テストグループ", UpdatedAt: "2026-01-01T00:00:00Z"}
+	target := boardapi.GroupEntity{ID: 99, Name: "Test Group", UpdatedAt: "2026-01-01T00:00:00Z"}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		b, _ := json.Marshal(target)
@@ -146,7 +146,7 @@ func TestGroupRepository_GetByID_CacheMiss_APISuccess(t *testing.T) {
 	}
 }
 
-// T_GRP05: GetByID - キャッシュミス、API エラー → error を返す
+// T_GRP05: GetByID - cache miss, API error -> returns error
 func TestGroupRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	db := newTestDB(t)
 	markSynced(t, db, "groups")
@@ -161,7 +161,7 @@ func TestGroupRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	}
 }
 
-// T_GRP06: Search - Name フィルタ → 一致するものを返す
+// T_GRP06: Search - Name filter -> returns matching items
 func TestGroupRepository_Search_NameFilter(t *testing.T) {
 	db := newTestDB(t)
 	seedGroupCache(t, db, sampleGroups)
@@ -171,16 +171,16 @@ func TestGroupRepository_Search_NameFilter(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeGroupRepo(t, db, apiClient, false)
-	got, err := repo.Search(context.Background(), boardapi.GroupSearchParams{Name: "グループA"}, repository.ReadOptions{})
+	got, err := repo.Search(context.Background(), boardapi.GroupSearchParams{Name: "GroupA"}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
-	if len(got) != 1 || got[0].Name != "グループA" {
+	if len(got) != 1 || got[0].Name != "GroupA" {
 		t.Errorf("unexpected result: %+v", got)
 	}
 }
 
-// T_GRP07: Search - パラメータなし → 全件返す
+// T_GRP07: Search - no filter -> returns all items
 func TestGroupRepository_Search_NoFilter(t *testing.T) {
 	db := newTestDB(t)
 	seedGroupCache(t, db, sampleGroups)

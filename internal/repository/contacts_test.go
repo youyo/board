@@ -16,7 +16,7 @@ import (
 	"github.com/youyo/board/internal/repository"
 )
 
-// makeContactRepo はテスト用 ContactRepository を構築する。
+// makeContactRepo constructs a ContactRepository for testing.
 func makeContactRepo(t *testing.T, db *cache.DB, apiClient *boardapi.Client, autoRefresh bool) *repository.ContactRepository {
 	t.Helper()
 	rc := cache.NewResourceCache(db)
@@ -27,7 +27,7 @@ func makeContactRepo(t *testing.T, db *cache.DB, apiClient *boardapi.Client, aut
 	return repository.NewContactRepository("default", apiClient, rc, ss, refresher, lm, tz, autoRefresh)
 }
 
-// seedContactCache はキャッシュに ContactEntity を直接書き込む。
+// seedContactCache writes ContactEntity records directly into the cache.
 func seedContactCache(t *testing.T, db *cache.DB, entities []boardapi.ContactEntity) {
 	t.Helper()
 	rc := cache.NewResourceCache(db)
@@ -53,7 +53,7 @@ func seedContactCache(t *testing.T, db *cache.DB, entities []boardapi.ContactEnt
 	}
 }
 
-// newContactAPIServer は contacts レスポンスを返す httptest.Server を返す。
+// newContactAPIServer returns an httptest.Server that serves entities for /v1/contacts.
 func newContactAPIServer(t *testing.T, entities []boardapi.ContactEntity) *httptest.Server {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -65,12 +65,12 @@ func newContactAPIServer(t *testing.T, entities []boardapi.ContactEntity) *httpt
 }
 
 var sampleContacts = []boardapi.ContactEntity{
-	{ID: 1, ClientID: 10, Name: "田中太郎", Email: "tanaka@example.com", UpdatedAt: "2026-01-01T00:00:00Z"},
-	{ID: 2, ClientID: 10, Name: "鈴木花子", Email: "suzuki@example.com", UpdatedAt: "2026-01-02T00:00:00Z"},
-	{ID: 3, ClientID: 20, Name: "佐藤次郎", Email: "sato@other.com", UpdatedAt: "2026-01-03T00:00:00Z"},
+	{ID: 1, ClientID: 10, Name: "Taro Tanaka", Email: "tanaka@example.com", UpdatedAt: "2026-01-01T00:00:00Z"},
+	{ID: 2, ClientID: 10, Name: "Hanako Suzuki", Email: "suzuki@example.com", UpdatedAt: "2026-01-02T00:00:00Z"},
+	{ID: 3, ClientID: 20, Name: "Jiro Sato", Email: "sato@other.com", UpdatedAt: "2026-01-03T00:00:00Z"},
 }
 
-// T_R29: List - キャッシュあり → キャッシュのデータを返す
+// T_R29: List - cache hit -> returns cached data
 func TestContactRepository_List_CacheHit(t *testing.T) {
 	db := newTestDB(t)
 	seedContactCache(t, db, sampleContacts)
@@ -89,7 +89,7 @@ func TestContactRepository_List_CacheHit(t *testing.T) {
 	}
 }
 
-// T_R30: List - キャッシュなし（初回） → ForceRefresh 後データを返す
+// T_R30: List - no cache (initial load) -> returns data after ForceRefresh
 func TestContactRepository_List_InitialLoad(t *testing.T) {
 	db := newTestDB(t)
 
@@ -106,7 +106,7 @@ func TestContactRepository_List_InitialLoad(t *testing.T) {
 	}
 }
 
-// T_R31: List - autoRefresh=true、NeedsDailyRefresh=true → DeltaRefresh 後データを返す
+// T_R31: List - autoRefresh=true, NeedsDailyRefresh=true -> returns data after DeltaRefresh
 func TestContactRepository_List_AutoRefresh(t *testing.T) {
 	db := newTestDB(t)
 	seedContactCache(t, db, sampleContacts[:1])
@@ -131,7 +131,7 @@ func TestContactRepository_List_AutoRefresh(t *testing.T) {
 	}
 }
 
-// T_R32: List - opts.ForceRefresh=true → ForceRefresh 後データを返す
+// T_R32: List - opts.ForceRefresh=true -> returns data after ForceRefresh
 func TestContactRepository_List_ForceRefresh(t *testing.T) {
 	db := newTestDB(t)
 
@@ -148,7 +148,7 @@ func TestContactRepository_List_ForceRefresh(t *testing.T) {
 	}
 }
 
-// T_R33: List - opts.Refresh=true → DeltaRefresh 後データを返す
+// T_R33: List - opts.Refresh=true -> returns data after DeltaRefresh
 func TestContactRepository_List_DeltaRefresh(t *testing.T) {
 	db := newTestDB(t)
 	seedContactCache(t, db, sampleContacts[:1])
@@ -167,7 +167,7 @@ func TestContactRepository_List_DeltaRefresh(t *testing.T) {
 	}
 }
 
-// T_R34: List - opts.Limit=2 → 2件のみ返す
+// T_R34: List - opts.Limit=2 -> returns only 2 items
 func TestContactRepository_List_Limit(t *testing.T) {
 	db := newTestDB(t)
 	seedContactCache(t, db, sampleContacts)
@@ -186,7 +186,7 @@ func TestContactRepository_List_Limit(t *testing.T) {
 	}
 }
 
-// T_R35: List - opts.Refresh=true、API エラー → stale キャッシュを返す
+// T_R35: List - opts.Refresh=true, API error -> returns stale cache
 func TestContactRepository_List_DeltaRefreshAPIError_StaleCache(t *testing.T) {
 	db := newTestDB(t)
 	seedContactCache(t, db, sampleContacts)
@@ -205,7 +205,7 @@ func TestContactRepository_List_DeltaRefreshAPIError_StaleCache(t *testing.T) {
 	}
 }
 
-// T_R36: Search - Email フィルタ → 一致するものを返す
+// T_R36: Search - Email filter -> returns matching items
 func TestContactRepository_Search_EmailFilter(t *testing.T) {
 	db := newTestDB(t)
 	seedContactCache(t, db, sampleContacts)
@@ -224,7 +224,7 @@ func TestContactRepository_Search_EmailFilter(t *testing.T) {
 	}
 }
 
-// T_R37: Search - ClientID フィルタ
+// T_R37: Search - ClientID filter
 func TestContactRepository_Search_ClientIDFilter(t *testing.T) {
 	db := newTestDB(t)
 	seedContactCache(t, db, sampleContacts)
@@ -243,7 +243,7 @@ func TestContactRepository_Search_ClientIDFilter(t *testing.T) {
 	}
 }
 
-// T_R38: GetByID - キャッシュヒット
+// T_R38: GetByID - cache hit
 func TestContactRepository_GetByID_CacheHit(t *testing.T) {
 	db := newTestDB(t)
 	seedContactCache(t, db, sampleContacts)
@@ -262,12 +262,12 @@ func TestContactRepository_GetByID_CacheHit(t *testing.T) {
 	}
 }
 
-// T_R39: GetByID - キャッシュミス、API 成功
+// T_R39: GetByID - cache miss, API success
 func TestContactRepository_GetByID_CacheMiss_APISuccess(t *testing.T) {
 	db := newTestDB(t)
 	markSynced(t, db, "contacts")
 
-	target := boardapi.ContactEntity{ID: 99, ClientID: 10, Name: "テスト担当"}
+	target := boardapi.ContactEntity{ID: 99, ClientID: 10, Name: "Test Contact"}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		b, _ := json.Marshal(target)
@@ -287,7 +287,7 @@ func TestContactRepository_GetByID_CacheMiss_APISuccess(t *testing.T) {
 	}
 }
 
-// T_R40: GetByID - キャッシュミス、API エラー → error を返す
+// T_R40: GetByID - cache miss, API error -> returns error
 func TestContactRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	db := newTestDB(t)
 	markSynced(t, db, "contacts")
@@ -302,7 +302,7 @@ func TestContactRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	}
 }
 
-// T_R41: Search - Name フィルタ
+// T_R41: Search - Name filter
 func TestContactRepository_Search_NameFilter(t *testing.T) {
 	db := newTestDB(t)
 	seedContactCache(t, db, sampleContacts)
@@ -312,11 +312,11 @@ func TestContactRepository_Search_NameFilter(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeContactRepo(t, db, apiClient, false)
-	got, err := repo.Search(context.Background(), boardapi.ContactSearchParams{Name: "田中"}, repository.ReadOptions{})
+	got, err := repo.Search(context.Background(), boardapi.ContactSearchParams{Name: "Tanaka"}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
-	if len(got) != 1 || got[0].Name != "田中太郎" {
+	if len(got) != 1 || got[0].Name != "Taro Tanaka" {
 		t.Errorf("unexpected result: %+v", got)
 	}
 }

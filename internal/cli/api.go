@@ -9,15 +9,15 @@ import (
 	serviceapi "github.com/youyo/board/internal/service/api"
 )
 
-// errNoApp は Context に App が格納されていない場合のエラー。
+// errNoApp is the error returned when App is not found in the context.
 var errNoApp = errors.New("board: app not found in context")
 
-// NewAPICmd は board api サブコマンドグループを返す。
+// NewAPICmd returns the board api subcommand group.
 func NewAPICmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "api",
-		Short: "BOARD API を直接操作する（low-level）",
-		Long:  "BOARD API のエンドポイントを直接呼び出す低レベルコマンド群。",
+		Short: "Access the BOARD API directly (low-level)",
+		Long:  "Low-level commands that call BOARD API endpoints directly.",
 	}
 
 	cmd.AddCommand(
@@ -48,7 +48,7 @@ func NewAPICmd() *cobra.Command {
 	return cmd
 }
 
-// apiServiceFromCmd は AppFromContext から api.Service を生成して返す。
+// apiServiceFromCmd creates and returns an api.Service from the App in context.
 func apiServiceFromCmd(cmd *cobra.Command) (*serviceapi.Service, error) {
 	a, ok := app.AppFromContext(cmd.Context())
 	if !ok {
@@ -82,7 +82,7 @@ func apiServiceFromCmd(cmd *cobra.Command) (*serviceapi.Service, error) {
 	return svc, nil
 }
 
-// readOptionsFromCmd は PersistentFlags から ReadOptions を組み立てる。
+// readOptionsFromCmd builds ReadOptions from the persistent flags.
 func readOptionsFromCmd(cmd *cobra.Command) repository.ReadOptions {
 	refresh, _ := cmd.Root().PersistentFlags().GetBool("refresh")
 	forceRefresh, _ := cmd.Root().PersistentFlags().GetBool("force-refresh")
@@ -94,7 +94,7 @@ func readOptionsFromCmd(cmd *cobra.Command) repository.ReadOptions {
 	}
 }
 
-// prettyFromCmd は --pretty フラグの値を返す。
+// prettyFromCmd returns the value of the --pretty flag.
 func prettyFromCmd(cmd *cobra.Command) bool {
 	v, _ := cmd.Root().PersistentFlags().GetBool("pretty")
 	return v

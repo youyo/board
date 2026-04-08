@@ -6,18 +6,18 @@ import (
 	"github.com/youyo/board/internal/cache"
 )
 
-// NeedsDailyRefresh は、指定された SyncState と現在時刻・timezone を元に
-// daily refresh が必要かどうかを返す。
+// NeedsDailyRefresh returns whether a daily refresh is needed
+// based on the given SyncState, current time, and timezone.
 //
-// 判定順:
-//  1. state == nil（初回、レコードなし）→ true
+// Decision order:
+//  1. state == nil (first time, no record) → true
 //  2. state.MustFullResync == true → true
-//  3. state.ExpiredAt が有効かつ now より過去 → true
-//  4. state.LastDailyRefreshDate が NULL → true
+//  3. state.ExpiredAt is valid and in the past → true
+//  4. state.LastDailyRefreshDate is NULL → true
 //  5. TodayInTZ(now, tz) != state.LastDailyRefreshDate → true/false
 //
-// DailyAutoRefresh フラグ（config）の OFF 判定は呼び出し側の責務。
-// NeedsDailyRefresh は config を受け取らない（純粋関数として保つため）。
+// The DailyAutoRefresh flag (config) OFF check is the caller's responsibility.
+// NeedsDailyRefresh does not accept config (to keep it a pure function).
 func NeedsDailyRefresh(state *cache.SyncState, now time.Time, tz *time.Location) bool {
 	if state == nil {
 		return true

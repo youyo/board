@@ -9,7 +9,7 @@ import (
 )
 
 func TestWriteJSON(t *testing.T) {
-	t.Run("マップをコンパクトJSONで出力", func(t *testing.T) {
+	t.Run("write map as compact JSON", func(t *testing.T) {
 		var buf bytes.Buffer
 		v := map[string]interface{}{"key": "value", "num": 42}
 		err := output.WriteJSON(&buf, v)
@@ -20,13 +20,13 @@ func TestWriteJSON(t *testing.T) {
 		if !strings.HasSuffix(got, "\n") {
 			t.Error("WriteJSON() output should end with newline")
 		}
-		// コンパクト形式なのでインデントなし
+		// compact format should have no indentation
 		if strings.Contains(got, "\n  ") {
 			t.Error("WriteJSON() should not produce indented output")
 		}
 	})
 
-	t.Run("nilをJSONで出力", func(t *testing.T) {
+	t.Run("write nil as JSON", func(t *testing.T) {
 		var buf bytes.Buffer
 		err := output.WriteJSON(&buf, nil)
 		if err != nil {
@@ -40,7 +40,7 @@ func TestWriteJSON(t *testing.T) {
 }
 
 func TestWritePrettyJSON(t *testing.T) {
-	t.Run("マップをインデント付きJSONで出力", func(t *testing.T) {
+	t.Run("write map as indented JSON", func(t *testing.T) {
 		var buf bytes.Buffer
 		v := map[string]interface{}{"key": "value"}
 		err := output.WritePrettyJSON(&buf, v)
@@ -51,7 +51,7 @@ func TestWritePrettyJSON(t *testing.T) {
 		if !strings.HasSuffix(got, "\n") {
 			t.Error("WritePrettyJSON() output should end with newline")
 		}
-		// インデント形式
+		// indented format
 		if !strings.Contains(got, "  ") {
 			t.Error("WritePrettyJSON() should produce indented output")
 		}
@@ -61,7 +61,7 @@ func TestWritePrettyJSON(t *testing.T) {
 func TestWrite(t *testing.T) {
 	v := map[string]interface{}{"x": 1}
 
-	t.Run("pretty=falseでコンパクトJSON", func(t *testing.T) {
+	t.Run("pretty=false produces compact JSON", func(t *testing.T) {
 		var buf bytes.Buffer
 		err := output.Write(&buf, v, false)
 		if err != nil {
@@ -73,7 +73,7 @@ func TestWrite(t *testing.T) {
 		}
 	})
 
-	t.Run("pretty=trueでインデント付きJSON", func(t *testing.T) {
+	t.Run("pretty=true produces indented JSON", func(t *testing.T) {
 		var buf bytes.Buffer
 		err := output.Write(&buf, v, true)
 		if err != nil {
@@ -87,7 +87,7 @@ func TestWrite(t *testing.T) {
 }
 
 func TestPrettyFormat(t *testing.T) {
-	t.Run("JSONバイトをインデント付きに整形", func(t *testing.T) {
+	t.Run("format JSON bytes with indentation", func(t *testing.T) {
 		input := []byte(`{"a":1,"b":"hello"}`)
 		got, err := output.PrettyFormat(input)
 		if err != nil {
@@ -98,7 +98,7 @@ func TestPrettyFormat(t *testing.T) {
 		}
 	})
 
-	t.Run("不正なJSONはエラーを返す", func(t *testing.T) {
+	t.Run("invalid JSON returns error", func(t *testing.T) {
 		input := []byte(`{invalid json}`)
 		_, err := output.PrettyFormat(input)
 		if err == nil {

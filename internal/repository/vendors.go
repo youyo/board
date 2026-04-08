@@ -12,7 +12,7 @@ import (
 	"github.com/youyo/board/internal/refresh"
 )
 
-// VendorRepository は vendors リソースのキャッシュ → リフレッシュ → API フォールバックを管理する。
+// VendorRepository manages cache -> refresh -> API fallback for the vendors resource.
 type VendorRepository struct {
 	profile     string
 	api         *boardapi.Client
@@ -24,7 +24,7 @@ type VendorRepository struct {
 	autoRefresh bool
 }
 
-// NewVendorRepository は VendorRepository を生成する。
+// NewVendorRepository creates a new VendorRepository.
 func NewVendorRepository(
 	profile string,
 	api *boardapi.Client,
@@ -49,7 +49,7 @@ func NewVendorRepository(
 
 const vendorsResource = "vendors"
 
-// List は全発注先をキャッシュから返す。
+// List returns all vendors from the cache.
 func (r *VendorRepository) List(ctx context.Context, opts ReadOptions) ([]boardapi.VendorEntity, error) {
 	fetcher := &vendorsFetcher{api: r.api}
 	now := time.Now()
@@ -92,8 +92,8 @@ func (r *VendorRepository) List(ctx context.Context, opts ReadOptions) ([]boarda
 	return entities, nil
 }
 
-// GetByID は指定 ID の発注先をキャッシュから返す。
-// キャッシュミス時は API から単体取得して upsert する。
+// GetByID returns the vendor with the given ID from the cache.
+// On cache miss, it fetches from the API and upserts the result.
 func (r *VendorRepository) GetByID(ctx context.Context, id int, opts ReadOptions) (*boardapi.VendorEntity, error) {
 	fetcher := &vendorsFetcher{api: r.api}
 	now := time.Now()
@@ -121,7 +121,7 @@ func (r *VendorRepository) GetByID(ctx context.Context, id int, opts ReadOptions
 		return &entity, nil
 	}
 
-	// キャッシュミス → API 単体取得
+	// Cache miss → fetch single entity from API
 	entity, err := r.api.GetVendor(ctx, id)
 	if err != nil {
 		return nil, err
@@ -138,7 +138,7 @@ func (r *VendorRepository) GetByID(ctx context.Context, id int, opts ReadOptions
 	return entity, nil
 }
 
-// Search はパラメータでフィルタした発注先をキャッシュから返す。
+// Search returns vendors filtered by the given parameters from the cache.
 func (r *VendorRepository) Search(ctx context.Context, params boardapi.VendorSearchParams, opts ReadOptions) ([]boardapi.VendorEntity, error) {
 	all, err := r.List(ctx, opts)
 	if err != nil {
@@ -147,8 +147,8 @@ func (r *VendorRepository) Search(ctx context.Context, params boardapi.VendorSea
 	return filterVendors(all, params), nil
 }
 
-// filterVendors はインメモリフィルタリングを行う。
-// UpdatedAtFrom は差分取得カーソルとして使用するためフィルタには含めない。
+// filterVendors performs in-memory filtering.
+// UpdatedAtFrom is used as a delta fetch cursor and is not included in the filter.
 func filterVendors(entities []boardapi.VendorEntity, params boardapi.VendorSearchParams) []boardapi.VendorEntity {
 	var result []boardapi.VendorEntity
 	for _, e := range entities {

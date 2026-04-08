@@ -8,8 +8,8 @@ import (
 	"strconv"
 )
 
-// ProjectEntity は BOARD API の案件エンティティ。
-// GET /v1/projects レスポンスの1要素に対応。
+// ProjectEntity is a BOARD API project entity.
+// Corresponds to one element in the GET /v1/projects response.
 type ProjectEntity struct {
 	ID        int    `json:"id"`
 	ClientID  int    `json:"client_id"`
@@ -23,7 +23,7 @@ type ProjectEntity struct {
 	CreatedAt string `json:"created_at"` // ISO 8601
 }
 
-// ProjectSearchParams は SearchProjects のパラメータ。
+// ProjectSearchParams is the parameter for SearchProjects.
 type ProjectSearchParams struct {
 	ClientID      int
 	Name          string
@@ -31,8 +31,8 @@ type ProjectSearchParams struct {
 	UpdatedAtFrom string
 }
 
-// ListProjects は全案件を取得する。
-// ページネーションは ListAll により自動処理される。
+// ListProjects retrieves all projects.
+// Pagination is automatically handled by ListAll.
 func (c *Client) ListProjects(ctx context.Context) ([]ProjectEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/projects", nil)
@@ -60,7 +60,7 @@ func (c *Client) ListProjects(ctx context.Context) ([]ProjectEntity, error) {
 	return result, nil
 }
 
-// GetProject は指定 ID の案件を取得する。
+// GetProject retrieves the project with the specified ID.
 func (c *Client) GetProject(ctx context.Context, id int) (*ProjectEntity, error) {
 	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/projects/%d", id), nil)
 	if err != nil {
@@ -77,8 +77,8 @@ func (c *Client) GetProject(ctx context.Context, id int) (*ProjectEntity, error)
 	return &x, nil
 }
 
-// SearchProjects は条件付きで案件を検索する。
-// ページネーションは ListAll により自動処理される。
+// SearchProjects searches projects with the given conditions.
+// Pagination is automatically handled by ListAll.
 func (c *Client) SearchProjects(ctx context.Context, params ProjectSearchParams) ([]ProjectEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/projects", nil)

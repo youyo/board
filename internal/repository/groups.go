@@ -12,7 +12,7 @@ import (
 	"github.com/youyo/board/internal/refresh"
 )
 
-// GroupRepository は groups リソースのキャッシュ → リフレッシュ → API フォールバックを管理する。
+// GroupRepository manages cache -> refresh -> API fallback for the groups resource.
 type GroupRepository struct {
 	profile     string
 	api         *boardapi.Client
@@ -24,7 +24,7 @@ type GroupRepository struct {
 	autoRefresh bool
 }
 
-// NewGroupRepository は GroupRepository を生成する。
+// NewGroupRepository creates a new GroupRepository.
 func NewGroupRepository(
 	profile string,
 	api *boardapi.Client,
@@ -49,7 +49,7 @@ func NewGroupRepository(
 
 const groupsResource = "groups"
 
-// List は全グループをキャッシュから返す。
+// List returns all groups from the cache.
 func (r *GroupRepository) List(ctx context.Context, opts ReadOptions) ([]boardapi.GroupEntity, error) {
 	fetcher := &groupsFetcher{api: r.api}
 	now := time.Now()
@@ -92,8 +92,8 @@ func (r *GroupRepository) List(ctx context.Context, opts ReadOptions) ([]boardap
 	return entities, nil
 }
 
-// GetByID は指定 ID のグループをキャッシュから返す。
-// キャッシュミス時は API から単体取得して upsert する。
+// GetByID returns the group with the given ID from the cache.
+// On cache miss, it fetches from the API and upserts the result.
 func (r *GroupRepository) GetByID(ctx context.Context, id int, opts ReadOptions) (*boardapi.GroupEntity, error) {
 	fetcher := &groupsFetcher{api: r.api}
 	now := time.Now()
@@ -121,7 +121,7 @@ func (r *GroupRepository) GetByID(ctx context.Context, id int, opts ReadOptions)
 		return &entity, nil
 	}
 
-	// キャッシュミス → API 単体取得
+	// Cache miss → fetch single entity from API
 	entity, err := r.api.GetGroup(ctx, id)
 	if err != nil {
 		return nil, err
@@ -138,7 +138,7 @@ func (r *GroupRepository) GetByID(ctx context.Context, id int, opts ReadOptions)
 	return entity, nil
 }
 
-// Search はパラメータでフィルタしたグループをキャッシュから返す。
+// Search returns groups filtered by the given parameters from the cache.
 func (r *GroupRepository) Search(ctx context.Context, params boardapi.GroupSearchParams, opts ReadOptions) ([]boardapi.GroupEntity, error) {
 	all, err := r.List(ctx, opts)
 	if err != nil {
@@ -147,8 +147,8 @@ func (r *GroupRepository) Search(ctx context.Context, params boardapi.GroupSearc
 	return filterGroups(all, params), nil
 }
 
-// filterGroups はインメモリフィルタリングを行う。
-// UpdatedAtFrom は差分取得カーソルとして使用するためフィルタには含めない。
+// filterGroups performs in-memory filtering.
+// UpdatedAtFrom is used as a delta fetch cursor and is not included in the filter.
 func filterGroups(entities []boardapi.GroupEntity, params boardapi.GroupSearchParams) []boardapi.GroupEntity {
 	var result []boardapi.GroupEntity
 	for _, e := range entities {

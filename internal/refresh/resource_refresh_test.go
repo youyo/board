@@ -8,14 +8,14 @@ import (
 	"github.com/youyo/board/internal/cache"
 )
 
-// stubFetcher はテスト用の Fetcher 実装。
+// stubFetcher is a test implementation of Fetcher.
 type stubFetcher struct {
 	resource       string
 	listAllItems   []json.RawMessage
 	listSinceItems []json.RawMessage
 	listAllErr     error
 	listSinceErr   error
-	capturedSince  string // ListUpdatedSince の引数記録
+	capturedSince  string // records the argument passed to ListUpdatedSince
 }
 
 func (f *stubFetcher) ResourceName() string { return f.resource }
@@ -29,12 +29,12 @@ func (f *stubFetcher) ListUpdatedSince(ctx context.Context, since string) ([]jso
 	return f.listSinceItems, f.listSinceErr
 }
 
-// makeRaw は JSON 文字列から json.RawMessage を生成するヘルパー。
+// makeRaw is a helper that creates a json.RawMessage from a JSON string.
 func makeRaw(s string) json.RawMessage {
 	return json.RawMessage(s)
 }
 
-// TestDeltaRefresh_NoExistingState_FetchesAll: sync_state なし → cursor="" でフェッチ、全件 UpsertMany
+// TestDeltaRefresh_NoExistingState_FetchesAll: no sync_state → fetch with cursor="", UpsertMany all items
 func TestDeltaRefresh_NoExistingState_FetchesAll(t *testing.T) {
 	db := openRefreshTestDB(t)
 	rc := cache.NewResourceCache(db)
@@ -60,12 +60,12 @@ func TestDeltaRefresh_NoExistingState_FetchesAll(t *testing.T) {
 	if result.FetchedCount != 2 {
 		t.Errorf("FetchedCount = %d, want 2", result.FetchedCount)
 	}
-	// cursor="" で ListUpdatedSince が呼ばれた
+	// ListUpdatedSince was called with cursor=""
 	if fetcher.capturedSince != "" {
 		t.Errorf("capturedSince = %q, want empty string", fetcher.capturedSince)
 	}
 
-	// キャッシュに2件保存されている
+	// 2 items are saved in cache
 	entries, err := rc.List(ctx, "default", "clients")
 	if err != nil {
 		t.Fatalf("List: %v", err)
@@ -75,7 +75,7 @@ func TestDeltaRefresh_NoExistingState_FetchesAll(t *testing.T) {
 	}
 }
 
-// TestDeltaRefresh_WithCursor_PassesCursorToFetcher: cursor_updated_at あり → fetcher に since を渡す
+// TestDeltaRefresh_WithCursor_PassesCursorToFetcher: cursor_updated_at exists → pass since to fetcher
 func TestDeltaRefresh_WithCursor_PassesCursorToFetcher(t *testing.T) {
 	db := openRefreshTestDB(t)
 	rc := cache.NewResourceCache(db)
@@ -83,7 +83,7 @@ func TestDeltaRefresh_WithCursor_PassesCursorToFetcher(t *testing.T) {
 	r := NewRefresher(rc, ss)
 	ctx := context.Background()
 
-	// 既存の SyncState に cursor を設定
+	// set cursor in existing SyncState
 	existing := cache.SyncState{
 		ProfileName:     "default",
 		ResourceName:    "clients",
@@ -105,13 +105,13 @@ func TestDeltaRefresh_WithCursor_PassesCursorToFetcher(t *testing.T) {
 		t.Fatalf("DeltaRefresh: %v", err)
 	}
 
-	// cursor が fetcher に渡された
+	// cursor was passed to fetcher
 	if fetcher.capturedSince != "2025-01-10T00:00:00Z" {
 		t.Errorf("capturedSince = %q, want %q", fetcher.capturedSince, "2025-01-10T00:00:00Z")
 	}
 }
 
-// TestDeltaRefresh_UpdatesMaxUpdatedAtAsCursor: 取得 entity の最大 updated_at が新カーソルになる
+// TestDeltaRefresh_UpdatesMaxUpdatedAtAsCursor: maximum updated_at of fetched entities becomes new cursor
 func TestDeltaRefresh_UpdatesMaxUpdatedAtAsCursor(t *testing.T) {
 	db := openRefreshTestDB(t)
 	rc := cache.NewResourceCache(db)
@@ -133,12 +133,12 @@ func TestDeltaRefresh_UpdatesMaxUpdatedAtAsCursor(t *testing.T) {
 		t.Fatalf("DeltaRefresh: %v", err)
 	}
 
-	// 最大 updated_at が新カーソル
+	// maximum updated_at is the new cursor
 	if result.NewCursor != "2025-01-15T09:00:00Z" {
 		t.Errorf("NewCursor = %q, want %q", result.NewCursor, "2025-01-15T09:00:00Z")
 	}
 
-	// sync_state の cursor も更新されている
+	// sync_state cursor is also updated
 	state, err := ss.Get(ctx, "default", "clients")
 	if err != nil {
 		t.Fatalf("Get: %v", err)
@@ -148,7 +148,7 @@ func TestDeltaRefresh_UpdatesMaxUpdatedAtAsCursor(t *testing.T) {
 	}
 }
 
-// TestDeltaRefresh_EmptyResult_PreservesCursor: 差分 0 件 → カーソル変化なし
+// TestDeltaRefresh_EmptyResult_PreservesCursor: 0 delta items → cursor unchanged
 func TestDeltaRefresh_EmptyResult_PreservesCursor(t *testing.T) {
 	db := openRefreshTestDB(t)
 	rc := cache.NewResourceCache(db)
@@ -167,7 +167,7 @@ func TestDeltaRefresh_EmptyResult_PreservesCursor(t *testing.T) {
 
 	fetcher := &stubFetcher{
 		resource:       "clients",
-		listSinceItems: []json.RawMessage{}, // 0件
+		listSinceItems: []json.RawMessage{}, // 0 items
 	}
 
 	result, err := r.DeltaRefresh(ctx, "default", fetcher, testNow, testTZ)
@@ -182,7 +182,7 @@ func TestDeltaRefresh_EmptyResult_PreservesCursor(t *testing.T) {
 		t.Errorf("NewCursor = %q, want empty (no change)", result.NewCursor)
 	}
 
-	// sync_state のカーソルは保持されている
+	// sync_state cursor is preserved
 	state, err := ss.Get(ctx, "default", "clients")
 	if err != nil {
 		t.Fatalf("Get: %v", err)
@@ -192,7 +192,7 @@ func TestDeltaRefresh_EmptyResult_PreservesCursor(t *testing.T) {
 	}
 }
 
-// TestDeltaRefresh_UpdatesSyncState: last_synced_at, last_sync_mode, last_daily_refresh_date が正しく設定される
+// TestDeltaRefresh_UpdatesSyncState: last_synced_at, last_sync_mode, last_daily_refresh_date are correctly set
 func TestDeltaRefresh_UpdatesSyncState(t *testing.T) {
 	db := openRefreshTestDB(t)
 	rc := cache.NewResourceCache(db)
@@ -227,7 +227,7 @@ func TestDeltaRefresh_UpdatesSyncState(t *testing.T) {
 	}
 }
 
-// TestDeltaRefresh_FetcherError_MarksError: fetcher エラー → MarkError が呼ばれ、エラー返却
+// TestDeltaRefresh_FetcherError_MarksError: fetcher error → MarkError is called and error is returned
 func TestDeltaRefresh_FetcherError_MarksError(t *testing.T) {
 	db := openRefreshTestDB(t)
 	rc := cache.NewResourceCache(db)
@@ -245,7 +245,7 @@ func TestDeltaRefresh_FetcherError_MarksError(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 
-	// sync_state にエラーが記録されている
+	// error is recorded in sync_state
 	state, err2 := ss.Get(ctx, "default", "clients")
 	if err2 != nil {
 		t.Fatalf("Get: %v", err2)
@@ -261,7 +261,7 @@ func TestDeltaRefresh_FetcherError_MarksError(t *testing.T) {
 	}
 }
 
-// TestDeltaRefresh_EntityWithNoUpdatedAt_Handled: updated_at なし entity → カーソル計算でスキップ（エラーなし）
+// TestDeltaRefresh_EntityWithNoUpdatedAt_Handled: entity without updated_at → skipped in cursor calculation (no error)
 func TestDeltaRefresh_EntityWithNoUpdatedAt_Handled(t *testing.T) {
 	db := openRefreshTestDB(t)
 	rc := cache.NewResourceCache(db)
@@ -272,7 +272,7 @@ func TestDeltaRefresh_EntityWithNoUpdatedAt_Handled(t *testing.T) {
 	fetcher := &stubFetcher{
 		resource: "clients",
 		listSinceItems: []json.RawMessage{
-			makeRaw(`{"id":1}`), // updated_at なし
+			makeRaw(`{"id":1}`), // no updated_at
 		},
 	}
 
@@ -284,13 +284,13 @@ func TestDeltaRefresh_EntityWithNoUpdatedAt_Handled(t *testing.T) {
 	if result.FetchedCount != 1 {
 		t.Errorf("FetchedCount = %d, want 1", result.FetchedCount)
 	}
-	// cursor は空のまま（updated_at なしはスキップ）
+	// cursor remains empty (entities without updated_at are skipped)
 	if result.NewCursor != "" {
 		t.Errorf("NewCursor = %q, want empty", result.NewCursor)
 	}
 }
 
-// errFetchFailed はテスト用エラー
+// errFetchFailed is a test error
 var errFetchFailed = errStr("fetch failed")
 
 type errStr string

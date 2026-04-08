@@ -12,7 +12,7 @@ import (
 	"github.com/youyo/board/internal/refresh"
 )
 
-// VendorContactRepository は vendor_contacts リソースのキャッシュ → リフレッシュ → API フォールバックを管理する。
+// VendorContactRepository manages cache -> refresh -> API fallback for the vendor_contacts resource.
 type VendorContactRepository struct {
 	profile     string
 	api         *boardapi.Client
@@ -24,7 +24,7 @@ type VendorContactRepository struct {
 	autoRefresh bool
 }
 
-// NewVendorContactRepository は VendorContactRepository を生成する。
+// NewVendorContactRepository creates a new VendorContactRepository.
 func NewVendorContactRepository(
 	profile string,
 	api *boardapi.Client,
@@ -49,7 +49,7 @@ func NewVendorContactRepository(
 
 const vendorContactsResource = "vendor_contacts"
 
-// List は全発注先担当者をキャッシュから返す。
+// List returns all vendor contacts from the cache.
 func (r *VendorContactRepository) List(ctx context.Context, opts ReadOptions) ([]boardapi.VendorContactEntity, error) {
 	fetcher := &vendorContactsFetcher{api: r.api}
 	now := time.Now()
@@ -92,8 +92,8 @@ func (r *VendorContactRepository) List(ctx context.Context, opts ReadOptions) ([
 	return entities, nil
 }
 
-// GetByID は指定 ID の発注先担当者をキャッシュから返す。
-// キャッシュミス時は API から単体取得して upsert する。
+// GetByID returns the vendor contact with the given ID from the cache.
+// On cache miss, it fetches from the API and upserts the result.
 func (r *VendorContactRepository) GetByID(ctx context.Context, id int, opts ReadOptions) (*boardapi.VendorContactEntity, error) {
 	fetcher := &vendorContactsFetcher{api: r.api}
 	now := time.Now()
@@ -121,7 +121,7 @@ func (r *VendorContactRepository) GetByID(ctx context.Context, id int, opts Read
 		return &entity, nil
 	}
 
-	// キャッシュミス → API 単体取得
+	// Cache miss → fetch single entity from API
 	entity, err := r.api.GetVendorContact(ctx, id)
 	if err != nil {
 		return nil, err
@@ -138,7 +138,7 @@ func (r *VendorContactRepository) GetByID(ctx context.Context, id int, opts Read
 	return entity, nil
 }
 
-// Search はパラメータでフィルタした発注先担当者をキャッシュから返す。
+// Search returns vendor contacts filtered by the given parameters from the cache.
 func (r *VendorContactRepository) Search(ctx context.Context, params boardapi.VendorContactSearchParams, opts ReadOptions) ([]boardapi.VendorContactEntity, error) {
 	all, err := r.List(ctx, opts)
 	if err != nil {
@@ -147,7 +147,7 @@ func (r *VendorContactRepository) Search(ctx context.Context, params boardapi.Ve
 	return filterVendorContacts(all, params), nil
 }
 
-// filterVendorContacts はインメモリフィルタリングを行う。
+// filterVendorContacts performs in-memory filtering.
 func filterVendorContacts(entities []boardapi.VendorContactEntity, params boardapi.VendorContactSearchParams) []boardapi.VendorContactEntity {
 	var result []boardapi.VendorContactEntity
 	for _, e := range entities {

@@ -8,8 +8,8 @@ import (
 	"strconv"
 )
 
-// VendorEntity は BOARD API の発注先エンティティ。
-// GET /v1/vendors レスポンスの1要素に対応。
+// VendorEntity is a BOARD API vendor entity.
+// Corresponds to one element in the GET /v1/vendors response.
 type VendorEntity struct {
 	ID        int    `json:"id"`
 	Name      string `json:"name"`
@@ -19,14 +19,14 @@ type VendorEntity struct {
 	CreatedAt string `json:"created_at"` // ISO 8601
 }
 
-// VendorSearchParams は SearchVendors のパラメータ。
+// VendorSearchParams is the parameter for SearchVendors.
 type VendorSearchParams struct {
 	Name          string
 	UpdatedAtFrom string
 }
 
-// ListVendors は全発注先を取得する。
-// ページネーションは ListAll により自動処理される。
+// ListVendors retrieves all vendors.
+// Pagination is automatically handled by ListAll.
 func (c *Client) ListVendors(ctx context.Context) ([]VendorEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/vendors", nil)
@@ -54,7 +54,7 @@ func (c *Client) ListVendors(ctx context.Context) ([]VendorEntity, error) {
 	return result, nil
 }
 
-// GetVendor は指定 ID の発注先を取得する。
+// GetVendor retrieves the vendor with the specified ID.
 func (c *Client) GetVendor(ctx context.Context, id int) (*VendorEntity, error) {
 	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/vendors/%d", id), nil)
 	if err != nil {
@@ -71,8 +71,8 @@ func (c *Client) GetVendor(ctx context.Context, id int) (*VendorEntity, error) {
 	return &x, nil
 }
 
-// SearchVendors は条件付きで発注先を検索する。
-// ページネーションは ListAll により自動処理される。
+// SearchVendors searches vendors with the given conditions.
+// Pagination is automatically handled by ListAll.
 func (c *Client) SearchVendors(ctx context.Context, params VendorSearchParams) ([]VendorEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/vendors", nil)

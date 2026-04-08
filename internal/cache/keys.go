@@ -1,14 +1,14 @@
 package cache
 
-// EntityKey はキャッシュエントリを一意に識別するキー。
-// profile_name, resource_name, entity_id の複合キー。
+// EntityKey is a key that uniquely identifies a cache entry.
+// Composite key of profile_name, resource_name, and entity_id.
 type EntityKey struct {
 	Profile  string
 	Resource string
 	EntityID string
 }
 
-// NewEntityKey は EntityKey を生成する。
+// NewEntityKey creates an EntityKey.
 func NewEntityKey(profile, resource, entityID string) EntityKey {
 	return EntityKey{
 		Profile:  profile,

@@ -9,7 +9,7 @@ import (
 )
 
 func TestConfigureGetCmd(t *testing.T) {
-	t.Run("timezone を get すると UTC が返る", func(t *testing.T) {
+	t.Run("getting timezone returns UTC", func(t *testing.T) {
 		newTempConfig(t)
 
 		root := cli.NewConfigureCmd()
@@ -23,7 +23,7 @@ func TestConfigureGetCmd(t *testing.T) {
 		}
 	})
 
-	t.Run("profiles.default.base_url を get すると base URL が返る", func(t *testing.T) {
+	t.Run("getting profiles.default.base_url returns the base URL", func(t *testing.T) {
 		newTempConfig(t)
 
 		root := cli.NewConfigureCmd()
@@ -37,7 +37,7 @@ func TestConfigureGetCmd(t *testing.T) {
 		}
 	})
 
-	t.Run("profiles.default.api_key を get するとマスクされた値が返る", func(t *testing.T) {
+	t.Run("getting profiles.default.api_key returns a masked value", func(t *testing.T) {
 		path := newTempConfig(t)
 
 		cfg := config.DefaultConfig()
@@ -54,13 +54,13 @@ func TestConfigureGetCmd(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		got := strings.TrimSpace(out)
-		// 長さ10: 先頭2文字 + **** + 末尾2文字 = "ab****ij"
+		// length 10: first 2 + **** + last 2 = "ab****ij"
 		if got != "ab****ij" {
 			t.Errorf("expected ab****ij, got %q", got)
 		}
 	})
 
-	t.Run("api_key が空の場合マスクは空文字", func(t *testing.T) {
+	t.Run("masking an empty api_key returns an empty string", func(t *testing.T) {
 		newTempConfig(t)
 
 		root := cli.NewConfigureCmd()
@@ -74,7 +74,7 @@ func TestConfigureGetCmd(t *testing.T) {
 		}
 	})
 
-	t.Run("不正なキーはエラー", func(t *testing.T) {
+	t.Run("an invalid key returns an error", func(t *testing.T) {
 		newTempConfig(t)
 
 		root := cli.NewConfigureCmd()
@@ -84,7 +84,7 @@ func TestConfigureGetCmd(t *testing.T) {
 		}
 	})
 
-	t.Run("引数なしは cobra の args エラー", func(t *testing.T) {
+	t.Run("no arguments returns a cobra args error", func(t *testing.T) {
 		newTempConfig(t)
 
 		root := cli.NewConfigureCmd()

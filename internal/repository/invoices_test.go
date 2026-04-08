@@ -61,12 +61,12 @@ func newInvoiceAPIServer(t *testing.T, entities []boardapi.InvoiceEntity) *httpt
 }
 
 var sampleInvoices = []boardapi.InvoiceEntity{
-	{ID: 1, ClientID: 10, ProjectID: 100, Title: "請求A", Status: "draft", UpdatedAt: "2026-01-01T00:00:00Z"},
-	{ID: 2, ClientID: 10, ProjectID: 101, Title: "請求B", Status: "sent", UpdatedAt: "2026-01-02T00:00:00Z"},
-	{ID: 3, ClientID: 20, ProjectID: 102, Title: "請求C", Status: "paid", UpdatedAt: "2026-01-03T00:00:00Z"},
+	{ID: 1, ClientID: 10, ProjectID: 100, Title: "InvoiceA", Status: "draft", UpdatedAt: "2026-01-01T00:00:00Z"},
+	{ID: 2, ClientID: 10, ProjectID: 101, Title: "InvoiceB", Status: "sent", UpdatedAt: "2026-01-02T00:00:00Z"},
+	{ID: 3, ClientID: 20, ProjectID: 102, Title: "InvoiceC", Status: "paid", UpdatedAt: "2026-01-03T00:00:00Z"},
 }
 
-// T_INV01: List - キャッシュあり → キャッシュのデータを返す
+// T_INV01: List - cache hit -> returns cached data
 func TestInvoiceRepository_List_CacheHit(t *testing.T) {
 	db := newTestDB(t)
 	seedInvoiceCache(t, db, sampleInvoices)
@@ -85,7 +85,7 @@ func TestInvoiceRepository_List_CacheHit(t *testing.T) {
 	}
 }
 
-// T_INV02: List - キャッシュなし（初回）→ ForceRefresh 後データを返す
+// T_INV02: List - no cache (initial load) -> returns data after ForceRefresh
 func TestInvoiceRepository_List_InitialLoad(t *testing.T) {
 	db := newTestDB(t)
 
@@ -102,7 +102,7 @@ func TestInvoiceRepository_List_InitialLoad(t *testing.T) {
 	}
 }
 
-// T_INV03: GetByID - キャッシュヒット → キャッシュから返す
+// T_INV03: GetByID - cache hit -> returns from cache
 func TestInvoiceRepository_GetByID_CacheHit(t *testing.T) {
 	db := newTestDB(t)
 	seedInvoiceCache(t, db, sampleInvoices)
@@ -121,12 +121,12 @@ func TestInvoiceRepository_GetByID_CacheHit(t *testing.T) {
 	}
 }
 
-// T_INV04: GetByID - キャッシュミス、API 成功 → API 取得して返す
+// T_INV04: GetByID - cache miss, API success -> fetches from API and returns
 func TestInvoiceRepository_GetByID_CacheMiss_APISuccess(t *testing.T) {
 	db := newTestDB(t)
 	markSynced(t, db, "invoices")
 
-	target := boardapi.InvoiceEntity{ID: 99, Title: "テスト請求", UpdatedAt: "2026-01-01T00:00:00Z"}
+	target := boardapi.InvoiceEntity{ID: 99, Title: "Test Invoice", UpdatedAt: "2026-01-01T00:00:00Z"}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		b, _ := json.Marshal(target)
@@ -146,7 +146,7 @@ func TestInvoiceRepository_GetByID_CacheMiss_APISuccess(t *testing.T) {
 	}
 }
 
-// T_INV05: GetByID - キャッシュミス、API エラー → error を返す
+// T_INV05: GetByID - cache miss, API error -> returns error
 func TestInvoiceRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	db := newTestDB(t)
 	markSynced(t, db, "invoices")
@@ -161,7 +161,7 @@ func TestInvoiceRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	}
 }
 
-// T_INV06: Search - ClientID フィルタ → 一致するものを返す
+// T_INV06: Search - ClientID filter -> returns matching items
 func TestInvoiceRepository_Search_ClientIDFilter(t *testing.T) {
 	db := newTestDB(t)
 	seedInvoiceCache(t, db, sampleInvoices)
@@ -180,7 +180,7 @@ func TestInvoiceRepository_Search_ClientIDFilter(t *testing.T) {
 	}
 }
 
-// T_INV07: Search - Status フィルタ → 一致するものを返す
+// T_INV07: Search - Status filter -> returns matching items
 func TestInvoiceRepository_Search_StatusFilter(t *testing.T) {
 	db := newTestDB(t)
 	seedInvoiceCache(t, db, sampleInvoices)
@@ -199,7 +199,7 @@ func TestInvoiceRepository_Search_StatusFilter(t *testing.T) {
 	}
 }
 
-// T_INV08: Search - パラメータなし → 全件返す
+// T_INV08: Search - no filter -> returns all items
 func TestInvoiceRepository_Search_NoFilter(t *testing.T) {
 	db := newTestDB(t)
 	seedInvoiceCache(t, db, sampleInvoices)

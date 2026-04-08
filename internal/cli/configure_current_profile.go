@@ -7,11 +7,11 @@ import (
 	"github.com/youyo/board/internal/config"
 )
 
-// NewConfigureCurrentProfileCmd は configure current-profile コマンドを返す。
+// NewConfigureCurrentProfileCmd returns the configure current-profile command.
 func NewConfigureCurrentProfileCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "current-profile",
-		Short: "現在のプロファイル名を表示する",
+		Short: "Show the current profile name",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			path := config.ConfigPath()

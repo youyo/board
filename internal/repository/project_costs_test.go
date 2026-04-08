@@ -16,7 +16,7 @@ import (
 	"github.com/youyo/board/internal/repository"
 )
 
-// makeProjectCostRepo はテスト用 ProjectCostRepository を構築する。
+// makeProjectCostRepo constructs a ProjectCostRepository for testing.
 func makeProjectCostRepo(t *testing.T, db *cache.DB, apiClient *boardapi.Client, autoRefresh bool) *repository.ProjectCostRepository {
 	t.Helper()
 	rc := cache.NewResourceCache(db)
@@ -27,7 +27,7 @@ func makeProjectCostRepo(t *testing.T, db *cache.DB, apiClient *boardapi.Client,
 	return repository.NewProjectCostRepository("default", apiClient, rc, ss, refresher, lm, tz, autoRefresh)
 }
 
-// seedProjectCostCache はキャッシュに ProjectCostEntity を直接書き込む。
+// seedProjectCostCache writes ProjectCostEntity records directly into the cache.
 func seedProjectCostCache(t *testing.T, db *cache.DB, entities []boardapi.ProjectCostEntity) {
 	t.Helper()
 	rc := cache.NewResourceCache(db)
@@ -53,7 +53,7 @@ func seedProjectCostCache(t *testing.T, db *cache.DB, entities []boardapi.Projec
 	}
 }
 
-// newProjectCostAPIServer は project_costs レスポンスを返す httptest.Server を返す。
+// newProjectCostAPIServer returns an httptest.Server that serves entities for /v1/project_costs.
 func newProjectCostAPIServer(t *testing.T, entities []boardapi.ProjectCostEntity) *httptest.Server {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -65,12 +65,12 @@ func newProjectCostAPIServer(t *testing.T, entities []boardapi.ProjectCostEntity
 }
 
 var sampleProjectCosts = []boardapi.ProjectCostEntity{
-	{ID: 1, ProjectID: 10, Name: "人件費", CostType: "labor", Amount: 100000},
-	{ID: 2, ProjectID: 10, Name: "外注費", CostType: "outsource", Amount: 50000},
-	{ID: 3, ProjectID: 20, Name: "交通費", CostType: "transport", Amount: 5000},
+	{ID: 1, ProjectID: 10, Name: "Labor Cost", CostType: "labor", Amount: 100000},
+	{ID: 2, ProjectID: 10, Name: "Outsourcing Fee", CostType: "outsource", Amount: 50000},
+	{ID: 3, ProjectID: 20, Name: "Travel Expense", CostType: "transport", Amount: 5000},
 }
 
-// T_R55: List - キャッシュあり → キャッシュのデータを返す
+// T_R55: List - cache hit -> returns cached data
 func TestProjectCostRepository_List_CacheHit(t *testing.T) {
 	db := newTestDB(t)
 	seedProjectCostCache(t, db, sampleProjectCosts)
@@ -89,7 +89,7 @@ func TestProjectCostRepository_List_CacheHit(t *testing.T) {
 	}
 }
 
-// T_R56: List - キャッシュなし（初回） → ForceRefresh 後データを返す
+// T_R56: List - no cache (initial load) -> returns data after ForceRefresh
 func TestProjectCostRepository_List_InitialLoad(t *testing.T) {
 	db := newTestDB(t)
 
@@ -106,7 +106,7 @@ func TestProjectCostRepository_List_InitialLoad(t *testing.T) {
 	}
 }
 
-// T_R57: List - autoRefresh=true、NeedsDailyRefresh=true → DeltaRefresh 後データを返す
+// T_R57: List - autoRefresh=true, NeedsDailyRefresh=true -> returns data after DeltaRefresh
 func TestProjectCostRepository_List_AutoRefresh(t *testing.T) {
 	db := newTestDB(t)
 	seedProjectCostCache(t, db, sampleProjectCosts[:1])
@@ -131,7 +131,7 @@ func TestProjectCostRepository_List_AutoRefresh(t *testing.T) {
 	}
 }
 
-// T_R58: List - opts.ForceRefresh=true → ForceRefresh 後データを返す
+// T_R58: List - opts.ForceRefresh=true -> returns data after ForceRefresh
 func TestProjectCostRepository_List_ForceRefresh(t *testing.T) {
 	db := newTestDB(t)
 
@@ -148,7 +148,7 @@ func TestProjectCostRepository_List_ForceRefresh(t *testing.T) {
 	}
 }
 
-// T_R59: List - opts.Refresh=true → DeltaRefresh 後データを返す
+// T_R59: List - opts.Refresh=true -> returns data after DeltaRefresh
 func TestProjectCostRepository_List_DeltaRefresh(t *testing.T) {
 	db := newTestDB(t)
 	seedProjectCostCache(t, db, sampleProjectCosts[:1])
@@ -167,7 +167,7 @@ func TestProjectCostRepository_List_DeltaRefresh(t *testing.T) {
 	}
 }
 
-// T_R60: List - opts.Limit=2 → 2件のみ返す
+// T_R60: List - opts.Limit=2 -> returns only 2 items
 func TestProjectCostRepository_List_Limit(t *testing.T) {
 	db := newTestDB(t)
 	seedProjectCostCache(t, db, sampleProjectCosts)
@@ -186,7 +186,7 @@ func TestProjectCostRepository_List_Limit(t *testing.T) {
 	}
 }
 
-// T_R61: List - opts.Refresh=true、API エラー → stale キャッシュを返す
+// T_R61: List - opts.Refresh=true, API error -> returns stale cache
 func TestProjectCostRepository_List_DeltaRefreshAPIError_StaleCache(t *testing.T) {
 	db := newTestDB(t)
 	seedProjectCostCache(t, db, sampleProjectCosts)
@@ -205,7 +205,7 @@ func TestProjectCostRepository_List_DeltaRefreshAPIError_StaleCache(t *testing.T
 	}
 }
 
-// T_R62: Search - ProjectID フィルタ → ProjectID が一致するものを返す
+// T_R62: Search - ProjectID filter -> returns items matching ProjectID
 func TestProjectCostRepository_Search_ProjectIDFilter(t *testing.T) {
 	db := newTestDB(t)
 	seedProjectCostCache(t, db, sampleProjectCosts)
@@ -224,7 +224,7 @@ func TestProjectCostRepository_Search_ProjectIDFilter(t *testing.T) {
 	}
 }
 
-// T_R63: GetByID - キャッシュヒット
+// T_R63: GetByID - cache hit
 func TestProjectCostRepository_GetByID_CacheHit(t *testing.T) {
 	db := newTestDB(t)
 	seedProjectCostCache(t, db, sampleProjectCosts)
@@ -243,12 +243,12 @@ func TestProjectCostRepository_GetByID_CacheHit(t *testing.T) {
 	}
 }
 
-// T_R64: GetByID - キャッシュミス、API 成功
+// T_R64: GetByID - cache miss, API success
 func TestProjectCostRepository_GetByID_CacheMiss_APISuccess(t *testing.T) {
 	db := newTestDB(t)
 	markSynced(t, db, "project_costs")
 
-	target := boardapi.ProjectCostEntity{ID: 99, ProjectID: 10, Name: "テスト費用", Amount: 9999}
+	target := boardapi.ProjectCostEntity{ID: 99, ProjectID: 10, Name: "Test Cost", Amount: 9999}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		b, _ := json.Marshal(target)
@@ -268,7 +268,7 @@ func TestProjectCostRepository_GetByID_CacheMiss_APISuccess(t *testing.T) {
 	}
 }
 
-// T_R65: GetByID - キャッシュミス、API エラー → error を返す
+// T_R65: GetByID - cache miss, API error -> returns error
 func TestProjectCostRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	db := newTestDB(t)
 	markSynced(t, db, "project_costs")
@@ -283,7 +283,7 @@ func TestProjectCostRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	}
 }
 
-// T_R66: Search - パラメータなし → 全件返す
+// T_R66: Search - no filter -> returns all items
 func TestProjectCostRepository_Search_NoFilter(t *testing.T) {
 	db := newTestDB(t)
 	seedProjectCostCache(t, db, sampleProjectCosts)
@@ -302,7 +302,7 @@ func TestProjectCostRepository_Search_NoFilter(t *testing.T) {
 	}
 }
 
-// T_R67: List - Limit=0（無制限） → 全件返す
+// T_R67: List - Limit=0 (unlimited) -> returns all items
 func TestProjectCostRepository_List_NoLimit(t *testing.T) {
 	db := newTestDB(t)
 	seedProjectCostCache(t, db, sampleProjectCosts)

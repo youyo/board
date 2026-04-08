@@ -8,22 +8,22 @@ import (
 	"time"
 )
 
-// Entry は resource_cache テーブルの1行を表す。
+// Entry represents one row in the resource_cache table.
 type Entry struct {
 	Key         EntityKey
 	PayloadJSON json.RawMessage
-	// UpdatedAt は BOARD API の updated_at に対応する。NULL 許容。
-	// SQLite では NULL は最小値として扱われ、ORDER BY updated_at ASC では先頭に来る。
+	// UpdatedAt corresponds to updated_at in the BOARD API. Nullable.
+	// In SQLite, NULL is treated as the minimum value, so NULL entries appear first in ORDER BY updated_at ASC.
 	UpdatedAt sql.NullString
 	FetchedAt string
 }
 
-// ResourceCache は resource_cache テーブルの CRUD 操作を提供する。
+// ResourceCache provides CRUD operations for the resource_cache table.
 type ResourceCache struct {
 	db *DB
 }
 
-// NewResourceCache は ResourceCache を生成する。
+// NewResourceCache creates a ResourceCache.
 func NewResourceCache(db *DB) *ResourceCache {
 	return &ResourceCache{db: db}
 }
@@ -52,8 +52,8 @@ const sqlDeleteAll = `
 DELETE FROM resource_cache
 WHERE profile_name = ? AND resource_name = ?`
 
-// Upsert はエントリを挿入または上書きする。
-// FetchedAt は現在時刻（UTC, RFC3339）で自動設定される。
+// Upsert inserts or overwrites an entry.
+// FetchedAt is automatically set to the current time (UTC, RFC3339).
 func (rc *ResourceCache) Upsert(ctx context.Context, entry Entry) error {
 	fetchedAt := time.Now().UTC().Format(time.RFC3339)
 	_, err := rc.db.db.ExecContext(ctx, sqlUpsert,
@@ -70,8 +70,8 @@ func (rc *ResourceCache) Upsert(ctx context.Context, entry Entry) error {
 	return nil
 }
 
-// UpsertMany は複数エントリをトランザクションで一括挿入/更新する。
-// いずれかのエントリでエラーが発生した場合はロールバックする。
+// UpsertMany bulk-inserts/updates multiple entries in a transaction.
+// Rolls back if any entry causes an error.
 func (rc *ResourceCache) UpsertMany(ctx context.Context, entries []Entry) error {
 	if len(entries) == 0 {
 		return nil
@@ -109,12 +109,12 @@ func (rc *ResourceCache) UpsertMany(ctx context.Context, entries []Entry) error 
 		stmt.Close()
 		return fmt.Errorf("cache: upsert_many: commit: %w", err)
 	}
-	// stmt.Close() は tx.Commit() の後に呼ぶ
+	// stmt.Close() must be called after tx.Commit()
 	stmt.Close()
 	return nil
 }
 
-// Get は指定キーのエントリを返す。存在しない場合は nil, nil を返す。
+// Get returns the entry for the specified key. Returns nil, nil if not found.
 func (rc *ResourceCache) Get(ctx context.Context, key EntityKey) (*Entry, error) {
 	row := rc.db.db.QueryRowContext(ctx, sqlGet,
 		key.Profile, key.Resource, key.EntityID,
@@ -138,8 +138,8 @@ func (rc *ResourceCache) Get(ctx context.Context, key EntityKey) (*Entry, error)
 	return &e, nil
 }
 
-// List は指定 profile+resource のエントリを updated_at ASC 順で返す。
-// SQLite では NULL は最小値として扱われるため、updated_at が NULL のエントリが先頭に来る。
+// List returns entries for the specified profile+resource ordered by updated_at ASC.
+// In SQLite, NULL is treated as the minimum value, so entries with NULL updated_at appear first.
 func (rc *ResourceCache) List(ctx context.Context, profile, resource string) ([]Entry, error) {
 	rows, err := rc.db.db.QueryContext(ctx, sqlList, profile, resource)
 	if err != nil {
@@ -168,7 +168,7 @@ func (rc *ResourceCache) List(ctx context.Context, profile, resource string) ([]
 	return entries, nil
 }
 
-// Delete は指定キーのエントリを削除する。存在しない場合もエラーなし。
+// Delete deletes the entry for the specified key. No error if not found.
 func (rc *ResourceCache) Delete(ctx context.Context, key EntityKey) error {
 	_, err := rc.db.db.ExecContext(ctx, sqlDelete,
 		key.Profile, key.Resource, key.EntityID,
@@ -179,7 +179,7 @@ func (rc *ResourceCache) Delete(ctx context.Context, key EntityKey) error {
 	return nil
 }
 
-// DeleteAll は指定 profile+resource のエントリをすべて削除する。
+// DeleteAll deletes all entries for the specified profile+resource.
 func (rc *ResourceCache) DeleteAll(ctx context.Context, profile, resource string) error {
 	_, err := rc.db.db.ExecContext(ctx, sqlDeleteAll, profile, resource)
 	if err != nil {

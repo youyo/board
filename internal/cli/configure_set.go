@@ -8,11 +8,11 @@ import (
 	"github.com/youyo/board/internal/config"
 )
 
-// NewConfigureSetCmd は configure set コマンドを返す。
+// NewConfigureSetCmd returns the configure set command.
 func NewConfigureSetCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "set KEY VALUE",
-		Short: "設定値を更新する",
+		Short: "Update a configuration value",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			key := args[0]
@@ -32,7 +32,7 @@ func NewConfigureSetCmd() *cobra.Command {
 	}
 }
 
-// setField は Config の KEY パスに value を設定する。
+// setField sets value at the KEY path in Config.
 func setField(cfg *config.Config, key string, value string) error {
 	scope, profileName, field, err := parseKey(key)
 	if err != nil {
@@ -52,7 +52,7 @@ func setField(cfg *config.Config, key string, value string) error {
 		if !validProfileFields[field] {
 			return fmt.Errorf("invalid key: %q", key)
 		}
-		prof := cfg.Profiles[profileName] // ゼロ値でも OK
+		prof := cfg.Profiles[profileName] // zero value is acceptable
 		switch field {
 		case "base_url":
 			prof.BaseURL = value

@@ -14,43 +14,43 @@ func TestMaskSecrets(t *testing.T) {
 		want    string
 	}{
 		{
-			name:    "空のsecrets",
+			name:    "empty secrets slice",
 			s:       "hello api_key=secret123",
 			secrets: []string{},
 			want:    "hello api_key=secret123",
 		},
 		{
-			name:    "nilのsecrets",
+			name:    "nil secrets slice",
 			s:       "hello api_key=secret123",
 			secrets: nil,
 			want:    "hello api_key=secret123",
 		},
 		{
-			name:    "単一のsecretをマスク",
+			name:    "mask single secret",
 			s:       "x-api-key: mysecretkey",
 			secrets: []string{"mysecretkey"},
 			want:    "x-api-key: ***",
 		},
 		{
-			name:    "複数のsecretをマスク",
+			name:    "mask multiple secrets",
 			s:       "key1=abc123 key2=xyz789",
 			secrets: []string{"abc123", "xyz789"},
 			want:    "key1=*** key2=***",
 		},
 		{
-			name:    "空文字列のsecretはスキップ",
+			name:    "empty string secret is skipped",
 			s:       "hello world",
 			secrets: []string{"", "world"},
 			want:    "hello ***",
 		},
 		{
-			name:    "secretが文中に複数回出現",
+			name:    "secret appears multiple times in string",
 			s:       "token=secret token=secret",
 			secrets: []string{"secret"},
 			want:    "token=*** token=***",
 		},
 		{
-			name:    "マッチなし",
+			name:    "no match",
 			s:       "no secrets here",
 			secrets: []string{"notpresent"},
 			want:    "no secrets here",

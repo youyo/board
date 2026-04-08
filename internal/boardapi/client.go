@@ -10,38 +10,38 @@ import (
 
 const defaultTimeout = 30 * time.Second
 
-// Client は BOARD API への HTTP クライアント。
+// Client is an HTTP client for the BOARD API.
 type Client struct {
 	baseURL    string
 	apiKey     string
 	apiToken   string
 	httpClient *http.Client
-	retryMax   int                 // デフォルト 5（0 でリトライ無効）
-	sleepFn    func(time.Duration) // テスト差し替え用（デフォルト time.Sleep）
+	retryMax   int                 // default 5 (0 disables retry)
+	sleepFn    func(time.Duration) // injectable for testing (default: time.Sleep)
 }
 
-// ClientOption は Client の設定オプション。
+// ClientOption is a configuration option for Client.
 type ClientOption func(*Client)
 
-// WithHTTPClient はカスタム *http.Client を注入する（主にテスト用途）。
+// WithHTTPClient injects a custom *http.Client (primarily for testing).
 func WithHTTPClient(hc *http.Client) ClientOption {
 	return func(c *Client) { c.httpClient = hc }
 }
 
-// WithRetryMax はリトライ最大回数を設定する。0 でリトライ無効。
+// WithRetryMax sets the maximum number of retries. 0 disables retry.
 func WithRetryMax(n int) ClientOption {
 	return func(c *Client) { c.retryMax = n }
 }
 
-// WithSleepFn はテスト用にスリープ関数を差し替える。
-// for testing only: 本番コードでは使用しないこと。
+// WithSleepFn replaces the sleep function for testing.
+// for testing only: do not use in production code.
 func WithSleepFn(fn func(time.Duration)) ClientOption {
 	return func(c *Client) { c.sleepFn = fn }
 }
 
-// New は Client を生成する。
-// baseURL は末尾スラッシュを正規化する。
-// timeout が 0 以下の場合はデフォルト 30s を使う。
+// New creates a Client.
+// baseURL is normalized by trimming trailing slashes.
+// If timeout is 0 or negative, defaults to 30s.
 func New(baseURL, apiKey, apiToken string, timeout time.Duration, opts ...ClientOption) *Client {
 	if timeout <= 0 {
 		timeout = defaultTimeout
@@ -62,16 +62,16 @@ func New(baseURL, apiKey, apiToken string, timeout time.Duration, opts ...Client
 	return c
 }
 
-// NewRequest は baseURL を付与した *http.Request を生成するヘルパー。
-// path は "/v1/clients" のように先頭スラッシュ付きで指定する。
+// NewRequest is a helper that creates a *http.Request with baseURL prepended.
+// path should be specified with a leading slash, e.g., "/v1/clients".
 func (c *Client) NewRequest(ctx context.Context, method, path string, body io.Reader) (*http.Request, error) {
 	url := c.baseURL + path
 	return http.NewRequestWithContext(ctx, method, url, body)
 }
 
-// Do はリクエストを実行し、成功レスポンスのボディを返す。
-// 2xx 以外は *APIError として返す。
-// transport エラーも *APIError{Code: APIErrorNetwork} にラップして返す。
+// Do executes a request and returns the successful response body.
+// Non-2xx responses are returned as *APIError.
+// Transport errors are also wrapped as *APIError{Code: APIErrorNetwork}.
 func (c *Client) Do(req *http.Request) ([]byte, error) {
 	applyAuthHeaders(req, c.apiKey, c.apiToken)
 

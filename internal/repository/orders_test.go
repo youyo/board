@@ -61,12 +61,12 @@ func newOrderAPIServer(t *testing.T, entities []boardapi.OrderEntity) *httptest.
 }
 
 var sampleOrders = []boardapi.OrderEntity{
-	{ID: 1, ClientID: 10, ProjectID: 100, Title: "受注A", Status: "draft", UpdatedAt: "2026-01-01T00:00:00Z"},
-	{ID: 2, ClientID: 10, ProjectID: 101, Title: "受注B", Status: "confirmed", UpdatedAt: "2026-01-02T00:00:00Z"},
-	{ID: 3, ClientID: 20, ProjectID: 102, Title: "受注C", Status: "completed", UpdatedAt: "2026-01-03T00:00:00Z"},
+	{ID: 1, ClientID: 10, ProjectID: 100, Title: "OrderA", Status: "draft", UpdatedAt: "2026-01-01T00:00:00Z"},
+	{ID: 2, ClientID: 10, ProjectID: 101, Title: "OrderB", Status: "confirmed", UpdatedAt: "2026-01-02T00:00:00Z"},
+	{ID: 3, ClientID: 20, ProjectID: 102, Title: "OrderC", Status: "completed", UpdatedAt: "2026-01-03T00:00:00Z"},
 }
 
-// T_ORD01: List - キャッシュあり → キャッシュのデータを返す
+// T_ORD01: List - cache hit -> returns cached data
 func TestOrderRepository_List_CacheHit(t *testing.T) {
 	db := newTestDB(t)
 	seedOrderCache(t, db, sampleOrders)
@@ -85,7 +85,7 @@ func TestOrderRepository_List_CacheHit(t *testing.T) {
 	}
 }
 
-// T_ORD02: List - キャッシュなし（初回）→ ForceRefresh 後データを返す
+// T_ORD02: List - no cache (initial load) -> returns data after ForceRefresh
 func TestOrderRepository_List_InitialLoad(t *testing.T) {
 	db := newTestDB(t)
 
@@ -102,7 +102,7 @@ func TestOrderRepository_List_InitialLoad(t *testing.T) {
 	}
 }
 
-// T_ORD03: GetByID - キャッシュヒット → キャッシュから返す
+// T_ORD03: GetByID - cache hit -> returns from cache
 func TestOrderRepository_GetByID_CacheHit(t *testing.T) {
 	db := newTestDB(t)
 	seedOrderCache(t, db, sampleOrders)
@@ -121,12 +121,12 @@ func TestOrderRepository_GetByID_CacheHit(t *testing.T) {
 	}
 }
 
-// T_ORD04: GetByID - キャッシュミス、API 成功 → API 取得して返す
+// T_ORD04: GetByID - cache miss, API success -> fetches from API and returns
 func TestOrderRepository_GetByID_CacheMiss_APISuccess(t *testing.T) {
 	db := newTestDB(t)
 	markSynced(t, db, "orders")
 
-	target := boardapi.OrderEntity{ID: 99, Title: "テスト受注", UpdatedAt: "2026-01-01T00:00:00Z"}
+	target := boardapi.OrderEntity{ID: 99, Title: "Test Order", UpdatedAt: "2026-01-01T00:00:00Z"}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		b, _ := json.Marshal(target)
@@ -146,7 +146,7 @@ func TestOrderRepository_GetByID_CacheMiss_APISuccess(t *testing.T) {
 	}
 }
 
-// T_ORD05: GetByID - キャッシュミス、API エラー → error を返す
+// T_ORD05: GetByID - cache miss, API error -> returns error
 func TestOrderRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	db := newTestDB(t)
 	markSynced(t, db, "orders")
@@ -161,7 +161,7 @@ func TestOrderRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	}
 }
 
-// T_ORD06: Search - ClientID フィルタ → 一致するものを返す
+// T_ORD06: Search - ClientID filter -> returns matching items
 func TestOrderRepository_Search_ClientIDFilter(t *testing.T) {
 	db := newTestDB(t)
 	seedOrderCache(t, db, sampleOrders)
@@ -180,7 +180,7 @@ func TestOrderRepository_Search_ClientIDFilter(t *testing.T) {
 	}
 }
 
-// T_ORD07: Search - Status フィルタ → 一致するものを返す
+// T_ORD07: Search - Status filter -> returns matching items
 func TestOrderRepository_Search_StatusFilter(t *testing.T) {
 	db := newTestDB(t)
 	seedOrderCache(t, db, sampleOrders)
@@ -199,7 +199,7 @@ func TestOrderRepository_Search_StatusFilter(t *testing.T) {
 	}
 }
 
-// T_ORD08: Search - パラメータなし → 全件返す
+// T_ORD08: Search - no filter -> returns all items
 func TestOrderRepository_Search_NoFilter(t *testing.T) {
 	db := newTestDB(t)
 	seedOrderCache(t, db, sampleOrders)

@@ -5,14 +5,14 @@ import (
 	"io"
 )
 
-// WriteJSON は v をコンパクト JSON として w に書き込む（末尾に改行あり）。
+// WriteJSON writes v to w as compact JSON (with a trailing newline).
 func WriteJSON(w io.Writer, v interface{}) error {
 	enc := json.NewEncoder(w)
 	enc.SetEscapeHTML(false)
 	return enc.Encode(v)
 }
 
-// WritePrettyJSON は v をインデント付き JSON として w に書き込む（末尾に改行あり）。
+// WritePrettyJSON writes v to w as indented JSON (with a trailing newline).
 func WritePrettyJSON(w io.Writer, v interface{}) error {
 	enc := json.NewEncoder(w)
 	enc.SetEscapeHTML(false)
@@ -20,7 +20,7 @@ func WritePrettyJSON(w io.Writer, v interface{}) error {
 	return enc.Encode(v)
 }
 
-// Write は pretty フラグに応じて WriteJSON または WritePrettyJSON を呼ぶ。
+// Write calls WriteJSON or WritePrettyJSON depending on the pretty flag.
 func Write(w io.Writer, v interface{}, pretty bool) error {
 	if pretty {
 		return WritePrettyJSON(w, v)

@@ -11,7 +11,7 @@ import (
 	"github.com/youyo/board/internal/refresh"
 )
 
-// PurchaseOrderRepository は purchase_orders リソースのキャッシュ → リフレッシュ → API フォールバックを管理する。
+// PurchaseOrderRepository manages cache -> refresh -> API fallback for the purchase_orders resource.
 type PurchaseOrderRepository struct {
 	profile     string
 	api         *boardapi.Client
@@ -23,7 +23,7 @@ type PurchaseOrderRepository struct {
 	autoRefresh bool
 }
 
-// NewPurchaseOrderRepository は PurchaseOrderRepository を生成する。
+// NewPurchaseOrderRepository creates a new PurchaseOrderRepository.
 func NewPurchaseOrderRepository(
 	profile string,
 	api *boardapi.Client,
@@ -48,7 +48,7 @@ func NewPurchaseOrderRepository(
 
 const purchaseOrdersResource = "purchase_orders"
 
-// List は全発注書をキャッシュから返す。
+// List returns all purchase orders from the cache.
 func (r *PurchaseOrderRepository) List(ctx context.Context, opts ReadOptions) ([]boardapi.PurchaseOrderEntity, error) {
 	fetcher := &purchaseOrdersFetcher{api: r.api}
 	now := time.Now()
@@ -91,8 +91,8 @@ func (r *PurchaseOrderRepository) List(ctx context.Context, opts ReadOptions) ([
 	return entities, nil
 }
 
-// GetByID は指定 ID の発注書をキャッシュから返す。
-// キャッシュミス時は API から単体取得して upsert する。
+// GetByID returns the purchase order with the given ID from the cache.
+// On cache miss, it fetches from the API and upserts the result.
 func (r *PurchaseOrderRepository) GetByID(ctx context.Context, id int, opts ReadOptions) (*boardapi.PurchaseOrderEntity, error) {
 	fetcher := &purchaseOrdersFetcher{api: r.api}
 	now := time.Now()
@@ -120,7 +120,7 @@ func (r *PurchaseOrderRepository) GetByID(ctx context.Context, id int, opts Read
 		return &entity, nil
 	}
 
-	// キャッシュミス → API 単体取得
+	// Cache miss → fetch single entity from API
 	entity, err := r.api.GetPurchaseOrder(ctx, id)
 	if err != nil {
 		return nil, err
@@ -137,7 +137,7 @@ func (r *PurchaseOrderRepository) GetByID(ctx context.Context, id int, opts Read
 	return entity, nil
 }
 
-// Search はパラメータでフィルタした発注書をキャッシュから返す。
+// Search returns purchase orders filtered by the given parameters from the cache.
 func (r *PurchaseOrderRepository) Search(ctx context.Context, params boardapi.PurchaseOrderSearchParams, opts ReadOptions) ([]boardapi.PurchaseOrderEntity, error) {
 	all, err := r.List(ctx, opts)
 	if err != nil {
@@ -146,8 +146,8 @@ func (r *PurchaseOrderRepository) Search(ctx context.Context, params boardapi.Pu
 	return filterPurchaseOrders(all, params), nil
 }
 
-// filterPurchaseOrders はインメモリフィルタリングを行う。
-// UpdatedAtFrom は差分取得カーソルとして使用するためフィルタには含めない。
+// filterPurchaseOrders performs in-memory filtering.
+// UpdatedAtFrom is used as a delta fetch cursor and is not included in the filter.
 func filterPurchaseOrders(entities []boardapi.PurchaseOrderEntity, params boardapi.PurchaseOrderSearchParams) []boardapi.PurchaseOrderEntity {
 	var result []boardapi.PurchaseOrderEntity
 	for _, e := range entities {

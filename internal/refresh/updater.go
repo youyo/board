@@ -8,23 +8,23 @@ import (
 	"github.com/youyo/board/internal/cache"
 )
 
-// Updater は sync_state の各フィールドを更新するヘルパー。
-// Refresher に埋め込まず、独立した型として定義する。
+// Updater is a helper for updating individual fields in sync_state.
+// Defined as an independent type rather than embedded in Refresher.
 type Updater struct {
 	syncStore *cache.SyncStateStore
 }
 
-// NewUpdater は Updater を生成する。
+// NewUpdater creates an Updater.
 func NewUpdater(ss *cache.SyncStateStore) *Updater {
 	return &Updater{syncStore: ss}
 }
 
-// nullString は文字列を sql.NullString に変換するヘルパー。
+// nullString is a helper that converts a string to sql.NullString.
 func nullString(s string) sql.NullString {
 	return sql.NullString{String: s, Valid: true}
 }
 
-// nullStringOrKeep は newVal が空の場合に existing を返し、そうでなければ newVal を返すヘルパー。
+// nullStringOrKeep is a helper that returns existing if newVal is empty, otherwise returns newVal.
 func nullStringOrKeep(newVal string, existing sql.NullString) sql.NullString {
 	if newVal == "" {
 		return existing
@@ -32,7 +32,7 @@ func nullStringOrKeep(newVal string, existing sql.NullString) sql.NullString {
 	return nullString(newVal)
 }
 
-// getOrInit は SyncStateStore から state を取得し、存在しない場合は初期値を返す。
+// getOrInit retrieves state from SyncStateStore, returning an initial value if not found.
 func getOrInit(ctx context.Context, ss *cache.SyncStateStore, profile, resource string) (*cache.SyncState, error) {
 	state, err := ss.Get(ctx, profile, resource)
 	if err != nil {
@@ -47,16 +47,16 @@ func getOrInit(ctx context.Context, ss *cache.SyncStateStore, profile, resource 
 	return state, nil
 }
 
-// MarkDeltaSuccess は差分取得成功後に sync_state を更新する。
+// MarkDeltaSuccess updates sync_state after a successful delta fetch.
 //
-// 更新フィールド:
+// Updated fields:
 //   - last_synced_at = now (RFC3339)
 //   - last_sync_mode = "delta"
 //   - last_sync_status = "success"
 //   - last_daily_refresh_date = TodayInTZ(now, tz)
-//   - cursor_updated_at = newCursor（空の場合は既存値を保持）
+//   - cursor_updated_at = newCursor (retain existing if empty)
 //   - consecutive_failures = 0
-//   - last_error_at, last_error_code, last_error_message は変更しない
+//   - last_error_at, last_error_code, last_error_message are not changed
 func (u *Updater) MarkDeltaSuccess(
 	ctx context.Context,
 	profile, resource string,
@@ -79,15 +79,15 @@ func (u *Updater) MarkDeltaSuccess(
 	return u.syncStore.Upsert(ctx, *state)
 }
 
-// MarkForceSuccess は全件取得成功後に sync_state を更新する。
+// MarkForceSuccess updates sync_state after a successful full fetch.
 //
-// 更新フィールド:
+// Updated fields:
 //   - last_synced_at = now (RFC3339)
 //   - last_full_synced_at = now (RFC3339)
 //   - last_sync_mode = "full"
 //   - last_sync_status = "success"
 //   - last_daily_refresh_date = TodayInTZ(now, tz)
-//   - cursor_updated_at = NULL（full 後はカーソルリセット）
+//   - cursor_updated_at = NULL (reset cursor after full fetch)
 //   - must_full_resync = false
 //   - consecutive_failures = 0
 func (u *Updater) MarkForceSuccess(
@@ -114,8 +114,8 @@ func (u *Updater) MarkForceSuccess(
 	return u.syncStore.Upsert(ctx, *state)
 }
 
-// MarkLockAcquired は refresh_started_at と refresh_owner を設定する。
-// sync_state が存在しない場合は新規作成（upsert）する。
+// MarkLockAcquired sets refresh_started_at and refresh_owner.
+// Creates a new record (upsert) if sync_state does not exist.
 func (u *Updater) MarkLockAcquired(ctx context.Context, profile, resource, ownerID string, now time.Time) error {
 	state, err := getOrInit(ctx, u.syncStore, profile, resource)
 	if err != nil {
@@ -128,8 +128,8 @@ func (u *Updater) MarkLockAcquired(ctx context.Context, profile, resource, owner
 	return u.syncStore.Upsert(ctx, *state)
 }
 
-// MarkLockReleased は refresh_started_at と refresh_owner を NULL に戻す。
-// sync_state が存在しない場合は何もしない（エラーなし）。
+// MarkLockReleased resets refresh_started_at and refresh_owner to NULL.
+// Does nothing if sync_state does not exist (no error).
 func (u *Updater) MarkLockReleased(ctx context.Context, profile, resource string) error {
 	state, err := u.syncStore.Get(ctx, profile, resource)
 	if err != nil {
@@ -145,9 +145,9 @@ func (u *Updater) MarkLockReleased(ctx context.Context, profile, resource string
 	return u.syncStore.Upsert(ctx, *state)
 }
 
-// MarkError は refresh 失敗時に sync_state を更新する。
+// MarkError updates sync_state on refresh failure.
 //
-// 更新フィールド:
+// Updated fields:
 //   - last_sync_status = "error"
 //   - last_error_at = now (RFC3339)
 //   - last_error_code = errCode

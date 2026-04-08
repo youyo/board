@@ -1,4 +1,4 @@
-// Package boardapi は BOARD API への HTTP クライアント基盤を提供する。
+// Package boardapi provides an HTTP client foundation for the BOARD API.
 package boardapi
 
 import (
@@ -10,51 +10,51 @@ import (
 	"time"
 )
 
-// APIErrorCode はエラー種別を表す文字列定数。
+// APIErrorCode is a string constant representing the error type.
 type APIErrorCode string
 
 const (
-	// APIErrorUnauthorized は 401 Unauthorized を表す。
+	// APIErrorUnauthorized represents 401 Unauthorized.
 	APIErrorUnauthorized APIErrorCode = "UNAUTHORIZED"
-	// APIErrorForbidden は 403 Forbidden を表す。
+	// APIErrorForbidden represents 403 Forbidden.
 	APIErrorForbidden APIErrorCode = "FORBIDDEN"
-	// APIErrorNotFound は 404 Not Found を表す。
+	// APIErrorNotFound represents 404 Not Found.
 	APIErrorNotFound APIErrorCode = "NOT_FOUND"
-	// APIErrorRateLimit は 429 Too Many Requests を表す。
+	// APIErrorRateLimit represents 429 Too Many Requests.
 	APIErrorRateLimit APIErrorCode = "RATE_LIMIT"
-	// APIErrorValidation は 400/422 バリデーションエラーを表す。
+	// APIErrorValidation represents 400/422 validation errors.
 	APIErrorValidation APIErrorCode = "VALIDATION"
-	// APIErrorTemporary は 5xx 一時的なサーバーエラーを表す。
+	// APIErrorTemporary represents 5xx temporary server errors.
 	APIErrorTemporary APIErrorCode = "TEMPORARY"
-	// APIErrorNetwork は transport レベルのネットワークエラーを表す。
+	// APIErrorNetwork represents transport-level network errors.
 	APIErrorNetwork APIErrorCode = "NETWORK"
-	// APIErrorUnknown はその他の未分類エラーを表す。
+	// APIErrorUnknown represents other unclassified errors.
 	APIErrorUnknown APIErrorCode = "UNKNOWN"
 )
 
-// APIError は BOARD API エラーを表す。
-// error インターフェースを実装する。
+// APIError represents a BOARD API error.
+// It implements the error interface.
 type APIError struct {
 	Code       APIErrorCode
 	StatusCode int
 	Message    string
-	Body       string        // 生レスポンスボディ（デバッグ用）
-	RetryAfter time.Duration // Retry-After ヘッダ値（0 は未指定）
+	Body       string        // raw response body (for debugging)
+	RetryAfter time.Duration // Retry-After header value (0 means not specified)
 }
 
-// Error は error インターフェースを実装する。
-// APIKey/APIToken 等のシークレットは含まない。
+// Error implements the error interface.
+// Does not include secrets such as APIKey/APIToken.
 func (e *APIError) Error() string {
 	return fmt.Sprintf("boardapi error [%s] status=%d: %s", e.Code, e.StatusCode, e.Message)
 }
 
-// boardAPIErrorBody は BOARD API のエラーレスポンス JSON 構造。
+// boardAPIErrorBody is the JSON structure of BOARD API error responses.
 type boardAPIErrorBody struct {
 	Message string `json:"message"`
 	Error   string `json:"error"`
 }
 
-// parseError は HTTP ステータスとボディから *APIError を生成する。
+// parseError creates a *APIError from an HTTP status code and body.
 func parseError(statusCode int, body []byte) *APIError {
 	code := ClassifyStatusCode(statusCode)
 	msg := extractMessage(body)
@@ -66,8 +66,8 @@ func parseError(statusCode int, body []byte) *APIError {
 	}
 }
 
-// ClassifyStatusCode は HTTP ステータスを APIErrorCode にマッピングする。
-// テストから参照できるよう公開している。
+// ClassifyStatusCode maps an HTTP status code to an APIErrorCode.
+// Exported so it can be referenced from tests.
 func ClassifyStatusCode(statusCode int) APIErrorCode {
 	switch {
 	case statusCode == 400:
@@ -89,7 +89,7 @@ func ClassifyStatusCode(statusCode int) APIErrorCode {
 	}
 }
 
-// parseErrorWithHeader は HTTP レスポンスから *APIError を生成する（Retry-After対応）。
+// parseErrorWithHeader creates a *APIError from an HTTP response (with Retry-After support).
 func parseErrorWithHeader(resp *http.Response, body []byte) *APIError {
 	ae := parseError(resp.StatusCode, body)
 	if ra := resp.Header.Get("Retry-After"); ra != "" {
@@ -100,14 +100,14 @@ func parseErrorWithHeader(resp *http.Response, body []byte) *APIError {
 	return ae
 }
 
-// IsRetryable はエラーがリトライ対象かどうかを返す。
-// 429、5xx（TEMPORARY）、ネットワークエラー（NETWORK）はリトライ対象。
-// 4xx（UNAUTHORIZED/FORBIDDEN/NOT_FOUND/VALIDATION）は恒久エラーのため非リトライ。
+// IsRetryable returns whether the error is retryable.
+// 429, 5xx (TEMPORARY), and network errors (NETWORK) are retryable.
+// 4xx (UNAUTHORIZED/FORBIDDEN/NOT_FOUND/VALIDATION) are permanent errors and not retryable.
 func IsRetryable(err error) bool {
 	return isRetryable(err)
 }
 
-// isRetryable は IsRetryable の内部実装。
+// isRetryable is the internal implementation of IsRetryable.
 func isRetryable(err error) bool {
 	var ae *APIError
 	if !errors.As(err, &ae) {
@@ -121,8 +121,8 @@ func isRetryable(err error) bool {
 	}
 }
 
-// extractMessage は JSON ボディからエラーメッセージを抽出する。
-// パース失敗時は空文字を返す。
+// extractMessage extracts an error message from a JSON body.
+// Returns an empty string on parse failure.
 func extractMessage(body []byte) string {
 	var eb boardAPIErrorBody
 	if err := json.Unmarshal(body, &eb); err != nil {

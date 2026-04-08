@@ -12,7 +12,7 @@ import (
 	"github.com/youyo/board/internal/refresh"
 )
 
-// ProjectRepository は projects リソースのキャッシュ → リフレッシュ → API フォールバックを管理する。
+// ProjectRepository manages cache -> refresh -> API fallback for the projects resource.
 type ProjectRepository struct {
 	profile     string
 	api         *boardapi.Client
@@ -24,7 +24,7 @@ type ProjectRepository struct {
 	autoRefresh bool
 }
 
-// NewProjectRepository は ProjectRepository を生成する。
+// NewProjectRepository creates a new ProjectRepository.
 func NewProjectRepository(
 	profile string,
 	api *boardapi.Client,
@@ -49,7 +49,7 @@ func NewProjectRepository(
 
 const projectsResource = "projects"
 
-// List は全案件をキャッシュから返す。
+// List returns all projects from the cache.
 func (r *ProjectRepository) List(ctx context.Context, opts ReadOptions) ([]boardapi.ProjectEntity, error) {
 	fetcher := &projectsFetcher{api: r.api}
 	now := time.Now()
@@ -92,7 +92,7 @@ func (r *ProjectRepository) List(ctx context.Context, opts ReadOptions) ([]board
 	return entities, nil
 }
 
-// GetByID は指定 ID の案件をキャッシュから返す。
+// GetByID returns the project with the given ID from the cache.
 func (r *ProjectRepository) GetByID(ctx context.Context, id int, opts ReadOptions) (*boardapi.ProjectEntity, error) {
 	fetcher := &projectsFetcher{api: r.api}
 	now := time.Now()
@@ -120,7 +120,7 @@ func (r *ProjectRepository) GetByID(ctx context.Context, id int, opts ReadOption
 		return &entity, nil
 	}
 
-	// キャッシュミス → API 単体取得
+	// Cache miss -> fetch single entry from API
 	entity, err := r.api.GetProject(ctx, id)
 	if err != nil {
 		return nil, err
@@ -137,7 +137,7 @@ func (r *ProjectRepository) GetByID(ctx context.Context, id int, opts ReadOption
 	return entity, nil
 }
 
-// Search はパラメータでフィルタした案件をキャッシュから返す。
+// Search returns projects filtered by the given parameters from the cache.
 func (r *ProjectRepository) Search(ctx context.Context, params boardapi.ProjectSearchParams, opts ReadOptions) ([]boardapi.ProjectEntity, error) {
 	all, err := r.List(ctx, opts)
 	if err != nil {
@@ -146,8 +146,8 @@ func (r *ProjectRepository) Search(ctx context.Context, params boardapi.ProjectS
 	return filterProjects(all, params), nil
 }
 
-// filterProjects はインメモリフィルタリングを行う。
-// UpdatedAtFrom は差分取得カーソルとして使用するためフィルタには含めない。
+// filterProjects performs in-memory filtering.
+// UpdatedAtFrom is used as a delta fetch cursor and is not included in the filter.
 func filterProjects(entities []boardapi.ProjectEntity, params boardapi.ProjectSearchParams) []boardapi.ProjectEntity {
 	var result []boardapi.ProjectEntity
 	for _, e := range entities {

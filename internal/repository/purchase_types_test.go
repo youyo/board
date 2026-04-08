@@ -61,12 +61,12 @@ func newPurchaseTypeAPIServer(t *testing.T, entities []boardapi.PurchaseTypeEnti
 }
 
 var samplePurchaseTypes = []boardapi.PurchaseTypeEntity{
-	{ID: 1, Name: "外注費", UpdatedAt: "2026-01-01T00:00:00Z"},
-	{ID: 2, Name: "備品購入", UpdatedAt: "2026-01-02T00:00:00Z"},
-	{ID: 3, Name: "ソフトウェア", UpdatedAt: "2026-01-03T00:00:00Z"},
+	{ID: 1, Name: "Outsourcing", UpdatedAt: "2026-01-01T00:00:00Z"},
+	{ID: 2, Name: "Equipment Purchase", UpdatedAt: "2026-01-02T00:00:00Z"},
+	{ID: 3, Name: "Software", UpdatedAt: "2026-01-03T00:00:00Z"},
 }
 
-// T_PRCT01: List - キャッシュあり → キャッシュのデータを返す
+// T_PRCT01: List - cache hit -> returns cached data
 func TestPurchaseTypeRepository_List_CacheHit(t *testing.T) {
 	db := newTestDB(t)
 	seedPurchaseTypeCache(t, db, samplePurchaseTypes)
@@ -85,7 +85,7 @@ func TestPurchaseTypeRepository_List_CacheHit(t *testing.T) {
 	}
 }
 
-// T_PRCT02: List - キャッシュなし（初回）→ ForceRefresh 後データを返す
+// T_PRCT02: List - no cache (initial load) -> returns data after ForceRefresh
 func TestPurchaseTypeRepository_List_InitialLoad(t *testing.T) {
 	db := newTestDB(t)
 
@@ -102,7 +102,7 @@ func TestPurchaseTypeRepository_List_InitialLoad(t *testing.T) {
 	}
 }
 
-// T_PRCT03: GetByID - キャッシュヒット → キャッシュから返す
+// T_PRCT03: GetByID - cache hit -> returns from cache
 func TestPurchaseTypeRepository_GetByID_CacheHit(t *testing.T) {
 	db := newTestDB(t)
 	seedPurchaseTypeCache(t, db, samplePurchaseTypes)
@@ -121,12 +121,12 @@ func TestPurchaseTypeRepository_GetByID_CacheHit(t *testing.T) {
 	}
 }
 
-// T_PRCT04: GetByID - キャッシュミス、API 成功 → API 取得して返す
+// T_PRCT04: GetByID - cache miss, API success -> fetches from API and returns
 func TestPurchaseTypeRepository_GetByID_CacheMiss_APISuccess(t *testing.T) {
 	db := newTestDB(t)
 	markSynced(t, db, "purchase_types")
 
-	target := boardapi.PurchaseTypeEntity{ID: 99, Name: "テスト発注区分", UpdatedAt: "2026-01-01T00:00:00Z"}
+	target := boardapi.PurchaseTypeEntity{ID: 99, Name: "Test Purchase Type", UpdatedAt: "2026-01-01T00:00:00Z"}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		b, _ := json.Marshal(target)
@@ -146,7 +146,7 @@ func TestPurchaseTypeRepository_GetByID_CacheMiss_APISuccess(t *testing.T) {
 	}
 }
 
-// T_PRCT05: GetByID - キャッシュミス、API エラー → error を返す
+// T_PRCT05: GetByID - cache miss, API error -> returns error
 func TestPurchaseTypeRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	db := newTestDB(t)
 	markSynced(t, db, "purchase_types")
@@ -161,7 +161,7 @@ func TestPurchaseTypeRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	}
 }
 
-// T_PRCT06: Search - Name フィルタ → 一致するものを返す
+// T_PRCT06: Search - Name filter -> returns matching items
 func TestPurchaseTypeRepository_Search_NameFilter(t *testing.T) {
 	db := newTestDB(t)
 	seedPurchaseTypeCache(t, db, samplePurchaseTypes)
@@ -171,16 +171,16 @@ func TestPurchaseTypeRepository_Search_NameFilter(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makePurchaseTypeRepo(t, db, apiClient, false)
-	got, err := repo.Search(context.Background(), boardapi.PurchaseTypeSearchParams{Name: "外注費"}, repository.ReadOptions{})
+	got, err := repo.Search(context.Background(), boardapi.PurchaseTypeSearchParams{Name: "Outsourcing"}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
-	if len(got) != 1 || got[0].Name != "外注費" {
+	if len(got) != 1 || got[0].Name != "Outsourcing" {
 		t.Errorf("unexpected result: %+v", got)
 	}
 }
 
-// T_PRCT07: Search - パラメータなし → 全件返す
+// T_PRCT07: Search - no filter -> returns all items
 func TestPurchaseTypeRepository_Search_NoFilter(t *testing.T) {
 	db := newTestDB(t)
 	seedPurchaseTypeCache(t, db, samplePurchaseTypes)

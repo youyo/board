@@ -8,8 +8,8 @@ import (
 	"strconv"
 )
 
-// DocumentSendChannelEntity は BOARD API の書類送付方法エンティティ。
-// GET /v1/document_send_channels レスポンスの1要素に対応。
+// DocumentSendChannelEntity is a BOARD API document send channel entity.
+// Corresponds to one element in the GET /v1/document_send_channels response.
 type DocumentSendChannelEntity struct {
 	ID        int    `json:"id"`
 	Name      string `json:"name"`
@@ -18,14 +18,14 @@ type DocumentSendChannelEntity struct {
 	CreatedAt string `json:"created_at"` // ISO 8601
 }
 
-// DocumentSendChannelSearchParams は SearchDocumentSendChannels のパラメータ。
+// DocumentSendChannelSearchParams is the parameter for SearchDocumentSendChannels.
 type DocumentSendChannelSearchParams struct {
 	Name          string
 	UpdatedAtFrom string
 }
 
-// ListDocumentSendChannels は全書類送付方法を取得する。
-// ページネーションは ListAll により自動処理される。
+// ListDocumentSendChannels retrieves all document send channels.
+// Pagination is automatically handled by ListAll.
 func (c *Client) ListDocumentSendChannels(ctx context.Context) ([]DocumentSendChannelEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/document_send_channels", nil)
@@ -53,7 +53,7 @@ func (c *Client) ListDocumentSendChannels(ctx context.Context) ([]DocumentSendCh
 	return result, nil
 }
 
-// GetDocumentSendChannel は指定 ID の書類送付方法を取得する。
+// GetDocumentSendChannel retrieves the document send channel with the specified ID.
 func (c *Client) GetDocumentSendChannel(ctx context.Context, id int) (*DocumentSendChannelEntity, error) {
 	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/document_send_channels/%d", id), nil)
 	if err != nil {
@@ -70,8 +70,8 @@ func (c *Client) GetDocumentSendChannel(ctx context.Context, id int) (*DocumentS
 	return &x, nil
 }
 
-// SearchDocumentSendChannels は条件付きで書類送付方法を検索する。
-// ページネーションは ListAll により自動処理される。
+// SearchDocumentSendChannels searches document send channels with the given conditions.
+// Pagination is automatically handled by ListAll.
 func (c *Client) SearchDocumentSendChannels(ctx context.Context, params DocumentSendChannelSearchParams) ([]DocumentSendChannelEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/document_send_channels", nil)

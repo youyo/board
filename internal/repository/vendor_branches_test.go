@@ -61,12 +61,12 @@ func newVendorBranchAPIServer(t *testing.T, entities []boardapi.VendorBranchEnti
 }
 
 var sampleVendorBranches = []boardapi.VendorBranchEntity{
-	{ID: 1, VendorID: 10, Name: "支社A", UpdatedAt: "2026-01-01T00:00:00Z"},
-	{ID: 2, VendorID: 10, Name: "支社B", UpdatedAt: "2026-01-02T00:00:00Z"},
-	{ID: 3, VendorID: 20, Name: "支社C", UpdatedAt: "2026-01-03T00:00:00Z"},
+	{ID: 1, VendorID: 10, Name: "BranchA", UpdatedAt: "2026-01-01T00:00:00Z"},
+	{ID: 2, VendorID: 10, Name: "BranchB", UpdatedAt: "2026-01-02T00:00:00Z"},
+	{ID: 3, VendorID: 20, Name: "BranchC", UpdatedAt: "2026-01-03T00:00:00Z"},
 }
 
-// T_VBR01: List - キャッシュあり → キャッシュのデータを返す
+// T_VBR01: List - cache hit -> returns cached data
 func TestVendorBranchRepository_List_CacheHit(t *testing.T) {
 	db := newTestDB(t)
 	seedVendorBranchCache(t, db, sampleVendorBranches)
@@ -85,7 +85,7 @@ func TestVendorBranchRepository_List_CacheHit(t *testing.T) {
 	}
 }
 
-// T_VBR02: List - キャッシュなし（初回）→ ForceRefresh 後データを返す
+// T_VBR02: List - no cache (initial load) -> returns data after ForceRefresh
 func TestVendorBranchRepository_List_InitialLoad(t *testing.T) {
 	db := newTestDB(t)
 
@@ -102,7 +102,7 @@ func TestVendorBranchRepository_List_InitialLoad(t *testing.T) {
 	}
 }
 
-// T_VBR03: GetByID - キャッシュヒット → キャッシュから返す
+// T_VBR03: GetByID - cache hit -> returns from cache
 func TestVendorBranchRepository_GetByID_CacheHit(t *testing.T) {
 	db := newTestDB(t)
 	seedVendorBranchCache(t, db, sampleVendorBranches)
@@ -121,12 +121,12 @@ func TestVendorBranchRepository_GetByID_CacheHit(t *testing.T) {
 	}
 }
 
-// T_VBR04: GetByID - キャッシュミス、API 成功 → API 取得して返す
+// T_VBR04: GetByID - cache miss, API success -> fetches from API and returns
 func TestVendorBranchRepository_GetByID_CacheMiss_APISuccess(t *testing.T) {
 	db := newTestDB(t)
 	markSynced(t, db, "vendor_branches")
 
-	target := boardapi.VendorBranchEntity{ID: 99, VendorID: 10, Name: "テスト支社", UpdatedAt: "2026-01-01T00:00:00Z"}
+	target := boardapi.VendorBranchEntity{ID: 99, VendorID: 10, Name: "Test Branch", UpdatedAt: "2026-01-01T00:00:00Z"}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		b, _ := json.Marshal(target)
@@ -146,7 +146,7 @@ func TestVendorBranchRepository_GetByID_CacheMiss_APISuccess(t *testing.T) {
 	}
 }
 
-// T_VBR05: GetByID - キャッシュミス、API エラー → error を返す
+// T_VBR05: GetByID - cache miss, API error -> returns error
 func TestVendorBranchRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	db := newTestDB(t)
 	markSynced(t, db, "vendor_branches")
@@ -161,7 +161,7 @@ func TestVendorBranchRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	}
 }
 
-// T_VBR06: Search - VendorID フィルタ → 一致するものを返す
+// T_VBR06: Search - VendorID filter -> returns matching items
 func TestVendorBranchRepository_Search_VendorIDFilter(t *testing.T) {
 	db := newTestDB(t)
 	seedVendorBranchCache(t, db, sampleVendorBranches)
@@ -180,7 +180,7 @@ func TestVendorBranchRepository_Search_VendorIDFilter(t *testing.T) {
 	}
 }
 
-// T_VBR07: Search - Name フィルタ → 一致するものを返す
+// T_VBR07: Search - Name filter -> returns matching items
 func TestVendorBranchRepository_Search_NameFilter(t *testing.T) {
 	db := newTestDB(t)
 	seedVendorBranchCache(t, db, sampleVendorBranches)
@@ -190,16 +190,16 @@ func TestVendorBranchRepository_Search_NameFilter(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeVendorBranchRepo(t, db, apiClient, false)
-	got, err := repo.Search(context.Background(), boardapi.VendorBranchSearchParams{Name: "支社A"}, repository.ReadOptions{})
+	got, err := repo.Search(context.Background(), boardapi.VendorBranchSearchParams{Name: "BranchA"}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
-	if len(got) != 1 || got[0].Name != "支社A" {
+	if len(got) != 1 || got[0].Name != "BranchA" {
 		t.Errorf("unexpected result: %+v", got)
 	}
 }
 
-// T_VBR08: Search - パラメータなし → 全件返す
+// T_VBR08: Search - no filter -> returns all items
 func TestVendorBranchRepository_Search_NoFilter(t *testing.T) {
 	db := newTestDB(t)
 	seedVendorBranchCache(t, db, sampleVendorBranches)

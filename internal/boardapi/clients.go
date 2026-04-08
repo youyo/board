@@ -8,9 +8,9 @@ import (
 	"strconv"
 )
 
-// ClientEntity は BOARD API の顧客エンティティ。
-// GET /v1/clients レスポンスの1要素に対応。
-// 注意: boardapi.Client は HTTP クライアント型のため、顧客エンティティは ClientEntity と命名。
+// ClientEntity is a BOARD API customer entity.
+// Corresponds to one element in the GET /v1/clients response.
+// Note: ClientEntity is named as such because boardapi.Client is the HTTP client type.
 type ClientEntity struct {
 	ID        int    `json:"id"`
 	Name      string `json:"name"`
@@ -20,14 +20,14 @@ type ClientEntity struct {
 	CreatedAt string `json:"created_at"` // ISO 8601
 }
 
-// ClientSearchParams は SearchClients のパラメータ。
+// ClientSearchParams is the parameter for SearchClients.
 type ClientSearchParams struct {
 	Name          string
 	UpdatedAtFrom string
 }
 
-// ListClients は全顧客を取得する。
-// ページネーションは ListAll により自動処理される。
+// ListClients retrieves all customers.
+// Pagination is automatically handled by ListAll.
 func (c *Client) ListClients(ctx context.Context) ([]ClientEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/clients", nil)
@@ -55,7 +55,7 @@ func (c *Client) ListClients(ctx context.Context) ([]ClientEntity, error) {
 	return result, nil
 }
 
-// GetClient は指定 ID の顧客を取得する。
+// GetClient retrieves the customer with the specified ID.
 func (c *Client) GetClient(ctx context.Context, id int) (*ClientEntity, error) {
 	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/clients/%d", id), nil)
 	if err != nil {
@@ -72,8 +72,8 @@ func (c *Client) GetClient(ctx context.Context, id int) (*ClientEntity, error) {
 	return &x, nil
 }
 
-// SearchClients は条件付きで顧客を検索する。
-// ページネーションは ListAll により自動処理される。
+// SearchClients searches customers with the given conditions.
+// Pagination is automatically handled by ListAll.
 func (c *Client) SearchClients(ctx context.Context, params ClientSearchParams) ([]ClientEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/clients", nil)

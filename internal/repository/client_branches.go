@@ -12,7 +12,7 @@ import (
 	"github.com/youyo/board/internal/refresh"
 )
 
-// ClientBranchRepository は client_branches リソースのキャッシュ → リフレッシュ → API フォールバックを管理する。
+// ClientBranchRepository manages cache -> refresh -> API fallback for the client_branches resource.
 type ClientBranchRepository struct {
 	profile     string
 	api         *boardapi.Client
@@ -24,7 +24,7 @@ type ClientBranchRepository struct {
 	autoRefresh bool
 }
 
-// NewClientBranchRepository は ClientBranchRepository を生成する。
+// NewClientBranchRepository creates a new ClientBranchRepository.
 func NewClientBranchRepository(
 	profile string,
 	api *boardapi.Client,
@@ -49,7 +49,7 @@ func NewClientBranchRepository(
 
 const clientBranchesResource = "client_branches"
 
-// List は全顧客支社をキャッシュから返す。
+// List returns all client branches from the cache.
 func (r *ClientBranchRepository) List(ctx context.Context, opts ReadOptions) ([]boardapi.ClientBranchEntity, error) {
 	fetcher := &clientBranchesFetcher{api: r.api}
 	now := time.Now()
@@ -92,7 +92,7 @@ func (r *ClientBranchRepository) List(ctx context.Context, opts ReadOptions) ([]
 	return entities, nil
 }
 
-// GetByID は指定 ID の顧客支社をキャッシュから返す。
+// GetByID returns the client branch with the given ID from the cache.
 func (r *ClientBranchRepository) GetByID(ctx context.Context, id int, opts ReadOptions) (*boardapi.ClientBranchEntity, error) {
 	fetcher := &clientBranchesFetcher{api: r.api}
 	now := time.Now()
@@ -120,7 +120,7 @@ func (r *ClientBranchRepository) GetByID(ctx context.Context, id int, opts ReadO
 		return &entity, nil
 	}
 
-	// キャッシュミス → API 単体取得
+	// Cache miss -> fetch single entry from API
 	entity, err := r.api.GetClientBranch(ctx, id)
 	if err != nil {
 		return nil, err
@@ -137,7 +137,7 @@ func (r *ClientBranchRepository) GetByID(ctx context.Context, id int, opts ReadO
 	return entity, nil
 }
 
-// Search はパラメータでフィルタした顧客支社をキャッシュから返す。
+// Search returns client branches filtered by the given parameters from the cache.
 func (r *ClientBranchRepository) Search(ctx context.Context, params boardapi.ClientBranchSearchParams, opts ReadOptions) ([]boardapi.ClientBranchEntity, error) {
 	all, err := r.List(ctx, opts)
 	if err != nil {
@@ -146,7 +146,7 @@ func (r *ClientBranchRepository) Search(ctx context.Context, params boardapi.Cli
 	return filterClientBranches(all, params), nil
 }
 
-// filterClientBranches はインメモリフィルタリングを行う。
+// filterClientBranches performs in-memory filtering.
 func filterClientBranches(entities []boardapi.ClientBranchEntity, params boardapi.ClientBranchSearchParams) []boardapi.ClientBranchEntity {
 	var result []boardapi.ClientBranchEntity
 	for _, e := range entities {

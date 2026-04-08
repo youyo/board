@@ -8,8 +8,8 @@ import (
 	"strconv"
 )
 
-// OrderEntity は BOARD API の発注エンティティ。
-// GET /v1/orders レスポンスの1要素に対応。
+// OrderEntity is a BOARD API order entity.
+// Corresponds to one element in the GET /v1/orders response.
 type OrderEntity struct {
 	ID          int     `json:"id"`
 	ClientID    int     `json:"client_id"`
@@ -23,7 +23,7 @@ type OrderEntity struct {
 	CreatedAt   string  `json:"created_at"` // ISO 8601
 }
 
-// OrderSearchParams は SearchOrders のパラメータ。
+// OrderSearchParams is the parameter for SearchOrders.
 type OrderSearchParams struct {
 	ClientID      int
 	ProjectID     int
@@ -31,8 +31,8 @@ type OrderSearchParams struct {
 	UpdatedAtFrom string
 }
 
-// ListOrders は全発注を取得する。
-// ページネーションは ListAll により自動処理される。
+// ListOrders retrieves all orders.
+// Pagination is automatically handled by ListAll.
 func (c *Client) ListOrders(ctx context.Context) ([]OrderEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/orders", nil)
@@ -60,7 +60,7 @@ func (c *Client) ListOrders(ctx context.Context) ([]OrderEntity, error) {
 	return result, nil
 }
 
-// GetOrder は指定 ID の発注を取得する。
+// GetOrder retrieves the order with the specified ID.
 func (c *Client) GetOrder(ctx context.Context, id int) (*OrderEntity, error) {
 	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/orders/%d", id), nil)
 	if err != nil {
@@ -77,8 +77,8 @@ func (c *Client) GetOrder(ctx context.Context, id int) (*OrderEntity, error) {
 	return &x, nil
 }
 
-// SearchOrders は条件付きで発注を検索する。
-// ページネーションは ListAll により自動処理される。
+// SearchOrders searches orders with the given conditions.
+// Pagination is automatically handled by ListAll.
 func (c *Client) SearchOrders(ctx context.Context, params OrderSearchParams) ([]OrderEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/orders", nil)

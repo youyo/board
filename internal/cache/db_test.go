@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// T_DB01: Open in-memory DB 成功
+// T_DB01: Open in-memory DB succeeds
 func TestOpen_InMemory(t *testing.T) {
 	db, err := Open(":memory:")
 	if err != nil {
@@ -17,7 +17,7 @@ func TestOpen_InMemory(t *testing.T) {
 	defer db.Close()
 }
 
-// T_DB02: Close 成功
+// T_DB02: Close succeeds
 func TestClose(t *testing.T) {
 	db, err := Open(":memory:")
 	if err != nil {
@@ -28,7 +28,7 @@ func TestClose(t *testing.T) {
 	}
 }
 
-// T_DB03: SQLDB() が non-nil を返す
+// T_DB03: SQLDB() returns non-nil
 func TestSQLDB_NonNil(t *testing.T) {
 	db, err := Open(":memory:")
 	if err != nil {
@@ -42,7 +42,7 @@ func TestSQLDB_NonNil(t *testing.T) {
 	}
 }
 
-// T_DB04: WAL mode 確認（in-memory は "memory" を返す場合あり）
+// T_DB04: WAL mode check (in-memory may return "memory")
 func TestWALMode(t *testing.T) {
 	db, err := Open(":memory:")
 	if err != nil {
@@ -59,7 +59,7 @@ func TestWALMode(t *testing.T) {
 	}
 }
 
-// T_DB05: Migrate 成功（テーブル作成確認）
+// T_DB05: Migrate succeeds (table creation check)
 func TestMigrate_Success(t *testing.T) {
 	db, err := Open(":memory:")
 	if err != nil {
@@ -72,7 +72,7 @@ func TestMigrate_Success(t *testing.T) {
 	}
 }
 
-// T_DB06: Migrate 冪等性（2回呼んでもエラーなし）
+// T_DB06: Migrate idempotency (no error on second call)
 func TestMigrate_Idempotent(t *testing.T) {
 	db, err := Open(":memory:")
 	if err != nil {
@@ -88,7 +88,7 @@ func TestMigrate_Idempotent(t *testing.T) {
 	}
 }
 
-// T_DB07: resource_cache テーブル存在確認（INSERT + SELECT）
+// T_DB07: resource_cache table existence check (INSERT + SELECT)
 func TestResourceCacheTable(t *testing.T) {
 	db, err := Open(":memory:")
 	if err != nil {
@@ -120,7 +120,7 @@ func TestResourceCacheTable(t *testing.T) {
 	}
 }
 
-// T_DB08: sync_state テーブル存在確認（INSERT + SELECT）
+// T_DB08: sync_state table existence check (INSERT + SELECT)
 func TestSyncStateTable(t *testing.T) {
 	db, err := Open(":memory:")
 	if err != nil {
@@ -151,7 +151,7 @@ func TestSyncStateTable(t *testing.T) {
 	}
 }
 
-// T_DB09: cache_meta テーブル存在確認
+// T_DB09: cache_meta table existence check
 func TestCacheMetaTable(t *testing.T) {
 	db, err := Open(":memory:")
 	if err != nil {
@@ -170,7 +170,7 @@ func TestCacheMetaTable(t *testing.T) {
 	}
 }
 
-// T_DB10: schema version が "1" であること
+// T_DB10: schema version is "1"
 func TestSchemaVersion(t *testing.T) {
 	db, err := Open(":memory:")
 	if err != nil {
@@ -194,7 +194,7 @@ func TestSchemaVersion(t *testing.T) {
 	}
 }
 
-// T_DB11: resource_cache の複合 PK 確認（重複 INSERT でエラー）
+// T_DB11: resource_cache composite PK check (duplicate INSERT returns error)
 func TestResourceCache_CompositePK(t *testing.T) {
 	db, err := Open(":memory:")
 	if err != nil {
@@ -225,7 +225,7 @@ func TestResourceCache_CompositePK(t *testing.T) {
 	}
 }
 
-// T_DB12: sync_state の複合 PK 確認
+// T_DB12: sync_state composite PK check
 func TestSyncState_CompositePK(t *testing.T) {
 	db, err := Open(":memory:")
 	if err != nil {
@@ -255,32 +255,32 @@ func TestSyncState_CompositePK(t *testing.T) {
 	}
 }
 
-// T_DB13: Open with invalid DSN でエラー
-// modernc.org/sqlite は sql.Open では基本エラーを返さないが、
-// PRAGMA 実行時にエラーになるパスを含む DSN でテストする。
-// ここでは実際に接続してエラーになるケースを確認する。
-// (modernc.org/sqlite は :memory: 以外のパスでも Open 自体はエラーにならないが
+// T_DB13: Open with invalid DSN returns error
+// modernc.org/sqlite does not return errors in sql.Open itself,
+// so test with a DSN that causes error during PRAGMA execution.
+// Verifies cases where connecting fails.
+// (modernc.org/sqlite does not error on Open even for non-:memory: paths,
 //
-//	不正なオプションはエラーになる)
+//	invalid options do cause errors)
 func TestOpen_PingError(t *testing.T) {
-	// 不正なパラメータを含む DSN でエラーを確認
-	// modernc.org/sqlite は sql.Open では遅延接続なので、
-	// PRAGMA 実行時に検出される。ここでは書き込み不可なパスを使う。
+	// check for error with DSN containing invalid parameters
+	// modernc.org/sqlite uses lazy connection in sql.Open,
+	// so errors are detected during PRAGMA execution. Using a non-writable path here.
 	db, err := Open("/nonexistent/path/that/cannot/be/created.db")
 	if err != nil {
-		// 期待通りエラーが返った
+		// error returned as expected
 		return
 	}
-	// エラーなく開けた場合は Ping で確認
+	// if opened without error, check with Ping
 	defer db.Close()
 	if pingErr := db.SQLDB().Ping(); pingErr != nil {
-		// Ping でエラーになった場合も許容
+		// Ping error is also acceptable
 		return
 	}
-	// 何もエラーが出なかった場合（DB が開けてしまった）は別途確認
-	// 一部の環境ではファイルが作られる場合があるのでスキップ扱い
+	// if no error at all (DB opened successfully), handle separately
+	// some environments may create the file, so treat as skip
 	t.Skip("could not trigger Open error with invalid path on this system")
 }
 
-// helper: sql.ErrNoRows を使うため database/sql をインポートしておく
+// helper: import database/sql to use sql.ErrNoRows
 var _ = sql.ErrNoRows

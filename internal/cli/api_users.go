@@ -9,11 +9,11 @@ import (
 	"github.com/youyo/board/internal/output"
 )
 
-// NewAPIUsersCmd は board api users サブコマンドグループを返す。
+// NewAPIUsersCmd  returns the board api users subcommand group.
 func NewAPIUsersCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "users",
-		Short: "ユーザー（users）を操作する",
+		Short: "Manage users",
 	}
 	cmd.AddCommand(
 		newAPIUsersListCmd(),
@@ -26,7 +26,7 @@ func NewAPIUsersCmd() *cobra.Command {
 func newAPIUsersListCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
-		Short: "ユーザーの一覧を取得する",
+		Short: "List all users",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			svc, err := apiServiceFromCmd(cmd)
 			if err != nil {
@@ -46,10 +46,10 @@ func newAPIUsersGetCmd() *cobra.Command {
 	var id int
 	cmd := &cobra.Command{
 		Use:   "get",
-		Short: "指定 ID のユーザーを取得する",
+		Short: "Get a user by ID",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if id == 0 {
-				return fmt.Errorf("--id は必須です")
+				return fmt.Errorf("--id is required")
 			}
 			svc, err := apiServiceFromCmd(cmd)
 			if err != nil {
@@ -63,7 +63,7 @@ func newAPIUsersGetCmd() *cobra.Command {
 			return output.Write(os.Stdout, result, prettyFromCmd(cmd))
 		},
 	}
-	cmd.Flags().IntVar(&id, "id", 0, "ユーザー ID（必須）")
+	cmd.Flags().IntVar(&id, "id", 0, "User ID (required)")
 	return cmd
 }
 
@@ -71,7 +71,7 @@ func newAPIUsersSearchCmd() *cobra.Command {
 	var name, email, updatedAtFrom string
 	cmd := &cobra.Command{
 		Use:   "search",
-		Short: "ユーザーを条件で検索する",
+		Short: "Search users by criteria",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			svc, err := apiServiceFromCmd(cmd)
 			if err != nil {
@@ -90,8 +90,8 @@ func newAPIUsersSearchCmd() *cobra.Command {
 			return output.Write(os.Stdout, result, prettyFromCmd(cmd))
 		},
 	}
-	cmd.Flags().StringVar(&name, "name", "", "ユーザー名でフィルタ")
-	cmd.Flags().StringVar(&email, "email", "", "メールアドレスでフィルタ")
-	cmd.Flags().StringVar(&updatedAtFrom, "updated-at-from", "", "更新日時（ISO 8601）以降でフィルタ")
+	cmd.Flags().StringVar(&name, "name", "", "Filter by user name")
+	cmd.Flags().StringVar(&email, "email", "", "Filter by email address")
+	cmd.Flags().StringVar(&updatedAtFrom, "updated-at-from", "", "Filter by updated_at (ISO 8601, lower bound)")
 	return cmd
 }

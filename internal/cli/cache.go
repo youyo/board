@@ -10,12 +10,12 @@ import (
 	"github.com/youyo/board/internal/output"
 )
 
-// NewCacheCmd は board cache サブコマンドグループを返す。
+// NewCacheCmd returns the board cache subcommand group.
 func NewCacheCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "cache",
-		Short: "キャッシュ管理",
-		Long:  "SQLite キャッシュの状態確認・期限切れ設定・削除・パス表示を行う。",
+		Short: "Manage the local cache",
+		Long:  "Inspect, expire, clear, and display the path of the SQLite cache.",
 	}
 	cmd.AddCommand(
 		newCacheStatusCmd(),
@@ -26,12 +26,12 @@ func NewCacheCmd() *cobra.Command {
 	return cmd
 }
 
-// newCacheStatusCmd は cache status サブコマンドを返す。
-// 全リソースの sync_state サマリーを JSON 出力する。
+// newCacheStatusCmd returns the cache status subcommand.
+// It outputs a JSON summary of the sync_state for all resources.
 func newCacheStatusCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "status",
-		Short: "全リソースのキャッシュ状態を表示",
+		Short: "Show cache status for all resources",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			a, ok := app.AppFromContext(cmd.Context())
 			if !ok {
@@ -43,7 +43,7 @@ func newCacheStatusCmd() *cobra.Command {
 				return fmt.Errorf("cache status: %w", err)
 			}
 
-			// JSON 出力用に変換
+			// Convert to JSON output format.
 			type stateRow struct {
 				Resource          string `json:"resource"`
 				LastSyncedAt      string `json:"last_synced_at,omitempty"`
@@ -82,14 +82,14 @@ func newCacheStatusCmd() *cobra.Command {
 	}
 }
 
-// newCacheExpireCmd は cache expire サブコマンドを返す。
-// --resource で個別リソース、省略時は全リソースを期限切れにする。
+// newCacheExpireCmd returns the cache expire subcommand.
+// Use --resource for a specific resource; omit to expire all resources.
 func newCacheExpireCmd() *cobra.Command {
 	var resource string
 
 	cmd := &cobra.Command{
 		Use:   "expire",
-		Short: "キャッシュを期限切れにする（次回アクセス時にリフレッシュ）",
+		Short: "Expire the cache (refreshed on next access)",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			a, ok := app.AppFromContext(cmd.Context())
 			if !ok {
@@ -112,18 +112,18 @@ func newCacheExpireCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&resource, "resource", "", "対象リソース名（省略時は全リソース）")
+	cmd.Flags().StringVar(&resource, "resource", "", "Target resource name (omit for all resources)")
 	return cmd
 }
 
-// newCacheClearCmd は cache clear サブコマンドを返す。
-// --resource で個別リソース、省略時は全リソースのキャッシュを削除する。
+// newCacheClearCmd returns the cache clear subcommand.
+// Use --resource for a specific resource; omit to clear all resources.
 func newCacheClearCmd() *cobra.Command {
 	var resource string
 
 	cmd := &cobra.Command{
 		Use:   "clear",
-		Short: "キャッシュを削除する",
+		Short: "Delete the cache",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			a, ok := app.AppFromContext(cmd.Context())
 			if !ok {
@@ -131,7 +131,7 @@ func newCacheClearCmd() *cobra.Command {
 			}
 
 			if resource != "" {
-				// resource_cache + sync_state を個別削除
+				// Delete resource_cache and sync_state entries for the specified resource.
 				if err := a.ResourceCache.DeleteAll(cmd.Context(), a.ProfileName, resource); err != nil {
 					return fmt.Errorf("cache clear: resource_cache: %w", err)
 				}
@@ -140,9 +140,9 @@ func newCacheClearCmd() *cobra.Command {
 				}
 				fmt.Fprintf(os.Stdout, "{\"cleared\":%q}\n", resource)
 			} else {
-				// 全リソース削除: resource_cache は全行削除、sync_state も全行削除
-				// resource_cache には DeleteAllProfiles に相当するメソッドがないため
-				// プロファイル単位で全22リソースをループ削除する
+				// Delete all resources: remove all rows from resource_cache and sync_state.
+				// resource_cache has no DeleteAllProfiles equivalent,
+				// so iterate over all 22 resources and delete them per profile.
 				resources := allResourceNames()
 				for _, r := range resources {
 					if err := a.ResourceCache.DeleteAll(cmd.Context(), a.ProfileName, r); err != nil {
@@ -158,29 +158,29 @@ func newCacheClearCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&resource, "resource", "", "対象リソース名（省略時は全リソース）")
+	cmd.Flags().StringVar(&resource, "resource", "", "Target resource name (omit for all resources)")
 	return cmd
 }
 
-// newCachePathCmd は cache path サブコマンドを返す。
-// SQLite DB のファイルパスを表示する。
+// newCachePathCmd returns the cache path subcommand.
+// It displays the file path of the SQLite DB.
 func newCachePathCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "path",
-		Short: "キャッシュ DB のパスを表示",
+		Short: "Show the path to the cache DB",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			a, ok := app.AppFromContext(cmd.Context())
 			if !ok {
 				return errNoApp
 			}
-			// DB のパスは app 経由で取得（DB.DSN は非公開のため、app から渡す）
+			// Retrieve the DB path via app (DB.DSN is unexported, so it is passed from app).
 			fmt.Fprintln(os.Stdout, a.DBPath)
 			return nil
 		},
 	}
 }
 
-// allResourceNames は全22リソース名のスライスを返す。
+// allResourceNames returns a slice of all 22 resource names.
 func allResourceNames() []string {
 	return []string{
 		"clients", "client_branches", "contacts",

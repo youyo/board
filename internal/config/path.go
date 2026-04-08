@@ -5,14 +5,14 @@ import (
 	"path/filepath"
 )
 
-// ConfigPath は config.toml のファイルパスを返す。
-// 優先順位:
-//  1. BOARD_CONFIG_PATH 環境変数
+// ConfigPath returns the file path of config.toml.
+// Resolution order:
+//  1. BOARD_CONFIG_PATH environment variable
 //  2. XDG_CONFIG_HOME/board/config.toml
 //  3. HOME/.config/board/config.toml
-//  4. $TMPDIR/board/config.toml（フォールバック）
+//  4. $TMPDIR/board/config.toml (fallback)
 func ConfigPath() string {
-	// 1. 環境変数による上書き
+	// 1. Override via environment variable
 	if p := os.Getenv("BOARD_CONFIG_PATH"); p != "" {
 		return p
 	}
@@ -27,11 +27,11 @@ func ConfigPath() string {
 		return filepath.Join(home, ".config", "board", "config.toml")
 	}
 
-	// 4. os.UserConfigDir() による標準パス
+	// 4. Standard path via os.UserConfigDir()
 	if dir, err := os.UserConfigDir(); err == nil {
 		return filepath.Join(dir, "board", "config.toml")
 	}
 
-	// 5. フォールバック: TMPDIR
+	// 5. Fallback: TMPDIR
 	return filepath.Join(os.TempDir(), "board", "config.toml")
 }

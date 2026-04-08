@@ -9,7 +9,7 @@ import (
 	"github.com/youyo/board/internal/repository"
 )
 
-// Repositories は全22リソースの Repository を保持するコンテナ。
+// Repositories is a container holding repositories for all 22 resources.
 type Repositories struct {
 	Clients              *repository.ClientRepository
 	ClientBranches       *repository.ClientBranchRepository
@@ -35,7 +35,7 @@ type Repositories struct {
 	DocumentSendChannels *repository.DocumentSendChannelRepository
 }
 
-// newRepositories は全22リポジトリを初期化して Repositories を返す。
+// newRepositories initializes all 22 repositories and returns a Repositories.
 func newRepositories(
 	profile string,
 	api *boardapi.Client,

@@ -9,11 +9,11 @@ import (
 	"github.com/youyo/board/internal/output"
 )
 
-// NewAPIClientBranchesCmd は board api client_branches サブコマンドグループを返す。
+// NewAPIClientBranchesCmd  returns the board api client_branches subcommand group.
 func NewAPIClientBranchesCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "client_branches",
-		Short: "顧客支社（client_branches）を操作する",
+		Short: "Manage client_branches",
 	}
 	cmd.AddCommand(
 		newAPIClientBranchesListCmd(),
@@ -26,7 +26,7 @@ func NewAPIClientBranchesCmd() *cobra.Command {
 func newAPIClientBranchesListCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
-		Short: "顧客支社の一覧を取得する",
+		Short: "List all client_branches",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			svc, err := apiServiceFromCmd(cmd)
 			if err != nil {
@@ -46,10 +46,10 @@ func newAPIClientBranchesGetCmd() *cobra.Command {
 	var id int
 	cmd := &cobra.Command{
 		Use:   "get",
-		Short: "指定 ID の顧客支社を取得する",
+		Short: "Get a client_branche by ID",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if id == 0 {
-				return fmt.Errorf("--id は必須です")
+				return fmt.Errorf("--id is required")
 			}
 			svc, err := apiServiceFromCmd(cmd)
 			if err != nil {
@@ -63,7 +63,7 @@ func newAPIClientBranchesGetCmd() *cobra.Command {
 			return output.Write(os.Stdout, result, prettyFromCmd(cmd))
 		},
 	}
-	cmd.Flags().IntVar(&id, "id", 0, "顧客支社 ID（必須）")
+	cmd.Flags().IntVar(&id, "id", 0, "Client branch ID (required)")
 	return cmd
 }
 
@@ -72,7 +72,7 @@ func newAPIClientBranchesSearchCmd() *cobra.Command {
 	var name string
 	cmd := &cobra.Command{
 		Use:   "search",
-		Short: "顧客支社を条件で検索する",
+		Short: "Search client_branches by criteria",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			svc, err := apiServiceFromCmd(cmd)
 			if err != nil {
@@ -90,7 +90,7 @@ func newAPIClientBranchesSearchCmd() *cobra.Command {
 			return output.Write(os.Stdout, result, prettyFromCmd(cmd))
 		},
 	}
-	cmd.Flags().IntVar(&clientID, "client-id", 0, "顧客 ID でフィルタ")
-	cmd.Flags().StringVar(&name, "name", "", "支社名でフィルタ")
+	cmd.Flags().IntVar(&clientID, "client-id", 0, "Filter by client ID")
+	cmd.Flags().StringVar(&name, "name", "", "Filter by branch name")
 	return cmd
 }

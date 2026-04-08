@@ -2,7 +2,7 @@ package refresh
 
 import "time"
 
-// TodayInTZ は now を tz の timezone で解釈した日付を "YYYY-MM-DD" 形式で返す。
+// TodayInTZ returns the date of now interpreted in the tz timezone, formatted as "YYYY-MM-DD".
 func TodayInTZ(now time.Time, tz *time.Location) string {
 	return now.In(tz).Format("2006-01-02")
 }

@@ -8,7 +8,7 @@ import (
 	"github.com/youyo/board/internal/cache"
 )
 
-// openRefreshTestDB はテスト用インメモリ DB を開き、マイグレーションを適用するヘルパー。
+// openRefreshTestDB is a helper that opens an in-memory DB for testing and applies migration.
 func openRefreshTestDB(t *testing.T) *cache.DB {
 	t.Helper()
 	db, err := cache.Open(":memory:")
@@ -27,7 +27,7 @@ var (
 	testTZ  = time.UTC
 )
 
-// TestUpdater_MarkDeltaSuccess_NewRecord: sync_state が存在しない初回、全フィールドが正しく設定される
+// TestUpdater_MarkDeltaSuccess_NewRecord: first time with no sync_state, all fields are correctly set
 func TestUpdater_MarkDeltaSuccess_NewRecord(t *testing.T) {
 	db := openRefreshTestDB(t)
 	ss := cache.NewSyncStateStore(db)
@@ -71,14 +71,14 @@ func TestUpdater_MarkDeltaSuccess_NewRecord(t *testing.T) {
 	}
 }
 
-// TestUpdater_MarkDeltaSuccess_UpdatesCursor: 既存 sync_state の cursor_updated_at が更新される
+// TestUpdater_MarkDeltaSuccess_UpdatesCursor: cursor_updated_at of existing sync_state is updated
 func TestUpdater_MarkDeltaSuccess_UpdatesCursor(t *testing.T) {
 	db := openRefreshTestDB(t)
 	ss := cache.NewSyncStateStore(db)
 	u := NewUpdater(ss)
 	ctx := context.Background()
 
-	// 既存状態をセット
+	// set existing state
 	existing := cache.SyncState{
 		ProfileName:         "default",
 		ResourceName:        "clients",
@@ -104,7 +104,7 @@ func TestUpdater_MarkDeltaSuccess_UpdatesCursor(t *testing.T) {
 	}
 }
 
-// TestUpdater_MarkDeltaSuccess_EmptyCursorPreservesExisting: newCursor が空の場合、既存 cursor_updated_at を保持する
+// TestUpdater_MarkDeltaSuccess_EmptyCursorPreservesExisting: existing cursor_updated_at is retained when newCursor is empty
 func TestUpdater_MarkDeltaSuccess_EmptyCursorPreservesExisting(t *testing.T) {
 	db := openRefreshTestDB(t)
 	ss := cache.NewSyncStateStore(db)
@@ -120,7 +120,7 @@ func TestUpdater_MarkDeltaSuccess_EmptyCursorPreservesExisting(t *testing.T) {
 		t.Fatalf("Upsert: %v", err)
 	}
 
-	// newCursor が空
+	// newCursor is empty
 	err := u.MarkDeltaSuccess(ctx, "default", "clients", "", testNow, testTZ)
 	if err != nil {
 		t.Fatalf("MarkDeltaSuccess: %v", err)
@@ -131,13 +131,13 @@ func TestUpdater_MarkDeltaSuccess_EmptyCursorPreservesExisting(t *testing.T) {
 		t.Fatalf("Get: %v", err)
 	}
 
-	// 既存カーソルが保持されている
+	// existing cursor is retained
 	if state.CursorUpdatedAt.String != "2025-01-10T00:00:00Z" {
 		t.Errorf("CursorUpdatedAt = %q, want %q", state.CursorUpdatedAt.String, "2025-01-10T00:00:00Z")
 	}
 }
 
-// TestUpdater_MarkDeltaSuccess_SetsConsecutiveFailuresToZero: consecutive_failures がリセットされる
+// TestUpdater_MarkDeltaSuccess_SetsConsecutiveFailuresToZero: consecutive_failures is reset
 func TestUpdater_MarkDeltaSuccess_SetsConsecutiveFailuresToZero(t *testing.T) {
 	db := openRefreshTestDB(t)
 	ss := cache.NewSyncStateStore(db)
@@ -168,7 +168,7 @@ func TestUpdater_MarkDeltaSuccess_SetsConsecutiveFailuresToZero(t *testing.T) {
 	}
 }
 
-// TestUpdater_MarkForceSuccess_ResetsCursor: cursor_updated_at が NULL にリセットされる
+// TestUpdater_MarkForceSuccess_ResetsCursor: cursor_updated_at is reset to NULL
 func TestUpdater_MarkForceSuccess_ResetsCursor(t *testing.T) {
 	db := openRefreshTestDB(t)
 	ss := cache.NewSyncStateStore(db)
@@ -199,7 +199,7 @@ func TestUpdater_MarkForceSuccess_ResetsCursor(t *testing.T) {
 	}
 }
 
-// TestUpdater_MarkForceSuccess_SetsLastFullSyncedAt: last_full_synced_at が更新される
+// TestUpdater_MarkForceSuccess_SetsLastFullSyncedAt: last_full_synced_at is updated
 func TestUpdater_MarkForceSuccess_SetsLastFullSyncedAt(t *testing.T) {
 	db := openRefreshTestDB(t)
 	ss := cache.NewSyncStateStore(db)
@@ -231,7 +231,7 @@ func TestUpdater_MarkForceSuccess_SetsLastFullSyncedAt(t *testing.T) {
 	}
 }
 
-// TestUpdater_MarkForceSuccess_ClearsMustFullResync: must_full_resync が false にクリアされる
+// TestUpdater_MarkForceSuccess_ClearsMustFullResync: must_full_resync is cleared to false
 func TestUpdater_MarkForceSuccess_ClearsMustFullResync(t *testing.T) {
 	db := openRefreshTestDB(t)
 	ss := cache.NewSyncStateStore(db)
@@ -262,7 +262,7 @@ func TestUpdater_MarkForceSuccess_ClearsMustFullResync(t *testing.T) {
 	}
 }
 
-// TestUpdater_MarkError_IncrementsConsecutiveFailures: consecutive_failures がインクリメントされる
+// TestUpdater_MarkError_IncrementsConsecutiveFailures: consecutive_failures is incremented
 func TestUpdater_MarkError_IncrementsConsecutiveFailures(t *testing.T) {
 	db := openRefreshTestDB(t)
 	ss := cache.NewSyncStateStore(db)
@@ -293,7 +293,7 @@ func TestUpdater_MarkError_IncrementsConsecutiveFailures(t *testing.T) {
 	}
 }
 
-// TestUpdater_MarkError_SetsErrorFields: last_error_at/code/message が更新される
+// TestUpdater_MarkError_SetsErrorFields: last_error_at/code/message are updated
 func TestUpdater_MarkError_SetsErrorFields(t *testing.T) {
 	db := openRefreshTestDB(t)
 	ss := cache.NewSyncStateStore(db)

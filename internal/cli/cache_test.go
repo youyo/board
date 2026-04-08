@@ -7,7 +7,7 @@ import (
 	"github.com/youyo/board/internal/cli"
 )
 
-// TestNewCacheCmd はコマンド構造（サブコマンド）を検証する。
+// TestNewCacheCmd verifies the command structure (subcommands).
 func TestNewCacheCmd(t *testing.T) {
 	cmd := cli.NewCacheCmd()
 
@@ -22,12 +22,12 @@ func TestNewCacheCmd(t *testing.T) {
 
 	for _, want := range []string{"status", "expire", "clear", "path"} {
 		if !subNames[want] {
-			t.Errorf("サブコマンド %q が登録されていない", want)
+			t.Errorf("subcommand %q is not registered", want)
 		}
 	}
 }
 
-// TestCacheExpireCmdFlags は cache expire の --resource フラグを検証する。
+// TestCacheExpireCmdFlags verifies the --resource flag of cache expire.
 func TestCacheExpireCmdFlags(t *testing.T) {
 	var expireCmd *cobra.Command
 	for _, sub := range cli.NewCacheCmd().Commands() {
@@ -36,14 +36,14 @@ func TestCacheExpireCmdFlags(t *testing.T) {
 		}
 	}
 	if expireCmd == nil {
-		t.Fatal("expire コマンドが見つからない")
+		t.Fatal("expire command not found")
 	}
 	if f := expireCmd.Flags().Lookup("resource"); f == nil {
-		t.Error("expire: --resource フラグが定義されていない")
+		t.Error("expire: --resource flag is not defined")
 	}
 }
 
-// TestCacheClearCmdFlags は cache clear の --resource フラグを検証する。
+// TestCacheClearCmdFlags verifies the --resource flag of cache clear.
 func TestCacheClearCmdFlags(t *testing.T) {
 	var clearCmd *cobra.Command
 	for _, sub := range cli.NewCacheCmd().Commands() {
@@ -52,14 +52,14 @@ func TestCacheClearCmdFlags(t *testing.T) {
 		}
 	}
 	if clearCmd == nil {
-		t.Fatal("clear コマンドが見つからない")
+		t.Fatal("clear command not found")
 	}
 	if f := clearCmd.Flags().Lookup("resource"); f == nil {
-		t.Error("clear: --resource フラグが定義されていない")
+		t.Error("clear: --resource flag is not defined")
 	}
 }
 
-// TestRootCmdHasCacheSubcommand は root コマンドに cache が登録されているか検証する。
+// TestRootCmdHasCacheSubcommand verifies that cache is registered on the root command.
 func TestRootCmdHasCacheSubcommand(t *testing.T) {
 	root := cli.NewRootCmd("test")
 	found := false
@@ -69,6 +69,6 @@ func TestRootCmdHasCacheSubcommand(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Error("root コマンドに cache サブコマンドが登録されていない")
+		t.Error("cache subcommand is not registered on root command")
 	}
 }

@@ -8,7 +8,7 @@ import (
 )
 
 func TestConfigureSetCmd(t *testing.T) {
-	t.Run("timezone を set すると config.toml に反映される", func(t *testing.T) {
+	t.Run("setting timezone is reflected in config.toml", func(t *testing.T) {
 		path := newTempConfig(t)
 
 		root := cli.NewConfigureCmd()
@@ -26,7 +26,7 @@ func TestConfigureSetCmd(t *testing.T) {
 		}
 	})
 
-	t.Run("profiles.default.api_key を set すると平文で保存される", func(t *testing.T) {
+	t.Run("setting profiles.default.api_key saves in plain text", func(t *testing.T) {
 		path := newTempConfig(t)
 
 		root := cli.NewConfigureCmd()
@@ -48,7 +48,7 @@ func TestConfigureSetCmd(t *testing.T) {
 		}
 	})
 
-	t.Run("profiles.default.daily_auto_refresh を false に set できる", func(t *testing.T) {
+	t.Run("can set profiles.default.daily_auto_refresh to false", func(t *testing.T) {
 		path := newTempConfig(t)
 
 		root := cli.NewConfigureCmd()
@@ -70,10 +70,10 @@ func TestConfigureSetCmd(t *testing.T) {
 		}
 	})
 
-	t.Run("profiles.default.daily_auto_refresh を true に set できる", func(t *testing.T) {
+	t.Run("can set profiles.default.daily_auto_refresh to true", func(t *testing.T) {
 		path := newTempConfig(t)
 
-		// まず false に設定
+		// First, set to false.
 		cfg := config.DefaultConfig()
 		prof := config.DefaultProfileConfig()
 		prof.DailyAutoRefresh = false
@@ -101,7 +101,7 @@ func TestConfigureSetCmd(t *testing.T) {
 		}
 	})
 
-	t.Run("不正なキーはエラー", func(t *testing.T) {
+	t.Run("an invalid key returns an error", func(t *testing.T) {
 		newTempConfig(t)
 
 		root := cli.NewConfigureCmd()
@@ -111,7 +111,7 @@ func TestConfigureSetCmd(t *testing.T) {
 		}
 	})
 
-	t.Run("引数1個は cobra の args エラー", func(t *testing.T) {
+	t.Run("a single argument returns a cobra args error", func(t *testing.T) {
 		newTempConfig(t)
 
 		root := cli.NewConfigureCmd()

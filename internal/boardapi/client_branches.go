@@ -8,8 +8,8 @@ import (
 	"strconv"
 )
 
-// ClientBranchEntity は BOARD API の顧客支社エンティティ。
-// GET /v1/client_branches レスポンスの1要素に対応。
+// ClientBranchEntity is a BOARD API customer branch entity.
+// Corresponds to one element in the GET /v1/client_branches response.
 type ClientBranchEntity struct {
 	ID         int    `json:"id"`
 	ClientID   int    `json:"client_id"`
@@ -23,14 +23,14 @@ type ClientBranchEntity struct {
 	CreatedAt  string `json:"created_at"` // ISO 8601
 }
 
-// ClientBranchSearchParams は SearchClientBranches のパラメータ。
+// ClientBranchSearchParams is the parameter for SearchClientBranches.
 type ClientBranchSearchParams struct {
 	ClientID int
 	Name     string
 }
 
-// ListClientBranches は全顧客支社を取得する。
-// ページネーションは ListAll により自動処理される。
+// ListClientBranches retrieves all customer branches.
+// Pagination is automatically handled by ListAll.
 func (c *Client) ListClientBranches(ctx context.Context) ([]ClientBranchEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/client_branches", nil)
@@ -58,7 +58,7 @@ func (c *Client) ListClientBranches(ctx context.Context) ([]ClientBranchEntity, 
 	return result, nil
 }
 
-// GetClientBranch は指定 ID の顧客支社を取得する。
+// GetClientBranch retrieves the customer branch with the specified ID.
 func (c *Client) GetClientBranch(ctx context.Context, id int) (*ClientBranchEntity, error) {
 	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/client_branches/%d", id), nil)
 	if err != nil {
@@ -75,8 +75,8 @@ func (c *Client) GetClientBranch(ctx context.Context, id int) (*ClientBranchEnti
 	return &x, nil
 }
 
-// SearchClientBranches は条件付きで顧客支社を検索する。
-// ページネーションは ListAll により自動処理される。
+// SearchClientBranches searches customer branches with the given conditions.
+// Pagination is automatically handled by ListAll.
 func (c *Client) SearchClientBranches(ctx context.Context, params ClientBranchSearchParams) ([]ClientBranchEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/client_branches", nil)

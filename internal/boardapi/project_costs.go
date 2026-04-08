@@ -8,8 +8,8 @@ import (
 	"strconv"
 )
 
-// ProjectCostEntity は BOARD API の案件原価エンティティ。
-// GET /v1/project_costs レスポンスの1要素に対応。
+// ProjectCostEntity is a BOARD API project cost entity.
+// Corresponds to one element in the GET /v1/project_costs response.
 type ProjectCostEntity struct {
 	ID        int     `json:"id"`
 	ProjectID int     `json:"project_id"`
@@ -21,13 +21,13 @@ type ProjectCostEntity struct {
 	CreatedAt string  `json:"created_at"` // ISO 8601
 }
 
-// ProjectCostSearchParams は SearchProjectCosts のパラメータ。
+// ProjectCostSearchParams is the parameter for SearchProjectCosts.
 type ProjectCostSearchParams struct {
 	ProjectID int
 }
 
-// ListProjectCosts は全案件原価を取得する。
-// ページネーションは ListAll により自動処理される。
+// ListProjectCosts retrieves all project costs.
+// Pagination is automatically handled by ListAll.
 func (c *Client) ListProjectCosts(ctx context.Context) ([]ProjectCostEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/project_costs", nil)
@@ -55,7 +55,7 @@ func (c *Client) ListProjectCosts(ctx context.Context) ([]ProjectCostEntity, err
 	return result, nil
 }
 
-// GetProjectCost は指定 ID の案件原価を取得する。
+// GetProjectCost retrieves the project cost with the specified ID.
 func (c *Client) GetProjectCost(ctx context.Context, id int) (*ProjectCostEntity, error) {
 	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/project_costs/%d", id), nil)
 	if err != nil {
@@ -72,8 +72,8 @@ func (c *Client) GetProjectCost(ctx context.Context, id int) (*ProjectCostEntity
 	return &x, nil
 }
 
-// SearchProjectCosts は条件付きで案件原価を検索する。
-// ページネーションは ListAll により自動処理される。
+// SearchProjectCosts searches project costs with the given conditions.
+// Pagination is automatically handled by ListAll.
 func (c *Client) SearchProjectCosts(ctx context.Context, params ProjectCostSearchParams) ([]ProjectCostEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/project_costs", nil)

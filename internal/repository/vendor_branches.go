@@ -12,7 +12,7 @@ import (
 	"github.com/youyo/board/internal/refresh"
 )
 
-// VendorBranchRepository は vendor_branches リソースのキャッシュ → リフレッシュ → API フォールバックを管理する。
+// VendorBranchRepository manages cache -> refresh -> API fallback for the vendor_branches resource.
 type VendorBranchRepository struct {
 	profile     string
 	api         *boardapi.Client
@@ -24,7 +24,7 @@ type VendorBranchRepository struct {
 	autoRefresh bool
 }
 
-// NewVendorBranchRepository は VendorBranchRepository を生成する。
+// NewVendorBranchRepository creates a new VendorBranchRepository.
 func NewVendorBranchRepository(
 	profile string,
 	api *boardapi.Client,
@@ -49,7 +49,7 @@ func NewVendorBranchRepository(
 
 const vendorBranchesResource = "vendor_branches"
 
-// List は全発注先支社をキャッシュから返す。
+// List returns all vendor branches from the cache.
 func (r *VendorBranchRepository) List(ctx context.Context, opts ReadOptions) ([]boardapi.VendorBranchEntity, error) {
 	fetcher := &vendorBranchesFetcher{api: r.api}
 	now := time.Now()
@@ -92,8 +92,8 @@ func (r *VendorBranchRepository) List(ctx context.Context, opts ReadOptions) ([]
 	return entities, nil
 }
 
-// GetByID は指定 ID の発注先支社をキャッシュから返す。
-// キャッシュミス時は API から単体取得して upsert する。
+// GetByID returns the vendor branch with the given ID from the cache.
+// On cache miss, it fetches from the API and upserts the result.
 func (r *VendorBranchRepository) GetByID(ctx context.Context, id int, opts ReadOptions) (*boardapi.VendorBranchEntity, error) {
 	fetcher := &vendorBranchesFetcher{api: r.api}
 	now := time.Now()
@@ -121,7 +121,7 @@ func (r *VendorBranchRepository) GetByID(ctx context.Context, id int, opts ReadO
 		return &entity, nil
 	}
 
-	// キャッシュミス → API 単体取得
+	// Cache miss → fetch single entity from API
 	entity, err := r.api.GetVendorBranch(ctx, id)
 	if err != nil {
 		return nil, err
@@ -138,7 +138,7 @@ func (r *VendorBranchRepository) GetByID(ctx context.Context, id int, opts ReadO
 	return entity, nil
 }
 
-// Search はパラメータでフィルタした発注先支社をキャッシュから返す。
+// Search returns vendor branches filtered by the given parameters from the cache.
 func (r *VendorBranchRepository) Search(ctx context.Context, params boardapi.VendorBranchSearchParams, opts ReadOptions) ([]boardapi.VendorBranchEntity, error) {
 	all, err := r.List(ctx, opts)
 	if err != nil {
@@ -147,7 +147,7 @@ func (r *VendorBranchRepository) Search(ctx context.Context, params boardapi.Ven
 	return filterVendorBranches(all, params), nil
 }
 
-// filterVendorBranches はインメモリフィルタリングを行う。
+// filterVendorBranches performs in-memory filtering.
 func filterVendorBranches(entities []boardapi.VendorBranchEntity, params boardapi.VendorBranchSearchParams) []boardapi.VendorBranchEntity {
 	var result []boardapi.VendorBranchEntity
 	for _, e := range entities {

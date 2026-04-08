@@ -16,7 +16,7 @@ import (
 	"github.com/youyo/board/internal/repository"
 )
 
-// makeProjectRepo はテスト用 ProjectRepository を構築する。
+// makeProjectRepo constructs a ProjectRepository for testing.
 func makeProjectRepo(t *testing.T, db *cache.DB, apiClient *boardapi.Client, autoRefresh bool) *repository.ProjectRepository {
 	t.Helper()
 	rc := cache.NewResourceCache(db)
@@ -27,7 +27,7 @@ func makeProjectRepo(t *testing.T, db *cache.DB, apiClient *boardapi.Client, aut
 	return repository.NewProjectRepository("default", apiClient, rc, ss, refresher, lm, tz, autoRefresh)
 }
 
-// seedProjectCache はキャッシュに ProjectEntity を直接書き込む。
+// seedProjectCache writes ProjectEntity records directly into the cache.
 func seedProjectCache(t *testing.T, db *cache.DB, entities []boardapi.ProjectEntity) {
 	t.Helper()
 	rc := cache.NewResourceCache(db)
@@ -53,7 +53,7 @@ func seedProjectCache(t *testing.T, db *cache.DB, entities []boardapi.ProjectEnt
 	}
 }
 
-// newProjectAPIServer は projects レスポンスを返す httptest.Server を返す。
+// newProjectAPIServer returns an httptest.Server that serves entities for /v1/projects.
 func newProjectAPIServer(t *testing.T, entities []boardapi.ProjectEntity) *httptest.Server {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -65,12 +65,12 @@ func newProjectAPIServer(t *testing.T, entities []boardapi.ProjectEntity) *httpt
 }
 
 var sampleProjects = []boardapi.ProjectEntity{
-	{ID: 1, ClientID: 10, Name: "プロジェクトA", Status: "active", UpdatedAt: "2026-01-01T00:00:00Z"},
-	{ID: 2, ClientID: 10, Name: "プロジェクトB", Status: "closed", UpdatedAt: "2026-01-02T00:00:00Z"},
-	{ID: 3, ClientID: 20, Name: "プロジェクトC", Status: "active", UpdatedAt: "2026-01-03T00:00:00Z"},
+	{ID: 1, ClientID: 10, Name: "ProjectA", Status: "active", UpdatedAt: "2026-01-01T00:00:00Z"},
+	{ID: 2, ClientID: 10, Name: "ProjectB", Status: "closed", UpdatedAt: "2026-01-02T00:00:00Z"},
+	{ID: 3, ClientID: 20, Name: "ProjectC", Status: "active", UpdatedAt: "2026-01-03T00:00:00Z"},
 }
 
-// T_R42: List - キャッシュあり → キャッシュのデータを返す
+// T_R42: List - cache hit -> returns cached data
 func TestProjectRepository_List_CacheHit(t *testing.T) {
 	db := newTestDB(t)
 	seedProjectCache(t, db, sampleProjects)
@@ -89,7 +89,7 @@ func TestProjectRepository_List_CacheHit(t *testing.T) {
 	}
 }
 
-// T_R43: List - キャッシュなし（初回） → ForceRefresh 後データを返す
+// T_R43: List - no cache (initial load) -> returns data after ForceRefresh
 func TestProjectRepository_List_InitialLoad(t *testing.T) {
 	db := newTestDB(t)
 
@@ -106,7 +106,7 @@ func TestProjectRepository_List_InitialLoad(t *testing.T) {
 	}
 }
 
-// T_R44: List - autoRefresh=true、NeedsDailyRefresh=true → DeltaRefresh 後データを返す
+// T_R44: List - autoRefresh=true, NeedsDailyRefresh=true -> returns data after DeltaRefresh
 func TestProjectRepository_List_AutoRefresh(t *testing.T) {
 	db := newTestDB(t)
 	seedProjectCache(t, db, sampleProjects[:1])
@@ -131,7 +131,7 @@ func TestProjectRepository_List_AutoRefresh(t *testing.T) {
 	}
 }
 
-// T_R45: List - opts.ForceRefresh=true → ForceRefresh 後データを返す
+// T_R45: List - opts.ForceRefresh=true -> returns data after ForceRefresh
 func TestProjectRepository_List_ForceRefresh(t *testing.T) {
 	db := newTestDB(t)
 
@@ -148,7 +148,7 @@ func TestProjectRepository_List_ForceRefresh(t *testing.T) {
 	}
 }
 
-// T_R46: List - opts.Refresh=true → DeltaRefresh 後データを返す
+// T_R46: List - opts.Refresh=true -> returns data after DeltaRefresh
 func TestProjectRepository_List_DeltaRefresh(t *testing.T) {
 	db := newTestDB(t)
 	seedProjectCache(t, db, sampleProjects[:1])
@@ -167,7 +167,7 @@ func TestProjectRepository_List_DeltaRefresh(t *testing.T) {
 	}
 }
 
-// T_R47: List - opts.Limit=2 → 2件のみ返す
+// T_R47: List - opts.Limit=2 -> returns only 2 items
 func TestProjectRepository_List_Limit(t *testing.T) {
 	db := newTestDB(t)
 	seedProjectCache(t, db, sampleProjects)
@@ -186,7 +186,7 @@ func TestProjectRepository_List_Limit(t *testing.T) {
 	}
 }
 
-// T_R48: List - opts.Refresh=true、API エラー → stale キャッシュを返す
+// T_R48: List - opts.Refresh=true, API error -> returns stale cache
 func TestProjectRepository_List_DeltaRefreshAPIError_StaleCache(t *testing.T) {
 	db := newTestDB(t)
 	seedProjectCache(t, db, sampleProjects)
@@ -205,7 +205,7 @@ func TestProjectRepository_List_DeltaRefreshAPIError_StaleCache(t *testing.T) {
 	}
 }
 
-// T_R49: Search - Status フィルタ（"active"）
+// T_R49: Search - Status filter ("active")
 func TestProjectRepository_Search_StatusFilter(t *testing.T) {
 	db := newTestDB(t)
 	seedProjectCache(t, db, sampleProjects)
@@ -224,7 +224,7 @@ func TestProjectRepository_Search_StatusFilter(t *testing.T) {
 	}
 }
 
-// T_R50: Search - UpdatedAtFrom フィルタ → フィルタに含めない（API 側で絞り込み済み）
+// T_R50: Search - UpdatedAtFrom filter -> not applied client-side (filtered by API)
 func TestProjectRepository_Search_UpdatedAtFrom(t *testing.T) {
 	db := newTestDB(t)
 	seedProjectCache(t, db, sampleProjects)
@@ -234,7 +234,7 @@ func TestProjectRepository_Search_UpdatedAtFrom(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeProjectRepo(t, db, apiClient, false)
-	// UpdatedAtFrom はフィルタに含めないので全件返る
+	// UpdatedAtFrom is not a client-side filter, so all items are returned
 	got, err := repo.Search(context.Background(), boardapi.ProjectSearchParams{UpdatedAtFrom: "2026-01-02T00:00:00Z"}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
@@ -244,7 +244,7 @@ func TestProjectRepository_Search_UpdatedAtFrom(t *testing.T) {
 	}
 }
 
-// T_R51: GetByID - キャッシュヒット
+// T_R51: GetByID - cache hit
 func TestProjectRepository_GetByID_CacheHit(t *testing.T) {
 	db := newTestDB(t)
 	seedProjectCache(t, db, sampleProjects)
@@ -263,12 +263,12 @@ func TestProjectRepository_GetByID_CacheHit(t *testing.T) {
 	}
 }
 
-// T_R52: GetByID - キャッシュミス、API 成功
+// T_R52: GetByID - cache miss, API success
 func TestProjectRepository_GetByID_CacheMiss_APISuccess(t *testing.T) {
 	db := newTestDB(t)
 	markSynced(t, db, "projects")
 
-	target := boardapi.ProjectEntity{ID: 99, ClientID: 10, Name: "テスト案件", Status: "active"}
+	target := boardapi.ProjectEntity{ID: 99, ClientID: 10, Name: "Test Project", Status: "active"}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		b, _ := json.Marshal(target)
@@ -288,7 +288,7 @@ func TestProjectRepository_GetByID_CacheMiss_APISuccess(t *testing.T) {
 	}
 }
 
-// T_R53: GetByID - キャッシュミス、API エラー → error を返す
+// T_R53: GetByID - cache miss, API error -> returns error
 func TestProjectRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	db := newTestDB(t)
 	markSynced(t, db, "projects")
@@ -303,7 +303,7 @@ func TestProjectRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	}
 }
 
-// T_R54: Search - Name フィルタ + ClientID フィルタ
+// T_R54: Search - Name filter + ClientID filter
 func TestProjectRepository_Search_MultiFilter(t *testing.T) {
 	db := newTestDB(t)
 	seedProjectCache(t, db, sampleProjects)
@@ -313,7 +313,7 @@ func TestProjectRepository_Search_MultiFilter(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeProjectRepo(t, db, apiClient, false)
-	got, err := repo.Search(context.Background(), boardapi.ProjectSearchParams{ClientID: 10, Name: "プロジェクト"}, repository.ReadOptions{})
+	got, err := repo.Search(context.Background(), boardapi.ProjectSearchParams{ClientID: 10, Name: "Project"}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}

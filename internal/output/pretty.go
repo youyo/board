@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 )
 
-// PrettyFormat は JSON バイト列をインデント付きに整形して返す。
+// PrettyFormat formats a JSON byte slice with indentation and returns the result.
 func PrettyFormat(data []byte) ([]byte, error) {
 	var v interface{}
 	if err := json.Unmarshal(data, &v); err != nil {
@@ -17,6 +17,6 @@ func PrettyFormat(data []byte) ([]byte, error) {
 	if err := enc.Encode(v); err != nil {
 		return nil, err
 	}
-	// Encode は末尾に \n を付けるので、スライスとして返す
+	// Encode appends a trailing \n, so return as a slice.
 	return buf.Bytes(), nil
 }

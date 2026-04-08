@@ -11,7 +11,7 @@ import (
 	"github.com/youyo/board/internal/refresh"
 )
 
-// InvoiceRepository は invoices リソースのキャッシュ → リフレッシュ → API フォールバックを管理する。
+// InvoiceRepository manages cache -> refresh -> API fallback for the invoices resource.
 type InvoiceRepository struct {
 	profile     string
 	api         *boardapi.Client
@@ -23,7 +23,7 @@ type InvoiceRepository struct {
 	autoRefresh bool
 }
 
-// NewInvoiceRepository は InvoiceRepository を生成する。
+// NewInvoiceRepository creates a new InvoiceRepository.
 func NewInvoiceRepository(
 	profile string,
 	api *boardapi.Client,
@@ -48,7 +48,7 @@ func NewInvoiceRepository(
 
 const invoicesResource = "invoices"
 
-// List は全請求をキャッシュから返す。
+// List returns all invoices from the cache.
 func (r *InvoiceRepository) List(ctx context.Context, opts ReadOptions) ([]boardapi.InvoiceEntity, error) {
 	fetcher := &invoicesFetcher{api: r.api}
 	now := time.Now()
@@ -91,8 +91,8 @@ func (r *InvoiceRepository) List(ctx context.Context, opts ReadOptions) ([]board
 	return entities, nil
 }
 
-// GetByID は指定 ID の請求をキャッシュから返す。
-// キャッシュミス時は API から単体取得して upsert する。
+// GetByID returns the invoice with the given ID from the cache.
+// On cache miss, it fetches from the API and upserts the result.
 func (r *InvoiceRepository) GetByID(ctx context.Context, id int, opts ReadOptions) (*boardapi.InvoiceEntity, error) {
 	fetcher := &invoicesFetcher{api: r.api}
 	now := time.Now()
@@ -120,7 +120,7 @@ func (r *InvoiceRepository) GetByID(ctx context.Context, id int, opts ReadOption
 		return &entity, nil
 	}
 
-	// キャッシュミス → API 単体取得
+	// Cache miss → fetch single entity from API
 	entity, err := r.api.GetInvoice(ctx, id)
 	if err != nil {
 		return nil, err
@@ -137,7 +137,7 @@ func (r *InvoiceRepository) GetByID(ctx context.Context, id int, opts ReadOption
 	return entity, nil
 }
 
-// Search はパラメータでフィルタした請求をキャッシュから返す。
+// Search returns invoices filtered by the given parameters from the cache.
 func (r *InvoiceRepository) Search(ctx context.Context, params boardapi.InvoiceSearchParams, opts ReadOptions) ([]boardapi.InvoiceEntity, error) {
 	all, err := r.List(ctx, opts)
 	if err != nil {
@@ -146,8 +146,8 @@ func (r *InvoiceRepository) Search(ctx context.Context, params boardapi.InvoiceS
 	return filterInvoices(all, params), nil
 }
 
-// filterInvoices はインメモリフィルタリングを行う。
-// UpdatedAtFrom は差分取得カーソルとして使用するためフィルタには含めない。
+// filterInvoices performs in-memory filtering.
+// UpdatedAtFrom is used as a delta fetch cursor and is not included in the filter.
 func filterInvoices(entities []boardapi.InvoiceEntity, params boardapi.InvoiceSearchParams) []boardapi.InvoiceEntity {
 	var result []boardapi.InvoiceEntity
 	for _, e := range entities {

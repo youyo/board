@@ -7,7 +7,7 @@ import (
 	"github.com/youyo/board/internal/cli"
 )
 
-// TestNewAPICmd はコマンド構造（サブコマンド・フラグ）を検証する。
+// TestNewAPICmd verifies the command structure (subcommands and flags).
 func TestNewAPICmd(t *testing.T) {
 	cmd := cli.NewAPICmd()
 
@@ -23,7 +23,7 @@ func TestNewAPICmd(t *testing.T) {
 	expects := []string{"clients", "client_branches", "contacts", "projects", "project_costs", "estimates", "invoices", "orders", "deliveries", "receipts", "vendors", "vendor_branches", "vendor_contacts", "purchase_orders", "payments", "users", "groups", "payment_terms", "project_types", "purchase_types", "accounting_types", "document_send_channels"}
 	for _, name := range expects {
 		if !subNames[name] {
-			t.Errorf("サブコマンド %q が登録されていない", name)
+			t.Errorf("subcommand %q is not registered", name)
 		}
 	}
 }
@@ -40,11 +40,11 @@ func TestNewAPIClientsCmd(t *testing.T) {
 	}
 	for _, name := range []string{"list", "get", "search"} {
 		if !subNames[name] {
-			t.Errorf("サブコマンド %q が登録されていない", name)
+			t.Errorf("subcommand %q is not registered", name)
 		}
 	}
 
-	// get コマンドに --id フラグがあるか確認
+	// Verify that the get command has the --id flag.
 	var getCmd *cobra.Command
 	for _, sub := range cmd.Commands() {
 		if sub.Use == "get" {
@@ -52,13 +52,13 @@ func TestNewAPIClientsCmd(t *testing.T) {
 		}
 	}
 	if getCmd == nil {
-		t.Fatal("get コマンドが見つからない")
+		t.Fatal("get command not found")
 	}
 	if f := getCmd.Flags().Lookup("id"); f == nil {
-		t.Error("get: --id フラグが定義されていない")
+		t.Error("get: --id flag is not defined")
 	}
 
-	// search コマンドのフラグ確認
+	// Verify search command flags.
 	var searchCmd *cobra.Command
 	for _, sub := range cmd.Commands() {
 		if sub.Use == "search" {
@@ -66,11 +66,11 @@ func TestNewAPIClientsCmd(t *testing.T) {
 		}
 	}
 	if searchCmd == nil {
-		t.Fatal("search コマンドが見つからない")
+		t.Fatal("search command not found")
 	}
 	for _, flagName := range []string{"name", "updated-at-from"} {
 		if f := searchCmd.Flags().Lookup(flagName); f == nil {
-			t.Errorf("search: --%s フラグが定義されていない", flagName)
+			t.Errorf("search: --%s flag is not defined", flagName)
 		}
 	}
 }
@@ -86,7 +86,7 @@ func TestNewAPIClientBranchesCmd(t *testing.T) {
 	}
 	for _, name := range []string{"list", "get", "search"} {
 		if !subNames[name] {
-			t.Errorf("サブコマンド %q が登録されていない", name)
+			t.Errorf("subcommand %q is not registered", name)
 		}
 	}
 
@@ -98,11 +98,11 @@ func TestNewAPIClientBranchesCmd(t *testing.T) {
 		}
 	}
 	if searchCmd == nil {
-		t.Fatal("search コマンドが見つからない")
+		t.Fatal("search command not found")
 	}
 	for _, flagName := range []string{"client-id", "name"} {
 		if f := searchCmd.Flags().Lookup(flagName); f == nil {
-			t.Errorf("search: --%s フラグが定義されていない", flagName)
+			t.Errorf("search: --%s flag is not defined", flagName)
 		}
 	}
 }
@@ -118,7 +118,7 @@ func TestNewAPIContactsCmd(t *testing.T) {
 	}
 	for _, name := range []string{"list", "get", "search"} {
 		if !subNames[name] {
-			t.Errorf("サブコマンド %q が登録されていない", name)
+			t.Errorf("subcommand %q is not registered", name)
 		}
 	}
 
@@ -129,11 +129,11 @@ func TestNewAPIContactsCmd(t *testing.T) {
 		}
 	}
 	if searchCmd == nil {
-		t.Fatal("search コマンドが見つからない")
+		t.Fatal("search command not found")
 	}
 	for _, flagName := range []string{"client-id", "name", "email"} {
 		if f := searchCmd.Flags().Lookup(flagName); f == nil {
-			t.Errorf("search: --%s フラグが定義されていない", flagName)
+			t.Errorf("search: --%s flag is not defined", flagName)
 		}
 	}
 }
@@ -149,7 +149,7 @@ func TestNewAPIProjectsCmd(t *testing.T) {
 	}
 	for _, name := range []string{"list", "get", "search"} {
 		if !subNames[name] {
-			t.Errorf("サブコマンド %q が登録されていない", name)
+			t.Errorf("subcommand %q is not registered", name)
 		}
 	}
 
@@ -160,11 +160,11 @@ func TestNewAPIProjectsCmd(t *testing.T) {
 		}
 	}
 	if searchCmd == nil {
-		t.Fatal("search コマンドが見つからない")
+		t.Fatal("search command not found")
 	}
 	for _, flagName := range []string{"client-id", "name", "status", "updated-at-from"} {
 		if f := searchCmd.Flags().Lookup(flagName); f == nil {
-			t.Errorf("search: --%s フラグが定義されていない", flagName)
+			t.Errorf("search: --%s flag is not defined", flagName)
 		}
 	}
 }
@@ -180,7 +180,7 @@ func TestNewAPIProjectCostsCmd(t *testing.T) {
 	}
 	for _, name := range []string{"list", "get", "search"} {
 		if !subNames[name] {
-			t.Errorf("サブコマンド %q が登録されていない", name)
+			t.Errorf("subcommand %q is not registered", name)
 		}
 	}
 
@@ -191,10 +191,10 @@ func TestNewAPIProjectCostsCmd(t *testing.T) {
 		}
 	}
 	if searchCmd == nil {
-		t.Fatal("search コマンドが見つからない")
+		t.Fatal("search command not found")
 	}
 	if f := searchCmd.Flags().Lookup("project-id"); f == nil {
-		t.Error("search: --project-id フラグが定義されていない")
+		t.Error("search: --project-id flag is not defined")
 	}
 }
 
@@ -209,11 +209,11 @@ func testDocumentCmd(t *testing.T, cmd *cobra.Command, use string, searchFlags [
 	}
 	for _, name := range []string{"list", "get", "search"} {
 		if !subNames[name] {
-			t.Errorf("サブコマンド %q が登録されていない", name)
+			t.Errorf("subcommand %q is not registered", name)
 		}
 	}
 
-	// get --id フラグ確認
+	// Verify get --id flag.
 	var getCmd *cobra.Command
 	for _, sub := range cmd.Commands() {
 		if sub.Use == "get" {
@@ -221,13 +221,13 @@ func testDocumentCmd(t *testing.T, cmd *cobra.Command, use string, searchFlags [
 		}
 	}
 	if getCmd == nil {
-		t.Fatal("get コマンドが見つからない")
+		t.Fatal("get command not found")
 	}
 	if f := getCmd.Flags().Lookup("id"); f == nil {
-		t.Error("get: --id フラグが定義されていない")
+		t.Error("get: --id flag is not defined")
 	}
 
-	// search フラグ確認
+	// Verify search flags.
 	var searchCmd *cobra.Command
 	for _, sub := range cmd.Commands() {
 		if sub.Use == "search" {
@@ -235,11 +235,11 @@ func testDocumentCmd(t *testing.T, cmd *cobra.Command, use string, searchFlags [
 		}
 	}
 	if searchCmd == nil {
-		t.Fatal("search コマンドが見つからない")
+		t.Fatal("search command not found")
 	}
 	for _, flagName := range searchFlags {
 		if f := searchCmd.Flags().Lookup(flagName); f == nil {
-			t.Errorf("search: --%s フラグが定義されていない", flagName)
+			t.Errorf("search: --%s flag is not defined", flagName)
 		}
 	}
 }
@@ -280,7 +280,7 @@ func TestNewAPIVendorsCmd(t *testing.T) {
 	}
 	for _, name := range []string{"list", "get", "search"} {
 		if !subNames[name] {
-			t.Errorf("サブコマンド %q が登録されていない", name)
+			t.Errorf("subcommand %q is not registered", name)
 		}
 	}
 
@@ -291,11 +291,11 @@ func TestNewAPIVendorsCmd(t *testing.T) {
 		}
 	}
 	if searchCmd == nil {
-		t.Fatal("search コマンドが見つからない")
+		t.Fatal("search command not found")
 	}
 	for _, flagName := range []string{"name", "updated-at-from"} {
 		if f := searchCmd.Flags().Lookup(flagName); f == nil {
-			t.Errorf("search: --%s フラグが定義されていない", flagName)
+			t.Errorf("search: --%s flag is not defined", flagName)
 		}
 	}
 }
@@ -311,7 +311,7 @@ func TestNewAPIVendorBranchesCmd(t *testing.T) {
 	}
 	for _, name := range []string{"list", "get", "search"} {
 		if !subNames[name] {
-			t.Errorf("サブコマンド %q が登録されていない", name)
+			t.Errorf("subcommand %q is not registered", name)
 		}
 	}
 
@@ -322,11 +322,11 @@ func TestNewAPIVendorBranchesCmd(t *testing.T) {
 		}
 	}
 	if searchCmd == nil {
-		t.Fatal("search コマンドが見つからない")
+		t.Fatal("search command not found")
 	}
 	for _, flagName := range []string{"vendor-id", "updated-at-from"} {
 		if f := searchCmd.Flags().Lookup(flagName); f == nil {
-			t.Errorf("search: --%s フラグが定義されていない", flagName)
+			t.Errorf("search: --%s flag is not defined", flagName)
 		}
 	}
 }
@@ -342,7 +342,7 @@ func TestNewAPIVendorContactsCmd(t *testing.T) {
 	}
 	for _, name := range []string{"list", "get", "search"} {
 		if !subNames[name] {
-			t.Errorf("サブコマンド %q が登録されていない", name)
+			t.Errorf("subcommand %q is not registered", name)
 		}
 	}
 
@@ -353,11 +353,11 @@ func TestNewAPIVendorContactsCmd(t *testing.T) {
 		}
 	}
 	if searchCmd == nil {
-		t.Fatal("search コマンドが見つからない")
+		t.Fatal("search command not found")
 	}
 	for _, flagName := range []string{"vendor-id", "name", "updated-at-from"} {
 		if f := searchCmd.Flags().Lookup(flagName); f == nil {
-			t.Errorf("search: --%s フラグが定義されていない", flagName)
+			t.Errorf("search: --%s flag is not defined", flagName)
 		}
 	}
 }
@@ -373,7 +373,7 @@ func TestNewAPIPurchaseOrdersCmd(t *testing.T) {
 	}
 	for _, name := range []string{"list", "get", "search"} {
 		if !subNames[name] {
-			t.Errorf("サブコマンド %q が登録されていない", name)
+			t.Errorf("subcommand %q is not registered", name)
 		}
 	}
 
@@ -384,11 +384,11 @@ func TestNewAPIPurchaseOrdersCmd(t *testing.T) {
 		}
 	}
 	if searchCmd == nil {
-		t.Fatal("search コマンドが見つからない")
+		t.Fatal("search command not found")
 	}
 	for _, flagName := range []string{"vendor-id", "project-id", "status", "updated-at-from"} {
 		if f := searchCmd.Flags().Lookup(flagName); f == nil {
-			t.Errorf("search: --%s フラグが定義されていない", flagName)
+			t.Errorf("search: --%s flag is not defined", flagName)
 		}
 	}
 }
@@ -404,7 +404,7 @@ func TestNewAPIPaymentsCmd(t *testing.T) {
 	}
 	for _, name := range []string{"list", "get", "search"} {
 		if !subNames[name] {
-			t.Errorf("サブコマンド %q が登録されていない", name)
+			t.Errorf("subcommand %q is not registered", name)
 		}
 	}
 
@@ -415,11 +415,11 @@ func TestNewAPIPaymentsCmd(t *testing.T) {
 		}
 	}
 	if searchCmd == nil {
-		t.Fatal("search コマンドが見つからない")
+		t.Fatal("search command not found")
 	}
 	for _, flagName := range []string{"vendor-id", "purchase-order-id", "status", "updated-at-from"} {
 		if f := searchCmd.Flags().Lookup(flagName); f == nil {
-			t.Errorf("search: --%s フラグが定義されていない", flagName)
+			t.Errorf("search: --%s flag is not defined", flagName)
 		}
 	}
 }
@@ -435,7 +435,7 @@ func testMasterCmd(t *testing.T, cmd *cobra.Command, use string, searchFlags []s
 	}
 	for _, name := range []string{"list", "get", "search"} {
 		if !subNames[name] {
-			t.Errorf("サブコマンド %q が登録されていない", name)
+			t.Errorf("subcommand %q is not registered", name)
 		}
 	}
 
@@ -446,10 +446,10 @@ func testMasterCmd(t *testing.T, cmd *cobra.Command, use string, searchFlags []s
 		}
 	}
 	if getCmd == nil {
-		t.Fatal("get コマンドが見つからない")
+		t.Fatal("get command not found")
 	}
 	if f := getCmd.Flags().Lookup("id"); f == nil {
-		t.Error("get: --id フラグが定義されていない")
+		t.Error("get: --id flag is not defined")
 	}
 
 	var searchCmd *cobra.Command
@@ -459,11 +459,11 @@ func testMasterCmd(t *testing.T, cmd *cobra.Command, use string, searchFlags []s
 		}
 	}
 	if searchCmd == nil {
-		t.Fatal("search コマンドが見つからない")
+		t.Fatal("search command not found")
 	}
 	for _, flagName := range searchFlags {
 		if f := searchCmd.Flags().Lookup(flagName); f == nil {
-			t.Errorf("search: --%s フラグが定義されていない", flagName)
+			t.Errorf("search: --%s flag is not defined", flagName)
 		}
 	}
 }
@@ -512,6 +512,6 @@ func TestRootCmdHasAPISubcommand(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Error("root コマンドに api サブコマンドが登録されていない")
+		t.Error("api subcommand is not registered on root command")
 	}
 }

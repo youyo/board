@@ -8,8 +8,8 @@ import (
 	"strconv"
 )
 
-// PurchaseOrderEntity は BOARD API の発注書エンティティ。
-// GET /v1/purchase_orders レスポンスの1要素に対応。
+// PurchaseOrderEntity is a BOARD API purchase order entity.
+// Corresponds to one element in the GET /v1/purchase_orders response.
 type PurchaseOrderEntity struct {
 	ID           int     `json:"id"`
 	VendorID     int     `json:"vendor_id"`
@@ -24,7 +24,7 @@ type PurchaseOrderEntity struct {
 	CreatedAt    string  `json:"created_at"` // ISO 8601
 }
 
-// PurchaseOrderSearchParams は SearchPurchaseOrders のパラメータ。
+// PurchaseOrderSearchParams is the parameter for SearchPurchaseOrders.
 type PurchaseOrderSearchParams struct {
 	VendorID      int
 	ProjectID     int
@@ -32,8 +32,8 @@ type PurchaseOrderSearchParams struct {
 	UpdatedAtFrom string
 }
 
-// ListPurchaseOrders は全発注書を取得する。
-// ページネーションは ListAll により自動処理される。
+// ListPurchaseOrders retrieves all purchase orders.
+// Pagination is automatically handled by ListAll.
 func (c *Client) ListPurchaseOrders(ctx context.Context) ([]PurchaseOrderEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/purchase_orders", nil)
@@ -61,7 +61,7 @@ func (c *Client) ListPurchaseOrders(ctx context.Context) ([]PurchaseOrderEntity,
 	return result, nil
 }
 
-// GetPurchaseOrder は指定 ID の発注書を取得する。
+// GetPurchaseOrder retrieves the purchase order with the specified ID.
 func (c *Client) GetPurchaseOrder(ctx context.Context, id int) (*PurchaseOrderEntity, error) {
 	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/purchase_orders/%d", id), nil)
 	if err != nil {
@@ -78,8 +78,8 @@ func (c *Client) GetPurchaseOrder(ctx context.Context, id int) (*PurchaseOrderEn
 	return &x, nil
 }
 
-// SearchPurchaseOrders は条件付きで発注書を検索する。
-// ページネーションは ListAll により自動処理される。
+// SearchPurchaseOrders searches purchase orders with the given conditions.
+// Pagination is automatically handled by ListAll.
 func (c *Client) SearchPurchaseOrders(ctx context.Context, params PurchaseOrderSearchParams) ([]PurchaseOrderEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/purchase_orders", nil)

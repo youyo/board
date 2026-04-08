@@ -9,11 +9,11 @@ import (
 	"github.com/youyo/board/internal/output"
 )
 
-// NewAPIPaymentTermsCmd は board api payment_terms サブコマンドグループを返す。
+// NewAPIPaymentTermsCmd  returns the board api payment_terms subcommand group.
 func NewAPIPaymentTermsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "payment_terms",
-		Short: "支払条件（payment_terms）を操作する",
+		Short: "Manage payment_terms",
 	}
 	cmd.AddCommand(
 		newAPIPaymentTermsListCmd(),
@@ -26,7 +26,7 @@ func NewAPIPaymentTermsCmd() *cobra.Command {
 func newAPIPaymentTermsListCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
-		Short: "支払条件の一覧を取得する",
+		Short: "List all payment_terms",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			svc, err := apiServiceFromCmd(cmd)
 			if err != nil {
@@ -46,10 +46,10 @@ func newAPIPaymentTermsGetCmd() *cobra.Command {
 	var id int
 	cmd := &cobra.Command{
 		Use:   "get",
-		Short: "指定 ID の支払条件を取得する",
+		Short: "Get a payment_term by ID",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if id == 0 {
-				return fmt.Errorf("--id は必須です")
+				return fmt.Errorf("--id is required")
 			}
 			svc, err := apiServiceFromCmd(cmd)
 			if err != nil {
@@ -63,7 +63,7 @@ func newAPIPaymentTermsGetCmd() *cobra.Command {
 			return output.Write(os.Stdout, result, prettyFromCmd(cmd))
 		},
 	}
-	cmd.Flags().IntVar(&id, "id", 0, "支払条件 ID（必須）")
+	cmd.Flags().IntVar(&id, "id", 0, "Payment term ID (required)")
 	return cmd
 }
 
@@ -71,7 +71,7 @@ func newAPIPaymentTermsSearchCmd() *cobra.Command {
 	var name, updatedAtFrom string
 	cmd := &cobra.Command{
 		Use:   "search",
-		Short: "支払条件を条件で検索する",
+		Short: "Search payment_terms by criteria",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			svc, err := apiServiceFromCmd(cmd)
 			if err != nil {
@@ -89,7 +89,7 @@ func newAPIPaymentTermsSearchCmd() *cobra.Command {
 			return output.Write(os.Stdout, result, prettyFromCmd(cmd))
 		},
 	}
-	cmd.Flags().StringVar(&name, "name", "", "支払条件名でフィルタ")
-	cmd.Flags().StringVar(&updatedAtFrom, "updated-at-from", "", "更新日時（ISO 8601）以降でフィルタ")
+	cmd.Flags().StringVar(&name, "name", "", "Filter by payment term name")
+	cmd.Flags().StringVar(&updatedAtFrom, "updated-at-from", "", "Filter by updated_at (ISO 8601, lower bound)")
 	return cmd
 }

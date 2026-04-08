@@ -9,9 +9,9 @@ import (
 	"github.com/pelletier/go-toml/v2"
 )
 
-// Load は指定パスの config.toml を読み込んで Config を返す。
-// ファイルが存在しない場合は DefaultConfig() を返す（エラーなし）。
-// ファイルが存在するが不正な TOML の場合は ErrInvalidConfig を返す。
+// Load reads config.toml from the given path and returns a Config.
+// If the file does not exist, it returns DefaultConfig() without an error.
+// If the file exists but contains invalid TOML, it returns ErrInvalidConfig.
 func Load(path string) (Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -26,7 +26,7 @@ func Load(path string) (Config, error) {
 		return Config{}, fmt.Errorf("%w: %w", ErrInvalidConfig, err)
 	}
 
-	// go-toml/v2 は空セクションを nil にする場合があるため補正
+	// Correct for go-toml/v2 possibly setting empty sections to nil.
 	if cfg.Profiles == nil {
 		cfg.Profiles = make(map[string]ProfileConfig)
 	}
@@ -34,9 +34,9 @@ func Load(path string) (Config, error) {
 	return cfg, nil
 }
 
-// Save は Config を指定パスに TOML 形式で保存する。
-// 親ディレクトリが存在しない場合は自動作成する。
-// ファイルは 0600 パーミッションで作成する。
+// Save saves Config to the given path in TOML format.
+// Parent directories are created automatically if they do not exist.
+// The file is created with 0600 permissions.
 func Save(cfg Config, path string) error {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0755); err != nil {

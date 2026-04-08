@@ -12,7 +12,7 @@ import (
 	"github.com/youyo/board/internal/refresh"
 )
 
-// ClientRepository は clients リソースのキャッシュ → リフレッシュ → API フォールバックを管理する。
+// ClientRepository manages cache -> refresh -> API fallback for the clients resource.
 type ClientRepository struct {
 	profile     string
 	api         *boardapi.Client
@@ -24,7 +24,7 @@ type ClientRepository struct {
 	autoRefresh bool
 }
 
-// NewClientRepository は ClientRepository を生成する。
+// NewClientRepository creates a new ClientRepository.
 func NewClientRepository(
 	profile string,
 	api *boardapi.Client,
@@ -49,30 +49,30 @@ func NewClientRepository(
 
 const clientsResource = "clients"
 
-// List は全顧客をキャッシュから返す。
-// opts に応じてリフレッシュを実行する。
+// List returns all clients from the cache.
+// Refresh is performed according to opts.
 func (r *ClientRepository) List(ctx context.Context, opts ReadOptions) ([]boardapi.ClientEntity, error) {
 	fetcher := &clientsFetcher{api: r.api}
 	now := time.Now()
 
-	// SyncState を取得
+	// Get SyncState
 	state, err := r.syncStore.Get(ctx, r.profile, clientsResource)
 	if err != nil {
 		return nil, err
 	}
 
-	// リフレッシュ判定・実行
+	// Determine and execute refresh
 	if err := maybeRefresh(ctx, r.profile, clientsResource, opts, state, r.autoRefresh, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
 		return nil, err
 	}
 
-	// キャッシュから取得
+	// Fetch from cache
 	entries, err := r.cache.List(ctx, r.profile, clientsResource)
 	if err != nil {
 		return nil, err
 	}
 
-	// キャッシュ空 + 未リフレッシュ → 暗黙 ForceRefresh
+	// Empty cache + no sync state -> implicit ForceRefresh
 	if len(entries) == 0 && state == nil {
 		if err := r.lockManager.WithLock(ctx, r.profile, clientsResource, func() error {
 			_, err := r.refresher.ForceRefresh(ctx, r.profile, fetcher, now, r.tz)
@@ -97,19 +97,19 @@ func (r *ClientRepository) List(ctx context.Context, opts ReadOptions) ([]boarda
 	return entities, nil
 }
 
-// GetByID は指定 ID の顧客をキャッシュから返す。
-// キャッシュミス時は API から単体取得して upsert する。
+// GetByID returns the client with the given ID from the cache.
+// On cache miss, it fetches from the API and upserts the result.
 func (r *ClientRepository) GetByID(ctx context.Context, id int, opts ReadOptions) (*boardapi.ClientEntity, error) {
 	fetcher := &clientsFetcher{api: r.api}
 	now := time.Now()
 
-	// SyncState を取得
+	// Get SyncState
 	state, err := r.syncStore.Get(ctx, r.profile, clientsResource)
 	if err != nil {
 		return nil, err
 	}
 
-	// リフレッシュ判定・実行
+	// Determine and execute refresh
 	if err := maybeRefresh(ctx, r.profile, clientsResource, opts, state, r.autoRefresh, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
 		return nil, err
 	}
@@ -128,7 +128,7 @@ func (r *ClientRepository) GetByID(ctx context.Context, id int, opts ReadOptions
 		return &entity, nil
 	}
 
-	// キャッシュミス → API 単体取得
+	// Cache miss -> fetch single entry from API
 	entity, err := r.api.GetClient(ctx, id)
 	if err != nil {
 		return nil, err
@@ -146,8 +146,8 @@ func (r *ClientRepository) GetByID(ctx context.Context, id int, opts ReadOptions
 	return entity, nil
 }
 
-// Search はパラメータでフィルタした顧客をキャッシュから返す。
-// リフレッシュは List と同様のロジックで制御する。
+// Search returns clients filtered by the given parameters from the cache.
+// Refresh is controlled by the same logic as List.
 func (r *ClientRepository) Search(ctx context.Context, params boardapi.ClientSearchParams, opts ReadOptions) ([]boardapi.ClientEntity, error) {
 	all, err := r.List(ctx, opts)
 	if err != nil {
@@ -156,7 +156,7 @@ func (r *ClientRepository) Search(ctx context.Context, params boardapi.ClientSea
 	return filterClients(all, params), nil
 }
 
-// filterClients はインメモリフィルタリングを行う。
+// filterClients performs in-memory filtering.
 func filterClients(entities []boardapi.ClientEntity, params boardapi.ClientSearchParams) []boardapi.ClientEntity {
 	var result []boardapi.ClientEntity
 	for _, e := range entities {

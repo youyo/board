@@ -12,7 +12,7 @@ import (
 	"github.com/youyo/board/internal/refresh"
 )
 
-// ContactRepository は contacts リソースのキャッシュ → リフレッシュ → API フォールバックを管理する。
+// ContactRepository manages cache -> refresh -> API fallback for the contacts resource.
 type ContactRepository struct {
 	profile     string
 	api         *boardapi.Client
@@ -24,7 +24,7 @@ type ContactRepository struct {
 	autoRefresh bool
 }
 
-// NewContactRepository は ContactRepository を生成する。
+// NewContactRepository creates a new ContactRepository.
 func NewContactRepository(
 	profile string,
 	api *boardapi.Client,
@@ -49,7 +49,7 @@ func NewContactRepository(
 
 const contactsResource = "contacts"
 
-// List は全担当者をキャッシュから返す。
+// List returns all contacts from the cache.
 func (r *ContactRepository) List(ctx context.Context, opts ReadOptions) ([]boardapi.ContactEntity, error) {
 	fetcher := &contactsFetcher{api: r.api}
 	now := time.Now()
@@ -92,7 +92,7 @@ func (r *ContactRepository) List(ctx context.Context, opts ReadOptions) ([]board
 	return entities, nil
 }
 
-// GetByID は指定 ID の担当者をキャッシュから返す。
+// GetByID returns the contact with the given ID from the cache.
 func (r *ContactRepository) GetByID(ctx context.Context, id int, opts ReadOptions) (*boardapi.ContactEntity, error) {
 	fetcher := &contactsFetcher{api: r.api}
 	now := time.Now()
@@ -120,7 +120,7 @@ func (r *ContactRepository) GetByID(ctx context.Context, id int, opts ReadOption
 		return &entity, nil
 	}
 
-	// キャッシュミス → API 単体取得
+	// Cache miss -> fetch single entry from API
 	entity, err := r.api.GetContact(ctx, id)
 	if err != nil {
 		return nil, err
@@ -137,7 +137,7 @@ func (r *ContactRepository) GetByID(ctx context.Context, id int, opts ReadOption
 	return entity, nil
 }
 
-// Search はパラメータでフィルタした担当者をキャッシュから返す。
+// Search returns contacts filtered by the given parameters from the cache.
 func (r *ContactRepository) Search(ctx context.Context, params boardapi.ContactSearchParams, opts ReadOptions) ([]boardapi.ContactEntity, error) {
 	all, err := r.List(ctx, opts)
 	if err != nil {
@@ -146,7 +146,7 @@ func (r *ContactRepository) Search(ctx context.Context, params boardapi.ContactS
 	return filterContacts(all, params), nil
 }
 
-// filterContacts はインメモリフィルタリングを行う。
+// filterContacts performs in-memory filtering.
 func filterContacts(entities []boardapi.ContactEntity, params boardapi.ContactSearchParams) []boardapi.ContactEntity {
 	var result []boardapi.ContactEntity
 	for _, e := range entities {

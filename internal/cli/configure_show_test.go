@@ -10,10 +10,10 @@ import (
 )
 
 func TestConfigureShowCmd(t *testing.T) {
-	t.Run("デフォルト config では secrets がマスクされた JSON が返る", func(t *testing.T) {
+	t.Run("default config returns JSON with masked secrets", func(t *testing.T) {
 		path := newTempConfig(t)
 
-		// api_key と api_token を設定
+		// Set api_key and api_token.
 		cfg := config.DefaultConfig()
 		prof := config.DefaultProfileConfig()
 		prof.APIKey = "myapikey12345"
@@ -44,10 +44,10 @@ func TestConfigureShowCmd(t *testing.T) {
 			t.Errorf("api_key should be masked, got %q", apiKey)
 		}
 		if apiKey == "" && len("myapikey12345") > 0 {
-			// 空でないはず
+			// Should not be empty.
 			t.Errorf("api_key should not be empty when value is set")
 		}
-		// マスクパターン確認: 先頭2文字 + **** + 末尾2文字
+		// Verify mask pattern: first 2 chars + **** + last 2 chars.
 		if apiKey != "my****45" {
 			t.Errorf("expected my****45, got %q", apiKey)
 		}
@@ -58,7 +58,7 @@ func TestConfigureShowCmd(t *testing.T) {
 		}
 	})
 
-	t.Run("--profile 指定でそのプロファイルの情報が表示される", func(t *testing.T) {
+	t.Run("--profile flag shows the specified profile information", func(t *testing.T) {
 		path := newTempConfig(t)
 
 		cfg := config.DefaultConfig()
@@ -90,7 +90,7 @@ func TestConfigureShowCmd(t *testing.T) {
 		}
 	})
 
-	t.Run("存在しないプロファイルを指定するとエラー", func(t *testing.T) {
+	t.Run("specifying a non-existent profile returns an error", func(t *testing.T) {
 		newTempConfig(t)
 
 		root := cli.NewConfigureCmd()

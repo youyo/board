@@ -11,7 +11,7 @@ import (
 	"github.com/youyo/board/internal/refresh"
 )
 
-// DeliveryRepository は deliveries リソースのキャッシュ → リフレッシュ → API フォールバックを管理する。
+// DeliveryRepository manages cache -> refresh -> API fallback for the deliveries resource.
 type DeliveryRepository struct {
 	profile     string
 	api         *boardapi.Client
@@ -23,7 +23,7 @@ type DeliveryRepository struct {
 	autoRefresh bool
 }
 
-// NewDeliveryRepository は DeliveryRepository を生成する。
+// NewDeliveryRepository creates a new DeliveryRepository.
 func NewDeliveryRepository(
 	profile string,
 	api *boardapi.Client,
@@ -48,7 +48,7 @@ func NewDeliveryRepository(
 
 const deliveriesResource = "deliveries"
 
-// List は全納品をキャッシュから返す。
+// List returns all deliveries from the cache.
 func (r *DeliveryRepository) List(ctx context.Context, opts ReadOptions) ([]boardapi.DeliveryEntity, error) {
 	fetcher := &deliveriesFetcher{api: r.api}
 	now := time.Now()
@@ -91,8 +91,8 @@ func (r *DeliveryRepository) List(ctx context.Context, opts ReadOptions) ([]boar
 	return entities, nil
 }
 
-// GetByID は指定 ID の納品をキャッシュから返す。
-// キャッシュミス時は API から単体取得して upsert する。
+// GetByID returns the delivery with the given ID from the cache.
+// On cache miss, it fetches from the API and upserts the result.
 func (r *DeliveryRepository) GetByID(ctx context.Context, id int, opts ReadOptions) (*boardapi.DeliveryEntity, error) {
 	fetcher := &deliveriesFetcher{api: r.api}
 	now := time.Now()
@@ -120,7 +120,7 @@ func (r *DeliveryRepository) GetByID(ctx context.Context, id int, opts ReadOptio
 		return &entity, nil
 	}
 
-	// キャッシュミス → API 単体取得
+	// Cache miss → fetch single entity from API
 	entity, err := r.api.GetDelivery(ctx, id)
 	if err != nil {
 		return nil, err
@@ -137,7 +137,7 @@ func (r *DeliveryRepository) GetByID(ctx context.Context, id int, opts ReadOptio
 	return entity, nil
 }
 
-// Search はパラメータでフィルタした納品をキャッシュから返す。
+// Search returns deliveries filtered by the given parameters from the cache.
 func (r *DeliveryRepository) Search(ctx context.Context, params boardapi.DeliverySearchParams, opts ReadOptions) ([]boardapi.DeliveryEntity, error) {
 	all, err := r.List(ctx, opts)
 	if err != nil {
@@ -146,8 +146,8 @@ func (r *DeliveryRepository) Search(ctx context.Context, params boardapi.Deliver
 	return filterDeliveries(all, params), nil
 }
 
-// filterDeliveries はインメモリフィルタリングを行う。
-// UpdatedAtFrom は差分取得カーソルとして使用するためフィルタには含めない。
+// filterDeliveries performs in-memory filtering.
+// UpdatedAtFrom is used as a delta fetch cursor and is not included in the filter.
 func filterDeliveries(entities []boardapi.DeliveryEntity, params boardapi.DeliverySearchParams) []boardapi.DeliveryEntity {
 	var result []boardapi.DeliveryEntity
 	for _, e := range entities {

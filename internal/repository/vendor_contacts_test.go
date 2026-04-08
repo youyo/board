@@ -61,12 +61,12 @@ func newVendorContactAPIServer(t *testing.T, entities []boardapi.VendorContactEn
 }
 
 var sampleVendorContacts = []boardapi.VendorContactEntity{
-	{ID: 1, VendorID: 10, Name: "担当者A", Email: "a@vendor.com", UpdatedAt: "2026-01-01T00:00:00Z"},
-	{ID: 2, VendorID: 10, Name: "担当者B", Email: "b@vendor.com", UpdatedAt: "2026-01-02T00:00:00Z"},
-	{ID: 3, VendorID: 20, Name: "担当者C", Email: "c@vendor.com", UpdatedAt: "2026-01-03T00:00:00Z"},
+	{ID: 1, VendorID: 10, Name: "ContactA", Email: "a@vendor.com", UpdatedAt: "2026-01-01T00:00:00Z"},
+	{ID: 2, VendorID: 10, Name: "ContactB", Email: "b@vendor.com", UpdatedAt: "2026-01-02T00:00:00Z"},
+	{ID: 3, VendorID: 20, Name: "ContactC", Email: "c@vendor.com", UpdatedAt: "2026-01-03T00:00:00Z"},
 }
 
-// T_VCO01: List - キャッシュあり → キャッシュのデータを返す
+// T_VCO01: List - cache hit -> returns cached data
 func TestVendorContactRepository_List_CacheHit(t *testing.T) {
 	db := newTestDB(t)
 	seedVendorContactCache(t, db, sampleVendorContacts)
@@ -85,7 +85,7 @@ func TestVendorContactRepository_List_CacheHit(t *testing.T) {
 	}
 }
 
-// T_VCO02: List - キャッシュなし（初回）→ ForceRefresh 後データを返す
+// T_VCO02: List - no cache (initial load) -> returns data after ForceRefresh
 func TestVendorContactRepository_List_InitialLoad(t *testing.T) {
 	db := newTestDB(t)
 
@@ -102,7 +102,7 @@ func TestVendorContactRepository_List_InitialLoad(t *testing.T) {
 	}
 }
 
-// T_VCO03: GetByID - キャッシュヒット → キャッシュから返す
+// T_VCO03: GetByID - cache hit -> returns from cache
 func TestVendorContactRepository_GetByID_CacheHit(t *testing.T) {
 	db := newTestDB(t)
 	seedVendorContactCache(t, db, sampleVendorContacts)
@@ -121,12 +121,12 @@ func TestVendorContactRepository_GetByID_CacheHit(t *testing.T) {
 	}
 }
 
-// T_VCO04: GetByID - キャッシュミス、API 成功 → API 取得して返す
+// T_VCO04: GetByID - cache miss, API success -> fetches from API and returns
 func TestVendorContactRepository_GetByID_CacheMiss_APISuccess(t *testing.T) {
 	db := newTestDB(t)
 	markSynced(t, db, "vendor_contacts")
 
-	target := boardapi.VendorContactEntity{ID: 99, VendorID: 10, Name: "テスト担当者", Email: "test@vendor.com", UpdatedAt: "2026-01-01T00:00:00Z"}
+	target := boardapi.VendorContactEntity{ID: 99, VendorID: 10, Name: "Test Contact", Email: "test@vendor.com", UpdatedAt: "2026-01-01T00:00:00Z"}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		b, _ := json.Marshal(target)
@@ -146,7 +146,7 @@ func TestVendorContactRepository_GetByID_CacheMiss_APISuccess(t *testing.T) {
 	}
 }
 
-// T_VCO05: GetByID - キャッシュミス、API エラー → error を返す
+// T_VCO05: GetByID - cache miss, API error -> returns error
 func TestVendorContactRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	db := newTestDB(t)
 	markSynced(t, db, "vendor_contacts")
@@ -161,7 +161,7 @@ func TestVendorContactRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	}
 }
 
-// T_VCO06: Search - VendorID フィルタ → 一致するものを返す
+// T_VCO06: Search - VendorID filter -> returns matching items
 func TestVendorContactRepository_Search_VendorIDFilter(t *testing.T) {
 	db := newTestDB(t)
 	seedVendorContactCache(t, db, sampleVendorContacts)
@@ -180,7 +180,7 @@ func TestVendorContactRepository_Search_VendorIDFilter(t *testing.T) {
 	}
 }
 
-// T_VCO07: Search - Email フィルタ → 一致するものを返す
+// T_VCO07: Search - Email filter -> returns matching items
 func TestVendorContactRepository_Search_EmailFilter(t *testing.T) {
 	db := newTestDB(t)
 	seedVendorContactCache(t, db, sampleVendorContacts)
@@ -199,7 +199,7 @@ func TestVendorContactRepository_Search_EmailFilter(t *testing.T) {
 	}
 }
 
-// T_VCO08: Search - パラメータなし → 全件返す
+// T_VCO08: Search - no filter -> returns all items
 func TestVendorContactRepository_Search_NoFilter(t *testing.T) {
 	db := newTestDB(t)
 	seedVendorContactCache(t, db, sampleVendorContacts)

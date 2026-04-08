@@ -61,12 +61,12 @@ func newDocumentSendChannelAPIServer(t *testing.T, entities []boardapi.DocumentS
 }
 
 var sampleDocumentSendChannels = []boardapi.DocumentSendChannelEntity{
-	{ID: 1, Name: "郵送", UpdatedAt: "2026-01-01T00:00:00Z"},
-	{ID: 2, Name: "メール", UpdatedAt: "2026-01-02T00:00:00Z"},
-	{ID: 3, Name: "手渡し", UpdatedAt: "2026-01-03T00:00:00Z"},
+	{ID: 1, Name: "Mail", UpdatedAt: "2026-01-01T00:00:00Z"},
+	{ID: 2, Name: "Email", UpdatedAt: "2026-01-02T00:00:00Z"},
+	{ID: 3, Name: "Hand delivery", UpdatedAt: "2026-01-03T00:00:00Z"},
 }
 
-// T_DSC01: List - キャッシュあり → キャッシュのデータを返す
+// T_DSC01: List - cache hit -> returns cached data
 func TestDocumentSendChannelRepository_List_CacheHit(t *testing.T) {
 	db := newTestDB(t)
 	seedDocumentSendChannelCache(t, db, sampleDocumentSendChannels)
@@ -85,7 +85,7 @@ func TestDocumentSendChannelRepository_List_CacheHit(t *testing.T) {
 	}
 }
 
-// T_DSC02: List - キャッシュなし（初回）→ ForceRefresh 後データを返す
+// T_DSC02: List - no cache (initial load) -> returns data after ForceRefresh
 func TestDocumentSendChannelRepository_List_InitialLoad(t *testing.T) {
 	db := newTestDB(t)
 
@@ -102,7 +102,7 @@ func TestDocumentSendChannelRepository_List_InitialLoad(t *testing.T) {
 	}
 }
 
-// T_DSC03: GetByID - キャッシュヒット → キャッシュから返す
+// T_DSC03: GetByID - cache hit -> returns from cache
 func TestDocumentSendChannelRepository_GetByID_CacheHit(t *testing.T) {
 	db := newTestDB(t)
 	seedDocumentSendChannelCache(t, db, sampleDocumentSendChannels)
@@ -121,12 +121,12 @@ func TestDocumentSendChannelRepository_GetByID_CacheHit(t *testing.T) {
 	}
 }
 
-// T_DSC04: GetByID - キャッシュミス、API 成功 → API 取得して返す
+// T_DSC04: GetByID - cache miss, API success -> fetches from API and returns
 func TestDocumentSendChannelRepository_GetByID_CacheMiss_APISuccess(t *testing.T) {
 	db := newTestDB(t)
 	markSynced(t, db, "document_send_channels")
 
-	target := boardapi.DocumentSendChannelEntity{ID: 99, Name: "テスト送付方法", UpdatedAt: "2026-01-01T00:00:00Z"}
+	target := boardapi.DocumentSendChannelEntity{ID: 99, Name: "Test Send Channel", UpdatedAt: "2026-01-01T00:00:00Z"}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		b, _ := json.Marshal(target)
@@ -146,7 +146,7 @@ func TestDocumentSendChannelRepository_GetByID_CacheMiss_APISuccess(t *testing.T
 	}
 }
 
-// T_DSC05: GetByID - キャッシュミス、API エラー → error を返す
+// T_DSC05: GetByID - cache miss, API error -> returns error
 func TestDocumentSendChannelRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	db := newTestDB(t)
 	markSynced(t, db, "document_send_channels")
@@ -161,7 +161,7 @@ func TestDocumentSendChannelRepository_GetByID_CacheMiss_APIError(t *testing.T) 
 	}
 }
 
-// T_DSC06: Search - Name フィルタ → 一致するものを返す
+// T_DSC06: Search - Name filter -> returns matching items
 func TestDocumentSendChannelRepository_Search_NameFilter(t *testing.T) {
 	db := newTestDB(t)
 	seedDocumentSendChannelCache(t, db, sampleDocumentSendChannels)
@@ -171,16 +171,16 @@ func TestDocumentSendChannelRepository_Search_NameFilter(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeDocumentSendChannelRepo(t, db, apiClient, false)
-	got, err := repo.Search(context.Background(), boardapi.DocumentSendChannelSearchParams{Name: "郵送"}, repository.ReadOptions{})
+	got, err := repo.Search(context.Background(), boardapi.DocumentSendChannelSearchParams{Name: "Mail"}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
-	if len(got) != 1 || got[0].Name != "郵送" {
+	if len(got) != 1 || got[0].Name != "Mail" {
 		t.Errorf("unexpected result: %+v", got)
 	}
 }
 
-// T_DSC07: Search - パラメータなし → 全件返す
+// T_DSC07: Search - no filter -> returns all items
 func TestDocumentSendChannelRepository_Search_NoFilter(t *testing.T) {
 	db := newTestDB(t)
 	seedDocumentSendChannelCache(t, db, sampleDocumentSendChannels)

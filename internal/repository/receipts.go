@@ -11,7 +11,7 @@ import (
 	"github.com/youyo/board/internal/refresh"
 )
 
-// ReceiptRepository は receipts リソースのキャッシュ → リフレッシュ → API フォールバックを管理する。
+// ReceiptRepository manages cache -> refresh -> API fallback for the receipts resource.
 type ReceiptRepository struct {
 	profile     string
 	api         *boardapi.Client
@@ -23,7 +23,7 @@ type ReceiptRepository struct {
 	autoRefresh bool
 }
 
-// NewReceiptRepository は ReceiptRepository を生成する。
+// NewReceiptRepository creates a new ReceiptRepository.
 func NewReceiptRepository(
 	profile string,
 	api *boardapi.Client,
@@ -48,7 +48,7 @@ func NewReceiptRepository(
 
 const receiptsResource = "receipts"
 
-// List は全領収をキャッシュから返す。
+// List returns all receipts from the cache.
 func (r *ReceiptRepository) List(ctx context.Context, opts ReadOptions) ([]boardapi.ReceiptEntity, error) {
 	fetcher := &receiptsFetcher{api: r.api}
 	now := time.Now()
@@ -91,8 +91,8 @@ func (r *ReceiptRepository) List(ctx context.Context, opts ReadOptions) ([]board
 	return entities, nil
 }
 
-// GetByID は指定 ID の領収をキャッシュから返す。
-// キャッシュミス時は API から単体取得して upsert する。
+// GetByID returns the receipt with the given ID from the cache.
+// On cache miss, it fetches from the API and upserts the result.
 func (r *ReceiptRepository) GetByID(ctx context.Context, id int, opts ReadOptions) (*boardapi.ReceiptEntity, error) {
 	fetcher := &receiptsFetcher{api: r.api}
 	now := time.Now()
@@ -120,7 +120,7 @@ func (r *ReceiptRepository) GetByID(ctx context.Context, id int, opts ReadOption
 		return &entity, nil
 	}
 
-	// キャッシュミス → API 単体取得
+	// Cache miss → fetch single entity from API
 	entity, err := r.api.GetReceipt(ctx, id)
 	if err != nil {
 		return nil, err
@@ -137,7 +137,7 @@ func (r *ReceiptRepository) GetByID(ctx context.Context, id int, opts ReadOption
 	return entity, nil
 }
 
-// Search はパラメータでフィルタした領収をキャッシュから返す。
+// Search returns receipts filtered by the given parameters from the cache.
 func (r *ReceiptRepository) Search(ctx context.Context, params boardapi.ReceiptSearchParams, opts ReadOptions) ([]boardapi.ReceiptEntity, error) {
 	all, err := r.List(ctx, opts)
 	if err != nil {
@@ -146,8 +146,8 @@ func (r *ReceiptRepository) Search(ctx context.Context, params boardapi.ReceiptS
 	return filterReceipts(all, params), nil
 }
 
-// filterReceipts はインメモリフィルタリングを行う。
-// UpdatedAtFrom は差分取得カーソルとして使用するためフィルタには含めない。
+// filterReceipts performs in-memory filtering.
+// UpdatedAtFrom is used as a delta fetch cursor and is not included in the filter.
 func filterReceipts(entities []boardapi.ReceiptEntity, params boardapi.ReceiptSearchParams) []boardapi.ReceiptEntity {
 	var result []boardapi.ReceiptEntity
 	for _, e := range entities {

@@ -7,162 +7,162 @@ import (
 	"github.com/youyo/board/internal/repository"
 )
 
-// ClientRepo は clients リポジトリのインターフェース。
+// ClientRepo is the interface for the clients repository.
 type ClientRepo interface {
 	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.ClientEntity, error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.ClientEntity, error)
 	Search(ctx context.Context, params boardapi.ClientSearchParams, opts repository.ReadOptions) ([]boardapi.ClientEntity, error)
 }
 
-// ClientBranchRepo は client_branches リポジトリのインターフェース。
+// ClientBranchRepo is the interface for the client_branches repository.
 type ClientBranchRepo interface {
 	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.ClientBranchEntity, error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.ClientBranchEntity, error)
 	Search(ctx context.Context, params boardapi.ClientBranchSearchParams, opts repository.ReadOptions) ([]boardapi.ClientBranchEntity, error)
 }
 
-// ContactRepo は contacts リポジトリのインターフェース。
+// ContactRepo is the interface for the contacts repository.
 type ContactRepo interface {
 	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.ContactEntity, error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.ContactEntity, error)
 	Search(ctx context.Context, params boardapi.ContactSearchParams, opts repository.ReadOptions) ([]boardapi.ContactEntity, error)
 }
 
-// ProjectRepo は projects リポジトリのインターフェース。
+// ProjectRepo is the interface for the projects repository.
 type ProjectRepo interface {
 	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.ProjectEntity, error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.ProjectEntity, error)
 	Search(ctx context.Context, params boardapi.ProjectSearchParams, opts repository.ReadOptions) ([]boardapi.ProjectEntity, error)
 }
 
-// ProjectCostRepo は project_costs リポジトリのインターフェース。
+// ProjectCostRepo is the interface for the project_costs repository.
 type ProjectCostRepo interface {
 	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.ProjectCostEntity, error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.ProjectCostEntity, error)
 	Search(ctx context.Context, params boardapi.ProjectCostSearchParams, opts repository.ReadOptions) ([]boardapi.ProjectCostEntity, error)
 }
 
-// EstimateRepo は estimates リポジトリのインターフェース。
+// EstimateRepo is the interface for the estimates repository.
 type EstimateRepo interface {
 	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.EstimateEntity, error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.EstimateEntity, error)
 	Search(ctx context.Context, params boardapi.EstimateSearchParams, opts repository.ReadOptions) ([]boardapi.EstimateEntity, error)
 }
 
-// InvoiceRepo は invoices リポジトリのインターフェース。
+// InvoiceRepo is the interface for the invoices repository.
 type InvoiceRepo interface {
 	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.InvoiceEntity, error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.InvoiceEntity, error)
 	Search(ctx context.Context, params boardapi.InvoiceSearchParams, opts repository.ReadOptions) ([]boardapi.InvoiceEntity, error)
 }
 
-// OrderRepo は orders リポジトリのインターフェース。
+// OrderRepo is the interface for the orders repository.
 type OrderRepo interface {
 	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.OrderEntity, error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.OrderEntity, error)
 	Search(ctx context.Context, params boardapi.OrderSearchParams, opts repository.ReadOptions) ([]boardapi.OrderEntity, error)
 }
 
-// DeliveryRepo は deliveries リポジトリのインターフェース。
+// DeliveryRepo is the interface for the deliveries repository.
 type DeliveryRepo interface {
 	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.DeliveryEntity, error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.DeliveryEntity, error)
 	Search(ctx context.Context, params boardapi.DeliverySearchParams, opts repository.ReadOptions) ([]boardapi.DeliveryEntity, error)
 }
 
-// ReceiptRepo は receipts リポジトリのインターフェース。
+// ReceiptRepo is the interface for the receipts repository.
 type ReceiptRepo interface {
 	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.ReceiptEntity, error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.ReceiptEntity, error)
 	Search(ctx context.Context, params boardapi.ReceiptSearchParams, opts repository.ReadOptions) ([]boardapi.ReceiptEntity, error)
 }
 
-// VendorRepo は vendors リポジトリのインターフェース。
+// VendorRepo is the interface for the vendors repository.
 type VendorRepo interface {
 	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.VendorEntity, error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.VendorEntity, error)
 	Search(ctx context.Context, params boardapi.VendorSearchParams, opts repository.ReadOptions) ([]boardapi.VendorEntity, error)
 }
 
-// VendorBranchRepo は vendor_branches リポジトリのインターフェース。
+// VendorBranchRepo is the interface for the vendor_branches repository.
 type VendorBranchRepo interface {
 	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.VendorBranchEntity, error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.VendorBranchEntity, error)
 	Search(ctx context.Context, params boardapi.VendorBranchSearchParams, opts repository.ReadOptions) ([]boardapi.VendorBranchEntity, error)
 }
 
-// VendorContactRepo は vendor_contacts リポジトリのインターフェース。
+// VendorContactRepo is the interface for the vendor_contacts repository.
 type VendorContactRepo interface {
 	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.VendorContactEntity, error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.VendorContactEntity, error)
 	Search(ctx context.Context, params boardapi.VendorContactSearchParams, opts repository.ReadOptions) ([]boardapi.VendorContactEntity, error)
 }
 
-// PurchaseOrderRepo は purchase_orders リポジトリのインターフェース。
+// PurchaseOrderRepo is the interface for the purchase_orders repository.
 type PurchaseOrderRepo interface {
 	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.PurchaseOrderEntity, error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.PurchaseOrderEntity, error)
 	Search(ctx context.Context, params boardapi.PurchaseOrderSearchParams, opts repository.ReadOptions) ([]boardapi.PurchaseOrderEntity, error)
 }
 
-// PaymentRepo は payments リポジトリのインターフェース。
+// PaymentRepo is the interface for the payments repository.
 type PaymentRepo interface {
 	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.PaymentEntity, error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.PaymentEntity, error)
 	Search(ctx context.Context, params boardapi.PaymentSearchParams, opts repository.ReadOptions) ([]boardapi.PaymentEntity, error)
 }
 
-// UserRepo は users リポジトリのインターフェース。
+// UserRepo is the interface for the users repository.
 type UserRepo interface {
 	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.UserEntity, error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.UserEntity, error)
 	Search(ctx context.Context, params boardapi.UserSearchParams, opts repository.ReadOptions) ([]boardapi.UserEntity, error)
 }
 
-// GroupRepo は groups リポジトリのインターフェース。
+// GroupRepo is the interface for the groups repository.
 type GroupRepo interface {
 	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.GroupEntity, error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.GroupEntity, error)
 	Search(ctx context.Context, params boardapi.GroupSearchParams, opts repository.ReadOptions) ([]boardapi.GroupEntity, error)
 }
 
-// PaymentTermRepo は payment_terms リポジトリのインターフェース。
+// PaymentTermRepo is the interface for the payment_terms repository.
 type PaymentTermRepo interface {
 	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.PaymentTermEntity, error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.PaymentTermEntity, error)
 	Search(ctx context.Context, params boardapi.PaymentTermSearchParams, opts repository.ReadOptions) ([]boardapi.PaymentTermEntity, error)
 }
 
-// ProjectTypeRepo は project_types リポジトリのインターフェース。
+// ProjectTypeRepo is the interface for the project_types repository.
 type ProjectTypeRepo interface {
 	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.ProjectTypeEntity, error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.ProjectTypeEntity, error)
 	Search(ctx context.Context, params boardapi.ProjectTypeSearchParams, opts repository.ReadOptions) ([]boardapi.ProjectTypeEntity, error)
 }
 
-// PurchaseTypeRepo は purchase_types リポジトリのインターフェース。
+// PurchaseTypeRepo is the interface for the purchase_types repository.
 type PurchaseTypeRepo interface {
 	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.PurchaseTypeEntity, error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.PurchaseTypeEntity, error)
 	Search(ctx context.Context, params boardapi.PurchaseTypeSearchParams, opts repository.ReadOptions) ([]boardapi.PurchaseTypeEntity, error)
 }
 
-// AccountingTypeRepo は accounting_types リポジトリのインターフェース。
+// AccountingTypeRepo is the interface for the accounting_types repository.
 type AccountingTypeRepo interface {
 	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.AccountingTypeEntity, error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.AccountingTypeEntity, error)
 	Search(ctx context.Context, params boardapi.AccountingTypeSearchParams, opts repository.ReadOptions) ([]boardapi.AccountingTypeEntity, error)
 }
 
-// DocumentSendChannelRepo は document_send_channels リポジトリのインターフェース。
+// DocumentSendChannelRepo is the interface for the document_send_channels repository.
 type DocumentSendChannelRepo interface {
 	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.DocumentSendChannelEntity, error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.DocumentSendChannelEntity, error)
 	Search(ctx context.Context, params boardapi.DocumentSendChannelSearchParams, opts repository.ReadOptions) ([]boardapi.DocumentSendChannelEntity, error)
 }
 
-// Service は service/api 層のメインサービス。
-// repository の薄いラッパーとして ReadOptions の組み立てと結果の返却のみを担う。
+// Service is the main service for the service/api layer.
+// It acts as a thin wrapper over repositories, responsible only for building ReadOptions and returning results.
 type Service struct {
 	clients              ClientRepo
 	clientBranches       ClientBranchRepo
@@ -188,7 +188,7 @@ type Service struct {
 	documentSendChannels DocumentSendChannelRepo
 }
 
-// Repos は Service 生成に必要なリポジトリをまとめた構造体。
+// Repos is a struct that aggregates all repositories required to construct a Service.
 type Repos struct {
 	Clients              ClientRepo
 	ClientBranches       ClientBranchRepo
@@ -214,7 +214,7 @@ type Repos struct {
 	DocumentSendChannels DocumentSendChannelRepo
 }
 
-// New は Service を生成する。
+// New creates a new Service.
 func New(repos Repos) *Service {
 	return &Service{
 		clients:              repos.Clients,

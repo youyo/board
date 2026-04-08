@@ -8,8 +8,8 @@ import (
 	"strconv"
 )
 
-// VendorBranchEntity は BOARD API の発注先支社エンティティ。
-// GET /v1/vendor_branches レスポンスの1要素に対応。
+// VendorBranchEntity is a BOARD API vendor branch entity.
+// Corresponds to one element in the GET /v1/vendor_branches response.
 type VendorBranchEntity struct {
 	ID         int    `json:"id"`
 	VendorID   int    `json:"vendor_id"`
@@ -23,15 +23,15 @@ type VendorBranchEntity struct {
 	CreatedAt  string `json:"created_at"` // ISO 8601
 }
 
-// VendorBranchSearchParams は SearchVendorBranches のパラメータ。
+// VendorBranchSearchParams is the parameter for SearchVendorBranches.
 type VendorBranchSearchParams struct {
 	VendorID      int
 	Name          string
 	UpdatedAtFrom string
 }
 
-// ListVendorBranches は全発注先支社を取得する。
-// ページネーションは ListAll により自動処理される。
+// ListVendorBranches retrieves all vendor branches.
+// Pagination is automatically handled by ListAll.
 func (c *Client) ListVendorBranches(ctx context.Context) ([]VendorBranchEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/vendor_branches", nil)
@@ -59,7 +59,7 @@ func (c *Client) ListVendorBranches(ctx context.Context) ([]VendorBranchEntity, 
 	return result, nil
 }
 
-// GetVendorBranch は指定 ID の発注先支社を取得する。
+// GetVendorBranch retrieves the vendor branch with the specified ID.
 func (c *Client) GetVendorBranch(ctx context.Context, id int) (*VendorBranchEntity, error) {
 	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/vendor_branches/%d", id), nil)
 	if err != nil {
@@ -76,8 +76,8 @@ func (c *Client) GetVendorBranch(ctx context.Context, id int) (*VendorBranchEnti
 	return &x, nil
 }
 
-// SearchVendorBranches は条件付きで発注先支社を検索する。
-// ページネーションは ListAll により自動処理される。
+// SearchVendorBranches searches vendor branches with the given conditions.
+// Pagination is automatically handled by ListAll.
 func (c *Client) SearchVendorBranches(ctx context.Context, params VendorBranchSearchParams) ([]VendorBranchEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/vendor_branches", nil)

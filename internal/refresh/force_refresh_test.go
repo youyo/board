@@ -8,7 +8,7 @@ import (
 	"github.com/youyo/board/internal/cache"
 )
 
-// TestForceRefresh_DeletesAllThenUpserts: DeleteAll 後に UpsertMany が呼ばれる順序保証
+// TestForceRefresh_DeletesAllThenUpserts: guarantees UpsertMany is called after DeleteAll
 func TestForceRefresh_DeletesAllThenUpserts(t *testing.T) {
 	db := openRefreshTestDB(t)
 	rc := cache.NewResourceCache(db)
@@ -16,7 +16,7 @@ func TestForceRefresh_DeletesAllThenUpserts(t *testing.T) {
 	r := NewRefresher(rc, ss)
 	ctx := context.Background()
 
-	// 既存データを入れておく
+	// insert existing data
 	existing := cache.Entry{
 		Key:         cache.EntityKey{Profile: "default", Resource: "clients", EntityID: "999"},
 		PayloadJSON: json.RawMessage(`{"id":999}`),
@@ -44,7 +44,7 @@ func TestForceRefresh_DeletesAllThenUpserts(t *testing.T) {
 		t.Errorf("FetchedCount = %d, want 2", result.FetchedCount)
 	}
 
-	// 既存データ（999）は削除されている
+	// existing data (999) is deleted
 	entries, err := rc.List(ctx, "default", "clients")
 	if err != nil {
 		t.Fatalf("List: %v", err)
@@ -67,7 +67,7 @@ func TestForceRefresh_UpdatesSyncState(t *testing.T) {
 	r := NewRefresher(rc, ss)
 	ctx := context.Background()
 
-	// MustFullResync=true でセット
+	// set MustFullResync=true
 	existing := cache.SyncState{
 		ProfileName:    "default",
 		ResourceName:   "clients",
@@ -108,7 +108,7 @@ func TestForceRefresh_UpdatesSyncState(t *testing.T) {
 	}
 }
 
-// TestForceRefresh_EmptyResult_ClearsCache: 全件0件 → DeleteAll のみ実行、cache は空
+// TestForceRefresh_EmptyResult_ClearsCache: 0 total items → only DeleteAll runs, cache is empty
 func TestForceRefresh_EmptyResult_ClearsCache(t *testing.T) {
 	db := openRefreshTestDB(t)
 	rc := cache.NewResourceCache(db)
@@ -116,7 +116,7 @@ func TestForceRefresh_EmptyResult_ClearsCache(t *testing.T) {
 	r := NewRefresher(rc, ss)
 	ctx := context.Background()
 
-	// 既存データを入れておく
+	// insert existing data
 	existing := cache.Entry{
 		Key:         cache.EntityKey{Profile: "default", Resource: "clients", EntityID: "1"},
 		PayloadJSON: json.RawMessage(`{"id":1}`),
@@ -127,7 +127,7 @@ func TestForceRefresh_EmptyResult_ClearsCache(t *testing.T) {
 
 	fetcher := &stubFetcher{
 		resource:     "clients",
-		listAllItems: []json.RawMessage{}, // 0件
+		listAllItems: []json.RawMessage{}, // 0 items
 	}
 
 	result, err := r.ForceRefresh(ctx, "default", fetcher, testNow, testTZ)
@@ -139,7 +139,7 @@ func TestForceRefresh_EmptyResult_ClearsCache(t *testing.T) {
 		t.Errorf("FetchedCount = %d, want 0", result.FetchedCount)
 	}
 
-	// cache は空
+	// cache is empty
 	entries, err := rc.List(ctx, "default", "clients")
 	if err != nil {
 		t.Fatalf("List: %v", err)
@@ -149,7 +149,7 @@ func TestForceRefresh_EmptyResult_ClearsCache(t *testing.T) {
 	}
 }
 
-// TestForceRefresh_FetcherError_MarksError: fetcher エラー → MarkError が呼ばれ、DeleteAll は実行しない
+// TestForceRefresh_FetcherError_MarksError: fetcher error → MarkError is called, DeleteAll is not executed
 func TestForceRefresh_FetcherError_MarksError(t *testing.T) {
 	db := openRefreshTestDB(t)
 	rc := cache.NewResourceCache(db)
@@ -157,7 +157,7 @@ func TestForceRefresh_FetcherError_MarksError(t *testing.T) {
 	r := NewRefresher(rc, ss)
 	ctx := context.Background()
 
-	// 既存データを入れておく（DeleteAll が呼ばれていないことを確認するため）
+	// insert existing data (to verify DeleteAll was not called)
 	existing := cache.Entry{
 		Key:         cache.EntityKey{Profile: "default", Resource: "clients", EntityID: "1"},
 		PayloadJSON: json.RawMessage(`{"id":1}`),
@@ -176,7 +176,7 @@ func TestForceRefresh_FetcherError_MarksError(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 
-	// sync_state にエラーが記録されている
+	// error is recorded in sync_state
 	state, err2 := ss.Get(ctx, "default", "clients")
 	if err2 != nil {
 		t.Fatalf("Get: %v", err2)
@@ -188,7 +188,7 @@ func TestForceRefresh_FetcherError_MarksError(t *testing.T) {
 		t.Errorf("LastSyncStatus = %q, want \"error\"", state.LastSyncStatus.String)
 	}
 
-	// 既存データは保持されている（DeleteAll は呼ばれていない）
+	// existing data is retained (DeleteAll was not called)
 	entries, err2 := rc.List(ctx, "default", "clients")
 	if err2 != nil {
 		t.Fatalf("List: %v", err2)
@@ -198,7 +198,7 @@ func TestForceRefresh_FetcherError_MarksError(t *testing.T) {
 	}
 }
 
-// TestForceRefresh_ResetsCursor: 完了後 cursor_updated_at が NULL
+// TestForceRefresh_ResetsCursor: cursor_updated_at is NULL after completion
 func TestForceRefresh_ResetsCursor(t *testing.T) {
 	db := openRefreshTestDB(t)
 	rc := cache.NewResourceCache(db)
@@ -206,7 +206,7 @@ func TestForceRefresh_ResetsCursor(t *testing.T) {
 	r := NewRefresher(rc, ss)
 	ctx := context.Background()
 
-	// 既存カーソルをセット
+	// set existing cursor
 	existing := cache.SyncState{
 		ProfileName:     "default",
 		ResourceName:    "clients",
@@ -233,7 +233,7 @@ func TestForceRefresh_ResetsCursor(t *testing.T) {
 		t.Fatalf("Get: %v", err)
 	}
 
-	// cursor は NULL にリセット
+	// cursor is reset to NULL
 	if state.CursorUpdatedAt.Valid {
 		t.Errorf("CursorUpdatedAt should be NULL, got %q", state.CursorUpdatedAt.String)
 	}

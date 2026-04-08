@@ -61,12 +61,12 @@ func newDeliveryAPIServer(t *testing.T, entities []boardapi.DeliveryEntity) *htt
 }
 
 var sampleDeliveries = []boardapi.DeliveryEntity{
-	{ID: 1, ClientID: 10, ProjectID: 100, Title: "納品A", Status: "draft", UpdatedAt: "2026-01-01T00:00:00Z"},
-	{ID: 2, ClientID: 10, ProjectID: 101, Title: "納品B", Status: "delivered", UpdatedAt: "2026-01-02T00:00:00Z"},
-	{ID: 3, ClientID: 20, ProjectID: 102, Title: "納品C", Status: "accepted", UpdatedAt: "2026-01-03T00:00:00Z"},
+	{ID: 1, ClientID: 10, ProjectID: 100, Title: "DeliveryA", Status: "draft", UpdatedAt: "2026-01-01T00:00:00Z"},
+	{ID: 2, ClientID: 10, ProjectID: 101, Title: "DeliveryB", Status: "delivered", UpdatedAt: "2026-01-02T00:00:00Z"},
+	{ID: 3, ClientID: 20, ProjectID: 102, Title: "DeliveryC", Status: "accepted", UpdatedAt: "2026-01-03T00:00:00Z"},
 }
 
-// T_DEL01: List - キャッシュあり → キャッシュのデータを返す
+// T_DEL01: List - cache hit -> returns cached data
 func TestDeliveryRepository_List_CacheHit(t *testing.T) {
 	db := newTestDB(t)
 	seedDeliveryCache(t, db, sampleDeliveries)
@@ -85,7 +85,7 @@ func TestDeliveryRepository_List_CacheHit(t *testing.T) {
 	}
 }
 
-// T_DEL02: List - キャッシュなし（初回）→ ForceRefresh 後データを返す
+// T_DEL02: List - no cache (initial load) -> returns data after ForceRefresh
 func TestDeliveryRepository_List_InitialLoad(t *testing.T) {
 	db := newTestDB(t)
 
@@ -102,7 +102,7 @@ func TestDeliveryRepository_List_InitialLoad(t *testing.T) {
 	}
 }
 
-// T_DEL03: GetByID - キャッシュヒット → キャッシュから返す
+// T_DEL03: GetByID - cache hit -> returns from cache
 func TestDeliveryRepository_GetByID_CacheHit(t *testing.T) {
 	db := newTestDB(t)
 	seedDeliveryCache(t, db, sampleDeliveries)
@@ -121,12 +121,12 @@ func TestDeliveryRepository_GetByID_CacheHit(t *testing.T) {
 	}
 }
 
-// T_DEL04: GetByID - キャッシュミス、API 成功 → API 取得して返す
+// T_DEL04: GetByID - cache miss, API success -> fetches from API and returns
 func TestDeliveryRepository_GetByID_CacheMiss_APISuccess(t *testing.T) {
 	db := newTestDB(t)
 	markSynced(t, db, "deliveries")
 
-	target := boardapi.DeliveryEntity{ID: 99, Title: "テスト納品", UpdatedAt: "2026-01-01T00:00:00Z"}
+	target := boardapi.DeliveryEntity{ID: 99, Title: "Test Delivery", UpdatedAt: "2026-01-01T00:00:00Z"}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		b, _ := json.Marshal(target)
@@ -146,7 +146,7 @@ func TestDeliveryRepository_GetByID_CacheMiss_APISuccess(t *testing.T) {
 	}
 }
 
-// T_DEL05: GetByID - キャッシュミス、API エラー → error を返す
+// T_DEL05: GetByID - cache miss, API error -> returns error
 func TestDeliveryRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	db := newTestDB(t)
 	markSynced(t, db, "deliveries")
@@ -161,7 +161,7 @@ func TestDeliveryRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	}
 }
 
-// T_DEL06: Search - ClientID フィルタ → 一致するものを返す
+// T_DEL06: Search - ClientID filter -> returns matching items
 func TestDeliveryRepository_Search_ClientIDFilter(t *testing.T) {
 	db := newTestDB(t)
 	seedDeliveryCache(t, db, sampleDeliveries)
@@ -180,7 +180,7 @@ func TestDeliveryRepository_Search_ClientIDFilter(t *testing.T) {
 	}
 }
 
-// T_DEL07: Search - Status フィルタ → 一致するものを返す
+// T_DEL07: Search - Status filter -> returns matching items
 func TestDeliveryRepository_Search_StatusFilter(t *testing.T) {
 	db := newTestDB(t)
 	seedDeliveryCache(t, db, sampleDeliveries)
@@ -199,7 +199,7 @@ func TestDeliveryRepository_Search_StatusFilter(t *testing.T) {
 	}
 }
 
-// T_DEL08: Search - パラメータなし → 全件返す
+// T_DEL08: Search - no filter -> returns all items
 func TestDeliveryRepository_Search_NoFilter(t *testing.T) {
 	db := newTestDB(t)
 	seedDeliveryCache(t, db, sampleDeliveries)

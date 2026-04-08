@@ -8,8 +8,8 @@ import (
 	"strconv"
 )
 
-// PaymentEntity は BOARD API の支払エンティティ。
-// GET /v1/payments レスポンスの1要素に対応。
+// PaymentEntity is a BOARD API payment entity.
+// Corresponds to one element in the GET /v1/payments response.
 type PaymentEntity struct {
 	ID              int     `json:"id"`
 	VendorID        int     `json:"vendor_id"`
@@ -22,7 +22,7 @@ type PaymentEntity struct {
 	CreatedAt       string  `json:"created_at"` // ISO 8601
 }
 
-// PaymentSearchParams は SearchPayments のパラメータ。
+// PaymentSearchParams is the parameter for SearchPayments.
 type PaymentSearchParams struct {
 	VendorID        int
 	PurchaseOrderID int
@@ -30,8 +30,8 @@ type PaymentSearchParams struct {
 	UpdatedAtFrom   string
 }
 
-// ListPayments は全支払を取得する。
-// ページネーションは ListAll により自動処理される。
+// ListPayments retrieves all payments.
+// Pagination is automatically handled by ListAll.
 func (c *Client) ListPayments(ctx context.Context) ([]PaymentEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/payments", nil)
@@ -59,7 +59,7 @@ func (c *Client) ListPayments(ctx context.Context) ([]PaymentEntity, error) {
 	return result, nil
 }
 
-// GetPayment は指定 ID の支払を取得する。
+// GetPayment retrieves the payment with the specified ID.
 func (c *Client) GetPayment(ctx context.Context, id int) (*PaymentEntity, error) {
 	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/payments/%d", id), nil)
 	if err != nil {
@@ -76,8 +76,8 @@ func (c *Client) GetPayment(ctx context.Context, id int) (*PaymentEntity, error)
 	return &x, nil
 }
 
-// SearchPayments は条件付きで支払を検索する。
-// ページネーションは ListAll により自動処理される。
+// SearchPayments searches payments with the given conditions.
+// Pagination is automatically handled by ListAll.
 func (c *Client) SearchPayments(ctx context.Context, params PaymentSearchParams) ([]PaymentEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/payments", nil)

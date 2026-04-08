@@ -2,7 +2,7 @@ package cache
 
 import "testing"
 
-// T_KY01: NewEntityKey が正しいフィールドを設定する
+// T_KY01: NewEntityKey sets the correct fields
 func TestNewEntityKey(t *testing.T) {
 	key := NewEntityKey("default", "clients", "42")
 	if key.Profile != "default" {
@@ -16,7 +16,7 @@ func TestNewEntityKey(t *testing.T) {
 	}
 }
 
-// T_KY02: EntityKey はゼロ値で生成できる
+// T_KY02: EntityKey can be created as zero value
 func TestEntityKey_Zero(t *testing.T) {
 	var key EntityKey
 	if key.Profile != "" || key.Resource != "" || key.EntityID != "" {

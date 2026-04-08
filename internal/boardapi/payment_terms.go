@@ -8,8 +8,8 @@ import (
 	"strconv"
 )
 
-// PaymentTermEntity は BOARD API の支払条件エンティティ。
-// GET /v1/payment_terms レスポンスの1要素に対応。
+// PaymentTermEntity is a BOARD API payment term entity.
+// Corresponds to one element in the GET /v1/payment_terms response.
 type PaymentTermEntity struct {
 	ID        int    `json:"id"`
 	Name      string `json:"name"`
@@ -18,14 +18,14 @@ type PaymentTermEntity struct {
 	CreatedAt string `json:"created_at"` // ISO 8601
 }
 
-// PaymentTermSearchParams は SearchPaymentTerms のパラメータ。
+// PaymentTermSearchParams is the parameter for SearchPaymentTerms.
 type PaymentTermSearchParams struct {
 	Name          string
 	UpdatedAtFrom string
 }
 
-// ListPaymentTerms は全支払条件を取得する。
-// ページネーションは ListAll により自動処理される。
+// ListPaymentTerms retrieves all payment terms.
+// Pagination is automatically handled by ListAll.
 func (c *Client) ListPaymentTerms(ctx context.Context) ([]PaymentTermEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/payment_terms", nil)
@@ -53,7 +53,7 @@ func (c *Client) ListPaymentTerms(ctx context.Context) ([]PaymentTermEntity, err
 	return result, nil
 }
 
-// GetPaymentTerm は指定 ID の支払条件を取得する。
+// GetPaymentTerm retrieves the payment term with the specified ID.
 func (c *Client) GetPaymentTerm(ctx context.Context, id int) (*PaymentTermEntity, error) {
 	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/payment_terms/%d", id), nil)
 	if err != nil {
@@ -70,8 +70,8 @@ func (c *Client) GetPaymentTerm(ctx context.Context, id int) (*PaymentTermEntity
 	return &x, nil
 }
 
-// SearchPaymentTerms は条件付きで支払条件を検索する。
-// ページネーションは ListAll により自動処理される。
+// SearchPaymentTerms searches payment terms with the given conditions.
+// Pagination is automatically handled by ListAll.
 func (c *Client) SearchPaymentTerms(ctx context.Context, params PaymentTermSearchParams) ([]PaymentTermEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/payment_terms", nil)

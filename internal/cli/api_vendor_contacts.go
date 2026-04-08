@@ -9,11 +9,11 @@ import (
 	"github.com/youyo/board/internal/output"
 )
 
-// NewAPIVendorContactsCmd は board api vendor_contacts サブコマンドグループを返す。
+// NewAPIVendorContactsCmd  returns the board api vendor_contacts subcommand group.
 func NewAPIVendorContactsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "vendor_contacts",
-		Short: "発注先担当者（vendor_contacts）を操作する",
+		Short: "Manage vendor_contacts",
 	}
 	cmd.AddCommand(
 		newAPIVendorContactsListCmd(),
@@ -26,7 +26,7 @@ func NewAPIVendorContactsCmd() *cobra.Command {
 func newAPIVendorContactsListCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
-		Short: "発注先担当者の一覧を取得する",
+		Short: "List all vendor_contacts",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			svc, err := apiServiceFromCmd(cmd)
 			if err != nil {
@@ -46,10 +46,10 @@ func newAPIVendorContactsGetCmd() *cobra.Command {
 	var id int
 	cmd := &cobra.Command{
 		Use:   "get",
-		Short: "指定 ID の発注先担当者を取得する",
+		Short: "Get a vendor_contact by ID",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if id == 0 {
-				return fmt.Errorf("--id は必須です")
+				return fmt.Errorf("--id is required")
 			}
 			svc, err := apiServiceFromCmd(cmd)
 			if err != nil {
@@ -63,7 +63,7 @@ func newAPIVendorContactsGetCmd() *cobra.Command {
 			return output.Write(os.Stdout, result, prettyFromCmd(cmd))
 		},
 	}
-	cmd.Flags().IntVar(&id, "id", 0, "発注先担当者 ID（必須）")
+	cmd.Flags().IntVar(&id, "id", 0, "Vendor contact ID (required)")
 	return cmd
 }
 
@@ -72,7 +72,7 @@ func newAPIVendorContactsSearchCmd() *cobra.Command {
 	var name, updatedAtFrom string
 	cmd := &cobra.Command{
 		Use:   "search",
-		Short: "発注先担当者を条件で検索する",
+		Short: "Search vendor_contacts by criteria",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			svc, err := apiServiceFromCmd(cmd)
 			if err != nil {
@@ -91,8 +91,8 @@ func newAPIVendorContactsSearchCmd() *cobra.Command {
 			return output.Write(os.Stdout, result, prettyFromCmd(cmd))
 		},
 	}
-	cmd.Flags().IntVar(&vendorID, "vendor-id", 0, "発注先 ID でフィルタ")
-	cmd.Flags().StringVar(&name, "name", "", "担当者名でフィルタ")
-	cmd.Flags().StringVar(&updatedAtFrom, "updated-at-from", "", "更新日時（ISO 8601）以降でフィルタ")
+	cmd.Flags().IntVar(&vendorID, "vendor-id", 0, "Filter by vendor ID")
+	cmd.Flags().StringVar(&name, "name", "", "Filter by contact name")
+	cmd.Flags().StringVar(&updatedAtFrom, "updated-at-from", "", "Filter by updated_at (ISO 8601, lower bound)")
 	return cmd
 }

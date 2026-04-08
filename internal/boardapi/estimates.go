@@ -8,8 +8,8 @@ import (
 	"strconv"
 )
 
-// EstimateEntity は BOARD API の見積エンティティ。
-// GET /v1/estimates レスポンスの1要素に対応。
+// EstimateEntity is a BOARD API estimate entity.
+// Corresponds to one element in the GET /v1/estimates response.
 type EstimateEntity struct {
 	ID             int     `json:"id"`
 	ClientID       int     `json:"client_id"`
@@ -24,7 +24,7 @@ type EstimateEntity struct {
 	CreatedAt      string  `json:"created_at"` // ISO 8601
 }
 
-// EstimateSearchParams は SearchEstimates のパラメータ。
+// EstimateSearchParams is the parameter for SearchEstimates.
 type EstimateSearchParams struct {
 	ClientID      int
 	ProjectID     int
@@ -32,8 +32,8 @@ type EstimateSearchParams struct {
 	UpdatedAtFrom string
 }
 
-// ListEstimates は全見積を取得する。
-// ページネーションは ListAll により自動処理される。
+// ListEstimates retrieves all estimates.
+// Pagination is automatically handled by ListAll.
 func (c *Client) ListEstimates(ctx context.Context) ([]EstimateEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/estimates", nil)
@@ -61,7 +61,7 @@ func (c *Client) ListEstimates(ctx context.Context) ([]EstimateEntity, error) {
 	return result, nil
 }
 
-// GetEstimate は指定 ID の見積を取得する。
+// GetEstimate retrieves the estimate with the specified ID.
 func (c *Client) GetEstimate(ctx context.Context, id int) (*EstimateEntity, error) {
 	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/estimates/%d", id), nil)
 	if err != nil {
@@ -78,8 +78,8 @@ func (c *Client) GetEstimate(ctx context.Context, id int) (*EstimateEntity, erro
 	return &x, nil
 }
 
-// SearchEstimates は条件付きで見積を検索する。
-// ページネーションは ListAll により自動処理される。
+// SearchEstimates searches estimates with the given conditions.
+// Pagination is automatically handled by ListAll.
 func (c *Client) SearchEstimates(ctx context.Context, params EstimateSearchParams) ([]EstimateEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/estimates", nil)

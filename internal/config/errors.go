@@ -3,10 +3,10 @@ package config
 import "errors"
 
 var (
-	// ErrInvalidConfig は設定ファイルが不正な場合のエラー
+	// ErrInvalidConfig is returned when the configuration file is invalid.
 	ErrInvalidConfig = errors.New("invalid config")
-	// ErrSaveConfig は設定ファイルの保存に失敗した場合のエラー
+	// ErrSaveConfig is returned when saving the configuration file fails.
 	ErrSaveConfig = errors.New("failed to save config")
-	// ErrProfileNotFound は指定したプロファイルが存在しない場合のエラー
+	// ErrProfileNotFound is returned when the specified profile does not exist.
 	ErrProfileNotFound = errors.New("profile not found")
 )

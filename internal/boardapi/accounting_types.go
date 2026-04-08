@@ -8,8 +8,8 @@ import (
 	"strconv"
 )
 
-// AccountingTypeEntity は BOARD API の勘定科目エンティティ。
-// GET /v1/accounting_types レスポンスの1要素に対応。
+// AccountingTypeEntity is a BOARD API accounting type entity.
+// Corresponds to one element in the GET /v1/accounting_types response.
 type AccountingTypeEntity struct {
 	ID        int    `json:"id"`
 	Name      string `json:"name"`
@@ -18,14 +18,14 @@ type AccountingTypeEntity struct {
 	CreatedAt string `json:"created_at"` // ISO 8601
 }
 
-// AccountingTypeSearchParams は SearchAccountingTypes のパラメータ。
+// AccountingTypeSearchParams is the parameter for SearchAccountingTypes.
 type AccountingTypeSearchParams struct {
 	Name          string
 	UpdatedAtFrom string
 }
 
-// ListAccountingTypes は全勘定科目を取得する。
-// ページネーションは ListAll により自動処理される。
+// ListAccountingTypes retrieves all accounting types.
+// Pagination is automatically handled by ListAll.
 func (c *Client) ListAccountingTypes(ctx context.Context) ([]AccountingTypeEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/accounting_types", nil)
@@ -53,7 +53,7 @@ func (c *Client) ListAccountingTypes(ctx context.Context) ([]AccountingTypeEntit
 	return result, nil
 }
 
-// GetAccountingType は指定 ID の勘定科目を取得する。
+// GetAccountingType retrieves the accounting type with the specified ID.
 func (c *Client) GetAccountingType(ctx context.Context, id int) (*AccountingTypeEntity, error) {
 	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/accounting_types/%d", id), nil)
 	if err != nil {
@@ -70,8 +70,8 @@ func (c *Client) GetAccountingType(ctx context.Context, id int) (*AccountingType
 	return &x, nil
 }
 
-// SearchAccountingTypes は条件付きで勘定科目を検索する。
-// ページネーションは ListAll により自動処理される。
+// SearchAccountingTypes searches accounting types with the given conditions.
+// Pagination is automatically handled by ListAll.
 func (c *Client) SearchAccountingTypes(ctx context.Context, params AccountingTypeSearchParams) ([]AccountingTypeEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/accounting_types", nil)

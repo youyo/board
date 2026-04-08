@@ -9,11 +9,11 @@ import (
 	"github.com/youyo/board/internal/config"
 )
 
-// NewConfigureGetCmd は configure get コマンドを返す。
+// NewConfigureGetCmd returns the configure get command.
 func NewConfigureGetCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "get KEY",
-		Short: "設定値を取得する（secrets はマスク）",
+		Short: "Get a configuration value (secrets are masked)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			key := args[0]
@@ -38,18 +38,18 @@ func NewConfigureGetCmd() *cobra.Command {
 	}
 }
 
-// ParseKey は parseKey のエクスポート版（テスト用）。
+// ParseKey is the exported version of parseKey (for testing).
 func ParseKey(key string) (scope string, profileName string, field string, err error) {
 	return parseKey(key)
 }
 
-// parseKey は KEY パス文字列を解析して scope, profileName, field を返す。
+// parseKey parses a KEY path string and returns scope, profileName, and field.
 //
-// 仕様:
+// Format:
 //   - "timezone" → scope="top", profileName="", field="timezone"
 //   - "current_profile" → scope="top", profileName="", field="current_profile"
 //   - "profiles.<name>.<field>" → scope="profiles", profileName=<name>, field=<field>
-//   - 上記以外 → ErrInvalidKey
+//   - anything else → ErrInvalidKey
 func parseKey(key string) (scope string, profileName string, field string, err error) {
 	parts := strings.SplitN(key, ".", 3)
 	switch parts[0] {
@@ -68,7 +68,7 @@ func parseKey(key string) (scope string, profileName string, field string, err e
 	}
 }
 
-// validProfileFields は ProfileConfig の有効フィールド名セット
+// validProfileFields is the set of valid field names for ProfileConfig.
 var validProfileFields = map[string]bool{
 	"base_url":                true,
 	"api_key":                 true,
@@ -79,14 +79,14 @@ var validProfileFields = map[string]bool{
 	"pretty_default":          true,
 }
 
-// secretProfileFields はシークレットとして扱うフィールド名セット
+// secretProfileFields is the set of field names treated as secrets.
 var secretProfileFields = map[string]bool{
 	"api_key":   true,
 	"api_token": true,
 }
 
-// getField は Config から KEY パスに対応する値を文字列で返す。
-// isSecret が true の場合はシークレットフィールド。
+// getField returns the string value corresponding to the KEY path in Config.
+// isSecret is true when the field is a secret.
 func getField(cfg config.Config, key string) (val string, isSecret bool, err error) {
 	scope, profileName, field, err := parseKey(key)
 	if err != nil {

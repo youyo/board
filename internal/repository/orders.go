@@ -11,7 +11,7 @@ import (
 	"github.com/youyo/board/internal/refresh"
 )
 
-// OrderRepository は orders リソースのキャッシュ → リフレッシュ → API フォールバックを管理する。
+// OrderRepository manages cache -> refresh -> API fallback for the orders resource.
 type OrderRepository struct {
 	profile     string
 	api         *boardapi.Client
@@ -23,7 +23,7 @@ type OrderRepository struct {
 	autoRefresh bool
 }
 
-// NewOrderRepository は OrderRepository を生成する。
+// NewOrderRepository creates a new OrderRepository.
 func NewOrderRepository(
 	profile string,
 	api *boardapi.Client,
@@ -48,7 +48,7 @@ func NewOrderRepository(
 
 const ordersResource = "orders"
 
-// List は全受注をキャッシュから返す。
+// List returns all orders from the cache.
 func (r *OrderRepository) List(ctx context.Context, opts ReadOptions) ([]boardapi.OrderEntity, error) {
 	fetcher := &ordersFetcher{api: r.api}
 	now := time.Now()
@@ -91,8 +91,8 @@ func (r *OrderRepository) List(ctx context.Context, opts ReadOptions) ([]boardap
 	return entities, nil
 }
 
-// GetByID は指定 ID の受注をキャッシュから返す。
-// キャッシュミス時は API から単体取得して upsert する。
+// GetByID returns the order with the given ID from the cache.
+// On cache miss, it fetches from the API and upserts the result.
 func (r *OrderRepository) GetByID(ctx context.Context, id int, opts ReadOptions) (*boardapi.OrderEntity, error) {
 	fetcher := &ordersFetcher{api: r.api}
 	now := time.Now()
@@ -120,7 +120,7 @@ func (r *OrderRepository) GetByID(ctx context.Context, id int, opts ReadOptions)
 		return &entity, nil
 	}
 
-	// キャッシュミス → API 単体取得
+	// Cache miss → fetch single entity from API
 	entity, err := r.api.GetOrder(ctx, id)
 	if err != nil {
 		return nil, err
@@ -137,7 +137,7 @@ func (r *OrderRepository) GetByID(ctx context.Context, id int, opts ReadOptions)
 	return entity, nil
 }
 
-// Search はパラメータでフィルタした受注をキャッシュから返す。
+// Search returns orders filtered by the given parameters from the cache.
 func (r *OrderRepository) Search(ctx context.Context, params boardapi.OrderSearchParams, opts ReadOptions) ([]boardapi.OrderEntity, error) {
 	all, err := r.List(ctx, opts)
 	if err != nil {
@@ -146,8 +146,8 @@ func (r *OrderRepository) Search(ctx context.Context, params boardapi.OrderSearc
 	return filterOrders(all, params), nil
 }
 
-// filterOrders はインメモリフィルタリングを行う。
-// UpdatedAtFrom は差分取得カーソルとして使用するためフィルタには含めない。
+// filterOrders performs in-memory filtering.
+// UpdatedAtFrom is used as a delta fetch cursor and is not included in the filter.
 func filterOrders(entities []boardapi.OrderEntity, params boardapi.OrderSearchParams) []boardapi.OrderEntity {
 	var result []boardapi.OrderEntity
 	for _, e := range entities {

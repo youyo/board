@@ -9,11 +9,11 @@ import (
 	"github.com/youyo/board/internal/output"
 )
 
-// NewAPIContactsCmd は board api contacts サブコマンドグループを返す。
+// NewAPIContactsCmd  returns the board api contacts subcommand group.
 func NewAPIContactsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "contacts",
-		Short: "担当者（contacts）を操作する",
+		Short: "Manage contacts",
 	}
 	cmd.AddCommand(
 		newAPIContactsListCmd(),
@@ -26,7 +26,7 @@ func NewAPIContactsCmd() *cobra.Command {
 func newAPIContactsListCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
-		Short: "担当者の一覧を取得する",
+		Short: "List all contacts",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			svc, err := apiServiceFromCmd(cmd)
 			if err != nil {
@@ -46,10 +46,10 @@ func newAPIContactsGetCmd() *cobra.Command {
 	var id int
 	cmd := &cobra.Command{
 		Use:   "get",
-		Short: "指定 ID の担当者を取得する",
+		Short: "Get a contact by ID",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if id == 0 {
-				return fmt.Errorf("--id は必須です")
+				return fmt.Errorf("--id is required")
 			}
 			svc, err := apiServiceFromCmd(cmd)
 			if err != nil {
@@ -63,7 +63,7 @@ func newAPIContactsGetCmd() *cobra.Command {
 			return output.Write(os.Stdout, result, prettyFromCmd(cmd))
 		},
 	}
-	cmd.Flags().IntVar(&id, "id", 0, "担当者 ID（必須）")
+	cmd.Flags().IntVar(&id, "id", 0, "Contact ID (required)")
 	return cmd
 }
 
@@ -72,7 +72,7 @@ func newAPIContactsSearchCmd() *cobra.Command {
 	var name, email string
 	cmd := &cobra.Command{
 		Use:   "search",
-		Short: "担当者を条件で検索する",
+		Short: "Search contacts by criteria",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			svc, err := apiServiceFromCmd(cmd)
 			if err != nil {
@@ -91,8 +91,8 @@ func newAPIContactsSearchCmd() *cobra.Command {
 			return output.Write(os.Stdout, result, prettyFromCmd(cmd))
 		},
 	}
-	cmd.Flags().IntVar(&clientID, "client-id", 0, "顧客 ID でフィルタ")
-	cmd.Flags().StringVar(&name, "name", "", "担当者名でフィルタ")
-	cmd.Flags().StringVar(&email, "email", "", "メールアドレスでフィルタ")
+	cmd.Flags().IntVar(&clientID, "client-id", 0, "Filter by client ID")
+	cmd.Flags().StringVar(&name, "name", "", "Filter by contact name")
+	cmd.Flags().StringVar(&email, "email", "", "Filter by email address")
 	return cmd
 }

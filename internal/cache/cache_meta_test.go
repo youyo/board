@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// T_CM01: NewCacheMetaStore が non-nil を返す
+// T_CM01: NewCacheMetaStore returns non-nil
 func TestNewCacheMetaStore(t *testing.T) {
 	db := openTestDB(t)
 	s := NewCacheMetaStore(db)
@@ -14,7 +14,7 @@ func TestNewCacheMetaStore(t *testing.T) {
 	}
 }
 
-// T_CM02: Set→Get が正しく値を返す
+// T_CM02: Set→Get returns correct values
 func TestCacheMeta_SetAndGet(t *testing.T) {
 	db := openTestDB(t)
 	s := NewCacheMetaStore(db)
@@ -33,7 +33,7 @@ func TestCacheMeta_SetAndGet(t *testing.T) {
 	}
 }
 
-// T_CM03: Get が存在しないキーに対して "", nil を返す
+// T_CM03: Get returns "", nil for non-existent key
 func TestCacheMeta_GetNotFound(t *testing.T) {
 	db := openTestDB(t)
 	s := NewCacheMetaStore(db)
@@ -48,7 +48,7 @@ func TestCacheMeta_GetNotFound(t *testing.T) {
 	}
 }
 
-// T_CM04: Delete が指定キーを削除する
+// T_CM04: Delete deletes the specified key
 func TestCacheMeta_Delete(t *testing.T) {
 	db := openTestDB(t)
 	s := NewCacheMetaStore(db)
@@ -70,7 +70,7 @@ func TestCacheMeta_Delete(t *testing.T) {
 	}
 }
 
-// T_CM05: Set が既存キーを上書きする
+// T_CM05: Set overwrites an existing key
 func TestCacheMeta_SetOverwrite(t *testing.T) {
 	db := openTestDB(t)
 	s := NewCacheMetaStore(db)
@@ -92,7 +92,7 @@ func TestCacheMeta_SetOverwrite(t *testing.T) {
 	}
 }
 
-// T_CM06: Migrate 後に db_schema_version が正しく設定される
+// T_CM06: db_schema_version is correctly set after Migrate
 func TestCacheMeta_DBSchemaVersionAfterMigrate(t *testing.T) {
 	db := openTestDB(t)
 	s := NewCacheMetaStore(db)

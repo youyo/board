@@ -12,7 +12,7 @@ import (
 	"github.com/youyo/board/internal/refresh"
 )
 
-// UserRepository は users リソースのキャッシュ → リフレッシュ → API フォールバックを管理する。
+// UserRepository manages cache -> refresh -> API fallback for the users resource.
 type UserRepository struct {
 	profile     string
 	api         *boardapi.Client
@@ -24,7 +24,7 @@ type UserRepository struct {
 	autoRefresh bool
 }
 
-// NewUserRepository は UserRepository を生成する。
+// NewUserRepository creates a new UserRepository.
 func NewUserRepository(
 	profile string,
 	api *boardapi.Client,
@@ -49,7 +49,7 @@ func NewUserRepository(
 
 const usersResource = "users"
 
-// List は全ユーザーをキャッシュから返す。
+// List returns all users from the cache.
 func (r *UserRepository) List(ctx context.Context, opts ReadOptions) ([]boardapi.UserEntity, error) {
 	fetcher := &usersFetcher{api: r.api}
 	now := time.Now()
@@ -92,8 +92,8 @@ func (r *UserRepository) List(ctx context.Context, opts ReadOptions) ([]boardapi
 	return entities, nil
 }
 
-// GetByID は指定 ID のユーザーをキャッシュから返す。
-// キャッシュミス時は API から単体取得して upsert する。
+// GetByID returns the user with the given ID from the cache.
+// On cache miss, it fetches from the API and upserts the result.
 func (r *UserRepository) GetByID(ctx context.Context, id int, opts ReadOptions) (*boardapi.UserEntity, error) {
 	fetcher := &usersFetcher{api: r.api}
 	now := time.Now()
@@ -121,7 +121,7 @@ func (r *UserRepository) GetByID(ctx context.Context, id int, opts ReadOptions) 
 		return &entity, nil
 	}
 
-	// キャッシュミス → API 単体取得
+	// Cache miss → fetch single entity from API
 	entity, err := r.api.GetUser(ctx, id)
 	if err != nil {
 		return nil, err
@@ -138,7 +138,7 @@ func (r *UserRepository) GetByID(ctx context.Context, id int, opts ReadOptions) 
 	return entity, nil
 }
 
-// Search はパラメータでフィルタしたユーザーをキャッシュから返す。
+// Search returns users filtered by the given parameters from the cache.
 func (r *UserRepository) Search(ctx context.Context, params boardapi.UserSearchParams, opts ReadOptions) ([]boardapi.UserEntity, error) {
 	all, err := r.List(ctx, opts)
 	if err != nil {
@@ -147,8 +147,8 @@ func (r *UserRepository) Search(ctx context.Context, params boardapi.UserSearchP
 	return filterUsers(all, params), nil
 }
 
-// filterUsers はインメモリフィルタリングを行う。
-// UpdatedAtFrom は差分取得カーソルとして使用するためフィルタには含めない。
+// filterUsers performs in-memory filtering.
+// UpdatedAtFrom is used as a delta fetch cursor and is not included in the filter.
 func filterUsers(entities []boardapi.UserEntity, params boardapi.UserSearchParams) []boardapi.UserEntity {
 	var result []boardapi.UserEntity
 	for _, e := range entities {
