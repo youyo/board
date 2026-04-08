@@ -1,2 +1,22 @@
 [tools]
 go = "1.26"
+
+[tasks.build]
+description = "Build the board binary"
+run = "go build -ldflags \"-X main.version=dev\" -o board ./cmd/board"
+
+[tasks.test]
+description = "Run all tests"
+run = "go test ./..."
+
+[tasks.vet]
+description = "Run go vet"
+run = "go vet ./..."
+
+[tasks.fmt]
+description = "Format Go source code"
+run = "gofmt -s -w ."
+
+[tasks.clean]
+description = "Remove build artifacts"
+run = "rm -f board"
