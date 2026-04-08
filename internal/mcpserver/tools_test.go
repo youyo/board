@@ -158,19 +158,6 @@ func TestRegisterTools_ReadOnlyAnnotation(t *testing.T) {
 	}
 }
 
-func TestPlaceholderHandler_ReturnsNotImplemented(t *testing.T) {
-	result, err := notImplementedHandler(context.Background(), newEmptyCallToolRequest("find_clients"))
-	if err != nil {
-		t.Fatalf("placeholder handler returned error: %v", err)
-	}
-	if result == nil {
-		t.Fatal("placeholder handler returned nil result")
-	}
-	if !result.IsError {
-		t.Error("placeholder handler should return IsError=true")
-	}
-}
-
 func TestGetStringArg(t *testing.T) {
 	tests := []struct {
 		name string

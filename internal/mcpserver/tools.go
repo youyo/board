@@ -7,48 +7,34 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"github.com/youyo/board/internal/service/find"
 )
 
-// RegisterTools registers all 12 MCP tool definitions with placeholder handlers.
-// Real handlers are wired in M37 (core + documents) and M38 (vendor + master).
+// RegisterTools registers all 12 MCP tool definitions with real handlers.
 func RegisterTools(s *Server) {
 	s.MCPServer().AddTools(
 		// --- Simple tools (id, name, text, limit) ---
-		findClientsTool(),
-		findVendorsTool(),
-		findUsersTool(),
-		findGroupsTool(),
+		findClientsTool(s),
+		findVendorsTool(s),
+		findUsersTool(s),
+		findGroupsTool(s),
 
 		// --- Project tool (id, client_name, name, text, status, limit) ---
-		findProjectsTool(),
+		findProjectsTool(s),
 
 		// --- Client-document tools (id, client_name, project_name, text, status, limit) ---
-		findEstimatesTool(),
-		findInvoicesTool(),
-		findOrdersTool(),
-		findDeliveriesTool(),
-		findReceiptsTool(),
+		findEstimatesTool(s),
+		findInvoicesTool(s),
+		findOrdersTool(s),
+		findDeliveriesTool(s),
+		findReceiptsTool(s),
 
 		// --- Vendor-document tool (id, vendor_name, project_name, text, status, limit) ---
-		findPurchaseOrdersTool(),
+		findPurchaseOrdersTool(s),
 
 		// --- Payment tool (id, vendor_name, purchase_order_id, text, status, limit) ---
-		findPaymentsTool(),
+		findPaymentsTool(s),
 	)
-}
-
-// notImplementedHandler is a placeholder handler for tools not yet implemented.
-func notImplementedHandler(_ context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	return mcp.NewToolResultError(fmt.Sprintf("tool %q is not yet implemented", request.Params.Name)), nil
-}
-
-// newEmptyCallToolRequest creates a CallToolRequest for testing purposes.
-func newEmptyCallToolRequest(name string) mcp.CallToolRequest {
-	return mcp.CallToolRequest{
-		Params: mcp.CallToolParams{
-			Name: name,
-		},
-	}
 }
 
 // readOnlyAnnotation returns ToolOptions marking a tool as read-only.
@@ -123,7 +109,7 @@ func errorResult(err error) *mcp.CallToolResult {
 
 // --- Tool definitions ---
 
-func findClientsTool() server.ServerTool {
+func findClientsTool(srv *Server) server.ServerTool {
 	return server.ServerTool{
 		Tool: mcp.NewTool("find_clients",
 			mcp.WithDescription("Search for clients by ID, name, or free text. Returns client details with branches and contacts."),
@@ -133,11 +119,22 @@ func findClientsTool() server.ServerTool {
 			mcp.WithNumber("limit", mcp.Description("Max results to return (default: unlimited)")),
 			readOnlyAnnotation(),
 		),
-		Handler: notImplementedHandler,
+		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			results, err := srv.FindService().FindClient(ctx, find.FindClientQuery{
+				ID:    getIntArg(req, "id"),
+				Name:  getStringArg(req, "name"),
+				Text:  getStringArg(req, "text"),
+				Limit: getIntArg(req, "limit"),
+			})
+			if err != nil {
+				return errorResult(err), nil
+			}
+			return marshalResult(results)
+		},
 	}
 }
 
-func findVendorsTool() server.ServerTool {
+func findVendorsTool(srv *Server) server.ServerTool {
 	return server.ServerTool{
 		Tool: mcp.NewTool("find_vendors",
 			mcp.WithDescription("Search for vendors by ID, name, or free text. Returns vendor details with branches and contacts."),
@@ -147,11 +144,22 @@ func findVendorsTool() server.ServerTool {
 			mcp.WithNumber("limit", mcp.Description("Max results to return (default: unlimited)")),
 			readOnlyAnnotation(),
 		),
-		Handler: notImplementedHandler,
+		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			results, err := srv.FindService().FindVendor(ctx, find.FindVendorQuery{
+				ID:    getIntArg(req, "id"),
+				Name:  getStringArg(req, "name"),
+				Text:  getStringArg(req, "text"),
+				Limit: getIntArg(req, "limit"),
+			})
+			if err != nil {
+				return errorResult(err), nil
+			}
+			return marshalResult(results)
+		},
 	}
 }
 
-func findUsersTool() server.ServerTool {
+func findUsersTool(srv *Server) server.ServerTool {
 	return server.ServerTool{
 		Tool: mcp.NewTool("find_users",
 			mcp.WithDescription("Search for users by ID, name, or free text. Returns user details."),
@@ -161,11 +169,22 @@ func findUsersTool() server.ServerTool {
 			mcp.WithNumber("limit", mcp.Description("Max results to return (default: unlimited)")),
 			readOnlyAnnotation(),
 		),
-		Handler: notImplementedHandler,
+		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			results, err := srv.FindService().FindUser(ctx, find.FindUserQuery{
+				ID:    getIntArg(req, "id"),
+				Name:  getStringArg(req, "name"),
+				Text:  getStringArg(req, "text"),
+				Limit: getIntArg(req, "limit"),
+			})
+			if err != nil {
+				return errorResult(err), nil
+			}
+			return marshalResult(results)
+		},
 	}
 }
 
-func findGroupsTool() server.ServerTool {
+func findGroupsTool(srv *Server) server.ServerTool {
 	return server.ServerTool{
 		Tool: mcp.NewTool("find_groups",
 			mcp.WithDescription("Search for groups by ID, name, or free text. Returns group details."),
@@ -175,11 +194,22 @@ func findGroupsTool() server.ServerTool {
 			mcp.WithNumber("limit", mcp.Description("Max results to return (default: unlimited)")),
 			readOnlyAnnotation(),
 		),
-		Handler: notImplementedHandler,
+		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			results, err := srv.FindService().FindGroup(ctx, find.FindGroupQuery{
+				ID:    getIntArg(req, "id"),
+				Name:  getStringArg(req, "name"),
+				Text:  getStringArg(req, "text"),
+				Limit: getIntArg(req, "limit"),
+			})
+			if err != nil {
+				return errorResult(err), nil
+			}
+			return marshalResult(results)
+		},
 	}
 }
 
-func findProjectsTool() server.ServerTool {
+func findProjectsTool(srv *Server) server.ServerTool {
 	return server.ServerTool{
 		Tool: mcp.NewTool("find_projects",
 			mcp.WithDescription("Search for projects by ID, client name, project name, or free text. Supports status filtering."),
@@ -191,11 +221,24 @@ func findProjectsTool() server.ServerTool {
 			mcp.WithNumber("limit", mcp.Description("Max results to return (default: unlimited)")),
 			readOnlyAnnotation(),
 		),
-		Handler: notImplementedHandler,
+		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			results, err := srv.FindService().FindProject(ctx, find.FindProjectQuery{
+				ID:         getIntArg(req, "id"),
+				ClientName: getStringArg(req, "client_name"),
+				Name:       getStringArg(req, "name"),
+				Text:       getStringArg(req, "text"),
+				Status:     getStringArg(req, "status"),
+				Limit:      getIntArg(req, "limit"),
+			})
+			if err != nil {
+				return errorResult(err), nil
+			}
+			return marshalResult(results)
+		},
 	}
 }
 
-func findEstimatesTool() server.ServerTool {
+func findEstimatesTool(srv *Server) server.ServerTool {
 	return server.ServerTool{
 		Tool: mcp.NewTool("find_estimates",
 			mcp.WithDescription("Search for estimates by ID, client name, project name, or free text. Supports status filtering."),
@@ -207,11 +250,24 @@ func findEstimatesTool() server.ServerTool {
 			mcp.WithNumber("limit", mcp.Description("Max results to return (default: unlimited)")),
 			readOnlyAnnotation(),
 		),
-		Handler: notImplementedHandler,
+		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			results, err := srv.FindService().FindEstimate(ctx, find.FindEstimateQuery{
+				ID:          getIntArg(req, "id"),
+				ClientName:  getStringArg(req, "client_name"),
+				ProjectName: getStringArg(req, "project_name"),
+				Text:        getStringArg(req, "text"),
+				Status:      getStringArg(req, "status"),
+				Limit:       getIntArg(req, "limit"),
+			})
+			if err != nil {
+				return errorResult(err), nil
+			}
+			return marshalResult(results)
+		},
 	}
 }
 
-func findInvoicesTool() server.ServerTool {
+func findInvoicesTool(srv *Server) server.ServerTool {
 	return server.ServerTool{
 		Tool: mcp.NewTool("find_invoices",
 			mcp.WithDescription("Search for invoices by ID, client name, project name, or free text. Supports status filtering."),
@@ -223,11 +279,24 @@ func findInvoicesTool() server.ServerTool {
 			mcp.WithNumber("limit", mcp.Description("Max results to return (default: unlimited)")),
 			readOnlyAnnotation(),
 		),
-		Handler: notImplementedHandler,
+		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			results, err := srv.FindService().FindInvoice(ctx, find.FindInvoiceQuery{
+				ID:          getIntArg(req, "id"),
+				ClientName:  getStringArg(req, "client_name"),
+				ProjectName: getStringArg(req, "project_name"),
+				Text:        getStringArg(req, "text"),
+				Status:      getStringArg(req, "status"),
+				Limit:       getIntArg(req, "limit"),
+			})
+			if err != nil {
+				return errorResult(err), nil
+			}
+			return marshalResult(results)
+		},
 	}
 }
 
-func findOrdersTool() server.ServerTool {
+func findOrdersTool(srv *Server) server.ServerTool {
 	return server.ServerTool{
 		Tool: mcp.NewTool("find_orders",
 			mcp.WithDescription("Search for orders by ID, client name, project name, or free text. Supports status filtering."),
@@ -239,11 +308,24 @@ func findOrdersTool() server.ServerTool {
 			mcp.WithNumber("limit", mcp.Description("Max results to return (default: unlimited)")),
 			readOnlyAnnotation(),
 		),
-		Handler: notImplementedHandler,
+		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			results, err := srv.FindService().FindOrder(ctx, find.FindOrderQuery{
+				ID:          getIntArg(req, "id"),
+				ClientName:  getStringArg(req, "client_name"),
+				ProjectName: getStringArg(req, "project_name"),
+				Text:        getStringArg(req, "text"),
+				Status:      getStringArg(req, "status"),
+				Limit:       getIntArg(req, "limit"),
+			})
+			if err != nil {
+				return errorResult(err), nil
+			}
+			return marshalResult(results)
+		},
 	}
 }
 
-func findDeliveriesTool() server.ServerTool {
+func findDeliveriesTool(srv *Server) server.ServerTool {
 	return server.ServerTool{
 		Tool: mcp.NewTool("find_deliveries",
 			mcp.WithDescription("Search for deliveries by ID, client name, project name, or free text. Supports status filtering."),
@@ -255,11 +337,24 @@ func findDeliveriesTool() server.ServerTool {
 			mcp.WithNumber("limit", mcp.Description("Max results to return (default: unlimited)")),
 			readOnlyAnnotation(),
 		),
-		Handler: notImplementedHandler,
+		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			results, err := srv.FindService().FindDelivery(ctx, find.FindDeliveryQuery{
+				ID:          getIntArg(req, "id"),
+				ClientName:  getStringArg(req, "client_name"),
+				ProjectName: getStringArg(req, "project_name"),
+				Text:        getStringArg(req, "text"),
+				Status:      getStringArg(req, "status"),
+				Limit:       getIntArg(req, "limit"),
+			})
+			if err != nil {
+				return errorResult(err), nil
+			}
+			return marshalResult(results)
+		},
 	}
 }
 
-func findReceiptsTool() server.ServerTool {
+func findReceiptsTool(srv *Server) server.ServerTool {
 	return server.ServerTool{
 		Tool: mcp.NewTool("find_receipts",
 			mcp.WithDescription("Search for receipts by ID, client name, project name, or free text. Supports status filtering."),
@@ -271,11 +366,24 @@ func findReceiptsTool() server.ServerTool {
 			mcp.WithNumber("limit", mcp.Description("Max results to return (default: unlimited)")),
 			readOnlyAnnotation(),
 		),
-		Handler: notImplementedHandler,
+		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			results, err := srv.FindService().FindReceipt(ctx, find.FindReceiptQuery{
+				ID:          getIntArg(req, "id"),
+				ClientName:  getStringArg(req, "client_name"),
+				ProjectName: getStringArg(req, "project_name"),
+				Text:        getStringArg(req, "text"),
+				Status:      getStringArg(req, "status"),
+				Limit:       getIntArg(req, "limit"),
+			})
+			if err != nil {
+				return errorResult(err), nil
+			}
+			return marshalResult(results)
+		},
 	}
 }
 
-func findPurchaseOrdersTool() server.ServerTool {
+func findPurchaseOrdersTool(srv *Server) server.ServerTool {
 	return server.ServerTool{
 		Tool: mcp.NewTool("find_purchase_orders",
 			mcp.WithDescription("Search for purchase orders by ID, vendor name, project name, or free text. Supports status filtering."),
@@ -287,11 +395,24 @@ func findPurchaseOrdersTool() server.ServerTool {
 			mcp.WithNumber("limit", mcp.Description("Max results to return (default: unlimited)")),
 			readOnlyAnnotation(),
 		),
-		Handler: notImplementedHandler,
+		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			results, err := srv.FindService().FindPurchaseOrder(ctx, find.FindPurchaseOrderQuery{
+				ID:          getIntArg(req, "id"),
+				VendorName:  getStringArg(req, "vendor_name"),
+				ProjectName: getStringArg(req, "project_name"),
+				Text:        getStringArg(req, "text"),
+				Status:      getStringArg(req, "status"),
+				Limit:       getIntArg(req, "limit"),
+			})
+			if err != nil {
+				return errorResult(err), nil
+			}
+			return marshalResult(results)
+		},
 	}
 }
 
-func findPaymentsTool() server.ServerTool {
+func findPaymentsTool(srv *Server) server.ServerTool {
 	return server.ServerTool{
 		Tool: mcp.NewTool("find_payments",
 			mcp.WithDescription("Search for payments by ID, vendor name, purchase order ID, or free text. Supports status filtering."),
@@ -303,6 +424,19 @@ func findPaymentsTool() server.ServerTool {
 			mcp.WithNumber("limit", mcp.Description("Max results to return (default: unlimited)")),
 			readOnlyAnnotation(),
 		),
-		Handler: notImplementedHandler,
+		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			results, err := srv.FindService().FindPayment(ctx, find.FindPaymentQuery{
+				ID:              getIntArg(req, "id"),
+				VendorName:      getStringArg(req, "vendor_name"),
+				PurchaseOrderID: getIntArg(req, "purchase_order_id"),
+				Text:            getStringArg(req, "text"),
+				Status:          getStringArg(req, "status"),
+				Limit:           getIntArg(req, "limit"),
+			})
+			if err != nil {
+				return errorResult(err), nil
+			}
+			return marshalResult(results)
+		},
 	}
 }
