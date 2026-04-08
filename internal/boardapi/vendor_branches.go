@@ -25,8 +25,9 @@ type VendorBranchEntity struct {
 
 // VendorBranchSearchParams は SearchVendorBranches のパラメータ。
 type VendorBranchSearchParams struct {
-	VendorID int
-	Name     string
+	VendorID      int
+	Name          string
+	UpdatedAtFrom string
 }
 
 // ListVendorBranches は全発注先支社を取得する。
@@ -91,6 +92,9 @@ func (c *Client) SearchVendorBranches(ctx context.Context, params VendorBranchSe
 		}
 		if params.Name != "" {
 			q.Set("name", params.Name)
+		}
+		if params.UpdatedAtFrom != "" {
+			q.Set("updated_at_from", params.UpdatedAtFrom)
 		}
 		req.URL.RawQuery = q.Encode()
 		return req, nil

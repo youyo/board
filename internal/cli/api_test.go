@@ -20,7 +20,7 @@ func TestNewAPICmd(t *testing.T) {
 		subNames[sub.Use] = true
 	}
 
-	expects := []string{"clients", "client_branches", "contacts", "projects", "project_costs", "estimates", "invoices", "orders", "deliveries", "receipts"}
+	expects := []string{"clients", "client_branches", "contacts", "projects", "project_costs", "estimates", "invoices", "orders", "deliveries", "receipts", "vendors", "vendor_branches", "vendor_contacts", "purchase_orders", "payments"}
 	for _, name := range expects {
 		if !subNames[name] {
 			t.Errorf("サブコマンド %q が登録されていない", name)
@@ -267,6 +267,161 @@ func TestNewAPIDeliveriesCmd(t *testing.T) {
 func TestNewAPIReceiptsCmd(t *testing.T) {
 	testDocumentCmd(t, cli.NewAPIReceiptsCmd(), "receipts",
 		[]string{"client-id", "project-id", "status", "updated-at-from"})
+}
+
+func TestNewAPIVendorsCmd(t *testing.T) {
+	cmd := cli.NewAPIVendorsCmd()
+	if cmd.Use != "vendors" {
+		t.Errorf("Use = %q, want %q", cmd.Use, "vendors")
+	}
+	subNames := make(map[string]bool)
+	for _, sub := range cmd.Commands() {
+		subNames[sub.Use] = true
+	}
+	for _, name := range []string{"list", "get", "search"} {
+		if !subNames[name] {
+			t.Errorf("サブコマンド %q が登録されていない", name)
+		}
+	}
+
+	var searchCmd *cobra.Command
+	for _, sub := range cmd.Commands() {
+		if sub.Use == "search" {
+			searchCmd = sub
+		}
+	}
+	if searchCmd == nil {
+		t.Fatal("search コマンドが見つからない")
+	}
+	for _, flagName := range []string{"name", "updated-at-from"} {
+		if f := searchCmd.Flags().Lookup(flagName); f == nil {
+			t.Errorf("search: --%s フラグが定義されていない", flagName)
+		}
+	}
+}
+
+func TestNewAPIVendorBranchesCmd(t *testing.T) {
+	cmd := cli.NewAPIVendorBranchesCmd()
+	if cmd.Use != "vendor_branches" {
+		t.Errorf("Use = %q, want %q", cmd.Use, "vendor_branches")
+	}
+	subNames := make(map[string]bool)
+	for _, sub := range cmd.Commands() {
+		subNames[sub.Use] = true
+	}
+	for _, name := range []string{"list", "get", "search"} {
+		if !subNames[name] {
+			t.Errorf("サブコマンド %q が登録されていない", name)
+		}
+	}
+
+	var searchCmd *cobra.Command
+	for _, sub := range cmd.Commands() {
+		if sub.Use == "search" {
+			searchCmd = sub
+		}
+	}
+	if searchCmd == nil {
+		t.Fatal("search コマンドが見つからない")
+	}
+	for _, flagName := range []string{"vendor-id", "updated-at-from"} {
+		if f := searchCmd.Flags().Lookup(flagName); f == nil {
+			t.Errorf("search: --%s フラグが定義されていない", flagName)
+		}
+	}
+}
+
+func TestNewAPIVendorContactsCmd(t *testing.T) {
+	cmd := cli.NewAPIVendorContactsCmd()
+	if cmd.Use != "vendor_contacts" {
+		t.Errorf("Use = %q, want %q", cmd.Use, "vendor_contacts")
+	}
+	subNames := make(map[string]bool)
+	for _, sub := range cmd.Commands() {
+		subNames[sub.Use] = true
+	}
+	for _, name := range []string{"list", "get", "search"} {
+		if !subNames[name] {
+			t.Errorf("サブコマンド %q が登録されていない", name)
+		}
+	}
+
+	var searchCmd *cobra.Command
+	for _, sub := range cmd.Commands() {
+		if sub.Use == "search" {
+			searchCmd = sub
+		}
+	}
+	if searchCmd == nil {
+		t.Fatal("search コマンドが見つからない")
+	}
+	for _, flagName := range []string{"vendor-id", "name", "updated-at-from"} {
+		if f := searchCmd.Flags().Lookup(flagName); f == nil {
+			t.Errorf("search: --%s フラグが定義されていない", flagName)
+		}
+	}
+}
+
+func TestNewAPIPurchaseOrdersCmd(t *testing.T) {
+	cmd := cli.NewAPIPurchaseOrdersCmd()
+	if cmd.Use != "purchase_orders" {
+		t.Errorf("Use = %q, want %q", cmd.Use, "purchase_orders")
+	}
+	subNames := make(map[string]bool)
+	for _, sub := range cmd.Commands() {
+		subNames[sub.Use] = true
+	}
+	for _, name := range []string{"list", "get", "search"} {
+		if !subNames[name] {
+			t.Errorf("サブコマンド %q が登録されていない", name)
+		}
+	}
+
+	var searchCmd *cobra.Command
+	for _, sub := range cmd.Commands() {
+		if sub.Use == "search" {
+			searchCmd = sub
+		}
+	}
+	if searchCmd == nil {
+		t.Fatal("search コマンドが見つからない")
+	}
+	for _, flagName := range []string{"vendor-id", "project-id", "status", "updated-at-from"} {
+		if f := searchCmd.Flags().Lookup(flagName); f == nil {
+			t.Errorf("search: --%s フラグが定義されていない", flagName)
+		}
+	}
+}
+
+func TestNewAPIPaymentsCmd(t *testing.T) {
+	cmd := cli.NewAPIPaymentsCmd()
+	if cmd.Use != "payments" {
+		t.Errorf("Use = %q, want %q", cmd.Use, "payments")
+	}
+	subNames := make(map[string]bool)
+	for _, sub := range cmd.Commands() {
+		subNames[sub.Use] = true
+	}
+	for _, name := range []string{"list", "get", "search"} {
+		if !subNames[name] {
+			t.Errorf("サブコマンド %q が登録されていない", name)
+		}
+	}
+
+	var searchCmd *cobra.Command
+	for _, sub := range cmd.Commands() {
+		if sub.Use == "search" {
+			searchCmd = sub
+		}
+	}
+	if searchCmd == nil {
+		t.Fatal("search コマンドが見つからない")
+	}
+	for _, flagName := range []string{"vendor-id", "purchase-order-id", "status", "updated-at-from"} {
+		if f := searchCmd.Flags().Lookup(flagName); f == nil {
+			t.Errorf("search: --%s フラグが定義されていない", flagName)
+		}
+	}
 }
 
 func TestRootCmdHasAPISubcommand(t *testing.T) {

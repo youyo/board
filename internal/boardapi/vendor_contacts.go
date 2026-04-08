@@ -26,9 +26,10 @@ type VendorContactEntity struct {
 
 // VendorContactSearchParams は SearchVendorContacts のパラメータ。
 type VendorContactSearchParams struct {
-	VendorID int
-	Name     string
-	Email    string
+	VendorID      int
+	Name          string
+	Email         string
+	UpdatedAtFrom string
 }
 
 // ListVendorContacts は全発注先担当者を取得する。
@@ -96,6 +97,9 @@ func (c *Client) SearchVendorContacts(ctx context.Context, params VendorContactS
 		}
 		if params.Email != "" {
 			q.Set("email", params.Email)
+		}
+		if params.UpdatedAtFrom != "" {
+			q.Set("updated_at_from", params.UpdatedAtFrom)
 		}
 		req.URL.RawQuery = q.Encode()
 		return req, nil
