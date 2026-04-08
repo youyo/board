@@ -72,6 +72,7 @@ func NewRootCmd(version string) *cobra.Command {
 	rootCmd.AddCommand(NewConfigureCmd())
 	rootCmd.AddCommand(NewAPICmd())
 	rootCmd.AddCommand(NewCacheCmd())
+	rootCmd.AddCommand(NewCompletionCmd())
 
 	return rootCmd
 }
