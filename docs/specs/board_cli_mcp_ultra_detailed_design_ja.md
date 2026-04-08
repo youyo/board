@@ -558,7 +558,7 @@ MCP では無効。
 推奨:
 
 - config: `~/.config/board/config.toml`
-- cache DB: `~/.local/share/board/cache.db`
+- cache DB: `~/.cache/board/cache.db`
 
 OS ごとの標準ディレクトリは XDG を優先し、未設定時は妥当な fallback を使う。
 

@@ -138,7 +138,7 @@ board completion bash > /etc/bash_completion.d/board
 
 ## 設定
 
-設定ファイルは TOML 形式で、プラットフォームの XDG 設定パスに保存されます（`board configure path` で確認可能）。
+設定ファイルは TOML 形式で、`~/.config/board/config.toml` に保存されます（XDG: `XDG_CONFIG_HOME` で変更可能）。`board configure path` で解決パスを確認できます。
 
 ```toml
 current_profile = "default"

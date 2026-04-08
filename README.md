@@ -138,7 +138,7 @@ board completion bash > /etc/bash_completion.d/board
 
 ## Configuration
 
-Config file is TOML, stored at the platform XDG config path (shown by `board configure path`).
+Config file is TOML, stored at `~/.config/board/config.toml` (XDG: override with `XDG_CONFIG_HOME`). Run `board configure path` to show the resolved path.
 
 ```toml
 current_profile = "default"
