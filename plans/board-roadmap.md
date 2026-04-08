@@ -249,14 +249,14 @@
 - 📄 詳細: plans/board-m30-service-find-docs.md（着手時生成）
 
 #### M31: service/find - ベンダー・マスタ検索
-- [ ] find_vendor / find_purchase_order / find_payment
-- [ ] find_user / find_group 等
-- [ ] テスト
+- [x] find_vendor / find_purchase_order / find_payment
+- [x] find_user / find_group 等
+- [x] テスト
 - 📄 詳細: plans/board-m31-service-find-rest.md（着手時生成）
 
 #### M32: find CLI - 顧客・案件コマンド
-- [ ] board find client / board find project
-- [ ] --id, --name, --text 等フラグ
+- [x] board find client / board find project
+- [x] --id, --name, --text 等フラグ
 - 📄 詳細: plans/board-m32-find-cli-core.md（着手時生成）
 
 #### M33: find CLI - ドキュメント系コマンド
