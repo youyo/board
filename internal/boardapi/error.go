@@ -100,9 +100,14 @@ func parseErrorWithHeader(resp *http.Response, body []byte) *APIError {
 	return ae
 }
 
-// isRetryable はエラーがリトライ対象かどうかを返す。
+// IsRetryable はエラーがリトライ対象かどうかを返す。
 // 429、5xx（TEMPORARY）、ネットワークエラー（NETWORK）はリトライ対象。
 // 4xx（UNAUTHORIZED/FORBIDDEN/NOT_FOUND/VALIDATION）は恒久エラーのため非リトライ。
+func IsRetryable(err error) bool {
+	return isRetryable(err)
+}
+
+// isRetryable は IsRetryable の内部実装。
 func isRetryable(err error) bool {
 	var ae *APIError
 	if !errors.As(err, &ae) {

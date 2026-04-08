@@ -16,8 +16,8 @@ type Client struct {
 	apiKey     string
 	apiToken   string
 	httpClient *http.Client
-	retryMax   int                  // デフォルト 5（0 でリトライ無効）
-	sleepFn    func(time.Duration)  // テスト差し替え用（デフォルト time.Sleep）
+	retryMax   int                 // デフォルト 5（0 でリトライ無効）
+	sleepFn    func(time.Duration) // テスト差し替え用（デフォルト time.Sleep）
 }
 
 // ClientOption は Client の設定オプション。
@@ -96,5 +96,5 @@ func (c *Client) Do(req *http.Request) ([]byte, error) {
 		return body, nil
 	}
 
-	return nil, parseError(resp.StatusCode, body)
+	return nil, parseErrorWithHeader(resp, body)
 }
