@@ -9,7 +9,7 @@ import (
 // Resolution order:
 //  1. BOARD_CONFIG_PATH environment variable
 //  2. XDG_CONFIG_HOME/board/config.toml
-//  3. HOME/.config/board/config.toml
+//  3. $HOME/.config/board/config.toml
 //  4. $TMPDIR/board/config.toml (fallback)
 func ConfigPath() string {
 	// 1. Override via environment variable
@@ -22,16 +22,11 @@ func ConfigPath() string {
 		return filepath.Join(xdg, "board", "config.toml")
 	}
 
-	// 3. HOME/.config
+	// 3. $HOME/.config (XDG default)
 	if home := os.Getenv("HOME"); home != "" {
 		return filepath.Join(home, ".config", "board", "config.toml")
 	}
 
-	// 4. Standard path via os.UserConfigDir()
-	if dir, err := os.UserConfigDir(); err == nil {
-		return filepath.Join(dir, "board", "config.toml")
-	}
-
-	// 5. Fallback: TMPDIR
+	// 4. Fallback: TMPDIR
 	return filepath.Join(os.TempDir(), "board", "config.toml")
 }

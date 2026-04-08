@@ -123,22 +123,18 @@ func (a *App) Close() error {
 //
 // Resolution order:
 //  1. BOARD_CACHE_PATH environment variable
-//  2. XDG_DATA_HOME/board/cache.db
-//  3. HOME/.local/share/board/cache.db
-//  4. os.UserCacheDir()/board/cache.db
-//  5. $TMPDIR/board/cache.db (fallback)
+//  2. XDG_CACHE_HOME/board/cache.db
+//  3. HOME/.cache/board/cache.db
+//  4. $TMPDIR/board/cache.db (fallback)
 func dbPath() string {
 	if p := os.Getenv("BOARD_CACHE_PATH"); p != "" {
 		return p
 	}
-	if xdg := os.Getenv("XDG_DATA_HOME"); xdg != "" {
+	if xdg := os.Getenv("XDG_CACHE_HOME"); xdg != "" {
 		return filepath.Join(xdg, "board", "cache.db")
 	}
 	if home, err := os.UserHomeDir(); err == nil {
-		return filepath.Join(home, ".local", "share", "board", "cache.db")
-	}
-	if cacheDir, err := os.UserCacheDir(); err == nil {
-		return filepath.Join(cacheDir, "board", "cache.db")
+		return filepath.Join(home, ".cache", "board", "cache.db")
 	}
 	return filepath.Join(os.TempDir(), "board", "cache.db")
 }
