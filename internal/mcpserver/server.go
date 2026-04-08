@@ -58,10 +58,12 @@ func New(findSvc *find.Service, opts ...Option) *Server {
 
 	mcpSrv := server.NewMCPServer(cfg.name, cfg.version)
 
-	return &Server{
+	s := &Server{
 		mcpServer: mcpSrv,
 		findSvc:   findSvc,
 	}
+	RegisterTools(s)
+	return s
 }
 
 // MCPServer returns the underlying mcp-go MCPServer.
