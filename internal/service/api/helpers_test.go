@@ -1,60 +1,565 @@
 package api_test
 
 import (
+	"context"
+
+	"github.com/youyo/board/internal/boardapi"
+	"github.com/youyo/board/internal/repository"
 	svcapi "github.com/youyo/board/internal/service/api"
 )
 
-// newServiceWithClients は clients スタブのみを差し込んだ Service を返す。
+// --- スタブ: コア系 ---
+
+// stubClientRepo は ClientRepository のスタブ実装。
+type stubClientRepo struct {
+	listResult   []boardapi.ClientEntity
+	getResult    *boardapi.ClientEntity
+	searchResult []boardapi.ClientEntity
+	err          error
+}
+
+func (s *stubClientRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.ClientEntity, error) {
+	return s.listResult, s.err
+}
+func (s *stubClientRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.ClientEntity, error) {
+	return s.getResult, s.err
+}
+func (s *stubClientRepo) Search(_ context.Context, _ boardapi.ClientSearchParams, _ repository.ReadOptions) ([]boardapi.ClientEntity, error) {
+	return s.searchResult, s.err
+}
+
+// stubClientBranchRepo は ClientBranchRepository のスタブ実装。
+type stubClientBranchRepo struct {
+	listResult   []boardapi.ClientBranchEntity
+	getResult    *boardapi.ClientBranchEntity
+	searchResult []boardapi.ClientBranchEntity
+	err          error
+}
+
+func (s *stubClientBranchRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.ClientBranchEntity, error) {
+	return s.listResult, s.err
+}
+func (s *stubClientBranchRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.ClientBranchEntity, error) {
+	return s.getResult, s.err
+}
+func (s *stubClientBranchRepo) Search(_ context.Context, _ boardapi.ClientBranchSearchParams, _ repository.ReadOptions) ([]boardapi.ClientBranchEntity, error) {
+	return s.searchResult, s.err
+}
+
+// stubContactRepo は ContactRepository のスタブ実装。
+type stubContactRepo struct {
+	listResult   []boardapi.ContactEntity
+	getResult    *boardapi.ContactEntity
+	searchResult []boardapi.ContactEntity
+	err          error
+}
+
+func (s *stubContactRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.ContactEntity, error) {
+	return s.listResult, s.err
+}
+func (s *stubContactRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.ContactEntity, error) {
+	return s.getResult, s.err
+}
+func (s *stubContactRepo) Search(_ context.Context, _ boardapi.ContactSearchParams, _ repository.ReadOptions) ([]boardapi.ContactEntity, error) {
+	return s.searchResult, s.err
+}
+
+// stubProjectRepo は ProjectRepository のスタブ実装。
+type stubProjectRepo struct {
+	listResult   []boardapi.ProjectEntity
+	getResult    *boardapi.ProjectEntity
+	searchResult []boardapi.ProjectEntity
+	err          error
+}
+
+func (s *stubProjectRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.ProjectEntity, error) {
+	return s.listResult, s.err
+}
+func (s *stubProjectRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.ProjectEntity, error) {
+	return s.getResult, s.err
+}
+func (s *stubProjectRepo) Search(_ context.Context, _ boardapi.ProjectSearchParams, _ repository.ReadOptions) ([]boardapi.ProjectEntity, error) {
+	return s.searchResult, s.err
+}
+
+// stubProjectCostRepo は ProjectCostRepository のスタブ実装。
+type stubProjectCostRepo struct {
+	listResult   []boardapi.ProjectCostEntity
+	getResult    *boardapi.ProjectCostEntity
+	searchResult []boardapi.ProjectCostEntity
+	err          error
+}
+
+func (s *stubProjectCostRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.ProjectCostEntity, error) {
+	return s.listResult, s.err
+}
+func (s *stubProjectCostRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.ProjectCostEntity, error) {
+	return s.getResult, s.err
+}
+func (s *stubProjectCostRepo) Search(_ context.Context, _ boardapi.ProjectCostSearchParams, _ repository.ReadOptions) ([]boardapi.ProjectCostEntity, error) {
+	return s.searchResult, s.err
+}
+
+// --- スタブ: ドキュメント系 ---
+
+type stubEstimateRepo struct {
+	listResult   []boardapi.EstimateEntity
+	getResult    *boardapi.EstimateEntity
+	searchResult []boardapi.EstimateEntity
+	err          error
+}
+
+func (s *stubEstimateRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.EstimateEntity, error) {
+	return s.listResult, s.err
+}
+func (s *stubEstimateRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.EstimateEntity, error) {
+	return s.getResult, s.err
+}
+func (s *stubEstimateRepo) Search(_ context.Context, _ boardapi.EstimateSearchParams, _ repository.ReadOptions) ([]boardapi.EstimateEntity, error) {
+	return s.searchResult, s.err
+}
+
+type stubInvoiceRepo struct {
+	listResult   []boardapi.InvoiceEntity
+	getResult    *boardapi.InvoiceEntity
+	searchResult []boardapi.InvoiceEntity
+	err          error
+}
+
+func (s *stubInvoiceRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.InvoiceEntity, error) {
+	return s.listResult, s.err
+}
+func (s *stubInvoiceRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.InvoiceEntity, error) {
+	return s.getResult, s.err
+}
+func (s *stubInvoiceRepo) Search(_ context.Context, _ boardapi.InvoiceSearchParams, _ repository.ReadOptions) ([]boardapi.InvoiceEntity, error) {
+	return s.searchResult, s.err
+}
+
+type stubOrderRepo struct {
+	listResult   []boardapi.OrderEntity
+	getResult    *boardapi.OrderEntity
+	searchResult []boardapi.OrderEntity
+	err          error
+}
+
+func (s *stubOrderRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.OrderEntity, error) {
+	return s.listResult, s.err
+}
+func (s *stubOrderRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.OrderEntity, error) {
+	return s.getResult, s.err
+}
+func (s *stubOrderRepo) Search(_ context.Context, _ boardapi.OrderSearchParams, _ repository.ReadOptions) ([]boardapi.OrderEntity, error) {
+	return s.searchResult, s.err
+}
+
+type stubDeliveryRepo struct {
+	listResult   []boardapi.DeliveryEntity
+	getResult    *boardapi.DeliveryEntity
+	searchResult []boardapi.DeliveryEntity
+	err          error
+}
+
+func (s *stubDeliveryRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.DeliveryEntity, error) {
+	return s.listResult, s.err
+}
+func (s *stubDeliveryRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.DeliveryEntity, error) {
+	return s.getResult, s.err
+}
+func (s *stubDeliveryRepo) Search(_ context.Context, _ boardapi.DeliverySearchParams, _ repository.ReadOptions) ([]boardapi.DeliveryEntity, error) {
+	return s.searchResult, s.err
+}
+
+type stubReceiptRepo struct {
+	listResult   []boardapi.ReceiptEntity
+	getResult    *boardapi.ReceiptEntity
+	searchResult []boardapi.ReceiptEntity
+	err          error
+}
+
+func (s *stubReceiptRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.ReceiptEntity, error) {
+	return s.listResult, s.err
+}
+func (s *stubReceiptRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.ReceiptEntity, error) {
+	return s.getResult, s.err
+}
+func (s *stubReceiptRepo) Search(_ context.Context, _ boardapi.ReceiptSearchParams, _ repository.ReadOptions) ([]boardapi.ReceiptEntity, error) {
+	return s.searchResult, s.err
+}
+
+// --- スタブ: ベンダー系 ---
+
+type stubVendorRepo struct {
+	listResult   []boardapi.VendorEntity
+	getResult    *boardapi.VendorEntity
+	searchResult []boardapi.VendorEntity
+	err          error
+}
+
+func (s *stubVendorRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.VendorEntity, error) {
+	return s.listResult, s.err
+}
+func (s *stubVendorRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.VendorEntity, error) {
+	return s.getResult, s.err
+}
+func (s *stubVendorRepo) Search(_ context.Context, _ boardapi.VendorSearchParams, _ repository.ReadOptions) ([]boardapi.VendorEntity, error) {
+	return s.searchResult, s.err
+}
+
+type stubVendorBranchRepo struct {
+	listResult   []boardapi.VendorBranchEntity
+	getResult    *boardapi.VendorBranchEntity
+	searchResult []boardapi.VendorBranchEntity
+	err          error
+}
+
+func (s *stubVendorBranchRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.VendorBranchEntity, error) {
+	return s.listResult, s.err
+}
+func (s *stubVendorBranchRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.VendorBranchEntity, error) {
+	return s.getResult, s.err
+}
+func (s *stubVendorBranchRepo) Search(_ context.Context, _ boardapi.VendorBranchSearchParams, _ repository.ReadOptions) ([]boardapi.VendorBranchEntity, error) {
+	return s.searchResult, s.err
+}
+
+type stubVendorContactRepo struct {
+	listResult   []boardapi.VendorContactEntity
+	getResult    *boardapi.VendorContactEntity
+	searchResult []boardapi.VendorContactEntity
+	err          error
+}
+
+func (s *stubVendorContactRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.VendorContactEntity, error) {
+	return s.listResult, s.err
+}
+func (s *stubVendorContactRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.VendorContactEntity, error) {
+	return s.getResult, s.err
+}
+func (s *stubVendorContactRepo) Search(_ context.Context, _ boardapi.VendorContactSearchParams, _ repository.ReadOptions) ([]boardapi.VendorContactEntity, error) {
+	return s.searchResult, s.err
+}
+
+type stubPurchaseOrderRepo struct {
+	listResult   []boardapi.PurchaseOrderEntity
+	getResult    *boardapi.PurchaseOrderEntity
+	searchResult []boardapi.PurchaseOrderEntity
+	err          error
+}
+
+func (s *stubPurchaseOrderRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.PurchaseOrderEntity, error) {
+	return s.listResult, s.err
+}
+func (s *stubPurchaseOrderRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.PurchaseOrderEntity, error) {
+	return s.getResult, s.err
+}
+func (s *stubPurchaseOrderRepo) Search(_ context.Context, _ boardapi.PurchaseOrderSearchParams, _ repository.ReadOptions) ([]boardapi.PurchaseOrderEntity, error) {
+	return s.searchResult, s.err
+}
+
+type stubPaymentRepo struct {
+	listResult   []boardapi.PaymentEntity
+	getResult    *boardapi.PaymentEntity
+	searchResult []boardapi.PaymentEntity
+	err          error
+}
+
+func (s *stubPaymentRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.PaymentEntity, error) {
+	return s.listResult, s.err
+}
+func (s *stubPaymentRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.PaymentEntity, error) {
+	return s.getResult, s.err
+}
+func (s *stubPaymentRepo) Search(_ context.Context, _ boardapi.PaymentSearchParams, _ repository.ReadOptions) ([]boardapi.PaymentEntity, error) {
+	return s.searchResult, s.err
+}
+
+// --- スタブ: マスタ系 ---
+
+type stubUserRepo struct {
+	listResult   []boardapi.UserEntity
+	getResult    *boardapi.UserEntity
+	searchResult []boardapi.UserEntity
+	err          error
+}
+
+func (s *stubUserRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.UserEntity, error) {
+	return s.listResult, s.err
+}
+func (s *stubUserRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.UserEntity, error) {
+	return s.getResult, s.err
+}
+func (s *stubUserRepo) Search(_ context.Context, _ boardapi.UserSearchParams, _ repository.ReadOptions) ([]boardapi.UserEntity, error) {
+	return s.searchResult, s.err
+}
+
+type stubGroupRepo struct {
+	listResult   []boardapi.GroupEntity
+	getResult    *boardapi.GroupEntity
+	searchResult []boardapi.GroupEntity
+	err          error
+}
+
+func (s *stubGroupRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.GroupEntity, error) {
+	return s.listResult, s.err
+}
+func (s *stubGroupRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.GroupEntity, error) {
+	return s.getResult, s.err
+}
+func (s *stubGroupRepo) Search(_ context.Context, _ boardapi.GroupSearchParams, _ repository.ReadOptions) ([]boardapi.GroupEntity, error) {
+	return s.searchResult, s.err
+}
+
+type stubPaymentTermRepo struct {
+	listResult   []boardapi.PaymentTermEntity
+	getResult    *boardapi.PaymentTermEntity
+	searchResult []boardapi.PaymentTermEntity
+	err          error
+}
+
+func (s *stubPaymentTermRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.PaymentTermEntity, error) {
+	return s.listResult, s.err
+}
+func (s *stubPaymentTermRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.PaymentTermEntity, error) {
+	return s.getResult, s.err
+}
+func (s *stubPaymentTermRepo) Search(_ context.Context, _ boardapi.PaymentTermSearchParams, _ repository.ReadOptions) ([]boardapi.PaymentTermEntity, error) {
+	return s.searchResult, s.err
+}
+
+type stubProjectTypeRepo struct {
+	listResult   []boardapi.ProjectTypeEntity
+	getResult    *boardapi.ProjectTypeEntity
+	searchResult []boardapi.ProjectTypeEntity
+	err          error
+}
+
+func (s *stubProjectTypeRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.ProjectTypeEntity, error) {
+	return s.listResult, s.err
+}
+func (s *stubProjectTypeRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.ProjectTypeEntity, error) {
+	return s.getResult, s.err
+}
+func (s *stubProjectTypeRepo) Search(_ context.Context, _ boardapi.ProjectTypeSearchParams, _ repository.ReadOptions) ([]boardapi.ProjectTypeEntity, error) {
+	return s.searchResult, s.err
+}
+
+type stubPurchaseTypeRepo struct {
+	listResult   []boardapi.PurchaseTypeEntity
+	getResult    *boardapi.PurchaseTypeEntity
+	searchResult []boardapi.PurchaseTypeEntity
+	err          error
+}
+
+func (s *stubPurchaseTypeRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.PurchaseTypeEntity, error) {
+	return s.listResult, s.err
+}
+func (s *stubPurchaseTypeRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.PurchaseTypeEntity, error) {
+	return s.getResult, s.err
+}
+func (s *stubPurchaseTypeRepo) Search(_ context.Context, _ boardapi.PurchaseTypeSearchParams, _ repository.ReadOptions) ([]boardapi.PurchaseTypeEntity, error) {
+	return s.searchResult, s.err
+}
+
+type stubAccountingTypeRepo struct {
+	listResult   []boardapi.AccountingTypeEntity
+	getResult    *boardapi.AccountingTypeEntity
+	searchResult []boardapi.AccountingTypeEntity
+	err          error
+}
+
+func (s *stubAccountingTypeRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.AccountingTypeEntity, error) {
+	return s.listResult, s.err
+}
+func (s *stubAccountingTypeRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.AccountingTypeEntity, error) {
+	return s.getResult, s.err
+}
+func (s *stubAccountingTypeRepo) Search(_ context.Context, _ boardapi.AccountingTypeSearchParams, _ repository.ReadOptions) ([]boardapi.AccountingTypeEntity, error) {
+	return s.searchResult, s.err
+}
+
+type stubDocumentSendChannelRepo struct {
+	listResult   []boardapi.DocumentSendChannelEntity
+	getResult    *boardapi.DocumentSendChannelEntity
+	searchResult []boardapi.DocumentSendChannelEntity
+	err          error
+}
+
+func (s *stubDocumentSendChannelRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.DocumentSendChannelEntity, error) {
+	return s.listResult, s.err
+}
+func (s *stubDocumentSendChannelRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.DocumentSendChannelEntity, error) {
+	return s.getResult, s.err
+}
+func (s *stubDocumentSendChannelRepo) Search(_ context.Context, _ boardapi.DocumentSendChannelSearchParams, _ repository.ReadOptions) ([]boardapi.DocumentSendChannelEntity, error) {
+	return s.searchResult, s.err
+}
+
+// --- ゼロ値 Repos ヘルパー ---
+
+func zeroRepos() svcapi.Repos {
+	return svcapi.Repos{
+		Clients:              &stubClientRepo{},
+		ClientBranches:       &stubClientBranchRepo{},
+		Contacts:             &stubContactRepo{},
+		Projects:             &stubProjectRepo{},
+		ProjectCosts:         &stubProjectCostRepo{},
+		Estimates:            &stubEstimateRepo{},
+		Invoices:             &stubInvoiceRepo{},
+		Orders:               &stubOrderRepo{},
+		Deliveries:           &stubDeliveryRepo{},
+		Receipts:             &stubReceiptRepo{},
+		Vendors:              &stubVendorRepo{},
+		VendorBranches:       &stubVendorBranchRepo{},
+		VendorContacts:       &stubVendorContactRepo{},
+		PurchaseOrders:       &stubPurchaseOrderRepo{},
+		Payments:             &stubPaymentRepo{},
+		Users:                &stubUserRepo{},
+		Groups:               &stubGroupRepo{},
+		PaymentTerms:         &stubPaymentTermRepo{},
+		ProjectTypes:         &stubProjectTypeRepo{},
+		PurchaseTypes:        &stubPurchaseTypeRepo{},
+		AccountingTypes:      &stubAccountingTypeRepo{},
+		DocumentSendChannels: &stubDocumentSendChannelRepo{},
+	}
+}
+
+// --- helper: コア系 ---
+
 func newServiceWithClients(stub *stubClientRepo) *svcapi.Service {
-	return svcapi.New(svcapi.Repos{
-		Clients:        stub,
-		ClientBranches: &stubClientBranchRepo{},
-		Contacts:       &stubContactRepo{},
-		Projects:       &stubProjectRepo{},
-		ProjectCosts:   &stubProjectCostRepo{},
-	})
+	r := zeroRepos()
+	r.Clients = stub
+	return svcapi.New(r)
 }
 
-// newServiceWithClientBranches は clientBranches スタブのみを差し込んだ Service を返す。
 func newServiceWithClientBranches(stub *stubClientBranchRepo) *svcapi.Service {
-	return svcapi.New(svcapi.Repos{
-		Clients:        &stubClientRepo{},
-		ClientBranches: stub,
-		Contacts:       &stubContactRepo{},
-		Projects:       &stubProjectRepo{},
-		ProjectCosts:   &stubProjectCostRepo{},
-	})
+	r := zeroRepos()
+	r.ClientBranches = stub
+	return svcapi.New(r)
 }
 
-// newServiceWithContacts は contacts スタブのみを差し込んだ Service を返す。
 func newServiceWithContacts(stub *stubContactRepo) *svcapi.Service {
-	return svcapi.New(svcapi.Repos{
-		Clients:        &stubClientRepo{},
-		ClientBranches: &stubClientBranchRepo{},
-		Contacts:       stub,
-		Projects:       &stubProjectRepo{},
-		ProjectCosts:   &stubProjectCostRepo{},
-	})
+	r := zeroRepos()
+	r.Contacts = stub
+	return svcapi.New(r)
 }
 
-// newServiceWithProjects は projects スタブのみを差し込んだ Service を返す。
 func newServiceWithProjects(stub *stubProjectRepo) *svcapi.Service {
-	return svcapi.New(svcapi.Repos{
-		Clients:        &stubClientRepo{},
-		ClientBranches: &stubClientBranchRepo{},
-		Contacts:       &stubContactRepo{},
-		Projects:       stub,
-		ProjectCosts:   &stubProjectCostRepo{},
-	})
+	r := zeroRepos()
+	r.Projects = stub
+	return svcapi.New(r)
 }
 
-// newServiceWithProjectCosts は projectCosts スタブのみを差し込んだ Service を返す。
 func newServiceWithProjectCosts(stub *stubProjectCostRepo) *svcapi.Service {
-	return svcapi.New(svcapi.Repos{
-		Clients:        &stubClientRepo{},
-		ClientBranches: &stubClientBranchRepo{},
-		Contacts:       &stubContactRepo{},
-		Projects:       &stubProjectRepo{},
-		ProjectCosts:   stub,
-	})
+	r := zeroRepos()
+	r.ProjectCosts = stub
+	return svcapi.New(r)
+}
+
+// --- helper: ドキュメント系 ---
+
+func newServiceWithEstimates(stub *stubEstimateRepo) *svcapi.Service {
+	r := zeroRepos()
+	r.Estimates = stub
+	return svcapi.New(r)
+}
+
+func newServiceWithInvoices(stub *stubInvoiceRepo) *svcapi.Service {
+	r := zeroRepos()
+	r.Invoices = stub
+	return svcapi.New(r)
+}
+
+func newServiceWithOrders(stub *stubOrderRepo) *svcapi.Service {
+	r := zeroRepos()
+	r.Orders = stub
+	return svcapi.New(r)
+}
+
+func newServiceWithDeliveries(stub *stubDeliveryRepo) *svcapi.Service {
+	r := zeroRepos()
+	r.Deliveries = stub
+	return svcapi.New(r)
+}
+
+func newServiceWithReceipts(stub *stubReceiptRepo) *svcapi.Service {
+	r := zeroRepos()
+	r.Receipts = stub
+	return svcapi.New(r)
+}
+
+// --- helper: ベンダー系 ---
+
+func newServiceWithVendors(stub *stubVendorRepo) *svcapi.Service {
+	r := zeroRepos()
+	r.Vendors = stub
+	return svcapi.New(r)
+}
+
+func newServiceWithVendorBranches(stub *stubVendorBranchRepo) *svcapi.Service {
+	r := zeroRepos()
+	r.VendorBranches = stub
+	return svcapi.New(r)
+}
+
+func newServiceWithVendorContacts(stub *stubVendorContactRepo) *svcapi.Service {
+	r := zeroRepos()
+	r.VendorContacts = stub
+	return svcapi.New(r)
+}
+
+func newServiceWithPurchaseOrders(stub *stubPurchaseOrderRepo) *svcapi.Service {
+	r := zeroRepos()
+	r.PurchaseOrders = stub
+	return svcapi.New(r)
+}
+
+func newServiceWithPayments(stub *stubPaymentRepo) *svcapi.Service {
+	r := zeroRepos()
+	r.Payments = stub
+	return svcapi.New(r)
+}
+
+// --- helper: マスタ系 ---
+
+func newServiceWithUsers(stub *stubUserRepo) *svcapi.Service {
+	r := zeroRepos()
+	r.Users = stub
+	return svcapi.New(r)
+}
+
+func newServiceWithGroups(stub *stubGroupRepo) *svcapi.Service {
+	r := zeroRepos()
+	r.Groups = stub
+	return svcapi.New(r)
+}
+
+func newServiceWithPaymentTerms(stub *stubPaymentTermRepo) *svcapi.Service {
+	r := zeroRepos()
+	r.PaymentTerms = stub
+	return svcapi.New(r)
+}
+
+func newServiceWithProjectTypes(stub *stubProjectTypeRepo) *svcapi.Service {
+	r := zeroRepos()
+	r.ProjectTypes = stub
+	return svcapi.New(r)
+}
+
+func newServiceWithPurchaseTypes(stub *stubPurchaseTypeRepo) *svcapi.Service {
+	r := zeroRepos()
+	r.PurchaseTypes = stub
+	return svcapi.New(r)
+}
+
+func newServiceWithAccountingTypes(stub *stubAccountingTypeRepo) *svcapi.Service {
+	r := zeroRepos()
+	r.AccountingTypes = stub
+	return svcapi.New(r)
+}
+
+func newServiceWithDocumentSendChannels(stub *stubDocumentSendChannelRepo) *svcapi.Service {
+	r := zeroRepos()
+	r.DocumentSendChannels = stub
+	return svcapi.New(r)
 }
