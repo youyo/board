@@ -26,6 +26,11 @@ func NewAPICmd() *cobra.Command {
 		NewAPIContactsCmd(),
 		NewAPIProjectsCmd(),
 		NewAPIProjectCostsCmd(),
+		NewAPIEstimatesCmd(),
+		NewAPIInvoicesCmd(),
+		NewAPIOrdersCmd(),
+		NewAPIDeliveriesCmd(),
+		NewAPIReceiptsCmd(),
 	)
 
 	return cmd
