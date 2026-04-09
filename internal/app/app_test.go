@@ -180,3 +180,40 @@ daily_auto_refresh = false
 	}
 	defer func() { _ = a.Close() }()
 }
+
+// TestNew_EnvOverridesCredentials verifies that BOARD_API_KEY and BOARD_API_TOKEN
+// environment variables override config.toml credentials.
+func TestNew_EnvOverridesCredentials(t *testing.T) {
+	tmpDir := t.TempDir()
+	cfgContent := `
+current_profile = "default"
+timezone = "UTC"
+
+[profiles.default]
+base_url = "https://api.the-board.jp/v1/"
+api_key = "file-key"
+api_token = "file-token"
+daily_auto_refresh = false
+`
+	cfgPath := filepath.Join(tmpDir, "config.toml")
+	if err := os.WriteFile(cfgPath, []byte(cfgContent), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	t.Setenv("BOARD_CONFIG_PATH", cfgPath)
+	t.Setenv("BOARD_CACHE_PATH", filepath.Join(tmpDir, "cache.db"))
+	t.Setenv("BOARD_API_KEY", "env-key")
+	t.Setenv("BOARD_API_TOKEN", "env-token")
+
+	a, err := app.New("")
+	if err != nil {
+		t.Fatalf("app.New: %v", err)
+	}
+	defer func() { _ = a.Close() }()
+
+	if a.Profile.APIKey != "env-key" {
+		t.Errorf("Profile.APIKey = %q, want %q", a.Profile.APIKey, "env-key")
+	}
+	if a.Profile.APIToken != "env-token" {
+		t.Errorf("Profile.APIToken = %q, want %q", a.Profile.APIToken, "env-token")
+	}
+}

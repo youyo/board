@@ -55,6 +55,7 @@ func New(profileName string) (*App, error) {
 		return nil, fmt.Errorf("app: profile %q not found in config", profileName)
 	}
 	prof = config.ApplyDefaults(prof)
+	prof = config.ApplyEnvOverrides(prof)
 
 	// 3. Resolve DB path and open
 	dp := dbPath()

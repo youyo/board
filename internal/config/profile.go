@@ -1,6 +1,9 @@
 package config
 
-import "fmt"
+import (
+	"fmt"
+	"os"
+)
 
 // GetCurrentProfile returns the ProfileConfig corresponding to cfg.CurrentProfile.
 // Returns ErrInvalidConfig if CurrentProfile is empty.
@@ -56,5 +59,21 @@ func ApplyDefaults(p ProfileConfig) ProfileConfig {
 		p.DailyAutoRefresh = defaults.DailyAutoRefresh
 	}
 
+	return p
+}
+
+// ApplyEnvOverrides overrides ProfileConfig fields with environment variable values.
+// Only non-empty environment variable values are applied.
+//
+// Supported environment variables:
+//   - BOARD_API_KEY: overrides APIKey
+//   - BOARD_API_TOKEN: overrides APIToken
+func ApplyEnvOverrides(p ProfileConfig) ProfileConfig {
+	if v := os.Getenv("BOARD_API_KEY"); v != "" {
+		p.APIKey = v
+	}
+	if v := os.Getenv("BOARD_API_TOKEN"); v != "" {
+		p.APIToken = v
+	}
 	return p
 }

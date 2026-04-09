@@ -342,3 +342,60 @@ func TestSetCurrentProfile(t *testing.T) {
 		t.Errorf("expected CurrentProfile=readonly, got %q", cfg.CurrentProfile)
 	}
 }
+
+
+// ApplyEnvOverrides tests
+
+func TestApplyEnvOverrides_BothSet(t *testing.T) {
+	p := config.ProfileConfig{
+		APIKey:   "file-key",
+		APIToken: "file-token",
+	}
+	t.Setenv("BOARD_API_KEY", "env-key")
+	t.Setenv("BOARD_API_TOKEN", "env-token")
+
+	result := config.ApplyEnvOverrides(p)
+
+	if result.APIKey != "env-key" {
+		t.Errorf("APIKey = %q, want %q", result.APIKey, "env-key")
+	}
+	if result.APIToken != "env-token" {
+		t.Errorf("APIToken = %q, want %q", result.APIToken, "env-token")
+	}
+}
+
+func TestApplyEnvOverrides_OnlyKey(t *testing.T) {
+	p := config.ProfileConfig{
+		APIKey:   "file-key",
+		APIToken: "file-token",
+	}
+	t.Setenv("BOARD_API_KEY", "env-key")
+	t.Setenv("BOARD_API_TOKEN", "")
+
+	result := config.ApplyEnvOverrides(p)
+
+	if result.APIKey != "env-key" {
+		t.Errorf("APIKey = %q, want %q", result.APIKey, "env-key")
+	}
+	if result.APIToken != "file-token" {
+		t.Errorf("APIToken = %q, want %q (should not be overridden)", result.APIToken, "file-token")
+	}
+}
+
+func TestApplyEnvOverrides_NoneSet(t *testing.T) {
+	p := config.ProfileConfig{
+		APIKey:   "file-key",
+		APIToken: "file-token",
+	}
+	t.Setenv("BOARD_API_KEY", "")
+	t.Setenv("BOARD_API_TOKEN", "")
+
+	result := config.ApplyEnvOverrides(p)
+
+	if result.APIKey != "file-key" {
+		t.Errorf("APIKey = %q, want %q", result.APIKey, "file-key")
+	}
+	if result.APIToken != "file-token" {
+		t.Errorf("APIToken = %q, want %q", result.APIToken, "file-token")
+	}
+}
