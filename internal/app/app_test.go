@@ -78,6 +78,8 @@ daily_auto_refresh = false
 	}
 	t.Setenv("BOARD_CONFIG_PATH", cfgPath)
 	t.Setenv("BOARD_CACHE_PATH", filepath.Join(tmpDir, "cache.db"))
+	t.Setenv("BOARD_API_KEY", "")
+	t.Setenv("BOARD_API_TOKEN", "")
 
 	a, err := app.New("prod")
 	if err != nil {
