@@ -17,6 +17,10 @@ run = "go vet ./..."
 description = "Format Go source code"
 run = "gofmt -s -w ."
 
+[tasks."test:e2e"]
+description = "Run E2E tests against the real BOARD API (requires BOARD_API_KEY and BOARD_API_TOKEN)"
+run = "go test -tags e2e -v -count=1 ./internal/boardapi/ ./internal/service/find/"
+
 [tasks.clean]
 description = "Remove build artifacts"
 run = "rm -f board"
