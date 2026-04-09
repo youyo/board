@@ -9,10 +9,12 @@ import (
 
 // FindOrder performs a cross-resource search for orders, returning
 // orders with their associated client and project.
-// Field priority: ID > ClientName > ProjectName > Text > Status(standalone).
+// Uses project response_group API to discover document IDs, then fetches via GetByDocumentID.
+// Field priority: ID > ProjectID > ClientName > ProjectName.
+// Status is a post-filter only.
 func (s *Service) FindOrder(ctx context.Context, q FindOrderQuery) ([]OrderResult, error) {
-	if q.ID == 0 && q.ClientName == "" && q.ProjectName == "" && q.Text == "" && q.Status == "" {
-		return nil, errors.New("at least one of ID, ClientName, ProjectName, Text, or Status must be set")
+	if q.ID == 0 && q.ProjectID == 0 && q.ClientName == "" && q.ProjectName == "" {
+		return nil, errors.New("at least one of ID, ProjectID, ClientName, or ProjectName must be set")
 	}
 
 	opts := repoOpts(q.Opts)
@@ -21,63 +23,78 @@ func (s *Service) FindOrder(ctx context.Context, q FindOrderQuery) ([]OrderResul
 
 	switch {
 	case q.ID != 0:
-		o, err := s.orders.GetByID(ctx, q.ID, opts)
+		// Direct lookup by document ID
+		o, err := s.orders.GetByDocumentID(ctx, q.ID, opts)
 		if err != nil {
 			return nil, err
 		}
 		orders = []boardapi.OrderEntity{*o}
 
+	case q.ProjectID != 0:
+		// Lookup project with order group, then fetch document
+		p, err := s.projects.GetByIDWithGroup(ctx, q.ProjectID, "order")
+		if err != nil {
+			return nil, err
+		}
+		if p.Order != nil {
+			o, err := s.orders.GetByDocumentID(ctx, p.Order.ID, opts)
+			if err != nil && !boardapi.IsNotFound(err) {
+				return nil, err
+			}
+			if err == nil {
+				orders = []boardapi.OrderEntity{*o}
+			}
+		}
+
 	case q.ClientName != "":
+		// Resolve client name → search projects with order group → hydrate
 		clients, err := s.clients.Search(ctx, boardapi.ClientSearchParams{Name: q.ClientName}, opts)
 		if err != nil {
 			return nil, err
 		}
 		for _, c := range clients {
-			os, err := s.orders.Search(ctx, boardapi.OrderSearchParams{ClientID: c.ID}, opts)
+			projects, err := s.projects.Search(ctx, boardapi.ProjectSearchParams{ClientID: c.ID, ResponseGroup: "order"}, opts)
 			if err != nil {
 				return nil, err
 			}
-			orders = append(orders, os...)
+			for _, p := range projects {
+				if p.Order == nil {
+					continue
+				}
+				o, err := s.orders.GetByDocumentID(ctx, p.Order.ID, opts)
+				if boardapi.IsNotFound(err) {
+					continue
+				}
+				if err != nil {
+					return nil, err
+				}
+				orders = append(orders, *o)
+			}
 		}
 
 	case q.ProjectName != "":
-		projects, err := s.projects.Search(ctx, boardapi.ProjectSearchParams{Name: q.ProjectName}, opts)
+		// Search projects by name with order group → hydrate
+		projects, err := s.projects.Search(ctx, boardapi.ProjectSearchParams{Name: q.ProjectName, ResponseGroup: "order"}, opts)
 		if err != nil {
 			return nil, err
 		}
 		for _, p := range projects {
-			os, err := s.orders.Search(ctx, boardapi.OrderSearchParams{ProjectID: p.ID}, opts)
+			if p.Order == nil {
+				continue
+			}
+			o, err := s.orders.GetByDocumentID(ctx, p.Order.ID, opts)
+			if boardapi.IsNotFound(err) {
+				continue
+			}
 			if err != nil {
 				return nil, err
 			}
-			orders = append(orders, os...)
-		}
-
-	case q.Text != "":
-		all, err := s.orders.List(ctx, opts)
-		if err != nil {
-			return nil, err
-		}
-		for _, o := range all {
-			if containsText(q.Text, o.Title, o.Memo) {
-				orders = append(orders, o)
-			}
-		}
-
-	case q.Status != "":
-		all, err := s.orders.List(ctx, opts)
-		if err != nil {
-			return nil, err
-		}
-		for _, o := range all {
-			if o.Status == q.Status {
-				orders = append(orders, o)
-			}
+			orders = append(orders, *o)
 		}
 	}
 
-	// Apply status post-filter for non-status-only search modes
-	if q.Status != "" && q.ID == 0 && !(q.ClientName == "" && q.ProjectName == "" && q.Text == "") {
+	// Apply status post-filter
+	if q.Status != "" {
 		orders = filterOrdersByStatus(orders, q.Status)
 	}
 

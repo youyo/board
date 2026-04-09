@@ -163,3 +163,8 @@ func filterContacts(entities []boardapi.ContactEntity, params boardapi.ContactSe
 	}
 	return result
 }
+
+// ListPage retrieves a single page of ContactEntity directly from the API (cache bypass).
+func (r *ContactRepository) ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.ContactEntity], error) {
+	return r.api.ListContactsPage(ctx, page, perPage)
+}

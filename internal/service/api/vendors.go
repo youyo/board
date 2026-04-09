@@ -21,3 +21,8 @@ func (s *Service) GetVendor(ctx context.Context, id int, opts repository.ReadOpt
 func (s *Service) SearchVendors(ctx context.Context, params boardapi.VendorSearchParams, opts repository.ReadOptions) ([]boardapi.VendorEntity, error) {
 	return s.vendors.Search(ctx, params, opts)
 }
+
+// ListVendorsPage returns a single page of vendors.
+func (s *Service) ListVendorsPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.VendorEntity], error) {
+	return s.vendors.ListPage(ctx, page, perPage)
+}

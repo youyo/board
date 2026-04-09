@@ -69,6 +69,36 @@ func (c *Client) NewRequest(ctx context.Context, method, path string, body io.Re
 	return http.NewRequestWithContext(ctx, method, url, body)
 }
 
+// DoFull executes a request and returns the response body and headers on success.
+// Non-2xx responses are returned as *APIError (headers are nil).
+// Transport errors are also wrapped as *APIError{Code: APIErrorNetwork}.
+func (c *Client) DoFull(req *http.Request) ([]byte, http.Header, error) {
+	applyAuthHeaders(req, c.apiKey, c.apiToken)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, nil, &APIError{
+			Code:    APIErrorNetwork,
+			Message: err.Error(),
+		}
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, nil, &APIError{
+			Code:    APIErrorNetwork,
+			Message: "failed to read response body: " + err.Error(),
+		}
+	}
+
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		return body, resp.Header, nil
+	}
+
+	return nil, nil, parseErrorWithHeader(resp, body)
+}
+
 // Do executes a request and returns the successful response body.
 // Non-2xx responses are returned as *APIError.
 // Transport errors are also wrapped as *APIError{Code: APIErrorNetwork}.

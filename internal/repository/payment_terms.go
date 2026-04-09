@@ -159,3 +159,8 @@ func filterPaymentTerms(entities []boardapi.PaymentTermEntity, params boardapi.P
 	}
 	return result
 }
+
+// ListPage retrieves a single page of PaymentTermEntity directly from the API (cache bypass).
+func (r *PaymentTermRepository) ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.PaymentTermEntity], error) {
+	return r.api.ListPaymentTermsPage(ctx, page, perPage)
+}

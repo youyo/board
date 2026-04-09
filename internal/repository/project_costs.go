@@ -156,3 +156,8 @@ func filterProjectCosts(entities []boardapi.ProjectCostEntity, params boardapi.P
 	}
 	return result
 }
+
+// ListPage retrieves a single page of ProjectCostEntity directly from the API (cache bypass).
+func (r *ProjectCostRepository) ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.ProjectCostEntity], error) {
+	return r.api.ListProjectCostsPage(ctx, page, perPage)
+}

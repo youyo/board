@@ -29,7 +29,7 @@ type VendorSearchParams struct {
 // Pagination is automatically handled by ListAll.
 func (c *Client) ListVendors(ctx context.Context) ([]VendorEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
-		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/vendors", nil)
+		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/payees", nil)
 		if err != nil {
 			return nil, err
 		}
@@ -56,7 +56,7 @@ func (c *Client) ListVendors(ctx context.Context) ([]VendorEntity, error) {
 
 // GetVendor retrieves the vendor with the specified ID.
 func (c *Client) GetVendor(ctx context.Context, id int) (*VendorEntity, error) {
-	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/vendors/%d", id), nil)
+	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/payees/%d", id), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +75,7 @@ func (c *Client) GetVendor(ctx context.Context, id int) (*VendorEntity, error) {
 // Pagination is automatically handled by ListAll.
 func (c *Client) SearchVendors(ctx context.Context, params VendorSearchParams) ([]VendorEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
-		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/vendors", nil)
+		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/payees", nil)
 		if err != nil {
 			return nil, err
 		}
@@ -104,4 +104,20 @@ func (c *Client) SearchVendors(ctx context.Context, params VendorSearchParams) (
 		result = append(result, x)
 	}
 	return result, nil
+}
+
+// ListVendorsPage retrieves a single page of VendorEntity.
+func (c *Client) ListVendorsPage(ctx context.Context, page, perPage int) (*PageResult[VendorEntity], error) {
+	makeReq := func(ctx context.Context, p, pp int) (*http.Request, error) {
+		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/payees", nil)
+		if err != nil {
+			return nil, err
+		}
+		q := req.URL.Query()
+		q.Set("page", strconv.Itoa(p))
+		q.Set("per_page", strconv.Itoa(pp))
+		req.URL.RawQuery = q.Encode()
+		return req, nil
+	}
+	return ListPage[VendorEntity](c, ctx, makeReq, page, perPage)
 }

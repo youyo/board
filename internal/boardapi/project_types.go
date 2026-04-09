@@ -104,3 +104,19 @@ func (c *Client) SearchProjectTypes(ctx context.Context, params ProjectTypeSearc
 	}
 	return result, nil
 }
+
+// ListProjectTypesPage retrieves a single page of ProjectTypeEntity.
+func (c *Client) ListProjectTypesPage(ctx context.Context, page, perPage int) (*PageResult[ProjectTypeEntity], error) {
+	makeReq := func(ctx context.Context, p, pp int) (*http.Request, error) {
+		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/project_types", nil)
+		if err != nil {
+			return nil, err
+		}
+		q := req.URL.Query()
+		q.Set("page", strconv.Itoa(p))
+		q.Set("per_page", strconv.Itoa(pp))
+		req.URL.RawQuery = q.Encode()
+		return req, nil
+	}
+	return ListPage[ProjectTypeEntity](c, ctx, makeReq, page, perPage)
+}

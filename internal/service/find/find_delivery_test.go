@@ -19,7 +19,7 @@ func TestFindDelivery_ByID(t *testing.T) {
 		&stubClientRepo{getResult: client},
 		nil, nil,
 		&stubProjectRepo{getResult: project},
-		&stubDeliveryRepo{getResult: del},
+		&stubDeliveryRepo{getByDocIDResult: del},
 	)
 
 	got, err := svc.FindDelivery(testCtx, find.FindDeliveryQuery{ID: 1})
@@ -37,34 +37,58 @@ func TestFindDelivery_ByID(t *testing.T) {
 	}
 }
 
-func TestFindDelivery_ByClientName(t *testing.T) {
-	clients := []boardapi.ClientEntity{{ID: 10, Name: "ABC Corp"}}
-	deliveries := []boardapi.DeliveryEntity{
-		{ID: 1, ClientID: 10, Title: "D1"},
-		{ID: 2, ClientID: 10, Title: "D2"},
-	}
-
-	svc := newServiceWith(
-		&stubClientRepo{searchResult: clients, getResult: &boardapi.ClientEntity{ID: 10}},
-		nil, nil,
-		&stubProjectRepo{},
-		&stubDeliveryRepo{searchResult: deliveries},
-	)
-
-	got, err := svc.FindDelivery(testCtx, find.FindDeliveryQuery{ClientName: "ABC"})
-	assertNoError(t, err)
-	assertDeliveryResultLen(t, got, 2)
-}
-
-func TestFindDelivery_ByProjectName(t *testing.T) {
-	projects := []boardapi.ProjectEntity{{ID: 100, ClientID: 10, Name: "Web Dev"}}
-	deliveries := []boardapi.DeliveryEntity{{ID: 1, ClientID: 10, ProjectID: 100, Title: "D1"}}
+func TestFindDelivery_ByProjectID(t *testing.T) {
+	docSummary := &boardapi.DocumentSummary{ID: 42}
+	project := &boardapi.ProjectEntity{ID: 100, ClientID: 10, Name: "Web Dev", Delivery: docSummary}
+	del := &boardapi.DeliveryEntity{ID: 42, ClientID: 10, ProjectID: 100, Title: "D1"}
 
 	svc := newServiceWith(
 		&stubClientRepo{getResult: &boardapi.ClientEntity{ID: 10}},
 		nil, nil,
-		&stubProjectRepo{searchResult: projects, getResult: &boardapi.ProjectEntity{ID: 100}},
-		&stubDeliveryRepo{searchResult: deliveries},
+		&stubProjectRepo{getWithGroupResult: project, getResult: &boardapi.ProjectEntity{ID: 100}},
+		&stubDeliveryRepo{getByDocIDResult: del},
+	)
+
+	got, err := svc.FindDelivery(testCtx, find.FindDeliveryQuery{ProjectID: 100})
+	assertNoError(t, err)
+	assertDeliveryResultLen(t, got, 1)
+	if got[0].Delivery.ID != 42 {
+		t.Errorf("delivery ID = %d, want 42", got[0].Delivery.ID)
+	}
+}
+
+func TestFindDelivery_ByClientName(t *testing.T) {
+	clients := []boardapi.ClientEntity{{ID: 10, Name: "ABC Corp"}}
+	docSummary := &boardapi.DocumentSummary{ID: 1}
+	projects := []boardapi.ProjectEntity{
+		{ID: 100, ClientID: 10, Name: "P1", Delivery: docSummary},
+	}
+	del := &boardapi.DeliveryEntity{ID: 1, ClientID: 10, ProjectID: 100, Title: "D1"}
+
+	svc := newServiceWith(
+		&stubClientRepo{searchResult: clients, getResult: &boardapi.ClientEntity{ID: 10}},
+		nil, nil,
+		&stubProjectRepo{searchResult: projects},
+		&stubDeliveryRepo{getByDocIDResult: del},
+	)
+
+	got, err := svc.FindDelivery(testCtx, find.FindDeliveryQuery{ClientName: "ABC"})
+	assertNoError(t, err)
+	assertDeliveryResultLen(t, got, 1)
+}
+
+func TestFindDelivery_ByProjectName(t *testing.T) {
+	docSummary := &boardapi.DocumentSummary{ID: 1}
+	projects := []boardapi.ProjectEntity{
+		{ID: 100, ClientID: 10, Name: "Web Dev", Delivery: docSummary},
+	}
+	del := &boardapi.DeliveryEntity{ID: 1, ClientID: 10, ProjectID: 100, Title: "D1"}
+
+	svc := newServiceWith(
+		&stubClientRepo{getResult: &boardapi.ClientEntity{ID: 10}},
+		nil, nil,
+		&stubProjectRepo{searchResult: projects},
+		&stubDeliveryRepo{getByDocIDResult: del},
 	)
 
 	got, err := svc.FindDelivery(testCtx, find.FindDeliveryQuery{ProjectName: "Web"})
@@ -72,53 +96,19 @@ func TestFindDelivery_ByProjectName(t *testing.T) {
 	assertDeliveryResultLen(t, got, 1)
 }
 
-func TestFindDelivery_ByText(t *testing.T) {
-	allDeliveries := []boardapi.DeliveryEntity{
-		{ID: 1, Title: "Final Delivery", Memo: "complete"},
-		{ID: 2, Title: "Partial", Memo: "normal"},
-	}
-
-	svc := newServiceWith(
-		&stubClientRepo{}, nil, nil,
-		&stubProjectRepo{},
-		&stubDeliveryRepo{listResult: allDeliveries},
-	)
-
-	got, err := svc.FindDelivery(testCtx, find.FindDeliveryQuery{Text: "Final"})
-	assertNoError(t, err)
-	assertDeliveryResultLen(t, got, 1)
-}
-
-func TestFindDelivery_ByStatus(t *testing.T) {
-	allDeliveries := []boardapi.DeliveryEntity{
-		{ID: 1, Status: "delivered"},
-		{ID: 2, Status: "draft"},
-		{ID: 3, Status: "delivered"},
-	}
-
-	svc := newServiceWith(
-		&stubClientRepo{}, nil, nil,
-		&stubProjectRepo{},
-		&stubDeliveryRepo{listResult: allDeliveries},
-	)
-
-	got, err := svc.FindDelivery(testCtx, find.FindDeliveryQuery{Status: "delivered"})
-	assertNoError(t, err)
-	assertDeliveryResultLen(t, got, 2)
-}
-
 func TestFindDelivery_ByClientNameWithStatus(t *testing.T) {
 	clients := []boardapi.ClientEntity{{ID: 10, Name: "ABC"}}
-	deliveries := []boardapi.DeliveryEntity{
-		{ID: 1, ClientID: 10, Status: "delivered", Title: "D1"},
-		{ID: 2, ClientID: 10, Status: "draft", Title: "D2"},
+	docSummary := &boardapi.DocumentSummary{ID: 1}
+	projects := []boardapi.ProjectEntity{
+		{ID: 100, ClientID: 10, Name: "P1", Delivery: docSummary},
 	}
+	del := &boardapi.DeliveryEntity{ID: 1, ClientID: 10, Status: "delivered", Title: "D1"}
 
 	svc := newServiceWith(
 		&stubClientRepo{searchResult: clients, getResult: &boardapi.ClientEntity{ID: 10}},
 		nil, nil,
-		&stubProjectRepo{},
-		&stubDeliveryRepo{searchResult: deliveries},
+		&stubProjectRepo{searchResult: projects},
+		&stubDeliveryRepo{getByDocIDResult: del},
 	)
 
 	got, err := svc.FindDelivery(testCtx, find.FindDeliveryQuery{ClientName: "ABC", Status: "delivered"})
@@ -131,6 +121,12 @@ func TestFindDelivery_ByClientNameWithStatus(t *testing.T) {
 func TestFindDelivery_EmptyQuery(t *testing.T) {
 	svc := find.New(zeroRepos())
 	_, err := svc.FindDelivery(testCtx, find.FindDeliveryQuery{})
+	assertError(t, err)
+}
+
+func TestFindDelivery_StatusOnlyQuery(t *testing.T) {
+	svc := find.New(zeroRepos())
+	_, err := svc.FindDelivery(testCtx, find.FindDeliveryQuery{Status: "delivered"})
 	assertError(t, err)
 }
 
@@ -157,7 +153,7 @@ func TestFindDelivery_ClientResolutionFailure(t *testing.T) {
 	svc := newServiceWith(
 		&stubClientRepo{err: errors.New("client error")}, nil, nil,
 		&stubProjectRepo{getResult: &boardapi.ProjectEntity{ID: 100}},
-		&stubDeliveryRepo{getResult: del},
+		&stubDeliveryRepo{getByDocIDResult: del},
 	)
 
 	got, err := svc.FindDelivery(testCtx, find.FindDeliveryQuery{ID: 1})
@@ -173,7 +169,7 @@ func TestFindDelivery_ProjectResolutionFailure(t *testing.T) {
 	svc := newServiceWith(
 		&stubClientRepo{getResult: &boardapi.ClientEntity{ID: 10}}, nil, nil,
 		&stubProjectRepo{err: errors.New("project error")},
-		&stubDeliveryRepo{getResult: del},
+		&stubDeliveryRepo{getByDocIDResult: del},
 	)
 
 	got, err := svc.FindDelivery(testCtx, find.FindDeliveryQuery{ID: 1})
@@ -186,16 +182,16 @@ func TestFindDelivery_ProjectResolutionFailure(t *testing.T) {
 
 // --- FindDelivery: Priority ---
 
-func TestFindDelivery_IDPriorityOverClientName(t *testing.T) {
+func TestFindDelivery_IDPriorityOverProjectID(t *testing.T) {
 	del := &boardapi.DeliveryEntity{ID: 1, ClientID: 10, Title: "By ID"}
 	svc := newServiceWith(
-		&stubClientRepo{getResult: &boardapi.ClientEntity{ID: 10}, searchResult: []boardapi.ClientEntity{{ID: 20}}},
+		&stubClientRepo{getResult: &boardapi.ClientEntity{ID: 10}},
 		nil, nil,
 		&stubProjectRepo{},
-		&stubDeliveryRepo{getResult: del, searchResult: []boardapi.DeliveryEntity{{ID: 99}}},
+		&stubDeliveryRepo{getByDocIDResult: del},
 	)
 
-	got, err := svc.FindDelivery(testCtx, find.FindDeliveryQuery{ID: 1, ClientName: "ABC"})
+	got, err := svc.FindDelivery(testCtx, find.FindDeliveryQuery{ID: 1, ProjectID: 100})
 	assertNoError(t, err)
 	assertDeliveryResultLen(t, got, 1)
 	if got[0].Delivery.ID != 1 {
@@ -206,16 +202,23 @@ func TestFindDelivery_IDPriorityOverClientName(t *testing.T) {
 // --- FindDelivery: Limit ---
 
 func TestFindDelivery_Limit(t *testing.T) {
-	deliveries := []boardapi.DeliveryEntity{
-		{ID: 1, Title: "D1"}, {ID: 2, Title: "D2"}, {ID: 3, Title: "D3"},
+	docSummary1 := &boardapi.DocumentSummary{ID: 1}
+	docSummary2 := &boardapi.DocumentSummary{ID: 2}
+	docSummary3 := &boardapi.DocumentSummary{ID: 3}
+	projects := []boardapi.ProjectEntity{
+		{ID: 100, ClientID: 10, Name: "P1", Delivery: docSummary1},
+		{ID: 101, ClientID: 10, Name: "P2", Delivery: docSummary2},
+		{ID: 102, ClientID: 10, Name: "P3", Delivery: docSummary3},
 	}
+	del := &boardapi.DeliveryEntity{ID: 1, Title: "D"}
+
 	svc := newServiceWith(
-		&stubClientRepo{}, nil, nil,
-		&stubProjectRepo{},
-		&stubDeliveryRepo{listResult: deliveries},
+		nil, nil, nil,
+		&stubProjectRepo{searchResult: projects},
+		&stubDeliveryRepo{getByDocIDResult: del},
 	)
 
-	got, err := svc.FindDelivery(testCtx, find.FindDeliveryQuery{Text: "D", Limit: 2})
+	got, err := svc.FindDelivery(testCtx, find.FindDeliveryQuery{ProjectName: "P", Limit: 2})
 	assertNoError(t, err)
 	assertDeliveryResultLen(t, got, 2)
 }

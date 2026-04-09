@@ -1706,44 +1706,13 @@ func TestSearchProjectCosts_WithProjectID(t *testing.T) {
 }
 
 // ============================================================
-// M07: estimates entity tests (T67-T69)
+// M07: estimates entity tests (T68)
 // ============================================================
-
-// T67: ListEstimates — happy path
-func TestListEstimates_OK(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"client_id":10,"project_id":100,"title":"Estimate 1","total_amount":500000.0,"status":"draft","estimate_date":"2026-01-01","expiration_date":"2026-01-31","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":2,"client_id":10,"project_id":100,"title":"Estimate 2","total_amount":300000.0,"status":"sent","estimate_date":"2026-01-05","expiration_date":"2026-02-05","memo":"","updated_at":"2026-01-05T00:00:00Z","created_at":"2026-01-05T00:00:00Z"}]`))
-	}))
-	defer ts.Close()
-
-	noSleep := func(time.Duration) {}
-	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.ListEstimates(context.Background())
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(result) != 2 {
-		t.Errorf("want 2 estimates, got %d", len(result))
-	}
-	if result[0].ID != 1 || result[0].ClientID != 10 || result[0].ProjectID != 100 {
-		t.Errorf("estimate[0]: got %+v", result[0])
-	}
-	if result[0].TotalAmount != 500000.0 {
-		t.Errorf("TotalAmount: want 500000.0, got %f", result[0].TotalAmount)
-	}
-	if result[0].EstimateDate != "2026-01-01" {
-		t.Errorf("EstimateDate: want %q, got %q", "2026-01-01", result[0].EstimateDate)
-	}
-	if result[0].ExpirationDate != "2026-01-31" {
-		t.Errorf("ExpirationDate: want %q, got %q", "2026-01-31", result[0].ExpirationDate)
-	}
-}
 
 // T68: GetEstimate — happy path
 func TestGetEstimate_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/v1/estimates/42" {
+		if r.URL.Path != "/v1/documents/estimates/42" {
 			http.NotFound(w, r)
 			return
 		}
@@ -1766,34 +1735,6 @@ func TestGetEstimate_OK(t *testing.T) {
 	}
 	if got.Memo != "test memo" {
 		t.Errorf("Memo: want %q, got %q", "test memo", got.Memo)
-	}
-}
-
-// T69: SearchEstimates — with ClientID + Status parameters
-func TestSearchEstimates_WithClientIDAndStatus(t *testing.T) {
-	var gotClientID, gotStatus string
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotClientID = r.URL.Query().Get("client_id")
-		gotStatus = r.URL.Query().Get("status")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"client_id":10,"project_id":100,"title":"Estimate 1","total_amount":500000.0,"status":"draft","estimate_date":"2026-01-01","expiration_date":"2026-01-31","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
-	}))
-	defer ts.Close()
-
-	noSleep := func(time.Duration) {}
-	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.SearchEstimates(context.Background(), boardapi.EstimateSearchParams{ClientID: 10, Status: "draft"})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(result) != 1 {
-		t.Errorf("want 1 result, got %d", len(result))
-	}
-	if gotClientID != "10" {
-		t.Errorf("client_id param: want %q, got %q", "10", gotClientID)
-	}
-	if gotStatus != "draft" {
-		t.Errorf("status param: want %q, got %q", "draft", gotStatus)
 	}
 }
 
@@ -1878,35 +1819,13 @@ func TestSearchInvoices_WithProjectIDAndUpdatedAtFrom(t *testing.T) {
 }
 
 // ============================================================
-// M07: orders entity tests (T73-T75)
+// M07: orders entity tests (T74)
 // ============================================================
-
-// T73: ListOrders — happy path
-func TestListOrders_OK(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"client_id":10,"project_id":100,"title":"Order 1","total_amount":300000.0,"status":"draft","order_date":"2026-01-10","memo":"","updated_at":"2026-01-10T00:00:00Z","created_at":"2026-01-10T00:00:00Z"},{"id":2,"client_id":10,"project_id":101,"title":"Order 2","total_amount":150000.0,"status":"sent","order_date":"2026-01-15","memo":"","updated_at":"2026-01-15T00:00:00Z","created_at":"2026-01-15T00:00:00Z"}]`))
-	}))
-	defer ts.Close()
-
-	noSleep := func(time.Duration) {}
-	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.ListOrders(context.Background())
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(result) != 2 {
-		t.Errorf("want 2 orders, got %d", len(result))
-	}
-	if result[0].ID != 1 || result[0].OrderDate != "2026-01-10" {
-		t.Errorf("order[0]: got %+v", result[0])
-	}
-}
 
 // T74: GetOrder — happy path
 func TestGetOrder_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/v1/orders/77" {
+		if r.URL.Path != "/v1/documents/orders/77" {
 			http.NotFound(w, r)
 			return
 		}
@@ -1929,60 +1848,14 @@ func TestGetOrder_OK(t *testing.T) {
 	}
 }
 
-// T75: SearchOrders — with ClientID parameter
-func TestSearchOrders_WithClientID(t *testing.T) {
-	var gotClientID string
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotClientID = r.URL.Query().Get("client_id")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"client_id":10,"project_id":100,"title":"Order 1","total_amount":300000.0,"status":"draft","order_date":"2026-01-10","memo":"","updated_at":"2026-01-10T00:00:00Z","created_at":"2026-01-10T00:00:00Z"}]`))
-	}))
-	defer ts.Close()
-
-	noSleep := func(time.Duration) {}
-	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.SearchOrders(context.Background(), boardapi.OrderSearchParams{ClientID: 10})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(result) != 1 {
-		t.Errorf("want 1 result, got %d", len(result))
-	}
-	if gotClientID != "10" {
-		t.Errorf("client_id param: want %q, got %q", "10", gotClientID)
-	}
-}
-
 // ============================================================
-// M07: deliveries entity tests (T76-T78)
+// M07: deliveries entity tests (T77)
 // ============================================================
-
-// T76: ListDeliveries — happy path
-func TestListDeliveries_OK(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"client_id":10,"project_id":100,"title":"Delivery Note 1","total_amount":500000.0,"status":"draft","delivery_date":"2026-01-20","memo":"","updated_at":"2026-01-20T00:00:00Z","created_at":"2026-01-20T00:00:00Z"},{"id":2,"client_id":10,"project_id":101,"title":"Delivery Note 2","total_amount":250000.0,"status":"sent","delivery_date":"2026-02-20","memo":"","updated_at":"2026-02-20T00:00:00Z","created_at":"2026-02-20T00:00:00Z"}]`))
-	}))
-	defer ts.Close()
-
-	noSleep := func(time.Duration) {}
-	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.ListDeliveries(context.Background())
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(result) != 2 {
-		t.Errorf("want 2 deliveries, got %d", len(result))
-	}
-	if result[0].ID != 1 || result[0].DeliveryDate != "2026-01-20" {
-		t.Errorf("delivery[0]: got %+v", result[0])
-	}
-}
 
 // T77: GetDelivery — happy path
 func TestGetDelivery_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/v1/deliveries/88" {
+		if r.URL.Path != "/v1/documents/deliveries/88" {
 			http.NotFound(w, r)
 			return
 		}
@@ -2005,64 +1878,14 @@ func TestGetDelivery_OK(t *testing.T) {
 	}
 }
 
-// T78: SearchDeliveries — with ProjectID + Status parameters
-func TestSearchDeliveries_WithProjectIDAndStatus(t *testing.T) {
-	var gotProjectID, gotStatus string
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotProjectID = r.URL.Query().Get("project_id")
-		gotStatus = r.URL.Query().Get("status")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"client_id":10,"project_id":100,"title":"Delivery Note 1","total_amount":500000.0,"status":"delivered","delivery_date":"2026-01-20","memo":"","updated_at":"2026-01-20T00:00:00Z","created_at":"2026-01-20T00:00:00Z"}]`))
-	}))
-	defer ts.Close()
-
-	noSleep := func(time.Duration) {}
-	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.SearchDeliveries(context.Background(), boardapi.DeliverySearchParams{ProjectID: 100, Status: "delivered"})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(result) != 1 {
-		t.Errorf("want 1 result, got %d", len(result))
-	}
-	if gotProjectID != "100" {
-		t.Errorf("project_id param: want %q, got %q", "100", gotProjectID)
-	}
-	if gotStatus != "delivered" {
-		t.Errorf("status param: want %q, got %q", "delivered", gotStatus)
-	}
-}
-
 // ============================================================
-// M07: receipts entity tests (T79-T81)
+// M07: receipts entity tests (T80)
 // ============================================================
-
-// T79: ListReceipts — happy path
-func TestListReceipts_OK(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"client_id":10,"project_id":100,"title":"Receipt 1","total_amount":500000.0,"status":"draft","receipt_date":"2026-01-31","memo":"","updated_at":"2026-01-31T00:00:00Z","created_at":"2026-01-31T00:00:00Z"},{"id":2,"client_id":10,"project_id":101,"title":"Receipt 2","total_amount":200000.0,"status":"issued","receipt_date":"2026-02-28","memo":"","updated_at":"2026-02-28T00:00:00Z","created_at":"2026-02-28T00:00:00Z"}]`))
-	}))
-	defer ts.Close()
-
-	noSleep := func(time.Duration) {}
-	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.ListReceipts(context.Background())
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(result) != 2 {
-		t.Errorf("want 2 receipts, got %d", len(result))
-	}
-	if result[0].ID != 1 || result[0].ReceiptDate != "2026-01-31" {
-		t.Errorf("receipt[0]: got %+v", result[0])
-	}
-}
 
 // T80: GetReceipt — happy path
 func TestGetReceipt_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/v1/receipts/99" {
+		if r.URL.Path != "/v1/documents/receipts/99" {
 			http.NotFound(w, r)
 			return
 		}
@@ -2082,34 +1905,6 @@ func TestGetReceipt_OK(t *testing.T) {
 	}
 	if got.ID != 99 || got.TotalAmount != 900000.0 || got.ReceiptDate != "2026-03-31" {
 		t.Errorf("GetReceipt: got %+v", got)
-	}
-}
-
-// T81: SearchReceipts — with ClientID + UpdatedAtFrom parameters
-func TestSearchReceipts_WithClientIDAndUpdatedAtFrom(t *testing.T) {
-	var gotClientID, gotUpdatedAtFrom string
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotClientID = r.URL.Query().Get("client_id")
-		gotUpdatedAtFrom = r.URL.Query().Get("updated_at_from")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"client_id":10,"project_id":100,"title":"Receipt 1","total_amount":500000.0,"status":"draft","receipt_date":"2026-01-31","memo":"","updated_at":"2026-01-31T00:00:00Z","created_at":"2026-01-31T00:00:00Z"}]`))
-	}))
-	defer ts.Close()
-
-	noSleep := func(time.Duration) {}
-	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.SearchReceipts(context.Background(), boardapi.ReceiptSearchParams{ClientID: 10, UpdatedAtFrom: "2026-01-01"})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(result) != 1 {
-		t.Errorf("want 1 result, got %d", len(result))
-	}
-	if gotClientID != "10" {
-		t.Errorf("client_id param: want %q, got %q", "10", gotClientID)
-	}
-	if gotUpdatedAtFrom != "2026-01-01" {
-		t.Errorf("updated_at_from param: want %q, got %q", "2026-01-01", gotUpdatedAtFrom)
 	}
 }
 
@@ -2164,7 +1959,7 @@ func TestListVendors_Unauthorized(t *testing.T) {
 // T114: GetVendor — happy path
 func TestGetVendor_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/v1/vendors/1" {
+		if r.URL.Path != "/v1/payees/1" {
 			http.NotFound(w, r)
 			return
 		}
@@ -2305,7 +2100,7 @@ func TestListVendorBranches_Unauthorized(t *testing.T) {
 // T120: GetVendorBranch — happy path
 func TestGetVendorBranch_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/v1/vendor_branches/10" {
+		if r.URL.Path != "/v1/payee_branches/10" {
 			http.NotFound(w, r)
 			return
 		}
@@ -2446,7 +2241,7 @@ func TestListVendorContacts_Unauthorized(t *testing.T) {
 // T126: GetVendorContact — happy path
 func TestGetVendorContact_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/v1/vendor_contacts/1" {
+		if r.URL.Path != "/v1/payee_contacts/1" {
 			http.NotFound(w, r)
 			return
 		}
@@ -2591,7 +2386,7 @@ func TestListPurchaseOrders_Unauthorized(t *testing.T) {
 // T132: GetPurchaseOrder — happy path
 func TestGetPurchaseOrder_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/v1/purchase_orders/1" {
+		if r.URL.Path != "/v1/expenditures/1" {
 			http.NotFound(w, r)
 			return
 		}
@@ -2740,7 +2535,7 @@ func TestListPayments_Unauthorized(t *testing.T) {
 // T138: GetPayment — happy path
 func TestGetPayment_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/v1/payments/1" {
+		if r.URL.Path != "/v1/expenditure_payments/1" {
 			http.NotFound(w, r)
 			return
 		}
@@ -3483,7 +3278,7 @@ func TestListPurchaseTypes_OK(t *testing.T) {
 // T170: GetPurchaseType — happy path
 func TestGetPurchaseType_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/v1/purchase_types/1" {
+		if r.URL.Path != "/v1/expenditure_types/1" {
 			http.NotFound(w, r)
 			return
 		}
@@ -3671,5 +3466,317 @@ func TestSearchDocumentSendChannels_WithName(t *testing.T) {
 	}
 	if gotName != "Mail" {
 		t.Errorf("name param: want %q, got %q", "Mail", gotName)
+	}
+}
+
+// ── Step 0: IsNotFound ────────────────────────────────────────────────────────
+
+// T200: IsNotFound returns true for APIErrorNotFound
+func TestIsNotFound_True(t *testing.T) {
+	err := &boardapi.APIError{Code: boardapi.APIErrorNotFound, StatusCode: 404}
+	if !boardapi.IsNotFound(err) {
+		t.Errorf("IsNotFound: want true, got false")
+	}
+}
+
+// T201: IsNotFound returns false for other APIError codes
+func TestIsNotFound_False_OtherCode(t *testing.T) {
+	err := &boardapi.APIError{Code: boardapi.APIErrorUnauthorized, StatusCode: 401}
+	if boardapi.IsNotFound(err) {
+		t.Errorf("IsNotFound: want false, got true for UNAUTHORIZED")
+	}
+}
+
+// T202: IsNotFound returns false for nil
+func TestIsNotFound_False_Nil(t *testing.T) {
+	if boardapi.IsNotFound(nil) {
+		t.Errorf("IsNotFound: want false for nil, got true")
+	}
+}
+
+// T203: IsNotFound returns false for non-API errors
+func TestIsNotFound_False_NonAPIError(t *testing.T) {
+	err := errors.New("some generic error")
+	if boardapi.IsNotFound(err) {
+		t.Errorf("IsNotFound: want false for non-API error, got true")
+	}
+}
+
+// T204: IsNotFound via wrapped error (errors.As chain)
+func TestIsNotFound_WrappedError(t *testing.T) {
+	apiErr := &boardapi.APIError{Code: boardapi.APIErrorNotFound, StatusCode: 404}
+	wrapped := fmt.Errorf("wrapped: %w", apiErr)
+	if !boardapi.IsNotFound(wrapped) {
+		t.Errorf("IsNotFound: want true for wrapped NOT_FOUND, got false")
+	}
+}
+
+// ── Step 1: DoWithRetryFull & ListPage ────────────────────────────────────────
+
+// T205: ListClientsPage returns PageResult with items and pagination headers
+func TestListClientsPage_WithHeaders(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("page") != "2" {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("X-Total-Count", "250")
+		w.Header().Set("X-Page", "2")
+		w.Header().Set("X-Per-Page", "50")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`[{"id":51,"name":"Client51","code":"C51","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	result, err := c.ListClientsPage(context.Background(), 2, 50)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("got nil PageResult")
+	}
+	if len(result.Items) != 1 {
+		t.Errorf("want 1 item, got %d", len(result.Items))
+	}
+	if result.TotalCount != 250 {
+		t.Errorf("TotalCount: want 250, got %d", result.TotalCount)
+	}
+	if result.Page != 2 {
+		t.Errorf("Page: want 2, got %d", result.Page)
+	}
+	if result.PerPage != 50 {
+		t.Errorf("PerPage: want 50, got %d", result.PerPage)
+	}
+	if result.Items[0].ID != 51 {
+		t.Errorf("Items[0].ID: want 51, got %d", result.Items[0].ID)
+	}
+}
+
+// T206: ListClientsPage propagates API error
+func TestListClientsPage_Error(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte(`{"message":"unauthorized"}`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second,
+		boardapi.WithRetryMax(0),
+		boardapi.WithSleepFn(noSleep),
+	)
+	result, err := c.ListClientsPage(context.Background(), 1, 20)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if result != nil {
+		t.Errorf("expected nil result on error, got %+v", result)
+	}
+	var apiErr *boardapi.APIError
+	if !errors.As(err, &apiErr) {
+		t.Fatalf("expected *APIError, got %T", err)
+	}
+	if apiErr.Code != boardapi.APIErrorUnauthorized {
+		t.Errorf("Code: want UNAUTHORIZED, got %q", apiErr.Code)
+	}
+}
+
+// T207: parsePaginationHeaders returns zeros when headers are absent
+func TestListClientsPage_NoHeaders(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`[{"id":1,"name":"A","code":"","memo":"","updated_at":"","created_at":""}]`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	result, err := c.ListClientsPage(context.Background(), 1, 100)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.TotalCount != 0 || result.Page != 0 || result.PerPage != 0 {
+		t.Errorf("want zero pagination headers, got TotalCount=%d Page=%d PerPage=%d",
+			result.TotalCount, result.Page, result.PerPage)
+	}
+}
+
+// T208: ListProjectsPage works correctly
+func TestListProjectsPage_OK(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Total-Count", "1")
+		w.Header().Set("X-Page", "1")
+		w.Header().Set("X-Per-Page", "100")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`[{"id":1,"client_id":10,"name":"Project1","code":"P001","status":"active","start_date":"","end_date":"","memo":"","updated_at":"","created_at":""}]`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	result, err := c.ListProjectsPage(context.Background(), 1, 100)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result.Items) != 1 || result.Items[0].ID != 1 {
+		t.Errorf("unexpected items: %+v", result.Items)
+	}
+	if result.TotalCount != 1 {
+		t.Errorf("TotalCount: want 1, got %d", result.TotalCount)
+	}
+}
+
+// ── Step 2: GetProjectWithGroup + DocumentSummary ────────────────────────────
+
+// T209: GetProjectWithGroup passes response_group query param
+func TestGetProjectWithGroup_QueryParam(t *testing.T) {
+	var gotResponseGroup string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/projects/42" {
+			http.NotFound(w, r)
+			return
+		}
+		gotResponseGroup = r.URL.Query().Get("response_group")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"id":42,"client_id":1,"name":"ProjX","code":"PX","status":"active","start_date":"","end_date":"","memo":"","updated_at":"","created_at":"","invoice":{"id":7,"message":null,"total":"100000","tax":"10000","tax_withholding":"0","lock_flg":0}}`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	got, err := c.GetProjectWithGroup(context.Background(), 42, "invoice")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got == nil {
+		t.Fatal("got nil ProjectEntity")
+	}
+	if gotResponseGroup != "invoice" {
+		t.Errorf("response_group param: want %q, got %q", "invoice", gotResponseGroup)
+	}
+	if got.Invoice == nil {
+		t.Fatal("Invoice field is nil, expected DocumentSummary")
+	}
+	if got.Invoice.ID != 7 {
+		t.Errorf("Invoice.ID: want 7, got %d", got.Invoice.ID)
+	}
+	if got.Invoice.Total != "100000" {
+		t.Errorf("Invoice.Total: want %q, got %q", "100000", got.Invoice.Total)
+	}
+}
+
+// T210: GetProjectWithGroup with empty responseGroup behaves like GetProject
+func TestGetProjectWithGroup_EmptyGroup(t *testing.T) {
+	var gotQuery string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotQuery = r.URL.RawQuery
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"id":5,"client_id":1,"name":"P5","code":"P5","status":"active","start_date":"","end_date":"","memo":"","updated_at":"","created_at":""}`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	got, err := c.GetProjectWithGroup(context.Background(), 5, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.ID != 5 {
+		t.Errorf("ID: want 5, got %d", got.ID)
+	}
+	if gotQuery != "" {
+		t.Errorf("expected no query string for empty responseGroup, got %q", gotQuery)
+	}
+}
+
+// T211: SearchProjects passes response_group param
+func TestSearchProjects_WithResponseGroup(t *testing.T) {
+	var gotResponseGroup string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotResponseGroup = r.URL.Query().Get("response_group")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`[]`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	_, err := c.SearchProjects(context.Background(), boardapi.ProjectSearchParams{ResponseGroup: "all"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotResponseGroup != "all" {
+		t.Errorf("response_group param: want %q, got %q", "all", gotResponseGroup)
+	}
+}
+
+// T212: SearchProjects omits response_group when empty
+func TestSearchProjects_NoResponseGroup(t *testing.T) {
+	var gotResponseGroup string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotResponseGroup = r.URL.Query().Get("response_group")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`[]`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	_, err := c.SearchProjects(context.Background(), boardapi.ProjectSearchParams{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotResponseGroup != "" {
+		t.Errorf("expected no response_group param, got %q", gotResponseGroup)
+	}
+}
+
+// T213: ProjectEntity deserializes DocumentSummary with null message
+func TestProjectEntity_DocumentSummaryNullMessage(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"id":1,"client_id":1,"name":"P","code":"P","status":"active","start_date":"","end_date":"","memo":"","updated_at":"","created_at":"","estimate":{"id":3,"message":null,"total":"50000","tax":"5000","tax_withholding":"0","lock_flg":1}}`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	got, err := c.GetProjectWithGroup(context.Background(), 1, "estimate")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.Estimate == nil {
+		t.Fatal("Estimate is nil")
+	}
+	if got.Estimate.Message != nil {
+		t.Errorf("Message: want nil, got %v", got.Estimate.Message)
+	}
+	if got.Estimate.LockFlg != 1 {
+		t.Errorf("LockFlg: want 1, got %d", got.Estimate.LockFlg)
+	}
+}
+
+// T214: ListClientBranchesPage returns valid PageResult
+func TestListClientBranchesPage_OK(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Total-Count", "5")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`[{"id":1,"client_id":10,"name":"Branch1","postal_code":"","address":"","phone":"","fax":"","memo":"","updated_at":"","created_at":""}]`))
+	}))
+	defer ts.Close()
+
+	noSleep := func(time.Duration) {}
+	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
+	result, err := c.ListClientBranchesPage(context.Background(), 1, 20)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result.Items) != 1 || result.Items[0].ID != 1 {
+		t.Errorf("unexpected items: %+v", result.Items)
+	}
+	if result.TotalCount != 5 {
+		t.Errorf("TotalCount: want 5, got %d", result.TotalCount)
 	}
 }

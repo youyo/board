@@ -5,11 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 )
 
 // OrderEntity is a BOARD API order entity.
-// Corresponds to one element in the GET /v1/orders response.
+// Retrieved via GET /v1/documents/orders/{documentID}.
 type OrderEntity struct {
 	ID          int     `json:"id"`
 	ClientID    int     `json:"client_id"`
@@ -23,46 +22,9 @@ type OrderEntity struct {
 	CreatedAt   string  `json:"created_at"` // ISO 8601
 }
 
-// OrderSearchParams is the parameter for SearchOrders.
-type OrderSearchParams struct {
-	ClientID      int
-	ProjectID     int
-	Status        string
-	UpdatedAtFrom string
-}
-
-// ListOrders retrieves all orders.
-// Pagination is automatically handled by ListAll.
-func (c *Client) ListOrders(ctx context.Context) ([]OrderEntity, error) {
-	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
-		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/orders", nil)
-		if err != nil {
-			return nil, err
-		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		req.URL.RawQuery = q.Encode()
-		return req, nil
-	}
-	items, err := c.ListAll(ctx, makeReq)
-	if err != nil {
-		return nil, err
-	}
-	result := make([]OrderEntity, 0, len(items))
-	for _, raw := range items {
-		var x OrderEntity
-		if err := json.Unmarshal(raw, &x); err != nil {
-			return nil, &APIError{Code: APIErrorUnknown, Message: "ListOrders: unmarshal: " + err.Error()}
-		}
-		result = append(result, x)
-	}
-	return result, nil
-}
-
-// GetOrder retrieves the order with the specified ID.
-func (c *Client) GetOrder(ctx context.Context, id int) (*OrderEntity, error) {
-	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/orders/%d", id), nil)
+// GetOrder retrieves the order with the specified document ID.
+func (c *Client) GetOrder(ctx context.Context, documentID int) (*OrderEntity, error) {
+	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/documents/orders/%d", documentID), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -75,45 +37,4 @@ func (c *Client) GetOrder(ctx context.Context, id int) (*OrderEntity, error) {
 		return nil, &APIError{Code: APIErrorUnknown, Message: "GetOrder: unmarshal: " + err.Error()}
 	}
 	return &x, nil
-}
-
-// SearchOrders searches orders with the given conditions.
-// Pagination is automatically handled by ListAll.
-func (c *Client) SearchOrders(ctx context.Context, params OrderSearchParams) ([]OrderEntity, error) {
-	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
-		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/orders", nil)
-		if err != nil {
-			return nil, err
-		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		if params.ClientID != 0 {
-			q.Set("client_id", strconv.Itoa(params.ClientID))
-		}
-		if params.ProjectID != 0 {
-			q.Set("project_id", strconv.Itoa(params.ProjectID))
-		}
-		if params.Status != "" {
-			q.Set("status", params.Status)
-		}
-		if params.UpdatedAtFrom != "" {
-			q.Set("updated_at_from", params.UpdatedAtFrom)
-		}
-		req.URL.RawQuery = q.Encode()
-		return req, nil
-	}
-	items, err := c.ListAll(ctx, makeReq)
-	if err != nil {
-		return nil, err
-	}
-	result := make([]OrderEntity, 0, len(items))
-	for _, raw := range items {
-		var x OrderEntity
-		if err := json.Unmarshal(raw, &x); err != nil {
-			return nil, &APIError{Code: APIErrorUnknown, Message: "SearchOrders: unmarshal: " + err.Error()}
-		}
-		result = append(result, x)
-	}
-	return result, nil
 }

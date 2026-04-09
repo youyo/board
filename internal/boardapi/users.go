@@ -108,3 +108,19 @@ func (c *Client) SearchUsers(ctx context.Context, params UserSearchParams) ([]Us
 	}
 	return result, nil
 }
+
+// ListUsersPage retrieves a single page of users.
+func (c *Client) ListUsersPage(ctx context.Context, page, perPage int) (*PageResult[UserEntity], error) {
+	makeReq := func(ctx context.Context, p, pp int) (*http.Request, error) {
+		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/users", nil)
+		if err != nil {
+			return nil, err
+		}
+		q := req.URL.Query()
+		q.Set("page", strconv.Itoa(p))
+		q.Set("per_page", strconv.Itoa(pp))
+		req.URL.RawQuery = q.Encode()
+		return req, nil
+	}
+	return ListPage[UserEntity](c, ctx, makeReq, page, perPage)
+}

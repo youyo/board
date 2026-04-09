@@ -34,13 +34,12 @@ type ProjectRepo interface {
 	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.ProjectEntity, error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.ProjectEntity, error)
 	Search(ctx context.Context, params boardapi.ProjectSearchParams, opts repository.ReadOptions) ([]boardapi.ProjectEntity, error)
+	GetByIDWithGroup(ctx context.Context, id int, responseGroup string) (*boardapi.ProjectEntity, error)
 }
 
-// EstimateRepo is the repository interface for estimates.
+// EstimateRepo is the repository interface for estimates used by service/find.
 type EstimateRepo interface {
-	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.EstimateEntity, error)
-	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.EstimateEntity, error)
-	Search(ctx context.Context, params boardapi.EstimateSearchParams, opts repository.ReadOptions) ([]boardapi.EstimateEntity, error)
+	GetByDocumentID(ctx context.Context, documentID int, opts repository.ReadOptions) (*boardapi.EstimateEntity, error)
 }
 
 // InvoiceRepo is the repository interface for invoices.
@@ -50,25 +49,19 @@ type InvoiceRepo interface {
 	Search(ctx context.Context, params boardapi.InvoiceSearchParams, opts repository.ReadOptions) ([]boardapi.InvoiceEntity, error)
 }
 
-// OrderRepo is the repository interface for orders.
+// OrderRepo is the repository interface for orders used by service/find.
 type OrderRepo interface {
-	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.OrderEntity, error)
-	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.OrderEntity, error)
-	Search(ctx context.Context, params boardapi.OrderSearchParams, opts repository.ReadOptions) ([]boardapi.OrderEntity, error)
+	GetByDocumentID(ctx context.Context, documentID int, opts repository.ReadOptions) (*boardapi.OrderEntity, error)
 }
 
-// DeliveryRepo is the repository interface for deliveries.
+// DeliveryRepo is the repository interface for deliveries used by service/find.
 type DeliveryRepo interface {
-	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.DeliveryEntity, error)
-	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.DeliveryEntity, error)
-	Search(ctx context.Context, params boardapi.DeliverySearchParams, opts repository.ReadOptions) ([]boardapi.DeliveryEntity, error)
+	GetByDocumentID(ctx context.Context, documentID int, opts repository.ReadOptions) (*boardapi.DeliveryEntity, error)
 }
 
-// ReceiptRepo is the repository interface for receipts.
+// ReceiptRepo is the repository interface for receipts used by service/find.
 type ReceiptRepo interface {
-	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.ReceiptEntity, error)
-	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.ReceiptEntity, error)
-	Search(ctx context.Context, params boardapi.ReceiptSearchParams, opts repository.ReadOptions) ([]boardapi.ReceiptEntity, error)
+	GetByDocumentID(ctx context.Context, documentID int, opts repository.ReadOptions) (*boardapi.ReceiptEntity, error)
 }
 
 // VendorRepo is the repository interface for vendors used by service/find.

@@ -34,7 +34,7 @@ type PaymentSearchParams struct {
 // Pagination is automatically handled by ListAll.
 func (c *Client) ListPayments(ctx context.Context) ([]PaymentEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
-		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/payments", nil)
+		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/expenditure_payments", nil)
 		if err != nil {
 			return nil, err
 		}
@@ -61,7 +61,7 @@ func (c *Client) ListPayments(ctx context.Context) ([]PaymentEntity, error) {
 
 // GetPayment retrieves the payment with the specified ID.
 func (c *Client) GetPayment(ctx context.Context, id int) (*PaymentEntity, error) {
-	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/payments/%d", id), nil)
+	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/expenditure_payments/%d", id), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +80,7 @@ func (c *Client) GetPayment(ctx context.Context, id int) (*PaymentEntity, error)
 // Pagination is automatically handled by ListAll.
 func (c *Client) SearchPayments(ctx context.Context, params PaymentSearchParams) ([]PaymentEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
-		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/payments", nil)
+		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/expenditure_payments", nil)
 		if err != nil {
 			return nil, err
 		}
@@ -115,4 +115,20 @@ func (c *Client) SearchPayments(ctx context.Context, params PaymentSearchParams)
 		result = append(result, x)
 	}
 	return result, nil
+}
+
+// ListPaymentsPage retrieves a single page of PaymentEntity.
+func (c *Client) ListPaymentsPage(ctx context.Context, page, perPage int) (*PageResult[PaymentEntity], error) {
+	makeReq := func(ctx context.Context, p, pp int) (*http.Request, error) {
+		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/expenditure_payments", nil)
+		if err != nil {
+			return nil, err
+		}
+		q := req.URL.Query()
+		q.Set("page", strconv.Itoa(p))
+		q.Set("per_page", strconv.Itoa(pp))
+		req.URL.RawQuery = q.Encode()
+		return req, nil
+	}
+	return ListPage[PaymentEntity](c, ctx, makeReq, page, perPage)
 }

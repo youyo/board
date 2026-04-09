@@ -137,8 +137,18 @@ func (r *ProjectRepository) GetByID(ctx context.Context, id int, opts ReadOption
 	return entity, nil
 }
 
+// GetByIDWithGroup fetches a project directly from the API with a response_group parameter.
+// Cache is bypassed because response_group data should not be cached.
+func (r *ProjectRepository) GetByIDWithGroup(ctx context.Context, id int, responseGroup string) (*boardapi.ProjectEntity, error) {
+	return r.api.GetProjectWithGroup(ctx, id, responseGroup)
+}
+
 // Search returns projects filtered by the given parameters from the cache.
+// If params.ResponseGroup is set, the cache is bypassed and the API is called directly.
 func (r *ProjectRepository) Search(ctx context.Context, params boardapi.ProjectSearchParams, opts ReadOptions) ([]boardapi.ProjectEntity, error) {
+	if params.ResponseGroup != "" {
+		return r.api.SearchProjects(ctx, params)
+	}
 	all, err := r.List(ctx, opts)
 	if err != nil {
 		return nil, err
@@ -163,4 +173,9 @@ func filterProjects(entities []boardapi.ProjectEntity, params boardapi.ProjectSe
 		result = append(result, e)
 	}
 	return result
+}
+
+// ListPage retrieves a single page of ProjectEntity directly from the API (cache bypass).
+func (r *ProjectRepository) ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.ProjectEntity], error) {
+	return r.api.ListProjectsPage(ctx, page, perPage)
 }

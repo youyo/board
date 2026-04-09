@@ -34,7 +34,7 @@ type VendorBranchSearchParams struct {
 // Pagination is automatically handled by ListAll.
 func (c *Client) ListVendorBranches(ctx context.Context) ([]VendorBranchEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
-		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/vendor_branches", nil)
+		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/payee_branches", nil)
 		if err != nil {
 			return nil, err
 		}
@@ -61,7 +61,7 @@ func (c *Client) ListVendorBranches(ctx context.Context) ([]VendorBranchEntity, 
 
 // GetVendorBranch retrieves the vendor branch with the specified ID.
 func (c *Client) GetVendorBranch(ctx context.Context, id int) (*VendorBranchEntity, error) {
-	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/vendor_branches/%d", id), nil)
+	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/payee_branches/%d", id), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +80,7 @@ func (c *Client) GetVendorBranch(ctx context.Context, id int) (*VendorBranchEnti
 // Pagination is automatically handled by ListAll.
 func (c *Client) SearchVendorBranches(ctx context.Context, params VendorBranchSearchParams) ([]VendorBranchEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
-		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/vendor_branches", nil)
+		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/payee_branches", nil)
 		if err != nil {
 			return nil, err
 		}
@@ -112,4 +112,20 @@ func (c *Client) SearchVendorBranches(ctx context.Context, params VendorBranchSe
 		result = append(result, x)
 	}
 	return result, nil
+}
+
+// ListVendorBranchesPage retrieves a single page of VendorBranchEntity.
+func (c *Client) ListVendorBranchesPage(ctx context.Context, page, perPage int) (*PageResult[VendorBranchEntity], error) {
+	makeReq := func(ctx context.Context, p, pp int) (*http.Request, error) {
+		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/payee_branches", nil)
+		if err != nil {
+			return nil, err
+		}
+		q := req.URL.Query()
+		q.Set("page", strconv.Itoa(p))
+		q.Set("per_page", strconv.Itoa(pp))
+		req.URL.RawQuery = q.Encode()
+		return req, nil
+	}
+	return ListPage[VendorBranchEntity](c, ctx, makeReq, page, perPage)
 }

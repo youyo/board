@@ -97,7 +97,7 @@ func TestNewFindEstimateCmd(t *testing.T) {
 		t.Errorf("Use = %q, want %q", cmd.Use, "estimate")
 	}
 
-	for _, flagName := range []string{"id", "client-name", "project-name", "text", "status"} {
+	for _, flagName := range []string{"id", "project-id", "client-name", "project-name", "status"} {
 		if f := cmd.Flags().Lookup(flagName); f == nil {
 			t.Errorf("--%s flag not defined", flagName)
 		}
@@ -147,7 +147,7 @@ func TestNewFindOrderCmd(t *testing.T) {
 		t.Errorf("Use = %q, want %q", cmd.Use, "order")
 	}
 
-	for _, flagName := range []string{"id", "client-name", "project-name", "text", "status"} {
+	for _, flagName := range []string{"id", "project-id", "client-name", "project-name", "status"} {
 		if f := cmd.Flags().Lookup(flagName); f == nil {
 			t.Errorf("--%s flag not defined", flagName)
 		}
@@ -172,7 +172,7 @@ func TestNewFindDeliveryCmd(t *testing.T) {
 		t.Errorf("Use = %q, want %q", cmd.Use, "delivery")
 	}
 
-	for _, flagName := range []string{"id", "client-name", "project-name", "text", "status"} {
+	for _, flagName := range []string{"id", "project-id", "client-name", "project-name", "status"} {
 		if f := cmd.Flags().Lookup(flagName); f == nil {
 			t.Errorf("--%s flag not defined", flagName)
 		}
@@ -197,7 +197,7 @@ func TestNewFindReceiptCmd(t *testing.T) {
 		t.Errorf("Use = %q, want %q", cmd.Use, "receipt")
 	}
 
-	for _, flagName := range []string{"id", "client-name", "project-name", "text", "status"} {
+	for _, flagName := range []string{"id", "project-id", "client-name", "project-name", "status"} {
 		if f := cmd.Flags().Lookup(flagName); f == nil {
 			t.Errorf("--%s flag not defined", flagName)
 		}

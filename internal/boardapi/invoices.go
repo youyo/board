@@ -118,3 +118,19 @@ func (c *Client) SearchInvoices(ctx context.Context, params InvoiceSearchParams)
 	}
 	return result, nil
 }
+
+// ListInvoicesPage retrieves a single page of invoices.
+func (c *Client) ListInvoicesPage(ctx context.Context, page, perPage int) (*PageResult[InvoiceEntity], error) {
+	makeReq := func(ctx context.Context, p, pp int) (*http.Request, error) {
+		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/invoices", nil)
+		if err != nil {
+			return nil, err
+		}
+		q := req.URL.Query()
+		q.Set("page", strconv.Itoa(p))
+		q.Set("per_page", strconv.Itoa(pp))
+		req.URL.RawQuery = q.Encode()
+		return req, nil
+	}
+	return ListPage[InvoiceEntity](c, ctx, makeReq, page, perPage)
+}

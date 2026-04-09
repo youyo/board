@@ -21,3 +21,8 @@ func (s *Service) GetPaymentTerm(ctx context.Context, id int, opts repository.Re
 func (s *Service) SearchPaymentTerms(ctx context.Context, params boardapi.PaymentTermSearchParams, opts repository.ReadOptions) ([]boardapi.PaymentTermEntity, error) {
 	return s.paymentTerms.Search(ctx, params, opts)
 }
+
+// ListPaymentTermsPage returns a single page of payment terms.
+func (s *Service) ListPaymentTermsPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.PaymentTermEntity], error) {
+	return s.paymentTerms.ListPage(ctx, page, perPage)
+}

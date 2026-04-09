@@ -21,3 +21,8 @@ func (s *Service) GetProjectType(ctx context.Context, id int, opts repository.Re
 func (s *Service) SearchProjectTypes(ctx context.Context, params boardapi.ProjectTypeSearchParams, opts repository.ReadOptions) ([]boardapi.ProjectTypeEntity, error) {
 	return s.projectTypes.Search(ctx, params, opts)
 }
+
+// ListProjectTypesPage returns a single page of project types.
+func (s *Service) ListProjectTypesPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.ProjectTypeEntity], error) {
+	return s.projectTypes.ListPage(ctx, page, perPage)
+}

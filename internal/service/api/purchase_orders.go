@@ -21,3 +21,8 @@ func (s *Service) GetPurchaseOrder(ctx context.Context, id int, opts repository.
 func (s *Service) SearchPurchaseOrders(ctx context.Context, params boardapi.PurchaseOrderSearchParams, opts repository.ReadOptions) ([]boardapi.PurchaseOrderEntity, error) {
 	return s.purchaseOrders.Search(ctx, params, opts)
 }
+
+// ListPurchaseOrdersPage returns a single page of purchase orders.
+func (s *Service) ListPurchaseOrdersPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.PurchaseOrderEntity], error) {
+	return s.purchaseOrders.ListPage(ctx, page, perPage)
+}

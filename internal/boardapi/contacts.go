@@ -114,3 +114,19 @@ func (c *Client) SearchContacts(ctx context.Context, params ContactSearchParams)
 	}
 	return result, nil
 }
+
+// ListContactsPage retrieves a single page of contacts.
+func (c *Client) ListContactsPage(ctx context.Context, page, perPage int) (*PageResult[ContactEntity], error) {
+	makeReq := func(ctx context.Context, p, pp int) (*http.Request, error) {
+		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/contacts", nil)
+		if err != nil {
+			return nil, err
+		}
+		q := req.URL.Query()
+		q.Set("page", strconv.Itoa(p))
+		q.Set("per_page", strconv.Itoa(pp))
+		req.URL.RawQuery = q.Encode()
+		return req, nil
+	}
+	return ListPage[ContactEntity](c, ctx, makeReq, page, perPage)
+}

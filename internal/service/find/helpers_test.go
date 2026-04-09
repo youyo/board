@@ -167,10 +167,11 @@ func (s *stubContactRepo) Search(_ context.Context, _ boardapi.ContactSearchPara
 }
 
 type stubProjectRepo struct {
-	listResult   []boardapi.ProjectEntity
-	getResult    *boardapi.ProjectEntity
-	searchResult []boardapi.ProjectEntity
-	err          error
+	listResult         []boardapi.ProjectEntity
+	getResult          *boardapi.ProjectEntity
+	searchResult       []boardapi.ProjectEntity
+	getWithGroupResult *boardapi.ProjectEntity
+	err                error
 }
 
 func (s *stubProjectRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.ProjectEntity, error) {
@@ -182,22 +183,27 @@ func (s *stubProjectRepo) GetByID(_ context.Context, _ int, _ repository.ReadOpt
 func (s *stubProjectRepo) Search(_ context.Context, _ boardapi.ProjectSearchParams, _ repository.ReadOptions) ([]boardapi.ProjectEntity, error) {
 	return s.searchResult, s.err
 }
+func (s *stubProjectRepo) GetByIDWithGroup(_ context.Context, id int, _ string) (*boardapi.ProjectEntity, error) {
+	if s.getWithGroupResult != nil {
+		return s.getWithGroupResult, nil
+	}
+	if s.getResult != nil {
+		return s.getResult, nil
+	}
+	if s.err != nil {
+		return nil, s.err
+	}
+	// Return a bare entity with no document summary so enrichment is a no-op
+	return &boardapi.ProjectEntity{ID: id}, nil
+}
 
 type stubEstimateRepo struct {
-	listResult   []boardapi.EstimateEntity
-	getResult    *boardapi.EstimateEntity
-	searchResult []boardapi.EstimateEntity
-	err          error
+	getByDocIDResult *boardapi.EstimateEntity
+	err              error
 }
 
-func (s *stubEstimateRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.EstimateEntity, error) {
-	return s.listResult, s.err
-}
-func (s *stubEstimateRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.EstimateEntity, error) {
-	return s.getResult, s.err
-}
-func (s *stubEstimateRepo) Search(_ context.Context, _ boardapi.EstimateSearchParams, _ repository.ReadOptions) ([]boardapi.EstimateEntity, error) {
-	return s.searchResult, s.err
+func (s *stubEstimateRepo) GetByDocumentID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.EstimateEntity, error) {
+	return s.getByDocIDResult, s.err
 }
 
 type stubInvoiceRepo struct {
@@ -218,54 +224,30 @@ func (s *stubInvoiceRepo) Search(_ context.Context, _ boardapi.InvoiceSearchPara
 }
 
 type stubOrderRepo struct {
-	listResult   []boardapi.OrderEntity
-	getResult    *boardapi.OrderEntity
-	searchResult []boardapi.OrderEntity
-	err          error
+	getByDocIDResult *boardapi.OrderEntity
+	err              error
 }
 
-func (s *stubOrderRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.OrderEntity, error) {
-	return s.listResult, s.err
-}
-func (s *stubOrderRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.OrderEntity, error) {
-	return s.getResult, s.err
-}
-func (s *stubOrderRepo) Search(_ context.Context, _ boardapi.OrderSearchParams, _ repository.ReadOptions) ([]boardapi.OrderEntity, error) {
-	return s.searchResult, s.err
+func (s *stubOrderRepo) GetByDocumentID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.OrderEntity, error) {
+	return s.getByDocIDResult, s.err
 }
 
 type stubDeliveryRepo struct {
-	listResult   []boardapi.DeliveryEntity
-	getResult    *boardapi.DeliveryEntity
-	searchResult []boardapi.DeliveryEntity
-	err          error
+	getByDocIDResult *boardapi.DeliveryEntity
+	err              error
 }
 
-func (s *stubDeliveryRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.DeliveryEntity, error) {
-	return s.listResult, s.err
-}
-func (s *stubDeliveryRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.DeliveryEntity, error) {
-	return s.getResult, s.err
-}
-func (s *stubDeliveryRepo) Search(_ context.Context, _ boardapi.DeliverySearchParams, _ repository.ReadOptions) ([]boardapi.DeliveryEntity, error) {
-	return s.searchResult, s.err
+func (s *stubDeliveryRepo) GetByDocumentID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.DeliveryEntity, error) {
+	return s.getByDocIDResult, s.err
 }
 
 type stubReceiptRepo struct {
-	listResult   []boardapi.ReceiptEntity
-	getResult    *boardapi.ReceiptEntity
-	searchResult []boardapi.ReceiptEntity
-	err          error
+	getByDocIDResult *boardapi.ReceiptEntity
+	err              error
 }
 
-func (s *stubReceiptRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.ReceiptEntity, error) {
-	return s.listResult, s.err
-}
-func (s *stubReceiptRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.ReceiptEntity, error) {
-	return s.getResult, s.err
-}
-func (s *stubReceiptRepo) Search(_ context.Context, _ boardapi.ReceiptSearchParams, _ repository.ReadOptions) ([]boardapi.ReceiptEntity, error) {
-	return s.searchResult, s.err
+func (s *stubReceiptRepo) GetByDocumentID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.ReceiptEntity, error) {
+	return s.getByDocIDResult, s.err
 }
 
 type stubVendorRepo struct {

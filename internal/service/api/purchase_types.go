@@ -21,3 +21,8 @@ func (s *Service) GetPurchaseType(ctx context.Context, id int, opts repository.R
 func (s *Service) SearchPurchaseTypes(ctx context.Context, params boardapi.PurchaseTypeSearchParams, opts repository.ReadOptions) ([]boardapi.PurchaseTypeEntity, error) {
 	return s.purchaseTypes.Search(ctx, params, opts)
 }
+
+// ListPurchaseTypesPage returns a single page of purchase types.
+func (s *Service) ListPurchaseTypesPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.PurchaseTypeEntity], error) {
+	return s.purchaseTypes.ListPage(ctx, page, perPage)
+}

@@ -24,13 +24,25 @@ func NewAPIDocumentSendChannelsCmd() *cobra.Command {
 }
 
 func newAPIDocumentSendChannelsListCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List all document_send_channels",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			svc, err := apiServiceFromCmd(cmd)
 			if err != nil {
 				return err
+			}
+			page, _ := cmd.Flags().GetInt("page")
+			perPage, _ := cmd.Flags().GetInt("per-page")
+			if page > 0 {
+				result, err := svc.ListDocumentSendChannelsPage(cmd.Context(), page, perPage)
+				if err != nil {
+					return err
+				}
+				totalPages := (result.TotalCount + result.PerPage - 1) / result.PerPage
+				fmt.Fprintf(os.Stderr, "# Total: %d, Page: %d/%d, PerPage: %d\n",
+					result.TotalCount, result.Page, totalPages, result.PerPage)
+				return output.Write(os.Stdout, result.Items, prettyFromCmd(cmd))
 			}
 			opts := readOptionsFromCmd(cmd)
 			result, err := svc.ListDocumentSendChannels(cmd.Context(), opts)
@@ -40,6 +52,9 @@ func newAPIDocumentSendChannelsListCmd() *cobra.Command {
 			return output.Write(os.Stdout, result, prettyFromCmd(cmd))
 		},
 	}
+	cmd.Flags().Int("page", 0, "Page number (1-based, bypasses cache)")
+	cmd.Flags().Int("per-page", 50, "Items per page (max 100, used with --page)")
+	return cmd
 }
 
 func newAPIDocumentSendChannelsGetCmd() *cobra.Command {

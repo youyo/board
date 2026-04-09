@@ -21,3 +21,8 @@ func (s *Service) GetVendorBranch(ctx context.Context, id int, opts repository.R
 func (s *Service) SearchVendorBranches(ctx context.Context, params boardapi.VendorBranchSearchParams, opts repository.ReadOptions) ([]boardapi.VendorBranchEntity, error) {
 	return s.vendorBranches.Search(ctx, params, opts)
 }
+
+// ListVendorBranchesPage returns a single page of vendor branches.
+func (s *Service) ListVendorBranchesPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.VendorBranchEntity], error) {
+	return s.vendorBranches.ListPage(ctx, page, perPage)
+}

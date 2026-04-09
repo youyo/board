@@ -9,10 +9,12 @@ import (
 
 // FindDelivery performs a cross-resource search for deliveries, returning
 // deliveries with their associated client and project.
-// Field priority: ID > ClientName > ProjectName > Text > Status(standalone).
+// Uses project response_group API to discover document IDs, then fetches via GetByDocumentID.
+// Field priority: ID > ProjectID > ClientName > ProjectName.
+// Status is a post-filter only.
 func (s *Service) FindDelivery(ctx context.Context, q FindDeliveryQuery) ([]DeliveryResult, error) {
-	if q.ID == 0 && q.ClientName == "" && q.ProjectName == "" && q.Text == "" && q.Status == "" {
-		return nil, errors.New("at least one of ID, ClientName, ProjectName, Text, or Status must be set")
+	if q.ID == 0 && q.ProjectID == 0 && q.ClientName == "" && q.ProjectName == "" {
+		return nil, errors.New("at least one of ID, ProjectID, ClientName, or ProjectName must be set")
 	}
 
 	opts := repoOpts(q.Opts)
@@ -21,63 +23,78 @@ func (s *Service) FindDelivery(ctx context.Context, q FindDeliveryQuery) ([]Deli
 
 	switch {
 	case q.ID != 0:
-		d, err := s.deliveries.GetByID(ctx, q.ID, opts)
+		// Direct lookup by document ID
+		d, err := s.deliveries.GetByDocumentID(ctx, q.ID, opts)
 		if err != nil {
 			return nil, err
 		}
 		deliveries = []boardapi.DeliveryEntity{*d}
 
+	case q.ProjectID != 0:
+		// Lookup project with delivery group, then fetch document
+		p, err := s.projects.GetByIDWithGroup(ctx, q.ProjectID, "delivery")
+		if err != nil {
+			return nil, err
+		}
+		if p.Delivery != nil {
+			d, err := s.deliveries.GetByDocumentID(ctx, p.Delivery.ID, opts)
+			if err != nil && !boardapi.IsNotFound(err) {
+				return nil, err
+			}
+			if err == nil {
+				deliveries = []boardapi.DeliveryEntity{*d}
+			}
+		}
+
 	case q.ClientName != "":
+		// Resolve client name → search projects with delivery group → hydrate
 		clients, err := s.clients.Search(ctx, boardapi.ClientSearchParams{Name: q.ClientName}, opts)
 		if err != nil {
 			return nil, err
 		}
 		for _, c := range clients {
-			ds, err := s.deliveries.Search(ctx, boardapi.DeliverySearchParams{ClientID: c.ID}, opts)
+			projects, err := s.projects.Search(ctx, boardapi.ProjectSearchParams{ClientID: c.ID, ResponseGroup: "delivery"}, opts)
 			if err != nil {
 				return nil, err
 			}
-			deliveries = append(deliveries, ds...)
+			for _, p := range projects {
+				if p.Delivery == nil {
+					continue
+				}
+				d, err := s.deliveries.GetByDocumentID(ctx, p.Delivery.ID, opts)
+				if boardapi.IsNotFound(err) {
+					continue
+				}
+				if err != nil {
+					return nil, err
+				}
+				deliveries = append(deliveries, *d)
+			}
 		}
 
 	case q.ProjectName != "":
-		projects, err := s.projects.Search(ctx, boardapi.ProjectSearchParams{Name: q.ProjectName}, opts)
+		// Search projects by name with delivery group → hydrate
+		projects, err := s.projects.Search(ctx, boardapi.ProjectSearchParams{Name: q.ProjectName, ResponseGroup: "delivery"}, opts)
 		if err != nil {
 			return nil, err
 		}
 		for _, p := range projects {
-			ds, err := s.deliveries.Search(ctx, boardapi.DeliverySearchParams{ProjectID: p.ID}, opts)
+			if p.Delivery == nil {
+				continue
+			}
+			d, err := s.deliveries.GetByDocumentID(ctx, p.Delivery.ID, opts)
+			if boardapi.IsNotFound(err) {
+				continue
+			}
 			if err != nil {
 				return nil, err
 			}
-			deliveries = append(deliveries, ds...)
-		}
-
-	case q.Text != "":
-		all, err := s.deliveries.List(ctx, opts)
-		if err != nil {
-			return nil, err
-		}
-		for _, d := range all {
-			if containsText(q.Text, d.Title, d.Memo) {
-				deliveries = append(deliveries, d)
-			}
-		}
-
-	case q.Status != "":
-		all, err := s.deliveries.List(ctx, opts)
-		if err != nil {
-			return nil, err
-		}
-		for _, d := range all {
-			if d.Status == q.Status {
-				deliveries = append(deliveries, d)
-			}
+			deliveries = append(deliveries, *d)
 		}
 	}
 
-	// Apply status post-filter for non-status-only search modes
-	if q.Status != "" && q.ID == 0 && !(q.ClientName == "" && q.ProjectName == "" && q.Text == "") {
+	// Apply status post-filter
+	if q.Status != "" {
 		deliveries = filterDeliveriesByStatus(deliveries, q.Status)
 	}
 

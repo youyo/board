@@ -99,7 +99,8 @@ func (s *Service) FindProject(ctx context.Context, q FindProjectQuery) ([]Projec
 	return results, nil
 }
 
-// resolveProjectClient fetches the associated client for a project.
+// resolveProjectClient fetches the associated client and estimate for a project.
+// Both resolutions are non-fatal: nil is returned on lookup error.
 func (s *Service) resolveProjectClient(ctx context.Context, project boardapi.ProjectEntity, opts repository.ReadOptions) (ProjectResult, error) {
 	var client *boardapi.ClientEntity
 	if project.ClientID != 0 {
@@ -111,9 +112,21 @@ func (s *Service) resolveProjectClient(ctx context.Context, project boardapi.Pro
 			client = c
 		}
 	}
+
+	// Enrich with estimate via response_group
+	var estimate *boardapi.EstimateEntity
+	p, err := s.projects.GetByIDWithGroup(ctx, project.ID, "estimate")
+	if err == nil && p.Estimate != nil {
+		e, err := s.estimates.GetByDocumentID(ctx, p.Estimate.ID, opts)
+		if err == nil {
+			estimate = e
+		}
+	}
+
 	return ProjectResult{
-		Project: project,
-		Client:  client,
+		Project:  project,
+		Client:   client,
+		Estimate: estimate,
 	}, nil
 }
 

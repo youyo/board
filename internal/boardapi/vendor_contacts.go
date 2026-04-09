@@ -36,7 +36,7 @@ type VendorContactSearchParams struct {
 // Pagination is automatically handled by ListAll.
 func (c *Client) ListVendorContacts(ctx context.Context) ([]VendorContactEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
-		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/vendor_contacts", nil)
+		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/payee_contacts", nil)
 		if err != nil {
 			return nil, err
 		}
@@ -63,7 +63,7 @@ func (c *Client) ListVendorContacts(ctx context.Context) ([]VendorContactEntity,
 
 // GetVendorContact retrieves the vendor contact with the specified ID.
 func (c *Client) GetVendorContact(ctx context.Context, id int) (*VendorContactEntity, error) {
-	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/vendor_contacts/%d", id), nil)
+	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/payee_contacts/%d", id), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +82,7 @@ func (c *Client) GetVendorContact(ctx context.Context, id int) (*VendorContactEn
 // Pagination is automatically handled by ListAll.
 func (c *Client) SearchVendorContacts(ctx context.Context, params VendorContactSearchParams) ([]VendorContactEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
-		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/vendor_contacts", nil)
+		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/payee_contacts", nil)
 		if err != nil {
 			return nil, err
 		}
@@ -117,4 +117,20 @@ func (c *Client) SearchVendorContacts(ctx context.Context, params VendorContactS
 		result = append(result, x)
 	}
 	return result, nil
+}
+
+// ListVendorContactsPage retrieves a single page of VendorContactEntity.
+func (c *Client) ListVendorContactsPage(ctx context.Context, page, perPage int) (*PageResult[VendorContactEntity], error) {
+	makeReq := func(ctx context.Context, p, pp int) (*http.Request, error) {
+		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/payee_contacts", nil)
+		if err != nil {
+			return nil, err
+		}
+		q := req.URL.Query()
+		q.Set("page", strconv.Itoa(p))
+		q.Set("per_page", strconv.Itoa(pp))
+		req.URL.RawQuery = q.Encode()
+		return req, nil
+	}
+	return ListPage[VendorContactEntity](c, ctx, makeReq, page, perPage)
 }

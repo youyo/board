@@ -19,7 +19,7 @@ func TestFindReceipt_ByID(t *testing.T) {
 		&stubClientRepo{getResult: client},
 		nil, nil,
 		&stubProjectRepo{getResult: project},
-		&stubReceiptRepo{getResult: rec},
+		&stubReceiptRepo{getByDocIDResult: rec},
 	)
 
 	got, err := svc.FindReceipt(testCtx, find.FindReceiptQuery{ID: 1})
@@ -37,34 +37,58 @@ func TestFindReceipt_ByID(t *testing.T) {
 	}
 }
 
-func TestFindReceipt_ByClientName(t *testing.T) {
-	clients := []boardapi.ClientEntity{{ID: 10, Name: "ABC Corp"}}
-	receipts := []boardapi.ReceiptEntity{
-		{ID: 1, ClientID: 10, Title: "R1"},
-		{ID: 2, ClientID: 10, Title: "R2"},
-	}
-
-	svc := newServiceWith(
-		&stubClientRepo{searchResult: clients, getResult: &boardapi.ClientEntity{ID: 10}},
-		nil, nil,
-		&stubProjectRepo{},
-		&stubReceiptRepo{searchResult: receipts},
-	)
-
-	got, err := svc.FindReceipt(testCtx, find.FindReceiptQuery{ClientName: "ABC"})
-	assertNoError(t, err)
-	assertReceiptResultLen(t, got, 2)
-}
-
-func TestFindReceipt_ByProjectName(t *testing.T) {
-	projects := []boardapi.ProjectEntity{{ID: 100, ClientID: 10, Name: "Web Dev"}}
-	receipts := []boardapi.ReceiptEntity{{ID: 1, ClientID: 10, ProjectID: 100, Title: "R1"}}
+func TestFindReceipt_ByProjectID(t *testing.T) {
+	docSummary := &boardapi.DocumentSummary{ID: 42}
+	project := &boardapi.ProjectEntity{ID: 100, ClientID: 10, Name: "Web Dev", Receipt: docSummary}
+	rec := &boardapi.ReceiptEntity{ID: 42, ClientID: 10, ProjectID: 100, Title: "R1"}
 
 	svc := newServiceWith(
 		&stubClientRepo{getResult: &boardapi.ClientEntity{ID: 10}},
 		nil, nil,
-		&stubProjectRepo{searchResult: projects, getResult: &boardapi.ProjectEntity{ID: 100}},
-		&stubReceiptRepo{searchResult: receipts},
+		&stubProjectRepo{getWithGroupResult: project, getResult: &boardapi.ProjectEntity{ID: 100}},
+		&stubReceiptRepo{getByDocIDResult: rec},
+	)
+
+	got, err := svc.FindReceipt(testCtx, find.FindReceiptQuery{ProjectID: 100})
+	assertNoError(t, err)
+	assertReceiptResultLen(t, got, 1)
+	if got[0].Receipt.ID != 42 {
+		t.Errorf("receipt ID = %d, want 42", got[0].Receipt.ID)
+	}
+}
+
+func TestFindReceipt_ByClientName(t *testing.T) {
+	clients := []boardapi.ClientEntity{{ID: 10, Name: "ABC Corp"}}
+	docSummary := &boardapi.DocumentSummary{ID: 1}
+	projects := []boardapi.ProjectEntity{
+		{ID: 100, ClientID: 10, Name: "P1", Receipt: docSummary},
+	}
+	rec := &boardapi.ReceiptEntity{ID: 1, ClientID: 10, ProjectID: 100, Title: "R1"}
+
+	svc := newServiceWith(
+		&stubClientRepo{searchResult: clients, getResult: &boardapi.ClientEntity{ID: 10}},
+		nil, nil,
+		&stubProjectRepo{searchResult: projects},
+		&stubReceiptRepo{getByDocIDResult: rec},
+	)
+
+	got, err := svc.FindReceipt(testCtx, find.FindReceiptQuery{ClientName: "ABC"})
+	assertNoError(t, err)
+	assertReceiptResultLen(t, got, 1)
+}
+
+func TestFindReceipt_ByProjectName(t *testing.T) {
+	docSummary := &boardapi.DocumentSummary{ID: 1}
+	projects := []boardapi.ProjectEntity{
+		{ID: 100, ClientID: 10, Name: "Web Dev", Receipt: docSummary},
+	}
+	rec := &boardapi.ReceiptEntity{ID: 1, ClientID: 10, ProjectID: 100, Title: "R1"}
+
+	svc := newServiceWith(
+		&stubClientRepo{getResult: &boardapi.ClientEntity{ID: 10}},
+		nil, nil,
+		&stubProjectRepo{searchResult: projects},
+		&stubReceiptRepo{getByDocIDResult: rec},
 	)
 
 	got, err := svc.FindReceipt(testCtx, find.FindReceiptQuery{ProjectName: "Web"})
@@ -72,56 +96,22 @@ func TestFindReceipt_ByProjectName(t *testing.T) {
 	assertReceiptResultLen(t, got, 1)
 }
 
-func TestFindReceipt_ByText(t *testing.T) {
-	allReceipts := []boardapi.ReceiptEntity{
-		{ID: 1, Title: "Payment Receipt", Memo: "complete"},
-		{ID: 2, Title: "Deposit", Memo: "normal"},
-	}
-
-	svc := newServiceWith(
-		&stubClientRepo{}, nil, nil,
-		&stubProjectRepo{},
-		&stubReceiptRepo{listResult: allReceipts},
-	)
-
-	got, err := svc.FindReceipt(testCtx, find.FindReceiptQuery{Text: "Payment"})
-	assertNoError(t, err)
-	assertReceiptResultLen(t, got, 1)
-}
-
-func TestFindReceipt_ByStatus(t *testing.T) {
-	allReceipts := []boardapi.ReceiptEntity{
-		{ID: 1, Status: "issued"},
-		{ID: 2, Status: "draft"},
-		{ID: 3, Status: "issued"},
-	}
-
-	svc := newServiceWith(
-		&stubClientRepo{}, nil, nil,
-		&stubProjectRepo{},
-		&stubReceiptRepo{listResult: allReceipts},
-	)
-
-	got, err := svc.FindReceipt(testCtx, find.FindReceiptQuery{Status: "issued"})
-	assertNoError(t, err)
-	assertReceiptResultLen(t, got, 2)
-}
-
 func TestFindReceipt_ByClientNameWithStatus(t *testing.T) {
 	clients := []boardapi.ClientEntity{{ID: 10, Name: "ABC"}}
-	receipts := []boardapi.ReceiptEntity{
-		{ID: 1, ClientID: 10, Status: "issued", Title: "R1"},
-		{ID: 2, ClientID: 10, Status: "draft", Title: "R2"},
+	docSummary := &boardapi.DocumentSummary{ID: 1}
+	projects := []boardapi.ProjectEntity{
+		{ID: 100, ClientID: 10, Name: "P1", Receipt: docSummary},
 	}
+	rec := &boardapi.ReceiptEntity{ID: 1, ClientID: 10, Status: "confirmed", Title: "R1"}
 
 	svc := newServiceWith(
 		&stubClientRepo{searchResult: clients, getResult: &boardapi.ClientEntity{ID: 10}},
 		nil, nil,
-		&stubProjectRepo{},
-		&stubReceiptRepo{searchResult: receipts},
+		&stubProjectRepo{searchResult: projects},
+		&stubReceiptRepo{getByDocIDResult: rec},
 	)
 
-	got, err := svc.FindReceipt(testCtx, find.FindReceiptQuery{ClientName: "ABC", Status: "issued"})
+	got, err := svc.FindReceipt(testCtx, find.FindReceiptQuery{ClientName: "ABC", Status: "confirmed"})
 	assertNoError(t, err)
 	assertReceiptResultLen(t, got, 1)
 }
@@ -131,6 +121,12 @@ func TestFindReceipt_ByClientNameWithStatus(t *testing.T) {
 func TestFindReceipt_EmptyQuery(t *testing.T) {
 	svc := find.New(zeroRepos())
 	_, err := svc.FindReceipt(testCtx, find.FindReceiptQuery{})
+	assertError(t, err)
+}
+
+func TestFindReceipt_StatusOnlyQuery(t *testing.T) {
+	svc := find.New(zeroRepos())
+	_, err := svc.FindReceipt(testCtx, find.FindReceiptQuery{Status: "confirmed"})
 	assertError(t, err)
 }
 
@@ -157,7 +153,7 @@ func TestFindReceipt_ClientResolutionFailure(t *testing.T) {
 	svc := newServiceWith(
 		&stubClientRepo{err: errors.New("client error")}, nil, nil,
 		&stubProjectRepo{getResult: &boardapi.ProjectEntity{ID: 100}},
-		&stubReceiptRepo{getResult: rec},
+		&stubReceiptRepo{getByDocIDResult: rec},
 	)
 
 	got, err := svc.FindReceipt(testCtx, find.FindReceiptQuery{ID: 1})
@@ -173,7 +169,7 @@ func TestFindReceipt_ProjectResolutionFailure(t *testing.T) {
 	svc := newServiceWith(
 		&stubClientRepo{getResult: &boardapi.ClientEntity{ID: 10}}, nil, nil,
 		&stubProjectRepo{err: errors.New("project error")},
-		&stubReceiptRepo{getResult: rec},
+		&stubReceiptRepo{getByDocIDResult: rec},
 	)
 
 	got, err := svc.FindReceipt(testCtx, find.FindReceiptQuery{ID: 1})
@@ -186,16 +182,16 @@ func TestFindReceipt_ProjectResolutionFailure(t *testing.T) {
 
 // --- FindReceipt: Priority ---
 
-func TestFindReceipt_IDPriorityOverClientName(t *testing.T) {
+func TestFindReceipt_IDPriorityOverProjectID(t *testing.T) {
 	rec := &boardapi.ReceiptEntity{ID: 1, ClientID: 10, Title: "By ID"}
 	svc := newServiceWith(
-		&stubClientRepo{getResult: &boardapi.ClientEntity{ID: 10}, searchResult: []boardapi.ClientEntity{{ID: 20}}},
+		&stubClientRepo{getResult: &boardapi.ClientEntity{ID: 10}},
 		nil, nil,
 		&stubProjectRepo{},
-		&stubReceiptRepo{getResult: rec, searchResult: []boardapi.ReceiptEntity{{ID: 99}}},
+		&stubReceiptRepo{getByDocIDResult: rec},
 	)
 
-	got, err := svc.FindReceipt(testCtx, find.FindReceiptQuery{ID: 1, ClientName: "ABC"})
+	got, err := svc.FindReceipt(testCtx, find.FindReceiptQuery{ID: 1, ProjectID: 100})
 	assertNoError(t, err)
 	assertReceiptResultLen(t, got, 1)
 	if got[0].Receipt.ID != 1 {
@@ -206,16 +202,23 @@ func TestFindReceipt_IDPriorityOverClientName(t *testing.T) {
 // --- FindReceipt: Limit ---
 
 func TestFindReceipt_Limit(t *testing.T) {
-	receipts := []boardapi.ReceiptEntity{
-		{ID: 1, Title: "R1"}, {ID: 2, Title: "R2"}, {ID: 3, Title: "R3"},
+	docSummary1 := &boardapi.DocumentSummary{ID: 1}
+	docSummary2 := &boardapi.DocumentSummary{ID: 2}
+	docSummary3 := &boardapi.DocumentSummary{ID: 3}
+	projects := []boardapi.ProjectEntity{
+		{ID: 100, ClientID: 10, Name: "P1", Receipt: docSummary1},
+		{ID: 101, ClientID: 10, Name: "P2", Receipt: docSummary2},
+		{ID: 102, ClientID: 10, Name: "P3", Receipt: docSummary3},
 	}
+	rec := &boardapi.ReceiptEntity{ID: 1, Title: "R"}
+
 	svc := newServiceWith(
-		&stubClientRepo{}, nil, nil,
-		&stubProjectRepo{},
-		&stubReceiptRepo{listResult: receipts},
+		nil, nil, nil,
+		&stubProjectRepo{searchResult: projects},
+		&stubReceiptRepo{getByDocIDResult: rec},
 	)
 
-	got, err := svc.FindReceipt(testCtx, find.FindReceiptQuery{Text: "R", Limit: 2})
+	got, err := svc.FindReceipt(testCtx, find.FindReceiptQuery{ProjectName: "P", Limit: 2})
 	assertNoError(t, err)
 	assertReceiptResultLen(t, got, 2)
 }

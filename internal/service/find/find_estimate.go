@@ -9,11 +9,12 @@ import (
 
 // FindEstimate performs a cross-resource search for estimates, returning
 // estimates with their associated client and project.
-// Field priority: ID > ClientName > ProjectName > Text > Status(standalone).
-// Status also acts as a post-filter when combined with other criteria.
+// Uses project response_group API to discover document IDs, then fetches via GetByDocumentID.
+// Field priority: ID > ProjectID > ClientName > ProjectName.
+// Status is a post-filter only.
 func (s *Service) FindEstimate(ctx context.Context, q FindEstimateQuery) ([]EstimateResult, error) {
-	if q.ID == 0 && q.ClientName == "" && q.ProjectName == "" && q.Text == "" && q.Status == "" {
-		return nil, errors.New("at least one of ID, ClientName, ProjectName, Text, or Status must be set")
+	if q.ID == 0 && q.ProjectID == 0 && q.ClientName == "" && q.ProjectName == "" {
+		return nil, errors.New("at least one of ID, ProjectID, ClientName, or ProjectName must be set")
 	}
 
 	opts := repoOpts(q.Opts)
@@ -22,63 +23,78 @@ func (s *Service) FindEstimate(ctx context.Context, q FindEstimateQuery) ([]Esti
 
 	switch {
 	case q.ID != 0:
-		e, err := s.estimates.GetByID(ctx, q.ID, opts)
+		// Direct lookup by document ID
+		e, err := s.estimates.GetByDocumentID(ctx, q.ID, opts)
 		if err != nil {
 			return nil, err
 		}
 		estimates = []boardapi.EstimateEntity{*e}
 
+	case q.ProjectID != 0:
+		// Lookup project with estimate group, then fetch document
+		p, err := s.projects.GetByIDWithGroup(ctx, q.ProjectID, "estimate")
+		if err != nil {
+			return nil, err
+		}
+		if p.Estimate != nil {
+			e, err := s.estimates.GetByDocumentID(ctx, p.Estimate.ID, opts)
+			if err != nil && !boardapi.IsNotFound(err) {
+				return nil, err
+			}
+			if err == nil {
+				estimates = []boardapi.EstimateEntity{*e}
+			}
+		}
+
 	case q.ClientName != "":
+		// Resolve client name → search projects with estimate group → hydrate
 		clients, err := s.clients.Search(ctx, boardapi.ClientSearchParams{Name: q.ClientName}, opts)
 		if err != nil {
 			return nil, err
 		}
 		for _, c := range clients {
-			es, err := s.estimates.Search(ctx, boardapi.EstimateSearchParams{ClientID: c.ID}, opts)
+			projects, err := s.projects.Search(ctx, boardapi.ProjectSearchParams{ClientID: c.ID, ResponseGroup: "estimate"}, opts)
 			if err != nil {
 				return nil, err
 			}
-			estimates = append(estimates, es...)
+			for _, p := range projects {
+				if p.Estimate == nil {
+					continue
+				}
+				e, err := s.estimates.GetByDocumentID(ctx, p.Estimate.ID, opts)
+				if boardapi.IsNotFound(err) {
+					continue
+				}
+				if err != nil {
+					return nil, err
+				}
+				estimates = append(estimates, *e)
+			}
 		}
 
 	case q.ProjectName != "":
-		projects, err := s.projects.Search(ctx, boardapi.ProjectSearchParams{Name: q.ProjectName}, opts)
+		// Search projects by name with estimate group → hydrate
+		projects, err := s.projects.Search(ctx, boardapi.ProjectSearchParams{Name: q.ProjectName, ResponseGroup: "estimate"}, opts)
 		if err != nil {
 			return nil, err
 		}
 		for _, p := range projects {
-			es, err := s.estimates.Search(ctx, boardapi.EstimateSearchParams{ProjectID: p.ID}, opts)
+			if p.Estimate == nil {
+				continue
+			}
+			e, err := s.estimates.GetByDocumentID(ctx, p.Estimate.ID, opts)
+			if boardapi.IsNotFound(err) {
+				continue
+			}
 			if err != nil {
 				return nil, err
 			}
-			estimates = append(estimates, es...)
-		}
-
-	case q.Text != "":
-		all, err := s.estimates.List(ctx, opts)
-		if err != nil {
-			return nil, err
-		}
-		for _, e := range all {
-			if containsText(q.Text, e.Title, e.Memo) {
-				estimates = append(estimates, e)
-			}
-		}
-
-	case q.Status != "":
-		all, err := s.estimates.List(ctx, opts)
-		if err != nil {
-			return nil, err
-		}
-		for _, e := range all {
-			if e.Status == q.Status {
-				estimates = append(estimates, e)
-			}
+			estimates = append(estimates, *e)
 		}
 	}
 
-	// Apply status post-filter for non-status-only search modes
-	if q.Status != "" && q.ID == 0 && !(q.ClientName == "" && q.ProjectName == "" && q.Text == "") {
+	// Apply status post-filter
+	if q.Status != "" {
 		estimates = filterEstimatesByStatus(estimates, q.Status)
 	}
 

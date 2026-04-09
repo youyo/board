@@ -159,3 +159,8 @@ func filterProjectTypes(entities []boardapi.ProjectTypeEntity, params boardapi.P
 	}
 	return result
 }
+
+// ListPage retrieves a single page of ProjectTypeEntity directly from the API (cache bypass).
+func (r *ProjectTypeRepository) ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.ProjectTypeEntity], error) {
+	return r.api.ListProjectTypesPage(ctx, page, perPage)
+}

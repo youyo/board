@@ -104,3 +104,19 @@ func (c *Client) SearchGroups(ctx context.Context, params GroupSearchParams) ([]
 	}
 	return result, nil
 }
+
+// ListGroupsPage retrieves a single page of groups.
+func (c *Client) ListGroupsPage(ctx context.Context, page, perPage int) (*PageResult[GroupEntity], error) {
+	makeReq := func(ctx context.Context, p, pp int) (*http.Request, error) {
+		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/groups", nil)
+		if err != nil {
+			return nil, err
+		}
+		q := req.URL.Query()
+		q.Set("page", strconv.Itoa(p))
+		q.Set("per_page", strconv.Itoa(pp))
+		req.URL.RawQuery = q.Encode()
+		return req, nil
+	}
+	return ListPage[GroupEntity](c, ctx, makeReq, page, perPage)
+}

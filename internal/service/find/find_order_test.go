@@ -19,7 +19,7 @@ func TestFindOrder_ByID(t *testing.T) {
 		&stubClientRepo{getResult: client},
 		nil, nil,
 		&stubProjectRepo{getResult: project},
-		&stubOrderRepo{getResult: ord},
+		&stubOrderRepo{getByDocIDResult: ord},
 	)
 
 	got, err := svc.FindOrder(testCtx, find.FindOrderQuery{ID: 1})
@@ -37,34 +37,58 @@ func TestFindOrder_ByID(t *testing.T) {
 	}
 }
 
-func TestFindOrder_ByClientName(t *testing.T) {
-	clients := []boardapi.ClientEntity{{ID: 10, Name: "ABC Corp"}}
-	orders := []boardapi.OrderEntity{
-		{ID: 1, ClientID: 10, Title: "O1"},
-		{ID: 2, ClientID: 10, Title: "O2"},
-	}
-
-	svc := newServiceWith(
-		&stubClientRepo{searchResult: clients, getResult: &boardapi.ClientEntity{ID: 10}},
-		nil, nil,
-		&stubProjectRepo{},
-		&stubOrderRepo{searchResult: orders},
-	)
-
-	got, err := svc.FindOrder(testCtx, find.FindOrderQuery{ClientName: "ABC"})
-	assertNoError(t, err)
-	assertOrderResultLen(t, got, 2)
-}
-
-func TestFindOrder_ByProjectName(t *testing.T) {
-	projects := []boardapi.ProjectEntity{{ID: 100, ClientID: 10, Name: "Web Dev"}}
-	orders := []boardapi.OrderEntity{{ID: 1, ClientID: 10, ProjectID: 100, Title: "O1"}}
+func TestFindOrder_ByProjectID(t *testing.T) {
+	docSummary := &boardapi.DocumentSummary{ID: 42}
+	project := &boardapi.ProjectEntity{ID: 100, ClientID: 10, Name: "Web Dev", Order: docSummary}
+	ord := &boardapi.OrderEntity{ID: 42, ClientID: 10, ProjectID: 100, Title: "O1"}
 
 	svc := newServiceWith(
 		&stubClientRepo{getResult: &boardapi.ClientEntity{ID: 10}},
 		nil, nil,
-		&stubProjectRepo{searchResult: projects, getResult: &boardapi.ProjectEntity{ID: 100}},
-		&stubOrderRepo{searchResult: orders},
+		&stubProjectRepo{getWithGroupResult: project, getResult: &boardapi.ProjectEntity{ID: 100}},
+		&stubOrderRepo{getByDocIDResult: ord},
+	)
+
+	got, err := svc.FindOrder(testCtx, find.FindOrderQuery{ProjectID: 100})
+	assertNoError(t, err)
+	assertOrderResultLen(t, got, 1)
+	if got[0].Order.ID != 42 {
+		t.Errorf("order ID = %d, want 42", got[0].Order.ID)
+	}
+}
+
+func TestFindOrder_ByClientName(t *testing.T) {
+	clients := []boardapi.ClientEntity{{ID: 10, Name: "ABC Corp"}}
+	docSummary := &boardapi.DocumentSummary{ID: 1}
+	projects := []boardapi.ProjectEntity{
+		{ID: 100, ClientID: 10, Name: "P1", Order: docSummary},
+	}
+	ord := &boardapi.OrderEntity{ID: 1, ClientID: 10, ProjectID: 100, Title: "O1"}
+
+	svc := newServiceWith(
+		&stubClientRepo{searchResult: clients, getResult: &boardapi.ClientEntity{ID: 10}},
+		nil, nil,
+		&stubProjectRepo{searchResult: projects},
+		&stubOrderRepo{getByDocIDResult: ord},
+	)
+
+	got, err := svc.FindOrder(testCtx, find.FindOrderQuery{ClientName: "ABC"})
+	assertNoError(t, err)
+	assertOrderResultLen(t, got, 1)
+}
+
+func TestFindOrder_ByProjectName(t *testing.T) {
+	docSummary := &boardapi.DocumentSummary{ID: 1}
+	projects := []boardapi.ProjectEntity{
+		{ID: 100, ClientID: 10, Name: "Web Dev", Order: docSummary},
+	}
+	ord := &boardapi.OrderEntity{ID: 1, ClientID: 10, ProjectID: 100, Title: "O1"}
+
+	svc := newServiceWith(
+		&stubClientRepo{getResult: &boardapi.ClientEntity{ID: 10}},
+		nil, nil,
+		&stubProjectRepo{searchResult: projects},
+		&stubOrderRepo{getByDocIDResult: ord},
 	)
 
 	got, err := svc.FindOrder(testCtx, find.FindOrderQuery{ProjectName: "Web"})
@@ -72,53 +96,19 @@ func TestFindOrder_ByProjectName(t *testing.T) {
 	assertOrderResultLen(t, got, 1)
 }
 
-func TestFindOrder_ByText(t *testing.T) {
-	allOrders := []boardapi.OrderEntity{
-		{ID: 1, Title: "Server Purchase", Memo: "important"},
-		{ID: 2, Title: "License", Memo: "normal"},
-	}
-
-	svc := newServiceWith(
-		&stubClientRepo{}, nil, nil,
-		&stubProjectRepo{},
-		&stubOrderRepo{listResult: allOrders},
-	)
-
-	got, err := svc.FindOrder(testCtx, find.FindOrderQuery{Text: "Server"})
-	assertNoError(t, err)
-	assertOrderResultLen(t, got, 1)
-}
-
-func TestFindOrder_ByStatus(t *testing.T) {
-	allOrders := []boardapi.OrderEntity{
-		{ID: 1, Status: "confirmed"},
-		{ID: 2, Status: "draft"},
-		{ID: 3, Status: "confirmed"},
-	}
-
-	svc := newServiceWith(
-		&stubClientRepo{}, nil, nil,
-		&stubProjectRepo{},
-		&stubOrderRepo{listResult: allOrders},
-	)
-
-	got, err := svc.FindOrder(testCtx, find.FindOrderQuery{Status: "confirmed"})
-	assertNoError(t, err)
-	assertOrderResultLen(t, got, 2)
-}
-
 func TestFindOrder_ByClientNameWithStatus(t *testing.T) {
 	clients := []boardapi.ClientEntity{{ID: 10, Name: "ABC"}}
-	orders := []boardapi.OrderEntity{
-		{ID: 1, ClientID: 10, Status: "confirmed", Title: "O1"},
-		{ID: 2, ClientID: 10, Status: "draft", Title: "O2"},
+	docSummary := &boardapi.DocumentSummary{ID: 1}
+	projects := []boardapi.ProjectEntity{
+		{ID: 100, ClientID: 10, Name: "P1", Order: docSummary},
 	}
+	ord := &boardapi.OrderEntity{ID: 1, ClientID: 10, Status: "confirmed", Title: "O1"}
 
 	svc := newServiceWith(
 		&stubClientRepo{searchResult: clients, getResult: &boardapi.ClientEntity{ID: 10}},
 		nil, nil,
-		&stubProjectRepo{},
-		&stubOrderRepo{searchResult: orders},
+		&stubProjectRepo{searchResult: projects},
+		&stubOrderRepo{getByDocIDResult: ord},
 	)
 
 	got, err := svc.FindOrder(testCtx, find.FindOrderQuery{ClientName: "ABC", Status: "confirmed"})
@@ -131,6 +121,12 @@ func TestFindOrder_ByClientNameWithStatus(t *testing.T) {
 func TestFindOrder_EmptyQuery(t *testing.T) {
 	svc := find.New(zeroRepos())
 	_, err := svc.FindOrder(testCtx, find.FindOrderQuery{})
+	assertError(t, err)
+}
+
+func TestFindOrder_StatusOnlyQuery(t *testing.T) {
+	svc := find.New(zeroRepos())
+	_, err := svc.FindOrder(testCtx, find.FindOrderQuery{Status: "confirmed"})
 	assertError(t, err)
 }
 
@@ -157,7 +153,7 @@ func TestFindOrder_ClientResolutionFailure(t *testing.T) {
 	svc := newServiceWith(
 		&stubClientRepo{err: errors.New("client error")}, nil, nil,
 		&stubProjectRepo{getResult: &boardapi.ProjectEntity{ID: 100}},
-		&stubOrderRepo{getResult: ord},
+		&stubOrderRepo{getByDocIDResult: ord},
 	)
 
 	got, err := svc.FindOrder(testCtx, find.FindOrderQuery{ID: 1})
@@ -173,7 +169,7 @@ func TestFindOrder_ProjectResolutionFailure(t *testing.T) {
 	svc := newServiceWith(
 		&stubClientRepo{getResult: &boardapi.ClientEntity{ID: 10}}, nil, nil,
 		&stubProjectRepo{err: errors.New("project error")},
-		&stubOrderRepo{getResult: ord},
+		&stubOrderRepo{getByDocIDResult: ord},
 	)
 
 	got, err := svc.FindOrder(testCtx, find.FindOrderQuery{ID: 1})
@@ -186,16 +182,16 @@ func TestFindOrder_ProjectResolutionFailure(t *testing.T) {
 
 // --- FindOrder: Priority ---
 
-func TestFindOrder_IDPriorityOverClientName(t *testing.T) {
+func TestFindOrder_IDPriorityOverProjectID(t *testing.T) {
 	ord := &boardapi.OrderEntity{ID: 1, ClientID: 10, Title: "By ID"}
 	svc := newServiceWith(
-		&stubClientRepo{getResult: &boardapi.ClientEntity{ID: 10}, searchResult: []boardapi.ClientEntity{{ID: 20}}},
+		&stubClientRepo{getResult: &boardapi.ClientEntity{ID: 10}},
 		nil, nil,
 		&stubProjectRepo{},
-		&stubOrderRepo{getResult: ord, searchResult: []boardapi.OrderEntity{{ID: 99}}},
+		&stubOrderRepo{getByDocIDResult: ord},
 	)
 
-	got, err := svc.FindOrder(testCtx, find.FindOrderQuery{ID: 1, ClientName: "ABC"})
+	got, err := svc.FindOrder(testCtx, find.FindOrderQuery{ID: 1, ProjectID: 100})
 	assertNoError(t, err)
 	assertOrderResultLen(t, got, 1)
 	if got[0].Order.ID != 1 {
@@ -206,16 +202,23 @@ func TestFindOrder_IDPriorityOverClientName(t *testing.T) {
 // --- FindOrder: Limit ---
 
 func TestFindOrder_Limit(t *testing.T) {
-	orders := []boardapi.OrderEntity{
-		{ID: 1, Title: "O1"}, {ID: 2, Title: "O2"}, {ID: 3, Title: "O3"},
+	docSummary1 := &boardapi.DocumentSummary{ID: 1}
+	docSummary2 := &boardapi.DocumentSummary{ID: 2}
+	docSummary3 := &boardapi.DocumentSummary{ID: 3}
+	projects := []boardapi.ProjectEntity{
+		{ID: 100, ClientID: 10, Name: "P1", Order: docSummary1},
+		{ID: 101, ClientID: 10, Name: "P2", Order: docSummary2},
+		{ID: 102, ClientID: 10, Name: "P3", Order: docSummary3},
 	}
+	ord := &boardapi.OrderEntity{ID: 1, Title: "O"}
+
 	svc := newServiceWith(
-		&stubClientRepo{}, nil, nil,
-		&stubProjectRepo{},
-		&stubOrderRepo{listResult: orders},
+		nil, nil, nil,
+		&stubProjectRepo{searchResult: projects},
+		&stubOrderRepo{getByDocIDResult: ord},
 	)
 
-	got, err := svc.FindOrder(testCtx, find.FindOrderQuery{Text: "O", Limit: 2})
+	got, err := svc.FindOrder(testCtx, find.FindOrderQuery{ProjectName: "P", Limit: 2})
 	assertNoError(t, err)
 	assertOrderResultLen(t, got, 2)
 }

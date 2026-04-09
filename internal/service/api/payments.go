@@ -21,3 +21,8 @@ func (s *Service) GetPayment(ctx context.Context, id int, opts repository.ReadOp
 func (s *Service) SearchPayments(ctx context.Context, params boardapi.PaymentSearchParams, opts repository.ReadOptions) ([]boardapi.PaymentEntity, error) {
 	return s.payments.Search(ctx, params, opts)
 }
+
+// ListPaymentsPage returns a single page of payments.
+func (s *Service) ListPaymentsPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.PaymentEntity], error) {
+	return s.payments.ListPage(ctx, page, perPage)
+}

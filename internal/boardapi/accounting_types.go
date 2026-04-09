@@ -104,3 +104,19 @@ func (c *Client) SearchAccountingTypes(ctx context.Context, params AccountingTyp
 	}
 	return result, nil
 }
+
+// ListAccountingTypesPage retrieves a single page of accounting types.
+func (c *Client) ListAccountingTypesPage(ctx context.Context, page, perPage int) (*PageResult[AccountingTypeEntity], error) {
+	makeReq := func(ctx context.Context, p, pp int) (*http.Request, error) {
+		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/accounting_types", nil)
+		if err != nil {
+			return nil, err
+		}
+		q := req.URL.Query()
+		q.Set("page", strconv.Itoa(p))
+		q.Set("per_page", strconv.Itoa(pp))
+		req.URL.RawQuery = q.Encode()
+		return req, nil
+	}
+	return ListPage[AccountingTypeEntity](c, ctx, makeReq, page, perPage)
+}

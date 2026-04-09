@@ -159,3 +159,8 @@ func filterVendors(entities []boardapi.VendorEntity, params boardapi.VendorSearc
 	}
 	return result
 }
+
+// ListPage retrieves a single page of VendorEntity directly from the API (cache bypass).
+func (r *VendorRepository) ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.VendorEntity], error) {
+	return r.api.ListVendorsPage(ctx, page, perPage)
+}

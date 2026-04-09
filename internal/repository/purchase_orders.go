@@ -164,3 +164,8 @@ func filterPurchaseOrders(entities []boardapi.PurchaseOrderEntity, params boarda
 	}
 	return result
 }
+
+// ListPage retrieves a single page of PurchaseOrderEntity directly from the API (cache bypass).
+func (r *PurchaseOrderRepository) ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.PurchaseOrderEntity], error) {
+	return r.api.ListPurchaseOrdersPage(ctx, page, perPage)
+}

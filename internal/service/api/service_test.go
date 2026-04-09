@@ -64,6 +64,14 @@ func TestSearchClients(t *testing.T) {
 	assertLen(t, got, 1)
 }
 
+func TestListClientsPage(t *testing.T) {
+	stub := &stubClientRepo{listPageResult: &boardapi.PageResult[boardapi.ClientEntity]{Items: []boardapi.ClientEntity{{ID: 1}}}}
+	svc := newServiceWithClients(stub)
+	got, err := svc.ListClientsPage(testCtx, 1, 30)
+	assertNoError(t, err)
+	assertNotNil(t, got)
+}
+
 // --- ClientBranches tests ---
 
 func TestListClientBranches(t *testing.T) {
@@ -89,6 +97,14 @@ func TestSearchClientBranches(t *testing.T) {
 	got, err := svc.SearchClientBranches(testCtx, boardapi.ClientBranchSearchParams{ClientID: 1}, defaultOpts)
 	assertNoError(t, err)
 	assertLen(t, got, 1)
+}
+
+func TestListClientBranchesPage(t *testing.T) {
+	stub := &stubClientBranchRepo{listPageResult: &boardapi.PageResult[boardapi.ClientBranchEntity]{Items: []boardapi.ClientBranchEntity{{ID: 1}}}}
+	svc := newServiceWithClientBranches(stub)
+	got, err := svc.ListClientBranchesPage(testCtx, 1, 30)
+	assertNoError(t, err)
+	assertNotNil(t, got)
 }
 
 // --- Contacts tests ---
@@ -118,6 +134,14 @@ func TestSearchContacts(t *testing.T) {
 	assertLen(t, got, 1)
 }
 
+func TestListContactsPage(t *testing.T) {
+	stub := &stubContactRepo{listPageResult: &boardapi.PageResult[boardapi.ContactEntity]{Items: []boardapi.ContactEntity{{ID: 1}}}}
+	svc := newServiceWithContacts(stub)
+	got, err := svc.ListContactsPage(testCtx, 1, 30)
+	assertNoError(t, err)
+	assertNotNil(t, got)
+}
+
 // --- Projects tests ---
 
 func TestListProjects(t *testing.T) {
@@ -143,6 +167,23 @@ func TestSearchProjects(t *testing.T) {
 	got, err := svc.SearchProjects(testCtx, boardapi.ProjectSearchParams{Name: "ProjectB"}, defaultOpts)
 	assertNoError(t, err)
 	assertLen(t, got, 1)
+}
+
+func TestListProjectsPage(t *testing.T) {
+	stub := &stubProjectRepo{listPageResult: &boardapi.PageResult[boardapi.ProjectEntity]{Items: []boardapi.ProjectEntity{{ID: 1}}}}
+	svc := newServiceWithProjects(stub)
+	got, err := svc.ListProjectsPage(testCtx, 1, 30)
+	assertNoError(t, err)
+	assertNotNil(t, got)
+}
+
+func TestGetProjectWithGroup(t *testing.T) {
+	entity := &boardapi.ProjectEntity{ID: 1, Name: "ProjectA"}
+	stub := &stubProjectRepo{getWithGroupResult: entity}
+	svc := newServiceWithProjects(stub)
+	got, err := svc.GetProjectWithGroup(testCtx, 1, "invoice")
+	assertNoError(t, err)
+	assertNotNil(t, got)
 }
 
 // --- ProjectCosts tests ---
@@ -172,15 +213,15 @@ func TestSearchProjectCosts(t *testing.T) {
 	assertLen(t, got, 1)
 }
 
-// --- Estimates tests ---
-
-func TestListEstimates(t *testing.T) {
-	stub := &stubEstimateRepo{listResult: []boardapi.EstimateEntity{{ID: 1, ProjectID: 10}}}
-	svc := newServiceWithEstimates(stub)
-	got, err := svc.ListEstimates(testCtx, defaultOpts)
+func TestListProjectCostsPage(t *testing.T) {
+	stub := &stubProjectCostRepo{listPageResult: &boardapi.PageResult[boardapi.ProjectCostEntity]{Items: []boardapi.ProjectCostEntity{{ID: 1}}}}
+	svc := newServiceWithProjectCosts(stub)
+	got, err := svc.ListProjectCostsPage(testCtx, 1, 30)
 	assertNoError(t, err)
-	assertLen(t, got, 1)
+	assertNotNil(t, got)
 }
+
+// --- Estimates tests ---
 
 func TestGetEstimate(t *testing.T) {
 	entity := &boardapi.EstimateEntity{ID: 1, ProjectID: 10}
@@ -189,14 +230,6 @@ func TestGetEstimate(t *testing.T) {
 	got, err := svc.GetEstimate(testCtx, 1, defaultOpts)
 	assertNoError(t, err)
 	assertNotNil(t, got)
-}
-
-func TestSearchEstimates(t *testing.T) {
-	stub := &stubEstimateRepo{searchResult: []boardapi.EstimateEntity{{ID: 2, ProjectID: 10}}}
-	svc := newServiceWithEstimates(stub)
-	got, err := svc.SearchEstimates(testCtx, boardapi.EstimateSearchParams{ProjectID: 10}, defaultOpts)
-	assertNoError(t, err)
-	assertLen(t, got, 1)
 }
 
 // --- Invoices tests ---
@@ -226,15 +259,15 @@ func TestSearchInvoices(t *testing.T) {
 	assertLen(t, got, 1)
 }
 
-// --- Orders tests ---
-
-func TestListOrders(t *testing.T) {
-	stub := &stubOrderRepo{listResult: []boardapi.OrderEntity{{ID: 1, ProjectID: 10}}}
-	svc := newServiceWithOrders(stub)
-	got, err := svc.ListOrders(testCtx, defaultOpts)
+func TestListInvoicesPage(t *testing.T) {
+	stub := &stubInvoiceRepo{listPageResult: &boardapi.PageResult[boardapi.InvoiceEntity]{Items: []boardapi.InvoiceEntity{{ID: 1}}}}
+	svc := newServiceWithInvoices(stub)
+	got, err := svc.ListInvoicesPage(testCtx, 1, 30)
 	assertNoError(t, err)
-	assertLen(t, got, 1)
+	assertNotNil(t, got)
 }
+
+// --- Orders tests ---
 
 func TestGetOrder(t *testing.T) {
 	entity := &boardapi.OrderEntity{ID: 1, ProjectID: 10}
@@ -245,23 +278,7 @@ func TestGetOrder(t *testing.T) {
 	assertNotNil(t, got)
 }
 
-func TestSearchOrders(t *testing.T) {
-	stub := &stubOrderRepo{searchResult: []boardapi.OrderEntity{{ID: 2, ProjectID: 10}}}
-	svc := newServiceWithOrders(stub)
-	got, err := svc.SearchOrders(testCtx, boardapi.OrderSearchParams{ProjectID: 10}, defaultOpts)
-	assertNoError(t, err)
-	assertLen(t, got, 1)
-}
-
 // --- Deliveries tests ---
-
-func TestListDeliveries(t *testing.T) {
-	stub := &stubDeliveryRepo{listResult: []boardapi.DeliveryEntity{{ID: 1, ProjectID: 10}}}
-	svc := newServiceWithDeliveries(stub)
-	got, err := svc.ListDeliveries(testCtx, defaultOpts)
-	assertNoError(t, err)
-	assertLen(t, got, 1)
-}
 
 func TestGetDelivery(t *testing.T) {
 	entity := &boardapi.DeliveryEntity{ID: 1, ProjectID: 10}
@@ -272,23 +289,7 @@ func TestGetDelivery(t *testing.T) {
 	assertNotNil(t, got)
 }
 
-func TestSearchDeliveries(t *testing.T) {
-	stub := &stubDeliveryRepo{searchResult: []boardapi.DeliveryEntity{{ID: 2, ProjectID: 10}}}
-	svc := newServiceWithDeliveries(stub)
-	got, err := svc.SearchDeliveries(testCtx, boardapi.DeliverySearchParams{ProjectID: 10}, defaultOpts)
-	assertNoError(t, err)
-	assertLen(t, got, 1)
-}
-
 // --- Receipts tests ---
-
-func TestListReceipts(t *testing.T) {
-	stub := &stubReceiptRepo{listResult: []boardapi.ReceiptEntity{{ID: 1, ProjectID: 10}}}
-	svc := newServiceWithReceipts(stub)
-	got, err := svc.ListReceipts(testCtx, defaultOpts)
-	assertNoError(t, err)
-	assertLen(t, got, 1)
-}
 
 func TestGetReceipt(t *testing.T) {
 	entity := &boardapi.ReceiptEntity{ID: 1, ProjectID: 10}
@@ -297,14 +298,6 @@ func TestGetReceipt(t *testing.T) {
 	got, err := svc.GetReceipt(testCtx, 1, defaultOpts)
 	assertNoError(t, err)
 	assertNotNil(t, got)
-}
-
-func TestSearchReceipts(t *testing.T) {
-	stub := &stubReceiptRepo{searchResult: []boardapi.ReceiptEntity{{ID: 2, ProjectID: 10}}}
-	svc := newServiceWithReceipts(stub)
-	got, err := svc.SearchReceipts(testCtx, boardapi.ReceiptSearchParams{ProjectID: 10}, defaultOpts)
-	assertNoError(t, err)
-	assertLen(t, got, 1)
 }
 
 // --- Vendors tests ---
@@ -469,6 +462,14 @@ func TestSearchUsers(t *testing.T) {
 	assertLen(t, got, 1)
 }
 
+func TestListUsersPage(t *testing.T) {
+	stub := &stubUserRepo{listPageResult: &boardapi.PageResult[boardapi.UserEntity]{Items: []boardapi.UserEntity{{ID: 1}}}}
+	svc := newServiceWithUsers(stub)
+	got, err := svc.ListUsersPage(testCtx, 1, 30)
+	assertNoError(t, err)
+	assertNotNil(t, got)
+}
+
 // --- Groups tests ---
 
 func TestListGroups(t *testing.T) {
@@ -496,6 +497,14 @@ func TestSearchGroups(t *testing.T) {
 	assertLen(t, got, 1)
 }
 
+func TestListGroupsPage(t *testing.T) {
+	stub := &stubGroupRepo{listPageResult: &boardapi.PageResult[boardapi.GroupEntity]{Items: []boardapi.GroupEntity{{ID: 1}}}}
+	svc := newServiceWithGroups(stub)
+	got, err := svc.ListGroupsPage(testCtx, 1, 30)
+	assertNoError(t, err)
+	assertNotNil(t, got)
+}
+
 // --- PaymentTerms tests ---
 
 func TestListPaymentTerms(t *testing.T) {
@@ -521,6 +530,14 @@ func TestSearchPaymentTerms(t *testing.T) {
 	got, err := svc.SearchPaymentTerms(testCtx, boardapi.PaymentTermSearchParams{Name: "PaymentTermB"}, defaultOpts)
 	assertNoError(t, err)
 	assertLen(t, got, 1)
+}
+
+func TestListPaymentTermsPage(t *testing.T) {
+	stub := &stubPaymentTermRepo{listPageResult: &boardapi.PageResult[boardapi.PaymentTermEntity]{Items: []boardapi.PaymentTermEntity{{ID: 1}}}}
+	svc := newServiceWithPaymentTerms(stub)
+	got, err := svc.ListPaymentTermsPage(testCtx, 1, 30)
+	assertNoError(t, err)
+	assertNotNil(t, got)
 }
 
 // --- ProjectTypes tests ---
@@ -604,6 +621,14 @@ func TestSearchAccountingTypes(t *testing.T) {
 	assertLen(t, got, 1)
 }
 
+func TestListAccountingTypesPage(t *testing.T) {
+	stub := &stubAccountingTypeRepo{listPageResult: &boardapi.PageResult[boardapi.AccountingTypeEntity]{Items: []boardapi.AccountingTypeEntity{{ID: 1}}}}
+	svc := newServiceWithAccountingTypes(stub)
+	got, err := svc.ListAccountingTypesPage(testCtx, 1, 30)
+	assertNoError(t, err)
+	assertNotNil(t, got)
+}
+
 // --- DocumentSendChannels tests ---
 
 func TestListDocumentSendChannels(t *testing.T) {
@@ -629,4 +654,12 @@ func TestSearchDocumentSendChannels(t *testing.T) {
 	got, err := svc.SearchDocumentSendChannels(testCtx, boardapi.DocumentSendChannelSearchParams{Name: "DocumentSendChannelB"}, defaultOpts)
 	assertNoError(t, err)
 	assertLen(t, got, 1)
+}
+
+func TestListDocumentSendChannelsPage(t *testing.T) {
+	stub := &stubDocumentSendChannelRepo{listPageResult: &boardapi.PageResult[boardapi.DocumentSendChannelEntity]{Items: []boardapi.DocumentSendChannelEntity{{ID: 1}}}}
+	svc := newServiceWithDocumentSendChannels(stub)
+	got, err := svc.ListDocumentSendChannelsPage(testCtx, 1, 30)
+	assertNoError(t, err)
+	assertNotNil(t, got)
 }

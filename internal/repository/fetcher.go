@@ -241,32 +241,6 @@ func (f *projectCostsFetcher) ListUpdatedSince(ctx context.Context, _ string) ([
 	return entitiesToRaw(entities)
 }
 
-// --- estimates Fetcher ---
-
-// estimatesFetcher is an adapter that makes boardapi.Client conform to refresh.Fetcher.
-type estimatesFetcher struct {
-	api *boardapi.Client
-}
-
-func (f *estimatesFetcher) ResourceName() string { return "estimates" }
-
-func (f *estimatesFetcher) ListAll(ctx context.Context) ([]json.RawMessage, error) {
-	entities, err := f.api.ListEstimates(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return entitiesToRaw(entities)
-}
-
-func (f *estimatesFetcher) ListUpdatedSince(ctx context.Context, since string) ([]json.RawMessage, error) {
-	params := boardapi.EstimateSearchParams{UpdatedAtFrom: since}
-	entities, err := f.api.SearchEstimates(ctx, params)
-	if err != nil {
-		return nil, err
-	}
-	return entitiesToRaw(entities)
-}
-
 // --- invoices Fetcher ---
 
 // invoicesFetcher is an adapter that makes boardapi.Client conform to refresh.Fetcher.
@@ -287,84 +261,6 @@ func (f *invoicesFetcher) ListAll(ctx context.Context) ([]json.RawMessage, error
 func (f *invoicesFetcher) ListUpdatedSince(ctx context.Context, since string) ([]json.RawMessage, error) {
 	params := boardapi.InvoiceSearchParams{UpdatedAtFrom: since}
 	entities, err := f.api.SearchInvoices(ctx, params)
-	if err != nil {
-		return nil, err
-	}
-	return entitiesToRaw(entities)
-}
-
-// --- orders Fetcher ---
-
-// ordersFetcher is an adapter that makes boardapi.Client conform to refresh.Fetcher.
-type ordersFetcher struct {
-	api *boardapi.Client
-}
-
-func (f *ordersFetcher) ResourceName() string { return "orders" }
-
-func (f *ordersFetcher) ListAll(ctx context.Context) ([]json.RawMessage, error) {
-	entities, err := f.api.ListOrders(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return entitiesToRaw(entities)
-}
-
-func (f *ordersFetcher) ListUpdatedSince(ctx context.Context, since string) ([]json.RawMessage, error) {
-	params := boardapi.OrderSearchParams{UpdatedAtFrom: since}
-	entities, err := f.api.SearchOrders(ctx, params)
-	if err != nil {
-		return nil, err
-	}
-	return entitiesToRaw(entities)
-}
-
-// --- deliveries Fetcher ---
-
-// deliveriesFetcher is an adapter that makes boardapi.Client conform to refresh.Fetcher.
-type deliveriesFetcher struct {
-	api *boardapi.Client
-}
-
-func (f *deliveriesFetcher) ResourceName() string { return "deliveries" }
-
-func (f *deliveriesFetcher) ListAll(ctx context.Context) ([]json.RawMessage, error) {
-	entities, err := f.api.ListDeliveries(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return entitiesToRaw(entities)
-}
-
-func (f *deliveriesFetcher) ListUpdatedSince(ctx context.Context, since string) ([]json.RawMessage, error) {
-	params := boardapi.DeliverySearchParams{UpdatedAtFrom: since}
-	entities, err := f.api.SearchDeliveries(ctx, params)
-	if err != nil {
-		return nil, err
-	}
-	return entitiesToRaw(entities)
-}
-
-// --- receipts Fetcher ---
-
-// receiptsFetcher is an adapter that makes boardapi.Client conform to refresh.Fetcher.
-type receiptsFetcher struct {
-	api *boardapi.Client
-}
-
-func (f *receiptsFetcher) ResourceName() string { return "receipts" }
-
-func (f *receiptsFetcher) ListAll(ctx context.Context) ([]json.RawMessage, error) {
-	entities, err := f.api.ListReceipts(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return entitiesToRaw(entities)
-}
-
-func (f *receiptsFetcher) ListUpdatedSince(ctx context.Context, since string) ([]json.RawMessage, error) {
-	params := boardapi.ReceiptSearchParams{UpdatedAtFrom: since}
-	entities, err := f.api.SearchReceipts(ctx, params)
 	if err != nil {
 		return nil, err
 	}

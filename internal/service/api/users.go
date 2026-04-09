@@ -21,3 +21,8 @@ func (s *Service) GetUser(ctx context.Context, id int, opts repository.ReadOptio
 func (s *Service) SearchUsers(ctx context.Context, params boardapi.UserSearchParams, opts repository.ReadOptions) ([]boardapi.UserEntity, error) {
 	return s.users.Search(ctx, params, opts)
 }
+
+// ListUsersPage returns a single page of users.
+func (s *Service) ListUsersPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.UserEntity], error) {
+	return s.users.ListPage(ctx, page, perPage)
+}

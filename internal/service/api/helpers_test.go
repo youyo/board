@@ -12,10 +12,11 @@ import (
 
 // stubClientRepo is a stub implementation of ClientRepo.
 type stubClientRepo struct {
-	listResult   []boardapi.ClientEntity
-	getResult    *boardapi.ClientEntity
-	searchResult []boardapi.ClientEntity
-	err          error
+	listResult     []boardapi.ClientEntity
+	getResult      *boardapi.ClientEntity
+	searchResult   []boardapi.ClientEntity
+	listPageResult *boardapi.PageResult[boardapi.ClientEntity]
+	err            error
 }
 
 func (s *stubClientRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.ClientEntity, error) {
@@ -27,13 +28,17 @@ func (s *stubClientRepo) GetByID(_ context.Context, _ int, _ repository.ReadOpti
 func (s *stubClientRepo) Search(_ context.Context, _ boardapi.ClientSearchParams, _ repository.ReadOptions) ([]boardapi.ClientEntity, error) {
 	return s.searchResult, s.err
 }
+func (s *stubClientRepo) ListPage(_ context.Context, _, _ int) (*boardapi.PageResult[boardapi.ClientEntity], error) {
+	return s.listPageResult, s.err
+}
 
 // stubClientBranchRepo is a stub implementation of ClientBranchRepo.
 type stubClientBranchRepo struct {
-	listResult   []boardapi.ClientBranchEntity
-	getResult    *boardapi.ClientBranchEntity
-	searchResult []boardapi.ClientBranchEntity
-	err          error
+	listResult     []boardapi.ClientBranchEntity
+	getResult      *boardapi.ClientBranchEntity
+	searchResult   []boardapi.ClientBranchEntity
+	listPageResult *boardapi.PageResult[boardapi.ClientBranchEntity]
+	err            error
 }
 
 func (s *stubClientBranchRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.ClientBranchEntity, error) {
@@ -45,13 +50,17 @@ func (s *stubClientBranchRepo) GetByID(_ context.Context, _ int, _ repository.Re
 func (s *stubClientBranchRepo) Search(_ context.Context, _ boardapi.ClientBranchSearchParams, _ repository.ReadOptions) ([]boardapi.ClientBranchEntity, error) {
 	return s.searchResult, s.err
 }
+func (s *stubClientBranchRepo) ListPage(_ context.Context, _, _ int) (*boardapi.PageResult[boardapi.ClientBranchEntity], error) {
+	return s.listPageResult, s.err
+}
 
 // stubContactRepo is a stub implementation of ContactRepo.
 type stubContactRepo struct {
-	listResult   []boardapi.ContactEntity
-	getResult    *boardapi.ContactEntity
-	searchResult []boardapi.ContactEntity
-	err          error
+	listResult     []boardapi.ContactEntity
+	getResult      *boardapi.ContactEntity
+	searchResult   []boardapi.ContactEntity
+	listPageResult *boardapi.PageResult[boardapi.ContactEntity]
+	err            error
 }
 
 func (s *stubContactRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.ContactEntity, error) {
@@ -63,13 +72,18 @@ func (s *stubContactRepo) GetByID(_ context.Context, _ int, _ repository.ReadOpt
 func (s *stubContactRepo) Search(_ context.Context, _ boardapi.ContactSearchParams, _ repository.ReadOptions) ([]boardapi.ContactEntity, error) {
 	return s.searchResult, s.err
 }
+func (s *stubContactRepo) ListPage(_ context.Context, _, _ int) (*boardapi.PageResult[boardapi.ContactEntity], error) {
+	return s.listPageResult, s.err
+}
 
 // stubProjectRepo is a stub implementation of ProjectRepo.
 type stubProjectRepo struct {
-	listResult   []boardapi.ProjectEntity
-	getResult    *boardapi.ProjectEntity
-	searchResult []boardapi.ProjectEntity
-	err          error
+	listResult          []boardapi.ProjectEntity
+	getResult           *boardapi.ProjectEntity
+	searchResult        []boardapi.ProjectEntity
+	listPageResult      *boardapi.PageResult[boardapi.ProjectEntity]
+	getWithGroupResult  *boardapi.ProjectEntity
+	err                 error
 }
 
 func (s *stubProjectRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.ProjectEntity, error) {
@@ -81,13 +95,20 @@ func (s *stubProjectRepo) GetByID(_ context.Context, _ int, _ repository.ReadOpt
 func (s *stubProjectRepo) Search(_ context.Context, _ boardapi.ProjectSearchParams, _ repository.ReadOptions) ([]boardapi.ProjectEntity, error) {
 	return s.searchResult, s.err
 }
+func (s *stubProjectRepo) ListPage(_ context.Context, _, _ int) (*boardapi.PageResult[boardapi.ProjectEntity], error) {
+	return s.listPageResult, s.err
+}
+func (s *stubProjectRepo) GetByIDWithGroup(_ context.Context, _ int, _ string) (*boardapi.ProjectEntity, error) {
+	return s.getWithGroupResult, s.err
+}
 
 // stubProjectCostRepo is a stub implementation of ProjectCostRepo.
 type stubProjectCostRepo struct {
-	listResult   []boardapi.ProjectCostEntity
-	getResult    *boardapi.ProjectCostEntity
-	searchResult []boardapi.ProjectCostEntity
-	err          error
+	listResult     []boardapi.ProjectCostEntity
+	getResult      *boardapi.ProjectCostEntity
+	searchResult   []boardapi.ProjectCostEntity
+	listPageResult *boardapi.PageResult[boardapi.ProjectCostEntity]
+	err            error
 }
 
 func (s *stubProjectCostRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.ProjectCostEntity, error) {
@@ -99,31 +120,27 @@ func (s *stubProjectCostRepo) GetByID(_ context.Context, _ int, _ repository.Rea
 func (s *stubProjectCostRepo) Search(_ context.Context, _ boardapi.ProjectCostSearchParams, _ repository.ReadOptions) ([]boardapi.ProjectCostEntity, error) {
 	return s.searchResult, s.err
 }
+func (s *stubProjectCostRepo) ListPage(_ context.Context, _, _ int) (*boardapi.PageResult[boardapi.ProjectCostEntity], error) {
+	return s.listPageResult, s.err
+}
 
 // --- Stubs: document ---
 
 type stubEstimateRepo struct {
-	listResult   []boardapi.EstimateEntity
-	getResult    *boardapi.EstimateEntity
-	searchResult []boardapi.EstimateEntity
-	err          error
+	getResult *boardapi.EstimateEntity
+	err       error
 }
 
-func (s *stubEstimateRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.EstimateEntity, error) {
-	return s.listResult, s.err
-}
-func (s *stubEstimateRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.EstimateEntity, error) {
+func (s *stubEstimateRepo) GetByDocumentID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.EstimateEntity, error) {
 	return s.getResult, s.err
-}
-func (s *stubEstimateRepo) Search(_ context.Context, _ boardapi.EstimateSearchParams, _ repository.ReadOptions) ([]boardapi.EstimateEntity, error) {
-	return s.searchResult, s.err
 }
 
 type stubInvoiceRepo struct {
-	listResult   []boardapi.InvoiceEntity
-	getResult    *boardapi.InvoiceEntity
-	searchResult []boardapi.InvoiceEntity
-	err          error
+	listResult     []boardapi.InvoiceEntity
+	getResult      *boardapi.InvoiceEntity
+	searchResult   []boardapi.InvoiceEntity
+	listPageResult *boardapi.PageResult[boardapi.InvoiceEntity]
+	err            error
 }
 
 func (s *stubInvoiceRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.InvoiceEntity, error) {
@@ -135,56 +152,35 @@ func (s *stubInvoiceRepo) GetByID(_ context.Context, _ int, _ repository.ReadOpt
 func (s *stubInvoiceRepo) Search(_ context.Context, _ boardapi.InvoiceSearchParams, _ repository.ReadOptions) ([]boardapi.InvoiceEntity, error) {
 	return s.searchResult, s.err
 }
+func (s *stubInvoiceRepo) ListPage(_ context.Context, _, _ int) (*boardapi.PageResult[boardapi.InvoiceEntity], error) {
+	return s.listPageResult, s.err
+}
 
 type stubOrderRepo struct {
-	listResult   []boardapi.OrderEntity
-	getResult    *boardapi.OrderEntity
-	searchResult []boardapi.OrderEntity
-	err          error
+	getResult *boardapi.OrderEntity
+	err       error
 }
 
-func (s *stubOrderRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.OrderEntity, error) {
-	return s.listResult, s.err
-}
-func (s *stubOrderRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.OrderEntity, error) {
+func (s *stubOrderRepo) GetByDocumentID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.OrderEntity, error) {
 	return s.getResult, s.err
-}
-func (s *stubOrderRepo) Search(_ context.Context, _ boardapi.OrderSearchParams, _ repository.ReadOptions) ([]boardapi.OrderEntity, error) {
-	return s.searchResult, s.err
 }
 
 type stubDeliveryRepo struct {
-	listResult   []boardapi.DeliveryEntity
-	getResult    *boardapi.DeliveryEntity
-	searchResult []boardapi.DeliveryEntity
-	err          error
+	getResult *boardapi.DeliveryEntity
+	err       error
 }
 
-func (s *stubDeliveryRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.DeliveryEntity, error) {
-	return s.listResult, s.err
-}
-func (s *stubDeliveryRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.DeliveryEntity, error) {
+func (s *stubDeliveryRepo) GetByDocumentID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.DeliveryEntity, error) {
 	return s.getResult, s.err
-}
-func (s *stubDeliveryRepo) Search(_ context.Context, _ boardapi.DeliverySearchParams, _ repository.ReadOptions) ([]boardapi.DeliveryEntity, error) {
-	return s.searchResult, s.err
 }
 
 type stubReceiptRepo struct {
-	listResult   []boardapi.ReceiptEntity
-	getResult    *boardapi.ReceiptEntity
-	searchResult []boardapi.ReceiptEntity
-	err          error
+	getResult *boardapi.ReceiptEntity
+	err       error
 }
 
-func (s *stubReceiptRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.ReceiptEntity, error) {
-	return s.listResult, s.err
-}
-func (s *stubReceiptRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.ReceiptEntity, error) {
+func (s *stubReceiptRepo) GetByDocumentID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.ReceiptEntity, error) {
 	return s.getResult, s.err
-}
-func (s *stubReceiptRepo) Search(_ context.Context, _ boardapi.ReceiptSearchParams, _ repository.ReadOptions) ([]boardapi.ReceiptEntity, error) {
-	return s.searchResult, s.err
 }
 
 // --- Stubs: vendor ---
@@ -205,6 +201,9 @@ func (s *stubVendorRepo) GetByID(_ context.Context, _ int, _ repository.ReadOpti
 func (s *stubVendorRepo) Search(_ context.Context, _ boardapi.VendorSearchParams, _ repository.ReadOptions) ([]boardapi.VendorEntity, error) {
 	return s.searchResult, s.err
 }
+func (s *stubVendorRepo) ListPage(_ context.Context, _, _ int) (*boardapi.PageResult[boardapi.VendorEntity], error) {
+	return nil, s.err
+}
 
 type stubVendorBranchRepo struct {
 	listResult   []boardapi.VendorBranchEntity
@@ -221,6 +220,9 @@ func (s *stubVendorBranchRepo) GetByID(_ context.Context, _ int, _ repository.Re
 }
 func (s *stubVendorBranchRepo) Search(_ context.Context, _ boardapi.VendorBranchSearchParams, _ repository.ReadOptions) ([]boardapi.VendorBranchEntity, error) {
 	return s.searchResult, s.err
+}
+func (s *stubVendorBranchRepo) ListPage(_ context.Context, _, _ int) (*boardapi.PageResult[boardapi.VendorBranchEntity], error) {
+	return nil, s.err
 }
 
 type stubVendorContactRepo struct {
@@ -239,6 +241,9 @@ func (s *stubVendorContactRepo) GetByID(_ context.Context, _ int, _ repository.R
 func (s *stubVendorContactRepo) Search(_ context.Context, _ boardapi.VendorContactSearchParams, _ repository.ReadOptions) ([]boardapi.VendorContactEntity, error) {
 	return s.searchResult, s.err
 }
+func (s *stubVendorContactRepo) ListPage(_ context.Context, _, _ int) (*boardapi.PageResult[boardapi.VendorContactEntity], error) {
+	return nil, s.err
+}
 
 type stubPurchaseOrderRepo struct {
 	listResult   []boardapi.PurchaseOrderEntity
@@ -255,6 +260,9 @@ func (s *stubPurchaseOrderRepo) GetByID(_ context.Context, _ int, _ repository.R
 }
 func (s *stubPurchaseOrderRepo) Search(_ context.Context, _ boardapi.PurchaseOrderSearchParams, _ repository.ReadOptions) ([]boardapi.PurchaseOrderEntity, error) {
 	return s.searchResult, s.err
+}
+func (s *stubPurchaseOrderRepo) ListPage(_ context.Context, _, _ int) (*boardapi.PageResult[boardapi.PurchaseOrderEntity], error) {
+	return nil, s.err
 }
 
 type stubPaymentRepo struct {
@@ -273,14 +281,18 @@ func (s *stubPaymentRepo) GetByID(_ context.Context, _ int, _ repository.ReadOpt
 func (s *stubPaymentRepo) Search(_ context.Context, _ boardapi.PaymentSearchParams, _ repository.ReadOptions) ([]boardapi.PaymentEntity, error) {
 	return s.searchResult, s.err
 }
+func (s *stubPaymentRepo) ListPage(_ context.Context, _, _ int) (*boardapi.PageResult[boardapi.PaymentEntity], error) {
+	return nil, s.err
+}
 
 // --- Stubs: master ---
 
 type stubUserRepo struct {
-	listResult   []boardapi.UserEntity
-	getResult    *boardapi.UserEntity
-	searchResult []boardapi.UserEntity
-	err          error
+	listResult     []boardapi.UserEntity
+	getResult      *boardapi.UserEntity
+	searchResult   []boardapi.UserEntity
+	listPageResult *boardapi.PageResult[boardapi.UserEntity]
+	err            error
 }
 
 func (s *stubUserRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.UserEntity, error) {
@@ -292,12 +304,16 @@ func (s *stubUserRepo) GetByID(_ context.Context, _ int, _ repository.ReadOption
 func (s *stubUserRepo) Search(_ context.Context, _ boardapi.UserSearchParams, _ repository.ReadOptions) ([]boardapi.UserEntity, error) {
 	return s.searchResult, s.err
 }
+func (s *stubUserRepo) ListPage(_ context.Context, _, _ int) (*boardapi.PageResult[boardapi.UserEntity], error) {
+	return s.listPageResult, s.err
+}
 
 type stubGroupRepo struct {
-	listResult   []boardapi.GroupEntity
-	getResult    *boardapi.GroupEntity
-	searchResult []boardapi.GroupEntity
-	err          error
+	listResult     []boardapi.GroupEntity
+	getResult      *boardapi.GroupEntity
+	searchResult   []boardapi.GroupEntity
+	listPageResult *boardapi.PageResult[boardapi.GroupEntity]
+	err            error
 }
 
 func (s *stubGroupRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.GroupEntity, error) {
@@ -309,12 +325,16 @@ func (s *stubGroupRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptio
 func (s *stubGroupRepo) Search(_ context.Context, _ boardapi.GroupSearchParams, _ repository.ReadOptions) ([]boardapi.GroupEntity, error) {
 	return s.searchResult, s.err
 }
+func (s *stubGroupRepo) ListPage(_ context.Context, _, _ int) (*boardapi.PageResult[boardapi.GroupEntity], error) {
+	return s.listPageResult, s.err
+}
 
 type stubPaymentTermRepo struct {
-	listResult   []boardapi.PaymentTermEntity
-	getResult    *boardapi.PaymentTermEntity
-	searchResult []boardapi.PaymentTermEntity
-	err          error
+	listResult     []boardapi.PaymentTermEntity
+	getResult      *boardapi.PaymentTermEntity
+	searchResult   []boardapi.PaymentTermEntity
+	listPageResult *boardapi.PageResult[boardapi.PaymentTermEntity]
+	err            error
 }
 
 func (s *stubPaymentTermRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.PaymentTermEntity, error) {
@@ -325,6 +345,9 @@ func (s *stubPaymentTermRepo) GetByID(_ context.Context, _ int, _ repository.Rea
 }
 func (s *stubPaymentTermRepo) Search(_ context.Context, _ boardapi.PaymentTermSearchParams, _ repository.ReadOptions) ([]boardapi.PaymentTermEntity, error) {
 	return s.searchResult, s.err
+}
+func (s *stubPaymentTermRepo) ListPage(_ context.Context, _, _ int) (*boardapi.PageResult[boardapi.PaymentTermEntity], error) {
+	return s.listPageResult, s.err
 }
 
 type stubProjectTypeRepo struct {
@@ -343,6 +366,9 @@ func (s *stubProjectTypeRepo) GetByID(_ context.Context, _ int, _ repository.Rea
 func (s *stubProjectTypeRepo) Search(_ context.Context, _ boardapi.ProjectTypeSearchParams, _ repository.ReadOptions) ([]boardapi.ProjectTypeEntity, error) {
 	return s.searchResult, s.err
 }
+func (s *stubProjectTypeRepo) ListPage(_ context.Context, _, _ int) (*boardapi.PageResult[boardapi.ProjectTypeEntity], error) {
+	return nil, s.err
+}
 
 type stubPurchaseTypeRepo struct {
 	listResult   []boardapi.PurchaseTypeEntity
@@ -360,12 +386,16 @@ func (s *stubPurchaseTypeRepo) GetByID(_ context.Context, _ int, _ repository.Re
 func (s *stubPurchaseTypeRepo) Search(_ context.Context, _ boardapi.PurchaseTypeSearchParams, _ repository.ReadOptions) ([]boardapi.PurchaseTypeEntity, error) {
 	return s.searchResult, s.err
 }
+func (s *stubPurchaseTypeRepo) ListPage(_ context.Context, _, _ int) (*boardapi.PageResult[boardapi.PurchaseTypeEntity], error) {
+	return nil, s.err
+}
 
 type stubAccountingTypeRepo struct {
-	listResult   []boardapi.AccountingTypeEntity
-	getResult    *boardapi.AccountingTypeEntity
-	searchResult []boardapi.AccountingTypeEntity
-	err          error
+	listResult     []boardapi.AccountingTypeEntity
+	getResult      *boardapi.AccountingTypeEntity
+	searchResult   []boardapi.AccountingTypeEntity
+	listPageResult *boardapi.PageResult[boardapi.AccountingTypeEntity]
+	err            error
 }
 
 func (s *stubAccountingTypeRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.AccountingTypeEntity, error) {
@@ -377,12 +407,16 @@ func (s *stubAccountingTypeRepo) GetByID(_ context.Context, _ int, _ repository.
 func (s *stubAccountingTypeRepo) Search(_ context.Context, _ boardapi.AccountingTypeSearchParams, _ repository.ReadOptions) ([]boardapi.AccountingTypeEntity, error) {
 	return s.searchResult, s.err
 }
+func (s *stubAccountingTypeRepo) ListPage(_ context.Context, _, _ int) (*boardapi.PageResult[boardapi.AccountingTypeEntity], error) {
+	return s.listPageResult, s.err
+}
 
 type stubDocumentSendChannelRepo struct {
-	listResult   []boardapi.DocumentSendChannelEntity
-	getResult    *boardapi.DocumentSendChannelEntity
-	searchResult []boardapi.DocumentSendChannelEntity
-	err          error
+	listResult     []boardapi.DocumentSendChannelEntity
+	getResult      *boardapi.DocumentSendChannelEntity
+	searchResult   []boardapi.DocumentSendChannelEntity
+	listPageResult *boardapi.PageResult[boardapi.DocumentSendChannelEntity]
+	err            error
 }
 
 func (s *stubDocumentSendChannelRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.DocumentSendChannelEntity, error) {
@@ -393,6 +427,9 @@ func (s *stubDocumentSendChannelRepo) GetByID(_ context.Context, _ int, _ reposi
 }
 func (s *stubDocumentSendChannelRepo) Search(_ context.Context, _ boardapi.DocumentSendChannelSearchParams, _ repository.ReadOptions) ([]boardapi.DocumentSendChannelEntity, error) {
 	return s.searchResult, s.err
+}
+func (s *stubDocumentSendChannelRepo) ListPage(_ context.Context, _, _ int) (*boardapi.PageResult[boardapi.DocumentSendChannelEntity], error) {
+	return s.listPageResult, s.err
 }
 
 // --- Zero-value Repos helper ---

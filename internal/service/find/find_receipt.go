@@ -9,10 +9,12 @@ import (
 
 // FindReceipt performs a cross-resource search for receipts, returning
 // receipts with their associated client and project.
-// Field priority: ID > ClientName > ProjectName > Text > Status(standalone).
+// Uses project response_group API to discover document IDs, then fetches via GetByDocumentID.
+// Field priority: ID > ProjectID > ClientName > ProjectName.
+// Status is a post-filter only.
 func (s *Service) FindReceipt(ctx context.Context, q FindReceiptQuery) ([]ReceiptResult, error) {
-	if q.ID == 0 && q.ClientName == "" && q.ProjectName == "" && q.Text == "" && q.Status == "" {
-		return nil, errors.New("at least one of ID, ClientName, ProjectName, Text, or Status must be set")
+	if q.ID == 0 && q.ProjectID == 0 && q.ClientName == "" && q.ProjectName == "" {
+		return nil, errors.New("at least one of ID, ProjectID, ClientName, or ProjectName must be set")
 	}
 
 	opts := repoOpts(q.Opts)
@@ -21,63 +23,78 @@ func (s *Service) FindReceipt(ctx context.Context, q FindReceiptQuery) ([]Receip
 
 	switch {
 	case q.ID != 0:
-		r, err := s.receipts.GetByID(ctx, q.ID, opts)
+		// Direct lookup by document ID
+		r, err := s.receipts.GetByDocumentID(ctx, q.ID, opts)
 		if err != nil {
 			return nil, err
 		}
 		receipts = []boardapi.ReceiptEntity{*r}
 
+	case q.ProjectID != 0:
+		// Lookup project with receipt group, then fetch document
+		p, err := s.projects.GetByIDWithGroup(ctx, q.ProjectID, "receipt")
+		if err != nil {
+			return nil, err
+		}
+		if p.Receipt != nil {
+			r, err := s.receipts.GetByDocumentID(ctx, p.Receipt.ID, opts)
+			if err != nil && !boardapi.IsNotFound(err) {
+				return nil, err
+			}
+			if err == nil {
+				receipts = []boardapi.ReceiptEntity{*r}
+			}
+		}
+
 	case q.ClientName != "":
+		// Resolve client name → search projects with receipt group → hydrate
 		clients, err := s.clients.Search(ctx, boardapi.ClientSearchParams{Name: q.ClientName}, opts)
 		if err != nil {
 			return nil, err
 		}
 		for _, c := range clients {
-			rs, err := s.receipts.Search(ctx, boardapi.ReceiptSearchParams{ClientID: c.ID}, opts)
+			projects, err := s.projects.Search(ctx, boardapi.ProjectSearchParams{ClientID: c.ID, ResponseGroup: "receipt"}, opts)
 			if err != nil {
 				return nil, err
 			}
-			receipts = append(receipts, rs...)
+			for _, p := range projects {
+				if p.Receipt == nil {
+					continue
+				}
+				r, err := s.receipts.GetByDocumentID(ctx, p.Receipt.ID, opts)
+				if boardapi.IsNotFound(err) {
+					continue
+				}
+				if err != nil {
+					return nil, err
+				}
+				receipts = append(receipts, *r)
+			}
 		}
 
 	case q.ProjectName != "":
-		projects, err := s.projects.Search(ctx, boardapi.ProjectSearchParams{Name: q.ProjectName}, opts)
+		// Search projects by name with receipt group → hydrate
+		projects, err := s.projects.Search(ctx, boardapi.ProjectSearchParams{Name: q.ProjectName, ResponseGroup: "receipt"}, opts)
 		if err != nil {
 			return nil, err
 		}
 		for _, p := range projects {
-			rs, err := s.receipts.Search(ctx, boardapi.ReceiptSearchParams{ProjectID: p.ID}, opts)
+			if p.Receipt == nil {
+				continue
+			}
+			r, err := s.receipts.GetByDocumentID(ctx, p.Receipt.ID, opts)
+			if boardapi.IsNotFound(err) {
+				continue
+			}
 			if err != nil {
 				return nil, err
 			}
-			receipts = append(receipts, rs...)
-		}
-
-	case q.Text != "":
-		all, err := s.receipts.List(ctx, opts)
-		if err != nil {
-			return nil, err
-		}
-		for _, r := range all {
-			if containsText(q.Text, r.Title, r.Memo) {
-				receipts = append(receipts, r)
-			}
-		}
-
-	case q.Status != "":
-		all, err := s.receipts.List(ctx, opts)
-		if err != nil {
-			return nil, err
-		}
-		for _, r := range all {
-			if r.Status == q.Status {
-				receipts = append(receipts, r)
-			}
+			receipts = append(receipts, *r)
 		}
 	}
 
-	// Apply status post-filter for non-status-only search modes
-	if q.Status != "" && q.ID == 0 && !(q.ClientName == "" && q.ProjectName == "" && q.Text == "") {
+	// Apply status post-filter
+	if q.Status != "" {
 		receipts = filterReceiptsByStatus(receipts, q.Status)
 	}
 

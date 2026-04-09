@@ -21,3 +21,8 @@ func (s *Service) GetAccountingType(ctx context.Context, id int, opts repository
 func (s *Service) SearchAccountingTypes(ctx context.Context, params boardapi.AccountingTypeSearchParams, opts repository.ReadOptions) ([]boardapi.AccountingTypeEntity, error) {
 	return s.accountingTypes.Search(ctx, params, opts)
 }
+
+// ListAccountingTypesPage returns a single page of accounting types.
+func (s *Service) ListAccountingTypesPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.AccountingTypeEntity], error) {
+	return s.accountingTypes.ListPage(ctx, page, perPage)
+}

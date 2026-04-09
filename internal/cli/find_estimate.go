@@ -14,19 +14,22 @@ import (
 func NewFindEstimateCmd() *cobra.Command {
 	var (
 		id          int
+		projectID   int
 		clientName  string
 		projectName string
-		text        string
 		status      string
 	)
 
 	cmd := &cobra.Command{
 		Use:   "estimate",
 		Short: "Search estimates with client/project resolution",
-		Long:  "Search for estimates by ID, client name, project name, free text, or status. Returns estimates with their associated client and project.",
+		Long:  "Search for estimates by document ID, project ID, client name, or project name. Returns estimates with their associated client and project.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if id == 0 && clientName == "" && projectName == "" && text == "" && status == "" {
-				return fmt.Errorf("at least one of --id, --client-name, --project-name, --text, or --status must be specified")
+			if id == 0 && projectID == 0 && clientName == "" && projectName == "" {
+				return fmt.Errorf("at least one of --id, --project-id, --client-name, or --project-name must be specified")
+			}
+			if status != "" && id == 0 && projectID == 0 && clientName == "" && projectName == "" {
+				return fmt.Errorf("--status alone is not sufficient; combine with --id, --project-id, --client-name, or --project-name")
 			}
 
 			svc, err := findServiceFromCmd(cmd)
@@ -37,9 +40,9 @@ func NewFindEstimateCmd() *cobra.Command {
 			opts := readOptionsFromCmd(cmd)
 			q := find.FindEstimateQuery{
 				ID:          id,
+				ProjectID:   projectID,
 				ClientName:  clientName,
 				ProjectName: projectName,
-				Text:        text,
 				Status:      status,
 				Limit:       opts.Limit,
 				Opts: repository.ReadOptions{
@@ -57,11 +60,11 @@ func NewFindEstimateCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().IntVar(&id, "id", 0, "Estimate ID (direct lookup, highest priority)")
+	cmd.Flags().IntVar(&id, "id", 0, "Estimate document ID (direct lookup, highest priority)")
+	cmd.Flags().IntVar(&projectID, "project-id", 0, "Project ID to find its estimate")
 	cmd.Flags().StringVar(&clientName, "client-name", "", "Client name to resolve estimates for")
 	cmd.Flags().StringVar(&projectName, "project-name", "", "Project name to resolve estimates for")
-	cmd.Flags().StringVar(&text, "text", "", "Free-text search across title, memo")
-	cmd.Flags().StringVar(&status, "status", "", "Filter by estimate status")
+	cmd.Flags().StringVar(&status, "status", "", "Post-filter by estimate status")
 
 	return cmd
 }

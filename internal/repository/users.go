@@ -162,3 +162,8 @@ func filterUsers(entities []boardapi.UserEntity, params boardapi.UserSearchParam
 	}
 	return result
 }
+
+// ListPage retrieves a single page of UserEntity directly from the API (cache bypass).
+func (r *UserRepository) ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.UserEntity], error) {
+	return r.api.ListUsersPage(ctx, page, perPage)
+}

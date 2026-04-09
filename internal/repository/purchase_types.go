@@ -159,3 +159,8 @@ func filterPurchaseTypes(entities []boardapi.PurchaseTypeEntity, params boardapi
 	}
 	return result
 }
+
+// ListPage retrieves a single page of PurchaseTypeEntity directly from the API (cache bypass).
+func (r *PurchaseTypeRepository) ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.PurchaseTypeEntity], error) {
+	return r.api.ListPurchaseTypesPage(ctx, page, perPage)
+}

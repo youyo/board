@@ -21,3 +21,8 @@ func (s *Service) GetDocumentSendChannel(ctx context.Context, id int, opts repos
 func (s *Service) SearchDocumentSendChannels(ctx context.Context, params boardapi.DocumentSendChannelSearchParams, opts repository.ReadOptions) ([]boardapi.DocumentSendChannelEntity, error) {
 	return s.documentSendChannels.Search(ctx, params, opts)
 }
+
+// ListDocumentSendChannelsPage returns a single page of document send channels.
+func (s *Service) ListDocumentSendChannelsPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.DocumentSendChannelEntity], error) {
+	return s.documentSendChannels.ListPage(ctx, page, perPage)
+}

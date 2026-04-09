@@ -21,3 +21,8 @@ func (s *Service) GetProjectCost(ctx context.Context, id int, opts repository.Re
 func (s *Service) SearchProjectCosts(ctx context.Context, params boardapi.ProjectCostSearchParams, opts repository.ReadOptions) ([]boardapi.ProjectCostEntity, error) {
 	return s.projectCosts.Search(ctx, params, opts)
 }
+
+// ListProjectCostsPage returns a single page of project costs.
+func (s *Service) ListProjectCostsPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.ProjectCostEntity], error) {
+	return s.projectCosts.ListPage(ctx, page, perPage)
+}

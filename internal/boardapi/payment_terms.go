@@ -104,3 +104,19 @@ func (c *Client) SearchPaymentTerms(ctx context.Context, params PaymentTermSearc
 	}
 	return result, nil
 }
+
+// ListPaymentTermsPage retrieves a single page of payment terms.
+func (c *Client) ListPaymentTermsPage(ctx context.Context, page, perPage int) (*PageResult[PaymentTermEntity], error) {
+	makeReq := func(ctx context.Context, p, pp int) (*http.Request, error) {
+		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/payment_terms", nil)
+		if err != nil {
+			return nil, err
+		}
+		q := req.URL.Query()
+		q.Set("page", strconv.Itoa(p))
+		q.Set("per_page", strconv.Itoa(pp))
+		req.URL.RawQuery = q.Encode()
+		return req, nil
+	}
+	return ListPage[PaymentTermEntity](c, ctx, makeReq, page, perPage)
+}

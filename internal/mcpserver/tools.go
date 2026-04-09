@@ -241,21 +241,21 @@ func findProjectsTool(srv *Server) server.ServerTool {
 func findEstimatesTool(srv *Server) server.ServerTool {
 	return server.ServerTool{
 		Tool: mcp.NewTool("find_estimates",
-			mcp.WithDescription("Search for estimates by ID, client name, project name, or free text. Supports status filtering."),
-			mcp.WithNumber("id", mcp.Description("Estimate ID for direct lookup (highest priority)")),
-			mcp.WithString("client_name", mcp.Description("Resolve client name to filter estimates by client")),
-			mcp.WithString("project_name", mcp.Description("Resolve project name to filter estimates by project")),
-			mcp.WithString("text", mcp.Description("Free-text search across title, memo (lowest priority)")),
-			mcp.WithString("status", mcp.Description("Filter by estimate status")),
+			mcp.WithDescription("Search for estimates by ID, project ID, client name, or project name. Supports status post-filtering."),
+			mcp.WithNumber("id", mcp.Description("Estimate document ID for direct lookup (highest priority)")),
+			mcp.WithNumber("project_id", mcp.Description("Project ID to find its estimate")),
+			mcp.WithString("client_name", mcp.Description("Resolve client name to find estimates via projects")),
+			mcp.WithString("project_name", mcp.Description("Resolve project name to find estimates")),
+			mcp.WithString("status", mcp.Description("Post-filter by estimate status")),
 			mcp.WithNumber("limit", mcp.Description("Max results to return (default: unlimited)")),
 			readOnlyAnnotation(),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			results, err := srv.FindService().FindEstimate(ctx, find.FindEstimateQuery{
 				ID:          getIntArg(req, "id"),
+				ProjectID:   getIntArg(req, "project_id"),
 				ClientName:  getStringArg(req, "client_name"),
 				ProjectName: getStringArg(req, "project_name"),
-				Text:        getStringArg(req, "text"),
 				Status:      getStringArg(req, "status"),
 				Limit:       getIntArg(req, "limit"),
 			})
@@ -299,21 +299,21 @@ func findInvoicesTool(srv *Server) server.ServerTool {
 func findOrdersTool(srv *Server) server.ServerTool {
 	return server.ServerTool{
 		Tool: mcp.NewTool("find_orders",
-			mcp.WithDescription("Search for orders by ID, client name, project name, or free text. Supports status filtering."),
-			mcp.WithNumber("id", mcp.Description("Order ID for direct lookup (highest priority)")),
-			mcp.WithString("client_name", mcp.Description("Resolve client name to filter orders by client")),
-			mcp.WithString("project_name", mcp.Description("Resolve project name to filter orders by project")),
-			mcp.WithString("text", mcp.Description("Free-text search across title, memo (lowest priority)")),
-			mcp.WithString("status", mcp.Description("Filter by order status")),
+			mcp.WithDescription("Search for orders by ID, project ID, client name, or project name. Supports status post-filtering."),
+			mcp.WithNumber("id", mcp.Description("Order document ID for direct lookup (highest priority)")),
+			mcp.WithNumber("project_id", mcp.Description("Project ID to find its order")),
+			mcp.WithString("client_name", mcp.Description("Resolve client name to find orders via projects")),
+			mcp.WithString("project_name", mcp.Description("Resolve project name to find orders")),
+			mcp.WithString("status", mcp.Description("Post-filter by order status")),
 			mcp.WithNumber("limit", mcp.Description("Max results to return (default: unlimited)")),
 			readOnlyAnnotation(),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			results, err := srv.FindService().FindOrder(ctx, find.FindOrderQuery{
 				ID:          getIntArg(req, "id"),
+				ProjectID:   getIntArg(req, "project_id"),
 				ClientName:  getStringArg(req, "client_name"),
 				ProjectName: getStringArg(req, "project_name"),
-				Text:        getStringArg(req, "text"),
 				Status:      getStringArg(req, "status"),
 				Limit:       getIntArg(req, "limit"),
 			})
@@ -328,21 +328,21 @@ func findOrdersTool(srv *Server) server.ServerTool {
 func findDeliveriesTool(srv *Server) server.ServerTool {
 	return server.ServerTool{
 		Tool: mcp.NewTool("find_deliveries",
-			mcp.WithDescription("Search for deliveries by ID, client name, project name, or free text. Supports status filtering."),
-			mcp.WithNumber("id", mcp.Description("Delivery ID for direct lookup (highest priority)")),
-			mcp.WithString("client_name", mcp.Description("Resolve client name to filter deliveries by client")),
-			mcp.WithString("project_name", mcp.Description("Resolve project name to filter deliveries by project")),
-			mcp.WithString("text", mcp.Description("Free-text search across title, memo (lowest priority)")),
-			mcp.WithString("status", mcp.Description("Filter by delivery status")),
+			mcp.WithDescription("Search for deliveries by ID, project ID, client name, or project name. Supports status post-filtering."),
+			mcp.WithNumber("id", mcp.Description("Delivery document ID for direct lookup (highest priority)")),
+			mcp.WithNumber("project_id", mcp.Description("Project ID to find its delivery")),
+			mcp.WithString("client_name", mcp.Description("Resolve client name to find deliveries via projects")),
+			mcp.WithString("project_name", mcp.Description("Resolve project name to find deliveries")),
+			mcp.WithString("status", mcp.Description("Post-filter by delivery status")),
 			mcp.WithNumber("limit", mcp.Description("Max results to return (default: unlimited)")),
 			readOnlyAnnotation(),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			results, err := srv.FindService().FindDelivery(ctx, find.FindDeliveryQuery{
 				ID:          getIntArg(req, "id"),
+				ProjectID:   getIntArg(req, "project_id"),
 				ClientName:  getStringArg(req, "client_name"),
 				ProjectName: getStringArg(req, "project_name"),
-				Text:        getStringArg(req, "text"),
 				Status:      getStringArg(req, "status"),
 				Limit:       getIntArg(req, "limit"),
 			})
@@ -357,21 +357,21 @@ func findDeliveriesTool(srv *Server) server.ServerTool {
 func findReceiptsTool(srv *Server) server.ServerTool {
 	return server.ServerTool{
 		Tool: mcp.NewTool("find_receipts",
-			mcp.WithDescription("Search for receipts by ID, client name, project name, or free text. Supports status filtering."),
-			mcp.WithNumber("id", mcp.Description("Receipt ID for direct lookup (highest priority)")),
-			mcp.WithString("client_name", mcp.Description("Resolve client name to filter receipts by client")),
-			mcp.WithString("project_name", mcp.Description("Resolve project name to filter receipts by project")),
-			mcp.WithString("text", mcp.Description("Free-text search across title, memo (lowest priority)")),
-			mcp.WithString("status", mcp.Description("Filter by receipt status")),
+			mcp.WithDescription("Search for receipts by ID, project ID, client name, or project name. Supports status post-filtering."),
+			mcp.WithNumber("id", mcp.Description("Receipt document ID for direct lookup (highest priority)")),
+			mcp.WithNumber("project_id", mcp.Description("Project ID to find its receipt")),
+			mcp.WithString("client_name", mcp.Description("Resolve client name to find receipts via projects")),
+			mcp.WithString("project_name", mcp.Description("Resolve project name to find receipts")),
+			mcp.WithString("status", mcp.Description("Post-filter by receipt status")),
 			mcp.WithNumber("limit", mcp.Description("Max results to return (default: unlimited)")),
 			readOnlyAnnotation(),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			results, err := srv.FindService().FindReceipt(ctx, find.FindReceiptQuery{
 				ID:          getIntArg(req, "id"),
+				ProjectID:   getIntArg(req, "project_id"),
 				ClientName:  getStringArg(req, "client_name"),
 				ProjectName: getStringArg(req, "project_name"),
-				Text:        getStringArg(req, "text"),
 				Status:      getStringArg(req, "status"),
 				Limit:       getIntArg(req, "limit"),
 			})

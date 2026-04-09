@@ -167,3 +167,8 @@ func filterClients(entities []boardapi.ClientEntity, params boardapi.ClientSearc
 	}
 	return result
 }
+
+// ListPage retrieves a single page of ClientEntity directly from the API (cache bypass).
+func (r *ClientRepository) ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.ClientEntity], error) {
+	return r.api.ListClientsPage(ctx, page, perPage)
+}

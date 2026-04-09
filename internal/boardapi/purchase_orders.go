@@ -36,7 +36,7 @@ type PurchaseOrderSearchParams struct {
 // Pagination is automatically handled by ListAll.
 func (c *Client) ListPurchaseOrders(ctx context.Context) ([]PurchaseOrderEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
-		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/purchase_orders", nil)
+		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/expenditures", nil)
 		if err != nil {
 			return nil, err
 		}
@@ -63,7 +63,7 @@ func (c *Client) ListPurchaseOrders(ctx context.Context) ([]PurchaseOrderEntity,
 
 // GetPurchaseOrder retrieves the purchase order with the specified ID.
 func (c *Client) GetPurchaseOrder(ctx context.Context, id int) (*PurchaseOrderEntity, error) {
-	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/purchase_orders/%d", id), nil)
+	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/expenditures/%d", id), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +82,7 @@ func (c *Client) GetPurchaseOrder(ctx context.Context, id int) (*PurchaseOrderEn
 // Pagination is automatically handled by ListAll.
 func (c *Client) SearchPurchaseOrders(ctx context.Context, params PurchaseOrderSearchParams) ([]PurchaseOrderEntity, error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
-		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/purchase_orders", nil)
+		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/expenditures", nil)
 		if err != nil {
 			return nil, err
 		}
@@ -117,4 +117,20 @@ func (c *Client) SearchPurchaseOrders(ctx context.Context, params PurchaseOrderS
 		result = append(result, x)
 	}
 	return result, nil
+}
+
+// ListPurchaseOrdersPage retrieves a single page of PurchaseOrderEntity.
+func (c *Client) ListPurchaseOrdersPage(ctx context.Context, page, perPage int) (*PageResult[PurchaseOrderEntity], error) {
+	makeReq := func(ctx context.Context, p, pp int) (*http.Request, error) {
+		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/expenditures", nil)
+		if err != nil {
+			return nil, err
+		}
+		q := req.URL.Query()
+		q.Set("page", strconv.Itoa(p))
+		q.Set("per_page", strconv.Itoa(pp))
+		req.URL.RawQuery = q.Encode()
+		return req, nil
+	}
+	return ListPage[PurchaseOrderEntity](c, ctx, makeReq, page, perPage)
 }

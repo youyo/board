@@ -38,19 +38,20 @@ type ClientResult struct {
 
 // ProjectResult is the aggregated result for a project search.
 type ProjectResult struct {
-	Project boardapi.ProjectEntity `json:"project"`
-	Client  *boardapi.ClientEntity `json:"client,omitempty"`
+	Project  boardapi.ProjectEntity   `json:"project"`
+	Client   *boardapi.ClientEntity   `json:"client,omitempty"`
+	Estimate *boardapi.EstimateEntity `json:"estimate,omitempty"`
 }
 
 // FindEstimateQuery holds parameters for FindEstimate.
-// Field priority: ID > ClientName > ProjectName > Text > Status(standalone).
-// Status also acts as a post-filter when combined with other criteria.
+// Field priority: ID > ProjectID > ClientName > ProjectName.
+// Status acts as a post-filter. At least one of ID, ProjectID, ClientName, ProjectName must be set.
 type FindEstimateQuery struct {
-	ID          int    // Direct lookup by ID (highest priority)
-	ClientName  string // Resolve client name -> client IDs -> search estimates
-	ProjectName string // Resolve project name -> project IDs -> search estimates
-	Text        string // Free-text search across title, memo
-	Status      string // Standalone filter or post-filter on top of other modes
+	ID          int    // Direct lookup by document ID (highest priority)
+	ProjectID   int    // Lookup by project ID → GetByIDWithGroup("estimate") → hydrate
+	ClientName  string // Resolve client name → projects.Search(ResponseGroup="estimate") → hydrate
+	ProjectName string // Resolve project name → projects.Search(ResponseGroup="estimate") → hydrate
+	Status      string // Post-filter only (requires at least one of ID/ProjectID/ClientName/ProjectName)
 	Limit       int    // Max results to return (0 = unlimited). Applied at find layer.
 	Opts        repository.ReadOptions
 }
@@ -82,14 +83,15 @@ type InvoiceResult struct {
 }
 
 // FindOrderQuery holds parameters for FindOrder.
-// Field priority: ID > ClientName > ProjectName > Text > Status(standalone).
+// Field priority: ID > ProjectID > ClientName > ProjectName.
+// Status acts as a post-filter. At least one of ID, ProjectID, ClientName, ProjectName must be set.
 type FindOrderQuery struct {
-	ID          int
-	ClientName  string
-	ProjectName string
-	Text        string
-	Status      string
-	Limit       int
+	ID          int    // Direct lookup by document ID (highest priority)
+	ProjectID   int    // Lookup by project ID → GetByIDWithGroup("order") → hydrate
+	ClientName  string // Resolve client name → projects.Search(ResponseGroup="order") → hydrate
+	ProjectName string // Resolve project name → projects.Search(ResponseGroup="order") → hydrate
+	Status      string // Post-filter only (requires at least one of ID/ProjectID/ClientName/ProjectName)
+	Limit       int    // Max results to return (0 = unlimited). Applied at find layer.
 	Opts        repository.ReadOptions
 }
 
@@ -101,14 +103,15 @@ type OrderResult struct {
 }
 
 // FindDeliveryQuery holds parameters for FindDelivery.
-// Field priority: ID > ClientName > ProjectName > Text > Status(standalone).
+// Field priority: ID > ProjectID > ClientName > ProjectName.
+// Status acts as a post-filter. At least one of ID, ProjectID, ClientName, ProjectName must be set.
 type FindDeliveryQuery struct {
-	ID          int
-	ClientName  string
-	ProjectName string
-	Text        string
-	Status      string
-	Limit       int
+	ID          int    // Direct lookup by document ID (highest priority)
+	ProjectID   int    // Lookup by project ID → GetByIDWithGroup("delivery") → hydrate
+	ClientName  string // Resolve client name → projects.Search(ResponseGroup="delivery") → hydrate
+	ProjectName string // Resolve project name → projects.Search(ResponseGroup="delivery") → hydrate
+	Status      string // Post-filter only (requires at least one of ID/ProjectID/ClientName/ProjectName)
+	Limit       int    // Max results to return (0 = unlimited). Applied at find layer.
 	Opts        repository.ReadOptions
 }
 
@@ -120,14 +123,15 @@ type DeliveryResult struct {
 }
 
 // FindReceiptQuery holds parameters for FindReceipt.
-// Field priority: ID > ClientName > ProjectName > Text > Status(standalone).
+// Field priority: ID > ProjectID > ClientName > ProjectName.
+// Status acts as a post-filter. At least one of ID, ProjectID, ClientName, ProjectName must be set.
 type FindReceiptQuery struct {
-	ID          int
-	ClientName  string
-	ProjectName string
-	Text        string
-	Status      string
-	Limit       int
+	ID          int    // Direct lookup by document ID (highest priority)
+	ProjectID   int    // Lookup by project ID → GetByIDWithGroup("receipt") → hydrate
+	ClientName  string // Resolve client name → projects.Search(ResponseGroup="receipt") → hydrate
+	ProjectName string // Resolve project name → projects.Search(ResponseGroup="receipt") → hydrate
+	Status      string // Post-filter only (requires at least one of ID/ProjectID/ClientName/ProjectName)
+	Limit       int    // Max results to return (0 = unlimited). Applied at find layer.
 	Opts        repository.ReadOptions
 }
 

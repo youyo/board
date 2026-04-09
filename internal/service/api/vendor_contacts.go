@@ -21,3 +21,8 @@ func (s *Service) GetVendorContact(ctx context.Context, id int, opts repository.
 func (s *Service) SearchVendorContacts(ctx context.Context, params boardapi.VendorContactSearchParams, opts repository.ReadOptions) ([]boardapi.VendorContactEntity, error) {
 	return s.vendorContacts.Search(ctx, params, opts)
 }
+
+// ListVendorContactsPage returns a single page of vendor contacts.
+func (s *Service) ListVendorContactsPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.VendorContactEntity], error) {
+	return s.vendorContacts.ListPage(ctx, page, perPage)
+}

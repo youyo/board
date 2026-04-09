@@ -107,6 +107,15 @@ func IsRetryable(err error) bool {
 	return isRetryable(err)
 }
 
+// IsNotFound returns whether the error represents a 404 Not Found response.
+func IsNotFound(err error) bool {
+	var apiErr *APIError
+	if errors.As(err, &apiErr) {
+		return apiErr.Code == APIErrorNotFound
+	}
+	return false
+}
+
 // isRetryable is the internal implementation of IsRetryable.
 func isRetryable(err error) bool {
 	var ae *APIError

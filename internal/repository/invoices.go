@@ -164,3 +164,8 @@ func filterInvoices(entities []boardapi.InvoiceEntity, params boardapi.InvoiceSe
 	}
 	return result
 }
+
+// ListPage retrieves a single page of InvoiceEntity directly from the API (cache bypass).
+func (r *InvoiceRepository) ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.InvoiceEntity], error) {
+	return r.api.ListInvoicesPage(ctx, page, perPage)
+}

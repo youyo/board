@@ -95,16 +95,29 @@ func TestRegisterTools_InputSchemaProperties(t *testing.T) {
 		}
 	}
 
-	// Client-doc tools should have: id, client_name, project_name, text, status, limit
-	clientDocTools := []string{"find_estimates", "find_invoices", "find_orders", "find_deliveries", "find_receipts"}
-	clientDocProps := []string{"id", "client_name", "project_name", "text", "status", "limit"}
-	for _, toolName := range clientDocTools {
+	// Invoice tool should have: id, client_name, project_name, text, status, limit
+	invoiceProps := []string{"id", "client_name", "project_name", "text", "status", "limit"}
+	for _, prop := range invoiceProps {
+		tool, ok := tools["find_invoices"]
+		if !ok {
+			t.Error("tool \"find_invoices\" not found")
+			break
+		}
+		if _, exists := tool.Tool.InputSchema.Properties[prop]; !exists {
+			t.Errorf("tool %q missing property %q", "find_invoices", prop)
+		}
+	}
+
+	// Estimate/Order/Delivery/Receipt tools use project_id instead of text
+	docTools := []string{"find_estimates", "find_orders", "find_deliveries", "find_receipts"}
+	docProps := []string{"id", "project_id", "client_name", "project_name", "status", "limit"}
+	for _, toolName := range docTools {
 		tool, ok := tools[toolName]
 		if !ok {
 			t.Errorf("tool %q not found", toolName)
 			continue
 		}
-		for _, prop := range clientDocProps {
+		for _, prop := range docProps {
 			if _, exists := tool.Tool.InputSchema.Properties[prop]; !exists {
 				t.Errorf("tool %q missing property %q", toolName, prop)
 			}

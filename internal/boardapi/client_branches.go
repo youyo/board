@@ -109,3 +109,19 @@ func (c *Client) SearchClientBranches(ctx context.Context, params ClientBranchSe
 	}
 	return result, nil
 }
+
+// ListClientBranchesPage retrieves a single page of customer branches.
+func (c *Client) ListClientBranchesPage(ctx context.Context, page, perPage int) (*PageResult[ClientBranchEntity], error) {
+	makeReq := func(ctx context.Context, p, pp int) (*http.Request, error) {
+		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/client_branches", nil)
+		if err != nil {
+			return nil, err
+		}
+		q := req.URL.Query()
+		q.Set("page", strconv.Itoa(p))
+		q.Set("per_page", strconv.Itoa(pp))
+		req.URL.RawQuery = q.Encode()
+		return req, nil
+	}
+	return ListPage[ClientBranchEntity](c, ctx, makeReq, page, perPage)
+}

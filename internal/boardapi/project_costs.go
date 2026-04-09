@@ -103,3 +103,19 @@ func (c *Client) SearchProjectCosts(ctx context.Context, params ProjectCostSearc
 	}
 	return result, nil
 }
+
+// ListProjectCostsPage retrieves a single page of project costs.
+func (c *Client) ListProjectCostsPage(ctx context.Context, page, perPage int) (*PageResult[ProjectCostEntity], error) {
+	makeReq := func(ctx context.Context, p, pp int) (*http.Request, error) {
+		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/project_costs", nil)
+		if err != nil {
+			return nil, err
+		}
+		q := req.URL.Query()
+		q.Set("page", strconv.Itoa(p))
+		q.Set("per_page", strconv.Itoa(pp))
+		req.URL.RawQuery = q.Encode()
+		return req, nil
+	}
+	return ListPage[ProjectCostEntity](c, ctx, makeReq, page, perPage)
+}

@@ -244,9 +244,42 @@ func testDocumentCmd(t *testing.T, cmd *cobra.Command, use string, searchFlags [
 	}
 }
 
+func testDocumentGetOnlyCmd(t *testing.T, cmd *cobra.Command, use string) {
+	t.Helper()
+	if cmd.Use != use {
+		t.Errorf("Use = %q, want %q", cmd.Use, use)
+	}
+	subNames := make(map[string]bool)
+	for _, sub := range cmd.Commands() {
+		subNames[sub.Use] = true
+	}
+	if !subNames["get"] {
+		t.Errorf("subcommand %q is not registered", "get")
+	}
+	// list and search should NOT exist anymore
+	for _, removed := range []string{"list", "search"} {
+		if subNames[removed] {
+			t.Errorf("subcommand %q should have been removed", removed)
+		}
+	}
+
+	// Verify get --document-id flag.
+	var getCmd *cobra.Command
+	for _, sub := range cmd.Commands() {
+		if sub.Use == "get" {
+			getCmd = sub
+		}
+	}
+	if getCmd == nil {
+		t.Fatal("get command not found")
+	}
+	if f := getCmd.Flags().Lookup("document-id"); f == nil {
+		t.Error("get: --document-id flag is not defined")
+	}
+}
+
 func TestNewAPIEstimatesCmd(t *testing.T) {
-	testDocumentCmd(t, cli.NewAPIEstimatesCmd(), "estimates",
-		[]string{"client-id", "project-id", "status", "updated-at-from"})
+	testDocumentGetOnlyCmd(t, cli.NewAPIEstimatesCmd(), "estimates")
 }
 
 func TestNewAPIInvoicesCmd(t *testing.T) {
@@ -255,18 +288,15 @@ func TestNewAPIInvoicesCmd(t *testing.T) {
 }
 
 func TestNewAPIOrdersCmd(t *testing.T) {
-	testDocumentCmd(t, cli.NewAPIOrdersCmd(), "orders",
-		[]string{"client-id", "project-id", "status", "updated-at-from"})
+	testDocumentGetOnlyCmd(t, cli.NewAPIOrdersCmd(), "orders")
 }
 
 func TestNewAPIDeliveriesCmd(t *testing.T) {
-	testDocumentCmd(t, cli.NewAPIDeliveriesCmd(), "deliveries",
-		[]string{"client-id", "project-id", "status", "updated-at-from"})
+	testDocumentGetOnlyCmd(t, cli.NewAPIDeliveriesCmd(), "deliveries")
 }
 
 func TestNewAPIReceiptsCmd(t *testing.T) {
-	testDocumentCmd(t, cli.NewAPIReceiptsCmd(), "receipts",
-		[]string{"client-id", "project-id", "status", "updated-at-from"})
+	testDocumentGetOnlyCmd(t, cli.NewAPIReceiptsCmd(), "receipts")
 }
 
 func TestNewAPIVendorsCmd(t *testing.T) {

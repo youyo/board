@@ -159,3 +159,8 @@ func filterDocumentSendChannels(entities []boardapi.DocumentSendChannelEntity, p
 	}
 	return result
 }
+
+// ListPage retrieves a single page of DocumentSendChannelEntity directly from the API (cache bypass).
+func (r *DocumentSendChannelRepository) ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.DocumentSendChannelEntity], error) {
+	return r.api.ListDocumentSendChannelsPage(ctx, page, perPage)
+}

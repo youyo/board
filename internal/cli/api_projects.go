@@ -24,13 +24,25 @@ func NewAPIProjectsCmd() *cobra.Command {
 }
 
 func newAPIProjectsListCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List all projects",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			svc, err := apiServiceFromCmd(cmd)
 			if err != nil {
 				return err
+			}
+			page, _ := cmd.Flags().GetInt("page")
+			perPage, _ := cmd.Flags().GetInt("per-page")
+			if page > 0 {
+				result, err := svc.ListProjectsPage(cmd.Context(), page, perPage)
+				if err != nil {
+					return err
+				}
+				totalPages := (result.TotalCount + result.PerPage - 1) / result.PerPage
+				fmt.Fprintf(os.Stderr, "# Total: %d, Page: %d/%d, PerPage: %d\n",
+					result.TotalCount, result.Page, totalPages, result.PerPage)
+				return output.Write(os.Stdout, result.Items, prettyFromCmd(cmd))
 			}
 			opts := readOptionsFromCmd(cmd)
 			result, err := svc.ListProjects(cmd.Context(), opts)
@@ -40,6 +52,9 @@ func newAPIProjectsListCmd() *cobra.Command {
 			return output.Write(os.Stdout, result, prettyFromCmd(cmd))
 		},
 	}
+	cmd.Flags().Int("page", 0, "Page number (1-based, bypasses cache)")
+	cmd.Flags().Int("per-page", 50, "Items per page (max 100, used with --page)")
+	return cmd
 }
 
 func newAPIProjectsGetCmd() *cobra.Command {

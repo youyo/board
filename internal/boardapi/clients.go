@@ -106,3 +106,19 @@ func (c *Client) SearchClients(ctx context.Context, params ClientSearchParams) (
 	}
 	return result, nil
 }
+
+// ListClientsPage retrieves a single page of customers.
+func (c *Client) ListClientsPage(ctx context.Context, page, perPage int) (*PageResult[ClientEntity], error) {
+	makeReq := func(ctx context.Context, p, pp int) (*http.Request, error) {
+		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/clients", nil)
+		if err != nil {
+			return nil, err
+		}
+		q := req.URL.Query()
+		q.Set("page", strconv.Itoa(p))
+		q.Set("per_page", strconv.Itoa(pp))
+		req.URL.RawQuery = q.Encode()
+		return req, nil
+	}
+	return ListPage[ClientEntity](c, ctx, makeReq, page, perPage)
+}

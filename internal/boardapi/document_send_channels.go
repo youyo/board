@@ -104,3 +104,19 @@ func (c *Client) SearchDocumentSendChannels(ctx context.Context, params Document
 	}
 	return result, nil
 }
+
+// ListDocumentSendChannelsPage retrieves a single page of document send channels.
+func (c *Client) ListDocumentSendChannelsPage(ctx context.Context, page, perPage int) (*PageResult[DocumentSendChannelEntity], error) {
+	makeReq := func(ctx context.Context, p, pp int) (*http.Request, error) {
+		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/document_send_channels", nil)
+		if err != nil {
+			return nil, err
+		}
+		q := req.URL.Query()
+		q.Set("page", strconv.Itoa(p))
+		q.Set("per_page", strconv.Itoa(pp))
+		req.URL.RawQuery = q.Encode()
+		return req, nil
+	}
+	return ListPage[DocumentSendChannelEntity](c, ctx, makeReq, page, perPage)
+}

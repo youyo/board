@@ -91,3 +91,42 @@ func (c *Client) DoWithRetry(req *http.Request) ([]byte, error) {
 	}
 	return nil, lastErr
 }
+
+// DoWithRetryFull executes a request with retry support and returns response headers.
+// Returns immediately on context cancellation even during backoff.
+// Returns immediately for non-retryable errors (4xx, etc.).
+func (c *Client) DoWithRetryFull(req *http.Request) ([]byte, http.Header, error) {
+	var lastErr error
+	for attempt := 0; attempt <= c.retryMax; attempt++ {
+		cloned, err := cloneRequest(req)
+		if err != nil {
+			return nil, nil, err
+		}
+		body, headers, err := c.DoFull(cloned)
+		if err == nil {
+			return body, headers, nil
+		}
+		lastErr = err
+		if !isRetryable(err) {
+			return nil, nil, err
+		}
+		if attempt == c.retryMax {
+			break
+		}
+		wait := CalcBackoff(attempt, err)
+		// monitor context cancellation during backoff
+		select {
+		case <-req.Context().Done():
+			return nil, nil, req.Context().Err()
+		default:
+		}
+		c.sleepFn(wait)
+		// also check cancellation after sleepFn
+		select {
+		case <-req.Context().Done():
+			return nil, nil, req.Context().Err()
+		default:
+		}
+	}
+	return nil, nil, lastErr
+}

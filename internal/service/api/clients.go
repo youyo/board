@@ -21,3 +21,8 @@ func (s *Service) GetClient(ctx context.Context, id int, opts repository.ReadOpt
 func (s *Service) SearchClients(ctx context.Context, params boardapi.ClientSearchParams, opts repository.ReadOptions) ([]boardapi.ClientEntity, error) {
 	return s.clients.Search(ctx, params, opts)
 }
+
+// ListClientsPage returns a single page of clients.
+func (s *Service) ListClientsPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.ClientEntity], error) {
+	return s.clients.ListPage(ctx, page, perPage)
+}
