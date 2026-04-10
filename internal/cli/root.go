@@ -59,6 +59,8 @@ func NewRootCmd(version string) *cobra.Command {
 
 	rootCmd.Version = version
 	rootCmd.SetVersionTemplate("board version {{.Version}}\n")
+	rootCmd.SilenceUsage = true
+	rootCmd.SilenceErrors = true
 
 	// Common flags (inherited by all subcommands).
 	pf := rootCmd.PersistentFlags()

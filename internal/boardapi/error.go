@@ -130,6 +130,31 @@ func isRetryable(err error) bool {
 	}
 }
 
+// Hint returns a human-readable hint explaining the error and suggesting a fix.
+func (e *APIError) Hint() string {
+	switch e.Code {
+	case APIErrorUnauthorized:
+		return "Invalid API key or token. Run `board configure` to check your credentials."
+	case APIErrorForbidden:
+		return "No permission to access this resource. Check API key permissions in BOARD settings (Settings > API)."
+	case APIErrorNotFound:
+		return "Resource not found. Verify the ID is correct."
+	case APIErrorRateLimit:
+		if e.RetryAfter > 0 {
+			return fmt.Sprintf("Rate limit exceeded. Retry after %s.", e.RetryAfter)
+		}
+		return "Rate limit exceeded (daily: 3000 requests, burst: 3/sec). Wait before retrying."
+	case APIErrorValidation:
+		return "Invalid request parameters."
+	case APIErrorTemporary:
+		return "BOARD API server error. This is temporary — retry later."
+	case APIErrorNetwork:
+		return "Cannot connect to BOARD API. Check your network connection."
+	default:
+		return ""
+	}
+}
+
 // extractMessage extracts an error message from a JSON body.
 // Returns an empty string on parse failure.
 func extractMessage(body []byte) string {

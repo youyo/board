@@ -1,4 +1,135 @@
-# Plan: BOARD API エンドポイント全面修正
+# Plan: CLI エラー出力の改善 — JSON + ヒント付きメッセージ
+
+## Context
+
+`board` CLI のエラー出力が不親切:
+- プレーンテキスト `boardapi error [FORBIDDEN] status=403: Forbidden` → JSON にしたい
+- Cobra の Usage/Help テキストが表示される → 不要
+- 403 が「権限不足」なのか「プラン制限」なのかわからない
+- 429 が「秒間制限」なのか「日次制限」なのかわからない
+
+complexity: L
+
+## 修正方針
+
+### Step 1: Cobra の SilenceUsage / SilenceErrors を設定
+
+`internal/cli/root.go`:
+```go
+cmd.SilenceUsage = true
+cmd.SilenceErrors = true
+```
+
+### Step 2: APIError にヒントメッセージを追加
+
+`internal/boardapi/error.go` に `Hint()` メソッドを追加:
+
+```go
+func (e *APIError) Hint() string {
+    switch e.Code {
+    case APIErrorUnauthorized:
+        return "Invalid API key or token. Run `board configure` to check your credentials."
+    case APIErrorForbidden:
+        return "No permission to access this resource. Check API key permissions in BOARD settings (Settings > API)."
+    case APIErrorNotFound:
+        return "Resource not found. Verify the ID is correct."
+    case APIErrorRateLimit:
+        if e.RetryAfter > 0 {
+            return fmt.Sprintf("Rate limit exceeded. Retry after %s.", e.RetryAfter)
+        }
+        return "Rate limit exceeded (daily: 3000 requests, burst: 3/sec). Wait before retrying."
+    case APIErrorValidation:
+        return "Invalid request parameters."
+    case APIErrorTemporary:
+        return "BOARD API server error. This is temporary — retry later."
+    case APIErrorNetwork:
+        return "Cannot connect to BOARD API. Check your network connection."
+    default:
+        return ""
+    }
+}
+```
+
+### Step 3: main.go でエラーを JSON 出力
+
+`cmd/board/main.go`:
+
+```go
+if err := rootCmd.Execute(); err != nil {
+    var apiErr *boardapi.APIError
+    if errors.As(err, &apiErr) {
+        result := map[string]interface{}{
+            "error":       true,
+            "code":        string(apiErr.Code),
+            "status_code": apiErr.StatusCode,
+            "message":     apiErr.Message,
+        }
+        if hint := apiErr.Hint(); hint != "" {
+            result["hint"] = hint
+        }
+        if apiErr.RetryAfter > 0 {
+            result["retry_after_seconds"] = int(apiErr.RetryAfter.Seconds())
+        }
+        json.NewEncoder(os.Stderr).Encode(result)
+    } else {
+        json.NewEncoder(os.Stderr).Encode(map[string]interface{}{
+            "error":   true,
+            "message": err.Error(),
+        })
+    }
+    os.Exit(1)
+}
+```
+
+### 期待する出力例
+
+**403 Forbidden:**
+```json
+{"code":"FORBIDDEN","error":true,"hint":"No permission to access this resource. Check API key permissions in BOARD settings (Settings > API).","message":"Forbidden","status_code":403}
+```
+
+**429 Rate Limit (daily):**
+```json
+{"code":"RATE_LIMIT","error":true,"hint":"Rate limit exceeded (daily: 3000 requests, burst: 3/sec). Wait before retrying.","message":"Limit Exceeded","status_code":429}
+```
+
+**429 Rate Limit (with Retry-After):**
+```json
+{"code":"RATE_LIMIT","error":true,"hint":"Rate limit exceeded. Retry after 1m0s.","message":"Limit Exceeded","retry_after_seconds":60,"status_code":429}
+```
+
+**401 Unauthorized:**
+```json
+{"code":"UNAUTHORIZED","error":true,"hint":"Invalid API key or token. Run `board configure` to check your credentials.","message":"Unauthorized","status_code":401}
+```
+
+**Network error:**
+```json
+{"code":"NETWORK","error":true,"hint":"Cannot connect to BOARD API. Check your network connection.","message":"...","status_code":0}
+```
+
+**Non-API error (invalid flag etc.):**
+```json
+{"error":true,"message":"unknown flag: --foo"}
+```
+
+## 変更ファイル
+
+| ファイル | 変更内容 |
+|---------|---------|
+| `internal/cli/root.go` | SilenceUsage + SilenceErrors 設定 |
+| `internal/boardapi/error.go` | `Hint()` メソッド追加 |
+| `cmd/board/main.go` | JSON エラー出力 + hint/retry_after フィールド |
+
+## 検証
+
+1. `go build ./...` でビルド確認
+2. `go run ./cmd/board/ api users list` → 403 JSON + hint
+3. 不正フラグ `go run ./cmd/board/ api users list --foo` → 汎用 JSON エラー、Usage なし
+4. `go test ./...` で既存テスト通過
+
+---
+(以下は完了済みの旧プラン — 参照用)
 
 ## Context
 
