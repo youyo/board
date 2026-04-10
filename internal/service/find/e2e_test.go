@@ -12,6 +12,7 @@ package find_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/youyo/board/internal/repository"
@@ -174,6 +175,87 @@ func TestE2E_FindProject_ByClientName(t *testing.T) {
 		t.Fatalf("FindProject(ClientName=%q): %v", clientName, err)
 	}
 	t.Logf("FindProject(ClientName=%q) returned %d results", clientName, len(results))
+}
+
+// --- FindEstimate ---
+
+func TestE2E_FindEstimate_ByProjectName(t *testing.T) {
+	svc, api := newE2EFindService(t)
+	ctx := context.Background()
+
+	pr, err := api.ListProjectsPage(ctx, 1, 1)
+	if err != nil || len(pr.Items) == 0 {
+		t.Skip("no projects available")
+	}
+	targetName := pr.Items[0].Name
+
+	results, err := svc.FindEstimate(ctx, find.FindEstimateQuery{
+		ProjectName: targetName,
+		Limit:       5,
+		Opts:        e2eOpts(),
+	})
+	if err != nil {
+		skipIfRateLimit(t, err, fmt.Sprintf("FindEstimate(ProjectName=%q)", targetName))
+		t.Fatalf("FindEstimate(ProjectName=%q): %v", targetName, err)
+	}
+	t.Logf("FindEstimate(ProjectName=%q) returned %d results", targetName, len(results))
+	if len(results) > 0 {
+		r := results[0]
+		if r.Estimate.ID <= 0 {
+			t.Errorf("result.Estimate.ID expected > 0, got %d", r.Estimate.ID)
+		}
+		t.Logf("Estimate: id=%d title=%q project_id=%d", r.Estimate.ID, r.Estimate.Title, r.Estimate.ProjectID)
+	}
+}
+
+func TestE2E_FindEstimate_ByProjectID(t *testing.T) {
+	svc, api := newE2EFindService(t)
+	ctx := context.Background()
+
+	pr, err := api.ListProjectsPage(ctx, 1, 1)
+	if err != nil || len(pr.Items) == 0 {
+		t.Skip("no projects available")
+	}
+	targetID := pr.Items[0].ID
+
+	results, err := svc.FindEstimate(ctx, find.FindEstimateQuery{
+		ProjectID: targetID,
+		Limit:     5,
+		Opts:      e2eOpts(),
+	})
+	if err != nil {
+		t.Fatalf("FindEstimate(ProjectID=%d): %v", targetID, err)
+	}
+	t.Logf("FindEstimate(ProjectID=%d) returned %d results", targetID, len(results))
+}
+
+func TestE2E_FindProject_WithEstimate(t *testing.T) {
+	svc, api := newE2EFindService(t)
+	ctx := context.Background()
+
+	pr, err := api.ListProjectsPage(ctx, 1, 1)
+	if err != nil || len(pr.Items) == 0 {
+		t.Skip("no projects available")
+	}
+	targetName := pr.Items[0].Name
+
+	results, err := svc.FindProject(ctx, find.FindProjectQuery{
+		Name:  targetName,
+		Limit: 5,
+		Opts:  e2eOpts(),
+	})
+	if err != nil {
+		t.Fatalf("FindProject(Name=%q): %v", targetName, err)
+	}
+	if len(results) == 0 {
+		t.Skipf("FindProject(Name=%q): no results", targetName)
+	}
+	r := results[0]
+	if r.Estimate != nil {
+		t.Logf("Project %q enriched with estimate: id=%d title=%q", r.Project.Name, r.Estimate.ID, r.Estimate.Title)
+	} else {
+		t.Logf("Project %q has no estimate enrichment", r.Project.Name)
+	}
 }
 
 // Note: FindInvoice E2E tests are omitted from the find layer because this account

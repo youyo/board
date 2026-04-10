@@ -3,6 +3,7 @@
 package find_test
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -11,6 +12,16 @@ import (
 	"github.com/youyo/board/internal/boardapi"
 	"github.com/youyo/board/internal/service/find"
 )
+
+// skipIfRateLimit skips the test when err is a boardapi 429 Rate Limit error.
+// E2E tests that issue many API calls may hit the 3/sec rate limit.
+func skipIfRateLimit(t *testing.T, err error, context string) {
+	t.Helper()
+	var apiErr *boardapi.APIError
+	if errors.As(err, &apiErr) && apiErr.Code == boardapi.APIErrorRateLimit {
+		t.Skipf("E2E: %s hit rate limit (429); skipping", context)
+	}
+}
 
 // skipIfNoCredentials skips the test if BOARD_API_KEY or BOARD_API_TOKEN is not set.
 func skipIfNoCredentials(t *testing.T) {

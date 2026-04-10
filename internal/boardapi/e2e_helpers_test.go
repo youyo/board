@@ -61,3 +61,13 @@ func requireNonEmpty(t *testing.T, s string, label string) {
 		t.Fatalf("%s: expected non-empty string", label)
 	}
 }
+
+// skipIfRateLimit skips the test when err is a boardapi 429 Rate Limit error.
+// E2E tests that issue many paginated API calls may hit the 3/sec rate limit.
+func skipIfRateLimit(t *testing.T, err error, context string) {
+	t.Helper()
+	var apiErr *boardapi.APIError
+	if errors.As(err, &apiErr) && apiErr.Code == boardapi.APIErrorRateLimit {
+		t.Skipf("E2E: %s hit rate limit (429); skipping", context)
+	}
+}
