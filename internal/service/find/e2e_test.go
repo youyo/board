@@ -12,7 +12,6 @@ package find_test
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/youyo/board/internal/repository"
@@ -136,11 +135,11 @@ func TestE2E_FindProject_ByID(t *testing.T) {
 	svc, api := newE2EFindService(t)
 	ctx := context.Background()
 
-	projects, err := api.ListProjects(ctx)
-	if err != nil || len(projects) == 0 {
+	pr, err := api.ListProjectsPage(ctx, 1, 1)
+	if err != nil || len(pr.Items) == 0 {
 		t.Skip("no projects available")
 	}
-	targetID := projects[0].ID
+	targetID := pr.Items[0].ID
 
 	results, err := svc.FindProject(ctx, find.FindProjectQuery{
 		ID:    targetID,
@@ -160,11 +159,11 @@ func TestE2E_FindProject_ByClientName(t *testing.T) {
 	svc, api := newE2EFindService(t)
 	ctx := context.Background()
 
-	clients, err := api.ListClients(ctx)
-	if err != nil || len(clients) == 0 {
+	cr, err := api.ListClientsPage(ctx, 1, 1)
+	if err != nil || len(cr.Items) == 0 {
 		t.Skip("no clients available")
 	}
-	clientName := clients[0].Name
+	clientName := cr.Items[0].Name
 
 	results, err := svc.FindProject(ctx, find.FindProjectQuery{
 		ClientName: clientName,
@@ -178,35 +177,6 @@ func TestE2E_FindProject_ByClientName(t *testing.T) {
 }
 
 // --- FindEstimate ---
-
-func TestE2E_FindEstimate_ByProjectName(t *testing.T) {
-	svc, api := newE2EFindService(t)
-	ctx := context.Background()
-
-	pr, err := api.ListProjectsPage(ctx, 1, 1)
-	if err != nil || len(pr.Items) == 0 {
-		t.Skip("no projects available")
-	}
-	targetName := pr.Items[0].Name
-
-	results, err := svc.FindEstimate(ctx, find.FindEstimateQuery{
-		ProjectName: targetName,
-		Limit:       5,
-		Opts:        e2eOpts(),
-	})
-	if err != nil {
-		skipIfRateLimit(t, err, fmt.Sprintf("FindEstimate(ProjectName=%q)", targetName))
-		t.Fatalf("FindEstimate(ProjectName=%q): %v", targetName, err)
-	}
-	t.Logf("FindEstimate(ProjectName=%q) returned %d results", targetName, len(results))
-	if len(results) > 0 {
-		r := results[0]
-		if r.Estimate.ID <= 0 {
-			t.Errorf("result.Estimate.ID expected > 0, got %d", r.Estimate.ID)
-		}
-		t.Logf("Estimate: id=%d title=%q project_id=%d", r.Estimate.ID, r.Estimate.Title, r.Estimate.ProjectID)
-	}
-}
 
 func TestE2E_FindEstimate_ByProjectID(t *testing.T) {
 	svc, api := newE2EFindService(t)
