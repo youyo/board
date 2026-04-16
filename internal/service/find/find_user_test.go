@@ -64,6 +64,26 @@ func TestFindUser_ByText(t *testing.T) {
 	assertUserResultLen(t, got, 2)
 }
 
+func TestFindUser_ByText_LastNameFirstName(t *testing.T) {
+	allUsers := []boardapi.UserEntity{
+		{ID: 1, LastName: "立花", FirstName: "拓也", Email: "tachibana@example.com"},
+		{ID: 2, LastName: "佐藤", FirstName: "花子", Email: "sato@example.com"},
+		{ID: 3, LastName: "田中", FirstName: "太郎", Email: "tanaka@example.com"},
+	}
+
+	svc := newServiceWith(
+		nil, nil, nil, nil,
+		&stubUserRepo{listResult: allUsers},
+	)
+
+	got, err := svc.FindUser(testCtx, find.FindUserQuery{Text: "立花"})
+	assertNoError(t, err)
+	assertUserResultLen(t, got, 1)
+	if got[0].User.ID != 1 {
+		t.Errorf("user ID = %d, want 1", got[0].User.ID)
+	}
+}
+
 // --- FindUser: Error/Edge Cases ---
 
 func TestFindUser_EmptyQuery(t *testing.T) {

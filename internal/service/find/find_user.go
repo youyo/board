@@ -39,7 +39,7 @@ func (s *Service) FindUser(ctx context.Context, q FindUserQuery) ([]UserResult, 
 			return nil, err
 		}
 		for _, u := range all {
-			if containsText(q.Text, u.Name, u.Email) {
+			if containsText(q.Text, u.DisplayName(), u.LastName, u.FirstName, u.Email) {
 				users = append(users, u)
 			}
 		}

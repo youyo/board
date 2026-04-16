@@ -101,8 +101,8 @@ func TestE2E_FindUser_ByName(t *testing.T) {
 	// Find the first user with a non-empty name.
 	targetName := ""
 	for _, u := range users {
-		if u.Name != "" {
-			targetName = u.Name
+		if u.DisplayName() != "" {
+			targetName = u.DisplayName()
 			break
 		}
 	}

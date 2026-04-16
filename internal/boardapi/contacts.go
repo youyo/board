@@ -16,12 +16,36 @@ type ContactEntity struct {
 	ClientBranchID int    `json:"client_branch_id"`
 	Name           string `json:"name"`
 	NameKana       string `json:"name_kana"`
+	LastName       string `json:"last_name"`
+	FirstName      string `json:"first_name"`
+	HonorificTitle string `json:"honorific_title"`
 	Title          string `json:"title"`
+	Department     string `json:"department"`
 	Email          string `json:"email"`
 	Phone          string `json:"phone"`
+	Note           string `json:"note"`
 	Memo           string `json:"memo"`
+	ArchiveFlg     int    `json:"archive_flg"`
 	UpdatedAt      string `json:"updated_at"` // ISO 8601
 	CreatedAt      string `json:"created_at"` // ISO 8601
+}
+
+// DisplayName returns a human-readable name.
+// Prefers Name if set, otherwise combines LastName + FirstName.
+func (c ContactEntity) DisplayName() string {
+	if c.Name != "" {
+		return c.Name
+	}
+	switch {
+	case c.LastName != "" && c.FirstName != "":
+		return c.LastName + " " + c.FirstName
+	case c.LastName != "":
+		return c.LastName
+	case c.FirstName != "":
+		return c.FirstName
+	default:
+		return ""
+	}
 }
 
 // ContactSearchParams is the parameter for SearchContacts.

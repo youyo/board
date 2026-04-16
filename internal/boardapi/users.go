@@ -11,11 +11,35 @@ import (
 // UserEntity is a BOARD API user entity.
 // Corresponds to one element in the GET /v1/users response.
 type UserEntity struct {
-	ID        int    `json:"id"`
-	Name      string `json:"name"`
-	Email     string `json:"email"`
-	UpdatedAt string `json:"updated_at"` // ISO 8601
-	CreatedAt string `json:"created_at"` // ISO 8601
+	ID           int    `json:"id"`
+	Name         string `json:"name"`
+	LastName     string `json:"last_name"`
+	FirstName    string `json:"first_name"`
+	Email        string `json:"email"`
+	RoleID       int    `json:"role_id"`
+	RoleName     string `json:"role_name"`
+	LastSignInAt string `json:"last_sign_in_at"` // ISO 8601
+	ValidFlg     int    `json:"valid_flg"`
+	UpdatedAt    string `json:"updated_at"`       // ISO 8601
+	CreatedAt    string `json:"created_at"`       // ISO 8601
+}
+
+// DisplayName returns a human-readable name.
+// Prefers Name if set, otherwise combines LastName + FirstName.
+func (u UserEntity) DisplayName() string {
+	if u.Name != "" {
+		return u.Name
+	}
+	switch {
+	case u.LastName != "" && u.FirstName != "":
+		return u.LastName + " " + u.FirstName
+	case u.LastName != "":
+		return u.LastName
+	case u.FirstName != "":
+		return u.FirstName
+	default:
+		return ""
+	}
 }
 
 // UserSearchParams is the parameter for SearchUsers.

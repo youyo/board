@@ -16,12 +16,36 @@ type VendorContactEntity struct {
 	VendorBranchID int    `json:"vendor_branch_id"`
 	Name           string `json:"name"`
 	NameKana       string `json:"name_kana"`
+	LastName       string `json:"last_name"`
+	FirstName      string `json:"first_name"`
+	HonorificTitle string `json:"honorific_title"`
 	Title          string `json:"title"`
+	Department     string `json:"department"`
 	Email          string `json:"email"`
 	Phone          string `json:"phone"`
+	Note           string `json:"note"`
 	Memo           string `json:"memo"`
+	ArchiveFlg     int    `json:"archive_flg"`
 	UpdatedAt      string `json:"updated_at"` // ISO 8601
 	CreatedAt      string `json:"created_at"` // ISO 8601
+}
+
+// DisplayName returns a human-readable name.
+// Prefers Name if set, otherwise combines LastName + FirstName.
+func (vc VendorContactEntity) DisplayName() string {
+	if vc.Name != "" {
+		return vc.Name
+	}
+	switch {
+	case vc.LastName != "" && vc.FirstName != "":
+		return vc.LastName + " " + vc.FirstName
+	case vc.LastName != "":
+		return vc.LastName
+	case vc.FirstName != "":
+		return vc.FirstName
+	default:
+		return ""
+	}
 }
 
 // VendorContactSearchParams is the parameter for SearchVendorContacts.

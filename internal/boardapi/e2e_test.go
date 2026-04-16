@@ -105,7 +105,7 @@ func TestE2E_Users_GetByID(t *testing.T) {
 		t.Fatalf("GetUser(%d): %v", users[0].ID, err)
 	}
 	requirePositiveID(t, got.ID, "GetUser.ID")
-	requireNonEmpty(t, got.Name, "GetUser.Name")
+	requireNonEmpty(t, got.DisplayName(), "GetUser.DisplayName")
 	if got.ID != users[0].ID {
 		t.Errorf("ID mismatch: got %d, want %d", got.ID, users[0].ID)
 	}
