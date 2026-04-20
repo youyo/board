@@ -388,52 +388,27 @@ Search で `name=zzz_nonexistent_keyword_for_e2e` を指定したが 2405 件全
 ## 結果記録
 
 ### Unit (6/6 Green)
-- [ ] U1 `TestListProjectsRaw_SinglePage`:
-- [ ] U2 `TestListProjectsRaw_MultiPage`:
-- [ ] U3 `TestGetProjectRaw_Success`:
-- [ ] U4 `TestGetProjectRaw_NotFound`:
-- [ ] U5 `TestSearchProjectsRaw_QueryParams`:
-- [ ] U6 `TestGetProjectWithGroupRaw_QueryParam`:
+- [x] U1 `TestListProjectsRaw_SinglePage`: Green
+- [x] U2 `TestListProjectsRaw_MultiPage`: Green
+- [x] U3 `TestGetProjectRaw_Success`: Green
+- [x] U4 `TestGetProjectRaw_NotFound`: Green
+- [x] U5 `TestSearchProjectsRaw_QueryParams`: Green
+- [x] U6 `TestGetProjectWithGroupRaw_QueryParam`: Green（6 groups + empty = 7 subtest 全 Green）
 
 ### E2E 実測
-- [ ] `TestE2E_Projects_List`:
-- [ ] `TestE2E_Projects_Get`:
-- [ ] `TestE2E_Projects_Search`:
-- [ ] `TestE2E_Projects_GetWithGroup/estimate`:
-- [ ] `TestE2E_Projects_GetWithGroup/order`:
-- [ ] `TestE2E_Projects_GetWithGroup/delivery`:
-- [ ] `TestE2E_Projects_GetWithGroup/invoice`:
-- [ ] `TestE2E_Projects_GetWithGroup/receipt`:
-- [ ] `TestE2E_Projects_GetWithGroup/all`:
+- [x] `TestE2E_Projects_List`: FAIL（意図的: 20 未マップ） / 2405 items
+- [x] `TestE2E_Projects_Get`: FAIL（意図的: 62 未マップ） / id=95944469
+- [x] `TestE2E_Projects_Search`: FAIL（意図的: 20 未マップ） / 2405 items（name filter 無視）
+- [x] `TestE2E_Projects_GetWithGroup/estimate`: FAIL（意図的: 26 未マップ） / estimate_present=true
+- [x] `TestE2E_Projects_GetWithGroup/order`: FAIL（意図的: 26 未マップ） / order_present=true
+- [x] `TestE2E_Projects_GetWithGroup/delivery`: FAIL（意図的: 21 未マップ） / deliveries 配列キー不一致
+- [x] `TestE2E_Projects_GetWithGroup/invoice`: FAIL（意図的: 21 未マップ） / invoices 配列キー不一致
+- [x] `TestE2E_Projects_GetWithGroup/receipt`: FAIL（意図的: 21 未マップ） / receipts 配列キー不一致
+- [x] `TestE2E_Projects_GetWithGroup/all`: FAIL（意図的: 97 未マップ） / estimate+order 発現、deliveries/invoices/receipts は配列
 
 ### 実 API 消費 req
-- 見積: **11 req** / 実績: **TBD**
-
-### 発見事項
-
-#### ProjectEntity base の未マップ（トップレベル）
-TBD
-
-#### DocumentSummary の未マップ（response_group=all で最も網羅）
-TBD
-
-#### 逆方向不整合
-TBD
-
-#### ネスト構造
-TBD
-
-#### BOARD API 全般仕様の累積確定
-TBD
-
-#### 403 / 429 / TLS 異常
-TBD
-
-### Pending Re-verification 追加候補
-TBD
-
-### フォローアップ（別 M）
-TBD
+- 見積: **11 req** / 実績: **11 req**（List 1 + Get 2 + Search 1 + GetWithGroup 7）
 
 ## Changelog
 - 2026-04-20 19:05 作成（plans/board-compliance-m13-projects.md）
+- 2026-04-21 01:08 M13 実装・検証完了: Raw 層 4 本追加、Unit 6/6 Green、E2E 4 本 + 6 subtest 実行。実 API 11 req 消費。List/Search 20 未マップ、Get 62 未マップ、GetWithGroup estimate/order は単一オブジェクト（DocumentSummary 未マップ 6-7 フィールド）、delivery/invoice/receipt は配列キー（`deliveries`/`invoices`/`receipts`）で返却され単一ポインタ設計と根本的不一致。Memo 逆方向 9 件連続確定、name filter 無視 9 件連続確定。403/429 なし。
