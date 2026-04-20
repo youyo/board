@@ -1828,7 +1828,7 @@ func TestSearchInvoices_WithProjectIDAndUpdatedAtFrom(t *testing.T) {
 // M07: orders entity tests (T74)
 // ============================================================
 
-// T74: GetOrder — happy path
+// T74: GetOrder — happy path (M36: 実 API 準拠スキーマに更新)
 func TestGetOrder_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/documents/orders/77" {
@@ -1836,7 +1836,7 @@ func TestGetOrder_OK(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"id":77,"client_id":10,"project_id":100,"title":"Order 77","total_amount":800000.0,"status":"approved","order_date":"2026-02-01","memo":"Approved","updated_at":"2026-02-01T00:00:00Z","created_at":"2026-02-01T00:00:00Z"}`))
+		w.Write([]byte(`{"id":77,"message":null,"total":"800000.0","tax":"80000.0","tax_withholding":"0.0","seal_approval_status":1,"document_amount_disp_kbn":1,"blank_date_flg":0,"lock_flg":0,"delivery_place":null,"details":[{"no":1,"detail_date":null,"description":"Item A","quantity":"1.0","unit":"式","unit_price":"800000.0","price":"800000.0","tax_rate":"10.0","tax_withholding_flg":0,"tax_included_flg":0,"reduced_tax_rate_kbn":1,"section_description":null,"section_subtotal":null,"document_detail_kbn":1,"document_detail_kbn_name":"通常","deduction_applicable":false}],"disp_order_date":null,"disp_order_receive_date":null}`))
 	}))
 	defer ts.Close()
 
@@ -1849,8 +1849,14 @@ func TestGetOrder_OK(t *testing.T) {
 	if got == nil {
 		t.Fatal("got nil OrderEntity")
 	}
-	if got.ID != 77 || got.Status != "approved" || got.Memo != "Approved" {
-		t.Errorf("GetOrder: got %+v", got)
+	if got.ID != 77 {
+		t.Errorf("GetOrder ID: got %d, want 77", got.ID)
+	}
+	if got.Total != "800000.0" {
+		t.Errorf("GetOrder Total: got %q, want %q", got.Total, "800000.0")
+	}
+	if len(got.Details) != 1 {
+		t.Errorf("GetOrder Details len: got %d, want 1", len(got.Details))
 	}
 }
 

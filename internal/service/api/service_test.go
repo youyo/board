@@ -270,7 +270,7 @@ func TestListInvoicesPage(t *testing.T) {
 // --- Orders tests ---
 
 func TestGetOrder(t *testing.T) {
-	entity := &boardapi.OrderEntity{ID: 1, ProjectID: 10}
+	entity := &boardapi.OrderEntity{ID: 1, Total: "90000.0"}
 	stub := &stubOrderRepo{getResult: entity}
 	svc := newServiceWithOrders(stub)
 	got, err := svc.GetOrder(testCtx, 1, defaultOpts)

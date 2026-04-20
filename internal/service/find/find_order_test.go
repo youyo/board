@@ -10,15 +10,16 @@ import (
 
 // --- FindOrder: Normal Cases ---
 
+// M36: OrderEntity に ClientID/ProjectID/Status フィールドは存在しない。
+// ID lookup では client/project は nil。ProjectID/ClientName/ProjectName ブランチでは
+// project コンテキストから enrichment を行う。
+
 func TestFindOrder_ByID(t *testing.T) {
-	ord := &boardapi.OrderEntity{ID: 1, ClientID: 10, ProjectID: 100, Title: "Order A"}
-	client := &boardapi.ClientEntity{ID: 10, Name: "Client X"}
-	project := &boardapi.ProjectEntity{ID: 100, Name: "Project Y"}
+	ord := &boardapi.OrderEntity{ID: 1, Total: "90000.0"}
 
 	svc := newServiceWith(
-		&stubClientRepo{getResult: client},
-		nil, nil,
-		&stubProjectRepo{getResult: project},
+		nil, nil, nil,
+		&stubProjectRepo{},
 		&stubOrderRepo{getByDocIDResult: ord},
 	)
 
@@ -29,18 +30,19 @@ func TestFindOrder_ByID(t *testing.T) {
 	if got[0].Order.ID != 1 {
 		t.Errorf("order ID = %d, want 1", got[0].Order.ID)
 	}
-	if got[0].Client == nil || got[0].Client.ID != 10 {
-		t.Error("client not resolved correctly")
+	// ID lookup では client/project は特定不能なので nil
+	if got[0].Client != nil {
+		t.Errorf("expected nil client for ID-only lookup, got %+v", got[0].Client)
 	}
-	if got[0].Project == nil || got[0].Project.ID != 100 {
-		t.Error("project not resolved correctly")
+	if got[0].Project != nil {
+		t.Errorf("expected nil project for ID-only lookup, got %+v", got[0].Project)
 	}
 }
 
 func TestFindOrder_ByProjectID(t *testing.T) {
 	docSummary := &boardapi.DocumentSummary{ID: 42}
 	project := &boardapi.ProjectEntity{ID: 100, ClientID: 10, Name: "Web Dev", Order: docSummary}
-	ord := &boardapi.OrderEntity{ID: 42, ClientID: 10, ProjectID: 100, Title: "O1"}
+	ord := &boardapi.OrderEntity{ID: 42, Total: "80000.0"}
 
 	svc := newServiceWith(
 		&stubClientRepo{getResult: &boardapi.ClientEntity{ID: 10}},
@@ -63,7 +65,7 @@ func TestFindOrder_ByClientName(t *testing.T) {
 	projects := []boardapi.ProjectEntity{
 		{ID: 100, ClientID: 10, Name: "P1", Order: docSummary},
 	}
-	ord := &boardapi.OrderEntity{ID: 1, ClientID: 10, ProjectID: 100, Title: "O1"}
+	ord := &boardapi.OrderEntity{ID: 1, Total: "50000.0"}
 
 	svc := newServiceWith(
 		&stubClientRepo{searchResult: clients, getResult: &boardapi.ClientEntity{ID: 10}},
@@ -82,7 +84,7 @@ func TestFindOrder_ByProjectName(t *testing.T) {
 	projects := []boardapi.ProjectEntity{
 		{ID: 100, ClientID: 10, Name: "Web Dev", Order: docSummary},
 	}
-	ord := &boardapi.OrderEntity{ID: 1, ClientID: 10, ProjectID: 100, Title: "O1"}
+	ord := &boardapi.OrderEntity{ID: 1, Total: "80000.0"}
 
 	svc := newServiceWith(
 		&stubClientRepo{getResult: &boardapi.ClientEntity{ID: 10}},
@@ -96,13 +98,16 @@ func TestFindOrder_ByProjectName(t *testing.T) {
 	assertOrderResultLen(t, got, 1)
 }
 
+// TestFindOrder_ByClientNameWithStatus: Status クエリパラメータを受け付けるが、
+// M36 時点では Status post-filter は無効（OrderEntity に Status フィールド無し）。
+// TODO(M25-M32): Status post-filter を再設計で復元する。
 func TestFindOrder_ByClientNameWithStatus(t *testing.T) {
 	clients := []boardapi.ClientEntity{{ID: 10, Name: "ABC"}}
 	docSummary := &boardapi.DocumentSummary{ID: 1}
 	projects := []boardapi.ProjectEntity{
 		{ID: 100, ClientID: 10, Name: "P1", Order: docSummary},
 	}
-	ord := &boardapi.OrderEntity{ID: 1, ClientID: 10, Status: "confirmed", Title: "O1"}
+	ord := &boardapi.OrderEntity{ID: 1, Total: "50000.0"}
 
 	svc := newServiceWith(
 		&stubClientRepo{searchResult: clients, getResult: &boardapi.ClientEntity{ID: 10}},
@@ -113,6 +118,7 @@ func TestFindOrder_ByClientNameWithStatus(t *testing.T) {
 
 	got, err := svc.FindOrder(testCtx, find.FindOrderQuery{ClientName: "ABC", Status: "confirmed"})
 	assertNoError(t, err)
+	// Status post-filter は無効のため、条件に関係なく 1 件返る
 	assertOrderResultLen(t, got, 1)
 }
 
@@ -148,11 +154,12 @@ func TestFindOrder_NoMatchByClientName(t *testing.T) {
 	assertOrderResultLen(t, got, 0)
 }
 
+// TestFindOrder_ClientResolutionFailure: ID lookup では enrichment しないため
+// client error は発生しない。結果は Client=nil で正常に返る。
 func TestFindOrder_ClientResolutionFailure(t *testing.T) {
-	ord := &boardapi.OrderEntity{ID: 1, ClientID: 10, ProjectID: 100}
+	ord := &boardapi.OrderEntity{ID: 1, Total: "90000.0"}
 	svc := newServiceWith(
-		&stubClientRepo{err: errors.New("client error")}, nil, nil,
-		&stubProjectRepo{getResult: &boardapi.ProjectEntity{ID: 100}},
+		nil, nil, nil, nil,
 		&stubOrderRepo{getByDocIDResult: ord},
 	)
 
@@ -160,15 +167,16 @@ func TestFindOrder_ClientResolutionFailure(t *testing.T) {
 	assertNoError(t, err)
 	assertOrderResultLen(t, got, 1)
 	if got[0].Client != nil {
-		t.Error("expected nil client on resolution failure")
+		t.Error("expected nil client for ID-only lookup")
 	}
 }
 
+// TestFindOrder_ProjectResolutionFailure: ID lookup では enrichment しないため
+// project error は発生しない。結果は Project=nil で正常に返る。
 func TestFindOrder_ProjectResolutionFailure(t *testing.T) {
-	ord := &boardapi.OrderEntity{ID: 1, ClientID: 10, ProjectID: 100}
+	ord := &boardapi.OrderEntity{ID: 1, Total: "90000.0"}
 	svc := newServiceWith(
-		&stubClientRepo{getResult: &boardapi.ClientEntity{ID: 10}}, nil, nil,
-		&stubProjectRepo{err: errors.New("project error")},
+		nil, nil, nil, nil,
 		&stubOrderRepo{getByDocIDResult: ord},
 	)
 
@@ -176,17 +184,16 @@ func TestFindOrder_ProjectResolutionFailure(t *testing.T) {
 	assertNoError(t, err)
 	assertOrderResultLen(t, got, 1)
 	if got[0].Project != nil {
-		t.Error("expected nil project on resolution failure")
+		t.Error("expected nil project for ID-only lookup")
 	}
 }
 
 // --- FindOrder: Priority ---
 
 func TestFindOrder_IDPriorityOverProjectID(t *testing.T) {
-	ord := &boardapi.OrderEntity{ID: 1, ClientID: 10, Title: "By ID"}
+	ord := &boardapi.OrderEntity{ID: 1, Total: "90000.0"}
 	svc := newServiceWith(
-		&stubClientRepo{getResult: &boardapi.ClientEntity{ID: 10}},
-		nil, nil,
+		nil, nil, nil,
 		&stubProjectRepo{},
 		&stubOrderRepo{getByDocIDResult: ord},
 	)
@@ -210,7 +217,7 @@ func TestFindOrder_Limit(t *testing.T) {
 		{ID: 101, ClientID: 10, Name: "P2", Order: docSummary2},
 		{ID: 102, ClientID: 10, Name: "P3", Order: docSummary3},
 	}
-	ord := &boardapi.OrderEntity{ID: 1, Title: "O"}
+	ord := &boardapi.OrderEntity{ID: 1, Total: "50000.0"}
 
 	svc := newServiceWith(
 		nil, nil, nil,

@@ -9,17 +9,21 @@ import (
 
 // OrderEntity is a BOARD API order entity.
 // Retrieved via GET /v1/documents/orders/{documentID}.
+// フィールドは実 API レスポンス（tmp/e2e-artifacts/orders_*.json）に準拠。
 type OrderEntity struct {
-	ID          int     `json:"id"`
-	ClientID    int     `json:"client_id"`
-	ProjectID   int     `json:"project_id"`
-	Title       string  `json:"title"`
-	TotalAmount float64 `json:"total_amount"`
-	Status      string  `json:"status"`
-	OrderDate   string  `json:"order_date"` // ISO 8601 date
-	Memo        string  `json:"memo"`
-	UpdatedAt   string  `json:"updated_at"` // ISO 8601
-	CreatedAt   string  `json:"created_at"` // ISO 8601
+	ID                    int                    `json:"id"`
+	Message               *string                `json:"message"`
+	Total                 string                 `json:"total"`
+	Tax                   string                 `json:"tax"`
+	TaxWithholding        string                 `json:"tax_withholding"`
+	SealApprovalStatus    int                    `json:"seal_approval_status"`
+	DocumentAmountDispKbn int                    `json:"document_amount_disp_kbn"`
+	BlankDateFlg          int                    `json:"blank_date_flg"`
+	LockFlg               int                    `json:"lock_flg"`
+	DeliveryPlace         *string                `json:"delivery_place"`
+	Details               []DocumentDetailEntity `json:"details"`
+	DispOrderDate         *string                `json:"disp_order_date"`
+	DispOrderReceiveDate  *string                `json:"disp_order_receive_date"`
 }
 
 // GetOrder retrieves the order with the specified document ID.
