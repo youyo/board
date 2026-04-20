@@ -9,8 +9,8 @@
 | 対象リポジトリ | /Users/youyo/src/github.com/youyo/board |
 | 親プラン | plans/vivid-strolling-ocean.md |
 | 作成日 | 2026-04-20 |
-| 最終更新 | 2026-04-20 17:30 |
-| ステータス | M04 完了（未マップ 1 件 + Get API 非対応 + Search filter 無効を発見、実装修正は別 M で対応） |
+| 最終更新 | 2026-04-20 17:40 |
+| ステータス | M05 完了（**当該アカウントで 403 Forbidden = API 非提供**を発見。List/Get/Search 全て取得不能のためフィールド突合は未達、権限付与後に再検証） |
 
 ## 背景と動機
 - 直近 `271cba3` で UserEntity/ContactEntity/VendorContactEntity に計 6 フィールドもの実 API 不整合が発覚。
@@ -41,9 +41,9 @@
 - 失敗した M は `Blockers` に転記、ユーザー判断待ちに。
 
 ## Current Focus
-- **マイルストーン**: M05 document_send_channels
-- **直近の完了**: M04 実 API E2E 実行で 1 未マップ（`archive_flg`）+ Get 404（API 非対応）+ Search name フィルタ無効を発見。M03 と同じパターンの仕様差異が確定しつつある。E2E は意図的に Fail 状態で commit（Entity 修正は別 M/別 commit で対応）
-- **次のアクション**: M05 (document_send_channels) を着手
+- **マイルストーン**: M06 purchase_types
+- **直近の完了**: M05 実 API E2E 実行で **List/Get/Search 全て 403 Forbidden**（`許可されていません。`）を検出。同じ credentials で M02-M04 の他マスタ系は 200 を返しているため、**当該アカウントには document_send_channels の権限が付与されていない or BOARD が API 提供していない**と判断。M03/M04 の Get 404・name filter 無効とは異なる新パターン（リソース全体 403）を compliance finding として記録。E2E は意図的に Fail 状態で commit、フィールド突合は権限付与後に再検証
+- **次のアクション**: M06 (purchase_types) を着手
 
 ## Progress
 
@@ -106,11 +106,19 @@
   - `SearchPaymentTerms` の `Name` パラメータが効かない件をドキュメント化または削除
   - M03/M04 で同現象が 2 件確定したため、M05 以降のマスタ系でも同パターン観測可能性を織り込んで計画
 
-#### M05: document_send_channels 完走
-- [ ] E2E: List / Get / Search
-- [ ] 厳格フィールド突合
-- 見積: ~5 req
-- 詳細: plans/board-compliance-m05-document-send-channels.md（着手時生成）
+#### M05: document_send_channels 完走 🟡（List/Get/Search 全て 403 Forbidden = 当該アカウントで API 非提供、厳格フィールド突合は未達）
+- [x] Raw 層 3 本追加（List/Get/Search）
+- [x] Unit 5/5 Green（RoundTripper mock、共通ヘルパ再利用）
+- [x] E2E: List / Get / Search 実行
+- [x] 厳格フィールド突合は **未達**（403 のため JSON 応答を取得できず）
+- [x] `GET /v1/document_send_channels` / `/v1/document_send_channels?name=...` 全て 403 Forbidden（`許可されていません。`）を返す → **当該アカウントでは API 非提供**（同 credentials で M02-M04 の他マスタ系は 200 のため、環境/認証要因ではない）
+- 見積: ~5 req / 実績: **3 req**（List 1 + List 再呼 1 + Search 1。Get 本体は discovery 段階で Fatalf のため未到達）
+- E2E 結果: List FAIL（403）/ Get FAIL（403、discovery 段階）/ Search FAIL（403）
+- 詳細: plans/board-compliance-m05-document-send-channels.md
+- **フォローアップ（別 commit / 別 M で対応予定）**:
+  - `DocumentSendChannelEntity` のフィールド突合は BOARD 側で権限付与もしくは API 提供が始まった時点で再実行
+  - `ListDocumentSendChannels` / `GetDocumentSendChannel` / `SearchDocumentSendChannels` / `ListDocumentSendChannelsPage` の公開 API そのものの妥当性（BOARD がそもそも提供しないなら削除 or ドキュメントで注意喚起）を検討
+  - M03/M04 の Get 404 / name filter 無効 / archive_flg 欠落 / Memo 逆方向不整合に加え、M05 で **リソース全体 403** の新パターンが確認された。M06 `purchase_types` 以降では取得自体が拒否されるシナリオも織り込む
 
 #### M06: purchase_types Search/Get 追補
 - [ ] E2E: Get（既存 List を活用）
@@ -334,6 +342,7 @@
 | M | リソース | 未検証テスト | 理由 | 再実行コマンド |
 |---|---------|-------------|------|----------------|
 | M02 | accounting_types | Get | List 0 件 | `go test -tags e2e -v -count=1 -run TestE2E_AccountingTypes_Get ./internal/boardapi/` |
+| M05 | document_send_channels | List / Get / Search | 403 Forbidden（当該アカウントで API 非提供） | 権限付与後: `go test -tags e2e -v -count=1 -run TestE2E_DocumentSendChannels ./internal/boardapi/` |
 
 ## Architecture Decisions
 | # | 決定 | 理由 | 日付 |
@@ -353,3 +362,4 @@
 | 2026-04-20 17:08 | M02 検証 | sandbox の HTTPS proxy 許可ホスト追加で Go TLS 問題解消。実 API E2E 実行成功: List/Search PASS（共に 0 items）、Get は List 0 件のため Skip。データ依存 skip 規約を運用ルールに追加し、Get を Pending Re-verification に転記。実消費 3 req（見積 5 req 以下）。 |
 | 2026-04-20 17:22 | M03 実装・検証 | `ListProjectTypesRaw`/`GetProjectTypeRaw`/`SearchProjectTypesRaw` を M02 と同形式で追加。Unit 5/5 Green。実 API E2E で **3 未マップフィールド検出**（`archive_flg`, `company_bank_id`, `company_bank_name`）、**`Memo` フィールドが実 API に不在**、**`GET /v1/project_types/{id}` が 404 = API 非対応**、**`name` パラメータが無視される**ことを発見。E2E は意図的に Fail 状態で commit、Entity 修正は別 M で対応。実消費 4 req（見積 5 req 以下）。 |
 | 2026-04-20 17:30 | M04 実装・検証 | `ListPaymentTermsRaw`/`GetPaymentTermRaw`/`SearchPaymentTermsRaw` を M03 と同形式で追加。Unit 5/5 Green（既存の `roundTripperFunc`/`jsonResp` を再利用）。実 API E2E で **1 未マップ検出**（`archive_flg`）、**`Memo` フィールドが実 API に不在**（逆方向不整合、M03 と同現象）、**`GET /v1/payment_terms/{id}` が 404 = API 非対応**（M03 と同現象）、**`name` パラメータが無視される**（M03 と同現象）ことを発見。マスタ系リソースで個別 Get 非対応 + name フィルタ無効の傾向が 2 件確定。E2E は意図的に Fail 状態で commit。実消費 4 req（見積 5 req 以下）。 |
+| 2026-04-20 17:40 | M05 実装・検証 | `ListDocumentSendChannelsRaw`/`GetDocumentSendChannelRaw`/`SearchDocumentSendChannelsRaw` を M04 と同形式で追加。Unit 5/5 Green。実 API E2E で **List/Get/Search 全 3 テストが 403 Forbidden**（`許可されていません。`）を返却。同一 credentials で M02-M04 の他マスタ系は 200 を返すため、**当該アカウントに document_send_channels の権限がない or BOARD が API 提供していない**と判断。M03/M04 の「Get のみ 404」「name フィルタ無効」とは異なる **リソース全体 403** の新パターンを compliance finding として記録。フィールド突合は権限付与後に再検証（Pending Re-verification 転記）。E2E は意図的に Fail 状態で commit。実消費 3 req（見積 5 req 以下）。 |
