@@ -76,10 +76,11 @@ func findAnyDocumentID(t *testing.T, client *boardapi.Client, docType string) (p
 ## Rate Limit
 
 - 走査上限: `maxProjects = 3`
-- 最悪ケース: List 1 + GetProjectWithGroupRaw × 3 = **4 req**
-- 期待ケース: List 1 + GetProjectWithGroupRaw × 1 = **2 req**（最初の project が estimate を持つ場合）
-- smoke test（estimate 1件のみ）: **~2 req**
-- M17 合計: **~4 req**
+- **重要**: project 一覧取得は `ListProjectsPage(1, maxDiscoveryProjects)` を使用（`ListProjectsRaw` は `ListAll` で全ページ走査するため NG）
+- 最悪ケース: `ListProjectsPage` 1 + `GetProjectWithGroupRaw` × 3 = **4 req**
+- 期待ケース: `ListProjectsPage` 1 + `GetProjectWithGroupRaw` × 1 = **2 req**（最初の project が estimate を持つ場合）
+- smoke test（estimate 1件のみ）: **2 req・0.69 秒**（実測値）
+- M17 合計: **2 req**
 
 ## テスト方針
 
@@ -117,4 +118,5 @@ func findAnyDocumentID(t *testing.T, client *boardapi.Client, docType string) (p
 |------|------|
 | 2026-04-21 | M17 着手・計画生成 |
 | 2026-04-21 | `findAnyDocumentID` 実装完了 |
-| 2026-04-21 | 実 API smoke test（estimate）PASS: projectID=95944469 documentID=105287235、実消費 **2 req**（List 1 + GetProjectWithGroupRaw 1） |
+| 2026-04-21 | 実 API smoke test（estimate）PASS: projectID=95944469 documentID=105287235（初回は `ListProjectsRaw+WithPerPage` で全ページ走査＝257 秒・約 800 req を消費するバグを発見） |
+| 2026-04-21 | `ListProjectsPage(1, maxDiscoveryProjects)` に切り替え。修正後 smoke test: **0.69 秒・2 req**（`ListProjectsPage` 1 + `GetProjectWithGroupRaw` 1） |

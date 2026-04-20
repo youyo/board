@@ -140,32 +140,25 @@ func findAnyDocumentID(t *testing.T, client *boardapi.Client, docType string) (p
 
 	ctx := context.Background()
 
-	// Step 1: project ID 一覧を取得（1 req）
-	listRaw, err := client.ListProjectsRaw(ctx, boardapi.WithPerPage(maxDiscoveryProjects))
+	// Step 1: 先頭 maxDiscoveryProjects 件のみ取得（1 req、全ページ走査を避ける）
+	// ListProjectsRaw は ListAll を使うため全ページを走査してしまう。
+	// ListProjectsPage(page=1, perPage=maxDiscoveryProjects) で単一ページのみ取得する。
+	page, err := client.ListProjectsPage(ctx, 1, maxDiscoveryProjects)
 	if err != nil {
-		t.Skipf("findAnyDocumentID: ListProjectsRaw failed: %v", err)
+		t.Skipf("findAnyDocumentID: ListProjectsPage failed: %v", err)
 	}
-
-	// project ID だけ抽出する最小 probe
-	var projectProbes []struct {
-		ID int `json:"id"`
-	}
-	if err := json.Unmarshal(listRaw, &projectProbes); err != nil {
-		t.Fatalf("findAnyDocumentID: unmarshal project list: %v", err)
-	}
-	if len(projectProbes) == 0 {
+	if len(page.Items) == 0 {
 		t.Skipf("findAnyDocumentID: no projects found; %s discovery pending re-verification", docType)
 	}
 
-	// 上限 maxDiscoveryProjects 件に絞る（ListProjectsRaw は perPage=3 を渡しているが念のため）
-	limit := len(projectProbes)
+	limit := len(page.Items)
 	if limit > maxDiscoveryProjects {
 		limit = maxDiscoveryProjects
 	}
 
 	// Step 2: 上位 limit 件を docType 付きで走査
 	for i := 0; i < limit; i++ {
-		pid := projectProbes[i].ID
+		pid := page.Items[i].ID
 		if pid <= 0 {
 			continue
 		}
