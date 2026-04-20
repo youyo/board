@@ -45,8 +45,11 @@ import (
 // TestE2E_Projects_List / TestE2E_Projects_GetByID / TestE2E_Projects_GetWithGroup
 // は M13 で厳格フィールド突合付き（List/Get/Search + GetWithGroup 全 6
 // response_group）の版に一本化したため e2e_projects_test.go へ移動（M12
-// clients と同パターン）。TestE2E_Estimates_GetByDocumentID は M17 docID
-// discovery helper のスコープなので本ファイルに残す。
+// clients と同パターン）。
+
+// --- Estimates ---
+// TestE2E_Estimates_Get は M18 で M17 helper 経由の厳格突合版に一本化したため
+// e2e_estimates_test.go へ移動。
 
 // --- Invoices ---
 
@@ -86,44 +89,6 @@ func TestE2E_Clients_ListPage(t *testing.T) {
 		t.Errorf("Items expected <= 5, got %d", len(pr.Items))
 	}
 	t.Logf("ListClientsPage: total=%d page=%d items=%d", pr.TotalCount, pr.Page, len(pr.Items))
-}
-
-// --- Estimates (document path) ---
-
-func TestE2E_Estimates_GetByDocumentID(t *testing.T) {
-	client := newE2EClient(t)
-	ctx := context.Background()
-
-	// Find a project that has an estimate via response_group.
-	projects, err := client.ListProjects(ctx)
-	if err != nil {
-		skipIfNotFound(t, err, "ListProjects")
-		t.Fatalf("ListProjects: %v", err)
-	}
-
-	var documentID int
-	for _, p := range projects {
-		pw, err := client.GetProjectWithGroup(ctx, p.ID, "estimate")
-		if err != nil {
-			continue
-		}
-		if pw.Estimate != nil && pw.Estimate.ID > 0 {
-			documentID = pw.Estimate.ID
-			t.Logf("Found estimate document ID %d on project %d (%s)", documentID, p.ID, p.Name)
-			break
-		}
-	}
-	if documentID == 0 {
-		t.Skip("no projects have estimates; cannot test GetEstimate")
-	}
-
-	est, err := client.GetEstimate(ctx, documentID)
-	if err != nil {
-		skipIfNotFound(t, err, "GetEstimate")
-		t.Fatalf("GetEstimate(%d): %v", documentID, err)
-	}
-	requirePositiveID(t, est.ID, "GetEstimate.ID")
-	t.Logf("GetEstimate: id=%d title=%q project_id=%d total=%.0f", est.ID, est.Title, est.ProjectID, est.TotalAmount)
 }
 
 // --- PurchaseOrders (expenditures path) ---
