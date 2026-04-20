@@ -9,8 +9,8 @@
 | 対象リポジトリ | /Users/youyo/src/github.com/youyo/board |
 | 親プラン | plans/vivid-strolling-ocean.md |
 | 作成日 | 2026-04-20 |
-| 最終更新 | 2026-04-20 18:15 |
-| ステータス | M08 完了（List PASS（26 items, unmapped 0）/ Get FAIL（404 = マスタ系 4 件連続）/ Search PASS（26 items, unmapped 0, name filter 無視 = 4 件連続）。`UserEntity.Name` が逆方向不整合（実 API に name キー不在）。Unit 5/5 Green） |
+| 最終更新 | 2026-04-20 18:40 |
+| ステータス | M09 完了（List FAIL（10 items, unmapped **7**）/ Get FAIL（**200 成功 = マスタ系 Get 404 が Phase D で切れた**、unmapped 7 + 既存 5 フィールド逆方向不整合）/ Search FAIL（10 items, unmapped 7, name filter 無視 = **5 件連続**）。Unit 5/5 Green。`ClientBranchEntity` は 10 フィールド中 5 つが逆方向不整合（`ClientID/PostalCode/Address/Phone/Memo` が実 API に存在せず）。親 client のネスト構造 `client:{id,name,name_disp,custom_no}` が新発見） |
 
 ## 背景と動機
 - 直近 `271cba3` で UserEntity/ContactEntity/VendorContactEntity に計 6 フィールドもの実 API 不整合が発覚。
@@ -41,9 +41,9 @@
 - 失敗した M は `Blockers` に転記、ユーザー判断待ちに。
 
 ## Current Focus
-- **マイルストーン**: M09 client_branches
-- **直近の完了**: M08 実 API E2E 実行で **List PASS（26 items, unmapped 0）/ Get FAIL（404 = マスタ系 4 件連続）/ Search PASS（26 items, unmapped 0, name filter 無視 4 件連続）**。271cba3 で追加された 6 フィールド（last_name / first_name / role_id / role_name / last_sign_in_at / valid_flg）は **全 26 件で完全に埋まっており実 API と完全一致**（`last_sign_in_at` は長さ 29 の ISO 8601 で null 欠落なし）。一方で **実 API に `name` キーが不在**（`UserEntity.Name` の逆方向不整合、M03/M04/M06 の `Memo` と同現象、マスタ系で 4 件目）。Unit は 5/5 Green。リソース全体 403 や 429 は発生せず。
-- **次のアクション**: M09 (client_branches) を着手
+- **マイルストーン**: M10 contacts
+- **直近の完了**: M09 実 API E2E 実行で **Phase D（コア業務）1 件目の結果**: List FAIL（10 items, unmapped **7 件**）/ Get FAIL（**200 成功** = マスタ系 Get 404 パターンが Phase D で切れた、unmapped 7 件 + 既存 5 フィールド逆方向不整合で空値化）/ Search FAIL（10 items, unmapped 7 件, **name filter 無視 5 件連続**）。実 API キー構成（12 個）: `[id, name, zip, pref, address1, address2, tel, fax, archive_flg, client, updated_at, created_at]`。**親 client のネスト構造** `client:{id, name, name_disp, custom_no}` が新発見（Phase D 固有リスクが的中）。既存 `ClientBranchEntity` は 10 フィールド中 **5 フィールド**（`ClientID / PostalCode / Address / Phone / Memo`）が実 API に存在せず逆方向不整合、マッチするのは 5 つ（`id / name / fax / updated_at / created_at`）のみ。Unit 5/5 Green。403/429/リソース全体 403 は発生せず。
+- **次のアクション**: M10 (contacts, 19 フィールド) を着手
 
 ## Progress
 
@@ -179,11 +179,23 @@
 
 ### Phase D: コア業務（未カバー）
 
-#### M09: client_branches 完走
-- [ ] E2E: List / Get / Search
-- [ ] 厳格フィールド突合（ClientBranchEntity 11 フィールド）
-- 見積: ~8 req
-- 詳細: plans/board-compliance-m09-client-branches.md（着手時生成）
+#### M09: client_branches 完走 🟡（Phase D 1 件目、List/Get/Search すべて意図的 Fail = 未マップ 7 フィールド + 既存 5 フィールド逆方向不整合）
+- [x] Raw 層 3 本追加（List/Get/Search）
+- [x] Unit 5/5 Green（RoundTripper mock、共通ヘルパ再利用、`ClientID+Name` の 2 クエリ検証）
+- [x] E2E: List / Get / Search 実行
+- [x] 厳格フィールド突合で 7 未マップ検出: `address1, address2, archive_flg, client, pref, tel, zip`
+- [x] `GET /v1/client_branches/{id}` は **200 成功**（マスタ系 4 件連続 Get 404 が Phase D で切れた、コア業務系は個別 Get を提供）
+- [x] `name` パラメータは無視される（検索しても 10 items 全件返却、M03/M04/M06/M08 と同現象、**5 件連続**、コア業務系でも継続）
+- [x] **親 client の ネスト構造**: `client: { id, name, name_disp, custom_no }` の 4 キー構造体が同梱（Phase D 固有リスクが的中、マスタ系では未観測）
+- [x] **既存 `ClientBranchEntity` は 5 フィールドが逆方向不整合**: `ClientID / PostalCode / Address / Phone / Memo` が実 API に存在せず、対応関係は `client_id → client.id` / `postal_code → zip` / `address → address1+address2` / `phone → tel` / `memo → 存在しない`
+- 見積: ~8 req / 実績: **4 req**（List 1 + Get discovery 1 + Get 本体 1 + Search 1、上限 10 req 以下）
+- E2E 結果: List FAIL（10 items, 7 unmapped）/ Get FAIL（200、7 unmapped + 5 逆方向 = `name` 以外ほぼ空値）/ Search FAIL（10 items, 7 unmapped, filter 無視）
+- 詳細: plans/board-compliance-m09-client-branches.md
+- **フォローアップ（別 commit / 別 M で対応予定、M09 は Phase D 1 件目として独立重要度高）**:
+  - **`ClientBranchEntity` の全面再設計**（最優先別 M）: 削除候補 5 フィールド + 追加候補 6 フィールド（ネスト `Client` 含む）。271cba3 UserEntity 修正と同等規模の影響（service/find / repository / mcp / cli 総点検）
+  - **`ClientBranchSearchParams.ClientID` の実機能確認**: 本 M ではクエリエンコードのみ U5 で確認、実 API が本当に絞り込むかは別 M で ClientID 指定 E2E 追加
+  - **`name` フィルタ無視はコア業務系でも継続確定（5 件連続）**: M10 contacts 以降のコア業務系 E2E は「filter 無視前提」で設計、Search テストは件数ではなく StrictFieldDiff と artifact 収集を主目的とする
+  - **ロードマップ本文「11 フィールド」表記修正**: 実 API は 12 キー（ネスト `client` を含む。展開すれば 15）。ただし表面的なトップレベル JSON キー数 = 12
 
 #### M10: contacts 完走（19 フィールド）
 - [ ] E2E: List / Get / Search
@@ -398,4 +410,5 @@
 | 2026-04-20 17:40 | M05 実装・検証 | `ListDocumentSendChannelsRaw`/`GetDocumentSendChannelRaw`/`SearchDocumentSendChannelsRaw` を M04 と同形式で追加。Unit 5/5 Green。実 API E2E で **List/Get/Search 全 3 テストが 403 Forbidden**（`許可されていません。`）を返却。同一 credentials で M02-M04 の他マスタ系は 200 を返すため、**当該アカウントに document_send_channels の権限がない or BOARD が API 提供していない**と判断。M03/M04 の「Get のみ 404」「name フィルタ無効」とは異なる **リソース全体 403** の新パターンを compliance finding として記録。フィールド突合は権限付与後に再検証（Pending Re-verification 転記）。E2E は意図的に Fail 状態で commit。実消費 3 req（見積 5 req 以下）。 |
 | 2026-04-20 17:55 | M06 実装・検証 | `ListPurchaseTypesRaw`/`GetPurchaseTypeRaw`/`SearchPurchaseTypesRaw` を M04 と完全同形で追加（エンドポイントは `/v1/expenditure_types`、命名不一致は既存仕様維持）。既存 `e2e_test.go` にあった軽量 `TestE2E_PurchaseTypes_List` は重複のため削除し、M06 の厳格突合版に一本化。Unit 5/5 Green。実 API E2E で **1 未マップ検出**（`archive_flg`、M04 と同じ）、**`Memo` フィールドが実 API に不在**（M03/M04 と同現象）、**`GET /v1/expenditure_types/{id}` が 404 = API 非対応**（M03/M04 と同現象、**マスタ系 Get 404 が 3 件連続**）、**`name` パラメータが無視される**（M03/M04 と同現象、5 items 全件返却）ことを発見。マスタ系で「Get 404 + name 無効 + archive_flg 欠落 + Memo 逆方向」パターンが 3 件で固定化。E2E は意図的に Fail 状態で commit。実消費 4 req（見積 3 req → 上限 5 req 以内）。 |
 | 2026-04-20 18:05 | M07 実装・検証 | `ListGroupsRaw` / `GetGroupRaw` を追加（**Search Raw は M07 スコープ外として意図的に未提供**、ロードマップ M07 定義「Get（既存 List 前提）+ 厳格突合（GroupEntity）」厳守）。既存 `e2e_test.go` の軽量 `TestE2E_Groups_List` は M06 と同パターンで削除し M07 厳格突合版に一本化。Unit 5/5 Green（既存 `roundTripperFunc`/`jsonResp` を再利用、Search 1 ケースの代わりに「既定 per_page=100 検証」を 5 本目として追加）。実 API E2E で **`GET /v1/groups` が 200 / 0 items / response body `null`**（M02 accounting_types と同パターン）を確認。List 0 件のため Get は `t.Skipf("pending re-verification")` で停止、List 厳格突合も実データなしのため未マップ検出機会なし。マスタ系の傾向（Get 404 / archive_flg / Memo 逆方向 / リソース 403）は M07 では **発生せず**（403/429 ともに無し）。実消費 **2 req**（List 1 + Get 内 discovery List 1）、見積 3 req 以下。Pending Re-verification に M07 を追加（データ投入後の再実行で `GroupEntity` 構造の準拠を検証）。 |
+| 2026-04-20 18:40 | M09 実装・検証 | `ListClientBranchesRaw` / `GetClientBranchRaw` / `SearchClientBranchesRaw` を M08 users と同形で追加（既存 `client_branches.go` に追記、URL `/v1/client_branches` top-level、`ClientBranchSearchParams` は `ClientID+Name` の 2 クエリ）。Unit 5/5 Green。実 API E2E で **Phase D 1 件目として重要発見を複数**: ①`GET /v1/client_branches/{id}` が **200 成功**（マスタ系 Get 404 パターンが Phase D で切れた、コア業務系は個別 Get 提供）、②**7 未マップフィールド**（`address1, address2, archive_flg, client, pref, tel, zip`）= 既存 `ClientBranchEntity` のキー名が軒並み実 API と不一致、③**既存 5 フィールドが逆方向不整合**（`ClientID / PostalCode / Address / Phone / Memo` が実 API に存在しない）、④**親 client のネスト構造** `client:{id, name, name_disp, custom_no}` が新発見（Phase D 固有リスクが的中、マスタ系では未観測）、⑤**`name` フィルタ無視 5 件連続**（マスタ系 4 件に加えコア業務系でも継続、BOARD API 全般の仕様と判断可能）、⑥リソース全体 403 / 429 は発生せず。既存 `ClientBranchEntity` 10 フィールド中マッチは 5 つ（`id / name / fax / updated_at / created_at`）のみで、Entity 全面改訂フォローアップが必要（271cba3 UserEntity 修正と同等規模）。E2E は意図的に Fail 状態で commit。実消費 **4 req**（List 1 + Get discovery 1 + Get 本体 1 + Search 1、見積 8 req → 上限 10 req 以内）。Pending Re-verification 追加なし。 |
 | 2026-04-20 18:15 | M08 実装・検証 | `ListUsersRaw` / `GetUserRaw` / `SearchUsersRaw` を M06 purchase_types と同形で追加（URL は `/v1/users`、命名一致）。既存 `e2e_test.go` の軽量 `TestE2E_Users_List` / `TestE2E_Users_GetByID` は M06/M07 と同パターンで削除し M08 厳格突合版に一本化。Unit 5/5 Green（既存 `roundTripperFunc` / `jsonResp` を再利用、`UserSearchParams` は Name/Email/UpdatedAtFrom の 3 クエリ検証）。実 API E2E で **List PASS（26 items, 未マップ 0）/ Get FAIL（404 = API 非対応、M03/M04/M06 と同現象、マスタ系 4 件連続）/ Search PASS（26 items, 未マップ 0, name フィルタ無視 4 件連続）**を確認。271cba3（2026-04-17）で追加された 6 フィールド（`last_name / first_name / role_id / role_name / last_sign_in_at / valid_flg`）は **全 26 件で完全に埋まっており実 API と完全一致**（`last_sign_in_at` は全件長さ 29 の ISO 8601 で null 欠落なし、`role_id = {1,2,4}`、`valid_flg = {1}`）、修正の妥当性を実証。一方で **実 API レスポンスに `name` キーが不在**（全 26 件で `has("name") == false`）→ `UserEntity.Name` は **逆方向不整合**（M03/M04/M06 の `Memo` と同現象、マスタ系で **4 件目**）。`DisplayName()` は常に LastName+FirstName 経路で動作することを実証。リソース全体 403 / 429 / TLS 異常: **発生せず**。実消費 **4 req**（List 1 + Get discovery 1 + Get 本体 1 + Search 1）、見積 5 req 以下。Pending Re-verification 追加なし（Get のみ API 非対応の固定 Fail で pending ではない）。 |

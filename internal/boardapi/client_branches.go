@@ -125,3 +125,83 @@ func (c *Client) ListClientBranchesPage(ctx context.Context, page, perPage int) 
 	}
 	return ListPage[ClientBranchEntity](c, ctx, makeReq, page, perPage)
 }
+
+// ListClientBranchesRaw retrieves all customer branches and returns the raw
+// HTTP response bodies merged across pages as a single JSON array. Unlike
+// ListClientBranches, the returned bytes are byte-preserving: each element
+// JSON is exactly what the BOARD API emitted, enabling strict field diff in
+// E2E tests to detect keys that are not mapped to ClientBranchEntity.
+//
+// Intended for E2E strict field diff; regular callers should use
+// ListClientBranches.
+func (c *Client) ListClientBranchesRaw(ctx context.Context, opts ...ListAllOption) ([]byte, error) {
+	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/client_branches", nil)
+		if err != nil {
+			return nil, err
+		}
+		q := req.URL.Query()
+		q.Set("page", strconv.Itoa(page))
+		q.Set("per_page", strconv.Itoa(perPage))
+		req.URL.RawQuery = q.Encode()
+		return req, nil
+	}
+	items, err := c.ListAll(ctx, makeReq, opts...)
+	if err != nil {
+		return nil, err
+	}
+	out, err := json.Marshal(items)
+	if err != nil {
+		return nil, &APIError{Code: APIErrorUnknown, Message: "ListClientBranchesRaw: marshal aggregate: " + err.Error()}
+	}
+	return out, nil
+}
+
+// GetClientBranchRaw retrieves a single customer branch and returns the raw
+// HTTP response body byte-for-byte.
+//
+// Intended for E2E strict field diff; regular callers should use
+// GetClientBranch.
+func (c *Client) GetClientBranchRaw(ctx context.Context, id int) ([]byte, error) {
+	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/client_branches/%d", id), nil)
+	if err != nil {
+		return nil, err
+	}
+	return c.DoWithRetry(req)
+}
+
+// SearchClientBranchesRaw retrieves customer branches matching the given
+// search parameters and returns the raw HTTP response bodies merged across
+// pages as a single JSON array. Same byte-preserving guarantee as
+// ListClientBranchesRaw.
+//
+// Intended for E2E strict field diff; regular callers should use
+// SearchClientBranches.
+func (c *Client) SearchClientBranchesRaw(ctx context.Context, params ClientBranchSearchParams, opts ...ListAllOption) ([]byte, error) {
+	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/client_branches", nil)
+		if err != nil {
+			return nil, err
+		}
+		q := req.URL.Query()
+		q.Set("page", strconv.Itoa(page))
+		q.Set("per_page", strconv.Itoa(perPage))
+		if params.ClientID != 0 {
+			q.Set("client_id", strconv.Itoa(params.ClientID))
+		}
+		if params.Name != "" {
+			q.Set("name", params.Name)
+		}
+		req.URL.RawQuery = q.Encode()
+		return req, nil
+	}
+	items, err := c.ListAll(ctx, makeReq, opts...)
+	if err != nil {
+		return nil, err
+	}
+	out, err := json.Marshal(items)
+	if err != nil {
+		return nil, &APIError{Code: APIErrorUnknown, Message: "SearchClientBranchesRaw: marshal aggregate: " + err.Error()}
+	}
+	return out, nil
+}
