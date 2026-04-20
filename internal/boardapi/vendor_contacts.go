@@ -143,6 +143,98 @@ func (c *Client) SearchVendorContacts(ctx context.Context, params VendorContactS
 	return result, nil
 }
 
+// ListVendorContactsRaw retrieves all vendor contacts and returns the raw HTTP
+// response bodies merged across pages as a single JSON array. Each element
+// preserves the exact byte content returned by the BOARD API.
+//
+// Note: the real BOARD API path is /v1/payee_contacts.
+//
+// Intended for E2E strict field diff; regular callers should use
+// ListVendorContacts.
+func (c *Client) ListVendorContactsRaw(ctx context.Context, opts ...ListAllOption) ([]byte, error) {
+	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/payee_contacts", nil)
+		if err != nil {
+			return nil, err
+		}
+		q := req.URL.Query()
+		q.Set("page", strconv.Itoa(page))
+		q.Set("per_page", strconv.Itoa(perPage))
+		req.URL.RawQuery = q.Encode()
+		return req, nil
+	}
+	items, err := c.ListAll(ctx, makeReq, opts...)
+	if err != nil {
+		return nil, err
+	}
+	out, err := json.Marshal(items)
+	if err != nil {
+		return nil, &APIError{Code: APIErrorUnknown, Message: "ListVendorContactsRaw: marshal aggregate: " + err.Error()}
+	}
+	return out, nil
+}
+
+// GetVendorContactRaw retrieves a single vendor contact and returns the raw HTTP
+// response body byte-for-byte.
+//
+// Note: the real BOARD API path is /v1/payee_contacts/{id}.
+//
+// Intended for E2E strict field diff; regular callers should use
+// GetVendorContact.
+func (c *Client) GetVendorContactRaw(ctx context.Context, id int) ([]byte, error) {
+	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/payee_contacts/%d", id), nil)
+	if err != nil {
+		return nil, err
+	}
+	return c.DoWithRetry(req)
+}
+
+// SearchVendorContactsRaw retrieves vendor contacts matching the given search
+// parameters and returns the raw HTTP response bodies merged across pages as a
+// single JSON array. Same byte-preserving guarantee as ListVendorContactsRaw.
+//
+// VendorContactSearchParams exposes 4 filters (VendorID, Name, Email, UpdatedAtFrom).
+// Note that the BOARD API has been observed to ignore the `name` filter across
+// 9 consecutive milestones (M03-M13), so the Name value in Search only
+// exercises request encoding, not server-side filtering.
+//
+// Intended for E2E strict field diff; regular callers should use
+// SearchVendorContacts.
+func (c *Client) SearchVendorContactsRaw(ctx context.Context, params VendorContactSearchParams, opts ...ListAllOption) ([]byte, error) {
+	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/payee_contacts", nil)
+		if err != nil {
+			return nil, err
+		}
+		q := req.URL.Query()
+		q.Set("page", strconv.Itoa(page))
+		q.Set("per_page", strconv.Itoa(perPage))
+		if params.VendorID != 0 {
+			q.Set("vendor_id", strconv.Itoa(params.VendorID))
+		}
+		if params.Name != "" {
+			q.Set("name", params.Name)
+		}
+		if params.Email != "" {
+			q.Set("email", params.Email)
+		}
+		if params.UpdatedAtFrom != "" {
+			q.Set("updated_at_from", params.UpdatedAtFrom)
+		}
+		req.URL.RawQuery = q.Encode()
+		return req, nil
+	}
+	items, err := c.ListAll(ctx, makeReq, opts...)
+	if err != nil {
+		return nil, err
+	}
+	out, err := json.Marshal(items)
+	if err != nil {
+		return nil, &APIError{Code: APIErrorUnknown, Message: "SearchVendorContactsRaw: marshal aggregate: " + err.Error()}
+	}
+	return out, nil
+}
+
 // ListVendorContactsPage retrieves a single page of VendorContactEntity.
 func (c *Client) ListVendorContactsPage(ctx context.Context, page, perPage int) (*PageResult[VendorContactEntity], error) {
 	makeReq := func(ctx context.Context, p, pp int) (*http.Request, error) {
