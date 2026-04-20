@@ -120,3 +120,79 @@ func (c *Client) ListProjectTypesPage(ctx context.Context, page, perPage int) (*
 	}
 	return ListPage[ProjectTypeEntity](c, ctx, makeReq, page, perPage)
 }
+
+// ListProjectTypesRaw retrieves all project types and returns the raw HTTP
+// response bodies merged across pages as a single JSON array.
+// Unlike ListProjectTypes, the returned bytes are byte-preserving: each
+// element JSON is exactly what the BOARD API emitted, enabling strict field
+// diff in E2E tests to detect keys that are not mapped to ProjectTypeEntity.
+//
+// Intended for E2E strict field diff; regular callers should use ListProjectTypes.
+func (c *Client) ListProjectTypesRaw(ctx context.Context, opts ...ListAllOption) ([]byte, error) {
+	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/project_types", nil)
+		if err != nil {
+			return nil, err
+		}
+		q := req.URL.Query()
+		q.Set("page", strconv.Itoa(page))
+		q.Set("per_page", strconv.Itoa(perPage))
+		req.URL.RawQuery = q.Encode()
+		return req, nil
+	}
+	items, err := c.ListAll(ctx, makeReq, opts...)
+	if err != nil {
+		return nil, err
+	}
+	out, err := json.Marshal(items)
+	if err != nil {
+		return nil, &APIError{Code: APIErrorUnknown, Message: "ListProjectTypesRaw: marshal aggregate: " + err.Error()}
+	}
+	return out, nil
+}
+
+// GetProjectTypeRaw retrieves a single project type and returns the raw HTTP
+// response body byte-for-byte.
+//
+// Intended for E2E strict field diff; regular callers should use GetProjectType.
+func (c *Client) GetProjectTypeRaw(ctx context.Context, id int) ([]byte, error) {
+	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/project_types/%d", id), nil)
+	if err != nil {
+		return nil, err
+	}
+	return c.DoWithRetry(req)
+}
+
+// SearchProjectTypesRaw retrieves project types matching the given search
+// parameters and returns the raw HTTP response bodies merged across pages as a
+// single JSON array. Same byte-preserving guarantee as ListProjectTypesRaw.
+//
+// Intended for E2E strict field diff; regular callers should use SearchProjectTypes.
+func (c *Client) SearchProjectTypesRaw(ctx context.Context, params ProjectTypeSearchParams, opts ...ListAllOption) ([]byte, error) {
+	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/project_types", nil)
+		if err != nil {
+			return nil, err
+		}
+		q := req.URL.Query()
+		q.Set("page", strconv.Itoa(page))
+		q.Set("per_page", strconv.Itoa(perPage))
+		if params.Name != "" {
+			q.Set("name", params.Name)
+		}
+		if params.UpdatedAtFrom != "" {
+			q.Set("updated_at_from", params.UpdatedAtFrom)
+		}
+		req.URL.RawQuery = q.Encode()
+		return req, nil
+	}
+	items, err := c.ListAll(ctx, makeReq, opts...)
+	if err != nil {
+		return nil, err
+	}
+	out, err := json.Marshal(items)
+	if err != nil {
+		return nil, &APIError{Code: APIErrorUnknown, Message: "SearchProjectTypesRaw: marshal aggregate: " + err.Error()}
+	}
+	return out, nil
+}

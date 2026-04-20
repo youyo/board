@@ -9,8 +9,8 @@
 | 対象リポジトリ | /Users/youyo/src/github.com/youyo/board |
 | 親プラン | plans/vivid-strolling-ocean.md |
 | 作成日 | 2026-04-20 |
-| 最終更新 | 2026-04-20 16:29 |
-| ステータス | 未着手（M01 先行詳細化済み） |
+| 最終更新 | 2026-04-20 17:22 |
+| ステータス | M03 完了（未マップ 3 件 + Get API 非対応を発見、実装修正は別 M で対応） |
 
 ## 背景と動機
 - 直近 `271cba3` で UserEntity/ContactEntity/VendorContactEntity に計 6 フィールドもの実 API 不整合が発覚。
@@ -41,9 +41,9 @@
 - 失敗した M は `Blockers` に転記、ユーザー判断待ちに。
 
 ## Current Focus
-- **マイルストーン**: M03 project_types（M02 完了、Get は実データ投入後再検証）
-- **直近の完了**: M02 実 API E2E 実行成功（List/Search PASS, 0 件のため Get は Skip）
-- **次のアクション**: M03 (project_types) を着手
+- **マイルストーン**: M04 payment_terms
+- **直近の完了**: M03 実 API E2E 実行で 3 未マップフィールド + Get 404（API 非対応）を発見。E2E は意図的に Fail 状態で commit（Entity 修正は別 M/別 commit で対応）
+- **次のアクション**: M04 (payment_terms) を着手
 
 ## Progress
 
@@ -73,11 +73,21 @@
 - 見積: ~5 req / 実績: 3 req（List 1 + Get 1 (List 再呼び出し) + Search 1）
 - 詳細: plans/board-compliance-m02-accounting-types.md
 
-#### M03: project_types 完走
-- [ ] E2E: List / Get / Search
-- [ ] 厳格フィールド突合
-- 見積: ~5 req
-- 詳細: plans/board-compliance-m03-project-types.md（着手時生成）
+#### M03: project_types 完走 🟡（List/Search は未マップ検知で Fail 状態、Get は API が 404 返却 = 非対応と判明）
+- [x] Raw 層 3 本追加（List/Get/Search）
+- [x] Unit 5/5 Green（RoundTripper mock）
+- [x] E2E: List / Get / Search 実行
+- [x] 厳格フィールド突合で 3 未マップ検出: `archive_flg`, `company_bank_id`, `company_bank_name`
+- [x] `ProjectTypeEntity.Memo` は実 API に存在しない（逆方向不整合も発見）
+- [x] `GET /v1/project_types/{id}` は 404 を返す（List で取得した有効 ID に対しても）→ **API が個別 Get エンドポイントを提供していない**
+- [x] `name` パラメータは無視される（検索しても全件返却）
+- 見積: ~4 req / 実績: **4 req**（List 1 + Get 2 + Search 1）
+- E2E 結果: List FAIL（11 items, 3 unmapped）/ Get FAIL（404）/ Search FAIL（11 items, 3 unmapped, filter 無効）
+- 詳細: plans/board-compliance-m03-project-types.md
+- **フォローアップ（別 commit / 別 M で対応予定）**:
+  - `ProjectTypeEntity` に 3 フィールド追加、`Memo` 削除検討
+  - `GetProjectType` / `GetProjectTypeRaw` の公開 API 妥当性（そもそも API 非対応なら削除 or エラーメッセージ明確化）を検討
+  - `SearchProjectTypes` の `Name` パラメータが効かない件をドキュメント化または削除
 
 #### M04: payment_terms 完走
 - [ ] E2E: List / Get / Search
@@ -330,3 +340,4 @@
 | 2026-04-20 16:29 | 作成 | ロードマップ初版作成。親プラン plans/vivid-strolling-ocean.md を参照。34 マイルストーン構成で中断耐性を最大化。 |
 | 2026-04-20 17:xx | M02 実装 | `ListAccountingTypesRaw`/`GetAccountingTypeRaw`/`SearchAccountingTypesRaw` を追加し、unit テストは httptest ではなく `http.RoundTripper` モック方式で実装（sandbox 制約回避）。E2E コードは `testhelper.StrictFieldDiff` + `dumpJSON` で準拠検証のパターンを確立。実 API 検証は sandbox TLS 問題で未達、Blockers に記録。 |
 | 2026-04-20 17:08 | M02 検証 | sandbox の HTTPS proxy 許可ホスト追加で Go TLS 問題解消。実 API E2E 実行成功: List/Search PASS（共に 0 items）、Get は List 0 件のため Skip。データ依存 skip 規約を運用ルールに追加し、Get を Pending Re-verification に転記。実消費 3 req（見積 5 req 以下）。 |
+| 2026-04-20 17:22 | M03 実装・検証 | `ListProjectTypesRaw`/`GetProjectTypeRaw`/`SearchProjectTypesRaw` を M02 と同形式で追加。Unit 5/5 Green。実 API E2E で **3 未マップフィールド検出**（`archive_flg`, `company_bank_id`, `company_bank_name`）、**`Memo` フィールドが実 API に不在**、**`GET /v1/project_types/{id}` が 404 = API 非対応**、**`name` パラメータが無視される**ことを発見。E2E は意図的に Fail 状態で commit、Entity 修正は別 M で対応。実消費 4 req（見積 5 req 以下）。 |
