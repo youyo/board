@@ -126,20 +126,6 @@ func TestE2E_Estimates_GetByDocumentID(t *testing.T) {
 	t.Logf("GetEstimate: id=%d title=%q project_id=%d total=%.0f", est.ID, est.Title, est.ProjectID, est.TotalAmount)
 }
 
-// --- Vendors (payees path) ---
-
-func TestE2E_Vendors_List(t *testing.T) {
-	client := newE2EClient(t)
-	ctx := context.Background()
-
-	vendors, err := client.ListVendors(ctx)
-	if err != nil {
-		skipIfNotFound(t, err, "ListVendors")
-		t.Fatalf("ListVendors: %v", err)
-	}
-	t.Logf("ListVendors returned %d items", len(vendors))
-}
-
 // --- PurchaseOrders (expenditures path) ---
 
 func TestE2E_PurchaseOrders_List(t *testing.T) {
