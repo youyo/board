@@ -52,21 +52,8 @@ import (
 // e2e_estimates_test.go へ移動。
 
 // --- Invoices ---
-
-// TestE2E_Invoices_List verifies that the invoices endpoint is reachable.
-// Note: accounts with many invoices may take significant time due to full pagination.
-func TestE2E_Invoices_List(t *testing.T) {
-	client := newE2EClient(t)
-	ctx := context.Background()
-
-	invoices, err := client.ListInvoices(ctx)
-	if err != nil {
-		skipIfNotFound(t, err, "ListInvoices")
-		skipIfRateLimit(t, err, "ListInvoices")
-		t.Fatalf("ListInvoices: %v", err)
-	}
-	t.Logf("ListInvoices returned %d items", len(invoices))
-}
+// TestE2E_Invoices_List / _Get / _Search は M22 で厳格フィールド突合付きの版に
+// 一本化したため e2e_invoices_test.go へ移動（M16 vendors と同パターン）。
 
 // --- Clients (pagination) ---
 
