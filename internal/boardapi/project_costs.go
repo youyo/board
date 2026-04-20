@@ -119,3 +119,82 @@ func (c *Client) ListProjectCostsPage(ctx context.Context, page, perPage int) (*
 	}
 	return ListPage[ProjectCostEntity](c, ctx, makeReq, page, perPage)
 }
+
+// ListProjectCostsRaw retrieves all project costs and returns the raw HTTP
+// response bodies merged across pages as a single JSON array. Unlike
+// ListProjectCosts, the returned bytes are byte-preserving: each element JSON
+// is exactly what the BOARD API emitted, enabling strict field diff in E2E
+// tests to detect keys that are not mapped to ProjectCostEntity.
+//
+// Intended for E2E strict field diff; regular callers should use
+// ListProjectCosts.
+func (c *Client) ListProjectCostsRaw(ctx context.Context, opts ...ListAllOption) ([]byte, error) {
+	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/project_costs", nil)
+		if err != nil {
+			return nil, err
+		}
+		q := req.URL.Query()
+		q.Set("page", strconv.Itoa(page))
+		q.Set("per_page", strconv.Itoa(perPage))
+		req.URL.RawQuery = q.Encode()
+		return req, nil
+	}
+	items, err := c.ListAll(ctx, makeReq, opts...)
+	if err != nil {
+		return nil, err
+	}
+	out, err := json.Marshal(items)
+	if err != nil {
+		return nil, &APIError{Code: APIErrorUnknown, Message: "ListProjectCostsRaw: marshal aggregate: " + err.Error()}
+	}
+	return out, nil
+}
+
+// GetProjectCostRaw retrieves a single project cost and returns the raw HTTP
+// response body byte-for-byte.
+//
+// Intended for E2E strict field diff; regular callers should use
+// GetProjectCost.
+func (c *Client) GetProjectCostRaw(ctx context.Context, id int) ([]byte, error) {
+	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/project_costs/%d", id), nil)
+	if err != nil {
+		return nil, err
+	}
+	return c.DoWithRetry(req)
+}
+
+// SearchProjectCostsRaw retrieves project costs matching the given search
+// parameters and returns the raw HTTP response bodies merged across pages as
+// a single JSON array. Same byte-preserving guarantee as ListProjectCostsRaw.
+//
+// Unlike contacts (client_id/name/email) or client_branches (client_id/name),
+// project_costs exposes only a single hierarchical filter `project_id`.
+//
+// Intended for E2E strict field diff; regular callers should use
+// SearchProjectCosts.
+func (c *Client) SearchProjectCostsRaw(ctx context.Context, params ProjectCostSearchParams, opts ...ListAllOption) ([]byte, error) {
+	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/project_costs", nil)
+		if err != nil {
+			return nil, err
+		}
+		q := req.URL.Query()
+		q.Set("page", strconv.Itoa(page))
+		q.Set("per_page", strconv.Itoa(perPage))
+		if params.ProjectID != 0 {
+			q.Set("project_id", strconv.Itoa(params.ProjectID))
+		}
+		req.URL.RawQuery = q.Encode()
+		return req, nil
+	}
+	items, err := c.ListAll(ctx, makeReq, opts...)
+	if err != nil {
+		return nil, err
+	}
+	out, err := json.Marshal(items)
+	if err != nil {
+		return nil, &APIError{Code: APIErrorUnknown, Message: "SearchProjectCostsRaw: marshal aggregate: " + err.Error()}
+	}
+	return out, nil
+}
