@@ -25,59 +25,13 @@ package boardapi_test
 import (
 	"context"
 	"testing"
-
-	"github.com/youyo/board/internal/boardapi"
 )
 
 // --- Clients ---
-
-func TestE2E_Clients_List(t *testing.T) {
-	client := newE2EClient(t)
-	ctx := context.Background()
-
-	clients, err := client.ListClients(ctx)
-	if err != nil {
-		skipIfNotFound(t, err, "ListClients")
-		t.Fatalf("ListClients: %v", err)
-	}
-	t.Logf("ListClients returned %d items", len(clients))
-}
-
-func TestE2E_Clients_GetByID(t *testing.T) {
-	client := newE2EClient(t)
-	ctx := context.Background()
-
-	clients, err := client.ListClients(ctx)
-	if err != nil {
-		skipIfNotFound(t, err, "ListClients")
-		t.Fatalf("ListClients: %v", err)
-	}
-	if len(clients) == 0 {
-		t.Skip("no clients available for GetByID test")
-	}
-
-	got, err := client.GetClient(ctx, clients[0].ID)
-	if err != nil {
-		skipIfNotFound(t, err, "GetClient")
-		t.Fatalf("GetClient(%d): %v", clients[0].ID, err)
-	}
-	requirePositiveID(t, got.ID, "GetClient.ID")
-	requireNonEmpty(t, got.Name, "GetClient.Name")
-	if got.ID != clients[0].ID {
-		t.Errorf("ID mismatch: got %d, want %d", got.ID, clients[0].ID)
-	}
-}
-
-func TestE2E_Clients_Search(t *testing.T) {
-	client := newE2EClient(t)
-	ctx := context.Background()
-
-	_, err := client.SearchClients(ctx, boardapi.ClientSearchParams{})
-	if err != nil {
-		skipIfNotFound(t, err, "SearchClients")
-		t.Fatalf("SearchClients: %v", err)
-	}
-}
+// TestE2E_Clients_List / TestE2E_Clients_GetByID / TestE2E_Clients_Search は
+// M12 で厳格フィールド突合付きの版に一本化したため e2e_clients_test.go へ
+// 移動（M06/M07/M08 と同パターン）。TestE2E_Clients_ListPage はページング
+// 検証として独立価値があるので本ファイルに残す。
 
 // --- Users ---
 // TestE2E_Users_List / TestE2E_Users_GetByID は M08 で厳格フィールド突合付き
