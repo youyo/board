@@ -9,8 +9,8 @@
 | 対象リポジトリ | /Users/youyo/src/github.com/youyo/board |
 | 親プラン | plans/vivid-strolling-ocean.md |
 | 作成日 | 2026-04-20 |
-| 最終更新 | 2026-04-20 17:55 |
-| ステータス | M06 完了（List/Search で `archive_flg` 未マップ 1 件、Get 404 = API 非対応、name フィルタ無効、Memo 逆方向不整合を確認。マスタ系 Get 404 が M03/M04/M06 の 3 件で確定） |
+| 最終更新 | 2026-04-20 18:05 |
+| ステータス | M07 完了（List PASS / Get SKIP（List 0 件、pending re-verification）。Unit 5/5 Green、Search Raw は M07 スコープ外として意図的未提供） |
 
 ## 背景と動機
 - 直近 `271cba3` で UserEntity/ContactEntity/VendorContactEntity に計 6 フィールドもの実 API 不整合が発覚。
@@ -41,9 +41,9 @@
 - 失敗した M は `Blockers` に転記、ユーザー判断待ちに。
 
 ## Current Focus
-- **マイルストーン**: M07 groups
-- **直近の完了**: M06 実 API E2E 実行で **List/Search で 5 items + `archive_flg` 未マップ 1 件**、**`GET /v1/expenditure_types/{id}` が 404 = 個別 Get API 非対応**（M03/M04 と同現象）、**`name` パラメータ無視**（M03/M04 と同現象）、**`memo` が実 API に不在 → Entity の Memo が逆方向不整合**（M03/M04 と同現象）を確認。マスタ系 4 件（project_types / payment_terms / purchase_types）で「Get 404 + name filter 無効 + archive_flg 欠落 + Memo 逆方向」パターンが固定化。E2E は意図的に Fail 状態で commit
-- **次のアクション**: M07 (groups) を着手
+- **マイルストーン**: M08 users
+- **直近の完了**: M07 実 API E2E 実行で **List PASS（0 items, response body `null`）/ Get SKIP（List 0 件、pending re-verification）**。`GroupEntity` 構造の準拠検証は実データ投入後に再実行（M02 accounting_types と同パターン）。Unit は 5/5 Green、Search Raw は M07 スコープ外として意図的に未提供（ロードマップ M07 定義「Get（既存 List 前提）+ 厳格突合」厳守）。リソース全体 403 や Get 404 は **発生せず**（`/v1/groups` 自体は 200 で応答）。
+- **次のアクション**: M08 (users) を着手
 
 ## Progress
 
@@ -137,11 +137,21 @@
   - `SearchPurchaseTypes` の `Name` パラメータが効かない件をドキュメント化または削除
   - **マスタ系 3 件（M03/M04/M06）で「Get 404 + name 無効 + archive_flg 欠落 + Memo 逆方向」の同一パターンが固定化。フォローアップ M で一括対応推奨**
 
-#### M07: groups Get + 厳格突合
-- [ ] E2E: Get（既存 List 前提）
-- [ ] 厳格フィールド突合（GroupEntity）
-- 見積: ~3 req
-- 詳細: plans/board-compliance-m07-groups.md（着手時生成）
+#### M07: groups Get + 厳格突合 ✅（List PASS、Get は List 0 件のため Skip = pending re-verification）
+- [x] Raw 層 2 本追加（List/Get、Search Raw は M07 スコープ外として意図的未提供）
+- [x] Unit 5/5 Green（RoundTripper mock、共通ヘルパ再利用）
+- [x] E2E: List / Get 実行
+- [x] 厳格フィールド突合: List は 0 件のため未マップ検出機会なし（実データ投入後の再実行で意味を持つ）
+- [x] `GET /v1/groups`: 200、0 items、レスポンスは `null`（M02 accounting_types と同じく空集合 `null` 返却）
+- [x] `GET /v1/groups/{id}`: 未検証（List 0 件のため discovery 失敗 → Skip）
+- [x] 既存 `e2e_test.go` の軽量 `TestE2E_Groups_List` を削除し、M07 厳格突合版に一本化（M06 と同パターン）
+- 見積: ~3 req / 実績: **2 req**（List 1 + Get 内 discovery List 1。Get 本体は Skip により未到達）
+- E2E 結果: List PASS（0 items, `null`）/ Get SKIP（pending re-verification）
+- 詳細: plans/board-compliance-m07-groups.md
+- **フォローアップ（実データ投入後 / 別 commit）**:
+  - List/Get の厳格突合をデータ投入後に再実行し、`archive_flg` / `Memo` 逆方向 / 階層フィールド（`parent_id`等）の有無を確認
+  - Get が 404 を返すか 200 を返すかを確定（マスタ系 3 件で 404 確定だが groups は accounts によって挙動が異なる可能性）
+  - 必要に応じて `GroupEntity` を拡張、Search Raw 追加検討（必要時に別 M）
 
 ---
 
@@ -354,6 +364,7 @@
 | M02 | accounting_types | Get | List 0 件 | `go test -tags e2e -v -count=1 -run TestE2E_AccountingTypes_Get ./internal/boardapi/` |
 | M05 | document_send_channels | List / Get / Search | 403 Forbidden（当該アカウントで API 非提供） | 権限付与後: `go test -tags e2e -v -count=1 -run TestE2E_DocumentSendChannels ./internal/boardapi/` |
 | M06 | purchase_types | Get | 404 = 個別 Get API 非対応（M03/M04 と同現象） | API 提供開始後: `go test -tags e2e -v -count=1 -run TestE2E_PurchaseTypes_Get ./internal/boardapi/` |
+| M07 | groups | List 厳格突合 / Get | List 0 件（M02 と同パターン）、Get は discovery 不能 | データ投入後: `go test -tags e2e -v -count=1 -run TestE2E_Groups ./internal/boardapi/` |
 
 ## Architecture Decisions
 | # | 決定 | 理由 | 日付 |
@@ -375,3 +386,4 @@
 | 2026-04-20 17:30 | M04 実装・検証 | `ListPaymentTermsRaw`/`GetPaymentTermRaw`/`SearchPaymentTermsRaw` を M03 と同形式で追加。Unit 5/5 Green（既存の `roundTripperFunc`/`jsonResp` を再利用）。実 API E2E で **1 未マップ検出**（`archive_flg`）、**`Memo` フィールドが実 API に不在**（逆方向不整合、M03 と同現象）、**`GET /v1/payment_terms/{id}` が 404 = API 非対応**（M03 と同現象）、**`name` パラメータが無視される**（M03 と同現象）ことを発見。マスタ系リソースで個別 Get 非対応 + name フィルタ無効の傾向が 2 件確定。E2E は意図的に Fail 状態で commit。実消費 4 req（見積 5 req 以下）。 |
 | 2026-04-20 17:40 | M05 実装・検証 | `ListDocumentSendChannelsRaw`/`GetDocumentSendChannelRaw`/`SearchDocumentSendChannelsRaw` を M04 と同形式で追加。Unit 5/5 Green。実 API E2E で **List/Get/Search 全 3 テストが 403 Forbidden**（`許可されていません。`）を返却。同一 credentials で M02-M04 の他マスタ系は 200 を返すため、**当該アカウントに document_send_channels の権限がない or BOARD が API 提供していない**と判断。M03/M04 の「Get のみ 404」「name フィルタ無効」とは異なる **リソース全体 403** の新パターンを compliance finding として記録。フィールド突合は権限付与後に再検証（Pending Re-verification 転記）。E2E は意図的に Fail 状態で commit。実消費 3 req（見積 5 req 以下）。 |
 | 2026-04-20 17:55 | M06 実装・検証 | `ListPurchaseTypesRaw`/`GetPurchaseTypeRaw`/`SearchPurchaseTypesRaw` を M04 と完全同形で追加（エンドポイントは `/v1/expenditure_types`、命名不一致は既存仕様維持）。既存 `e2e_test.go` にあった軽量 `TestE2E_PurchaseTypes_List` は重複のため削除し、M06 の厳格突合版に一本化。Unit 5/5 Green。実 API E2E で **1 未マップ検出**（`archive_flg`、M04 と同じ）、**`Memo` フィールドが実 API に不在**（M03/M04 と同現象）、**`GET /v1/expenditure_types/{id}` が 404 = API 非対応**（M03/M04 と同現象、**マスタ系 Get 404 が 3 件連続**）、**`name` パラメータが無視される**（M03/M04 と同現象、5 items 全件返却）ことを発見。マスタ系で「Get 404 + name 無効 + archive_flg 欠落 + Memo 逆方向」パターンが 3 件で固定化。E2E は意図的に Fail 状態で commit。実消費 4 req（見積 3 req → 上限 5 req 以内）。 |
+| 2026-04-20 18:05 | M07 実装・検証 | `ListGroupsRaw` / `GetGroupRaw` を追加（**Search Raw は M07 スコープ外として意図的に未提供**、ロードマップ M07 定義「Get（既存 List 前提）+ 厳格突合（GroupEntity）」厳守）。既存 `e2e_test.go` の軽量 `TestE2E_Groups_List` は M06 と同パターンで削除し M07 厳格突合版に一本化。Unit 5/5 Green（既存 `roundTripperFunc`/`jsonResp` を再利用、Search 1 ケースの代わりに「既定 per_page=100 検証」を 5 本目として追加）。実 API E2E で **`GET /v1/groups` が 200 / 0 items / response body `null`**（M02 accounting_types と同パターン）を確認。List 0 件のため Get は `t.Skipf("pending re-verification")` で停止、List 厳格突合も実データなしのため未マップ検出機会なし。マスタ系の傾向（Get 404 / archive_flg / Memo 逆方向 / リソース 403）は M07 では **発生せず**（403/429 ともに無し）。実消費 **2 req**（List 1 + Get 内 discovery List 1）、見積 3 req 以下。Pending Re-verification に M07 を追加（データ投入後の再実行で `GroupEntity` 構造の準拠を検証）。 |

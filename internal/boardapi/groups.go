@@ -120,3 +120,45 @@ func (c *Client) ListGroupsPage(ctx context.Context, page, perPage int) (*PageRe
 	}
 	return ListPage[GroupEntity](c, ctx, makeReq, page, perPage)
 }
+
+// ListGroupsRaw retrieves all groups and returns the raw HTTP response bodies
+// merged across pages as a single JSON array. Unlike ListGroups, the returned
+// bytes are byte-preserving: each element JSON is exactly what the BOARD API
+// emitted, enabling strict field diff in E2E tests to detect keys that are not
+// mapped to GroupEntity.
+//
+// Intended for E2E strict field diff; regular callers should use ListGroups.
+func (c *Client) ListGroupsRaw(ctx context.Context, opts ...ListAllOption) ([]byte, error) {
+	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/groups", nil)
+		if err != nil {
+			return nil, err
+		}
+		q := req.URL.Query()
+		q.Set("page", strconv.Itoa(page))
+		q.Set("per_page", strconv.Itoa(perPage))
+		req.URL.RawQuery = q.Encode()
+		return req, nil
+	}
+	items, err := c.ListAll(ctx, makeReq, opts...)
+	if err != nil {
+		return nil, err
+	}
+	out, err := json.Marshal(items)
+	if err != nil {
+		return nil, &APIError{Code: APIErrorUnknown, Message: "ListGroupsRaw: marshal aggregate: " + err.Error()}
+	}
+	return out, nil
+}
+
+// GetGroupRaw retrieves a single group and returns the raw HTTP response body
+// byte-for-byte.
+//
+// Intended for E2E strict field diff; regular callers should use GetGroup.
+func (c *Client) GetGroupRaw(ctx context.Context, id int) ([]byte, error) {
+	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/groups/%d", id), nil)
+	if err != nil {
+		return nil, err
+	}
+	return c.DoWithRetry(req)
+}

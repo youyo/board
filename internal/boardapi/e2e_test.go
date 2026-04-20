@@ -123,18 +123,8 @@ func TestE2E_Users_GetByID(t *testing.T) {
 }
 
 // --- Groups ---
-
-func TestE2E_Groups_List(t *testing.T) {
-	client := newE2EClient(t)
-	ctx := context.Background()
-
-	groups, err := client.ListGroups(ctx)
-	if err != nil {
-		skipIfNotFound(t, err, "ListGroups")
-		t.Fatalf("ListGroups: %v", err)
-	}
-	t.Logf("ListGroups returned %d items", len(groups))
-}
+// TestE2E_Groups_List は M07 で厳格フィールド突合付きの版に一本化したため
+// e2e_groups_test.go へ移動。
 
 // --- Projects ---
 
