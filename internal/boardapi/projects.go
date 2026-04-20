@@ -166,3 +166,122 @@ func (c *Client) ListProjectsPage(ctx context.Context, page, perPage int) (*Page
 	}
 	return ListPage[ProjectEntity](c, ctx, makeReq, page, perPage)
 }
+
+// ListProjectsRaw retrieves all projects and returns the raw HTTP response
+// bodies merged across pages as a single JSON array. Unlike ListProjects, the
+// returned bytes are byte-preserving: each element JSON is exactly what the
+// BOARD API emitted, enabling strict field diff in E2E tests to detect keys
+// that are not mapped to ProjectEntity.
+//
+// Intended for E2E strict field diff; regular callers should use ListProjects.
+func (c *Client) ListProjectsRaw(ctx context.Context, opts ...ListAllOption) ([]byte, error) {
+	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/projects", nil)
+		if err != nil {
+			return nil, err
+		}
+		q := req.URL.Query()
+		q.Set("page", strconv.Itoa(page))
+		q.Set("per_page", strconv.Itoa(perPage))
+		req.URL.RawQuery = q.Encode()
+		return req, nil
+	}
+	items, err := c.ListAll(ctx, makeReq, opts...)
+	if err != nil {
+		return nil, err
+	}
+	out, err := json.Marshal(items)
+	if err != nil {
+		return nil, &APIError{Code: APIErrorUnknown, Message: "ListProjectsRaw: marshal aggregate: " + err.Error()}
+	}
+	return out, nil
+}
+
+// GetProjectRaw retrieves a single project and returns the raw HTTP response
+// body byte-for-byte.
+//
+// Intended for E2E strict field diff; regular callers should use GetProject.
+func (c *Client) GetProjectRaw(ctx context.Context, id int) ([]byte, error) {
+	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/projects/%d", id), nil)
+	if err != nil {
+		return nil, err
+	}
+	return c.DoWithRetry(req)
+}
+
+// GetProjectWithGroupRaw retrieves a single project with response_group and
+// returns the raw HTTP response body byte-for-byte.
+//
+// responseGroup can be "estimate", "order", "delivery", "invoice", "receipt",
+// or "all". If responseGroup is empty, behaves like GetProjectRaw (no
+// response_group query is appended).
+//
+// The query is concatenated directly to the path via "?response_group=<value>"
+// to mirror GetProjectWithGroup's existing implementation; BOARD API has been
+// validated to parse this form. Raw variant is exposed for E2E strict field
+// diff on DocumentSummary sub-entities (estimate/order/delivery/invoice/
+// receipt) which appear only when response_group is specified.
+//
+// Intended for E2E strict field diff; regular callers should use
+// GetProjectWithGroup.
+func (c *Client) GetProjectWithGroupRaw(ctx context.Context, id int, responseGroup string) ([]byte, error) {
+	path := fmt.Sprintf("/v1/projects/%d", id)
+	if responseGroup != "" {
+		path += "?response_group=" + responseGroup
+	}
+	req, err := c.NewRequest(ctx, http.MethodGet, path, nil)
+	if err != nil {
+		return nil, err
+	}
+	return c.DoWithRetry(req)
+}
+
+// SearchProjectsRaw retrieves projects matching the given search parameters
+// and returns the raw HTTP response bodies merged across pages as a single
+// JSON array. Same byte-preserving guarantee as ListProjectsRaw.
+//
+// ProjectSearchParams exposes 5 filters (ClientID, Name, Status, UpdatedAtFrom,
+// ResponseGroup) — the richest surface across M02-M12. Note that the BOARD
+// API has been observed to ignore the `name` filter across 7 consecutive
+// milestones (M03/M04/M06/M08/M09/M10/M12), so the Name value in Search only
+// exercises request encoding, not server-side filtering.
+//
+// Intended for E2E strict field diff; regular callers should use
+// SearchProjects.
+func (c *Client) SearchProjectsRaw(ctx context.Context, params ProjectSearchParams, opts ...ListAllOption) ([]byte, error) {
+	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/projects", nil)
+		if err != nil {
+			return nil, err
+		}
+		q := req.URL.Query()
+		q.Set("page", strconv.Itoa(page))
+		q.Set("per_page", strconv.Itoa(perPage))
+		if params.ClientID != 0 {
+			q.Set("client_id", strconv.Itoa(params.ClientID))
+		}
+		if params.Name != "" {
+			q.Set("name", params.Name)
+		}
+		if params.Status != "" {
+			q.Set("status", params.Status)
+		}
+		if params.UpdatedAtFrom != "" {
+			q.Set("updated_at_from", params.UpdatedAtFrom)
+		}
+		if params.ResponseGroup != "" {
+			q.Set("response_group", params.ResponseGroup)
+		}
+		req.URL.RawQuery = q.Encode()
+		return req, nil
+	}
+	items, err := c.ListAll(ctx, makeReq, opts...)
+	if err != nil {
+		return nil, err
+	}
+	out, err := json.Marshal(items)
+	if err != nil {
+		return nil, &APIError{Code: APIErrorUnknown, Message: "SearchProjectsRaw: marshal aggregate: " + err.Error()}
+	}
+	return out, nil
+}

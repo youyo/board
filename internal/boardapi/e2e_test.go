@@ -42,42 +42,11 @@ import (
 // e2e_groups_test.go へ移動。
 
 // --- Projects ---
-
-func TestE2E_Projects_List(t *testing.T) {
-	client := newE2EClient(t)
-	ctx := context.Background()
-
-	projects, err := client.ListProjects(ctx)
-	if err != nil {
-		skipIfNotFound(t, err, "ListProjects")
-		t.Fatalf("ListProjects: %v", err)
-	}
-	t.Logf("ListProjects returned %d items", len(projects))
-}
-
-func TestE2E_Projects_GetByID(t *testing.T) {
-	client := newE2EClient(t)
-	ctx := context.Background()
-
-	projects, err := client.ListProjects(ctx)
-	if err != nil {
-		skipIfNotFound(t, err, "ListProjects")
-		t.Fatalf("ListProjects: %v", err)
-	}
-	if len(projects) == 0 {
-		t.Skip("no projects available for GetByID test")
-	}
-
-	got, err := client.GetProject(ctx, projects[0].ID)
-	if err != nil {
-		skipIfNotFound(t, err, "GetProject")
-		t.Fatalf("GetProject(%d): %v", projects[0].ID, err)
-	}
-	requirePositiveID(t, got.ID, "GetProject.ID")
-	if got.ID != projects[0].ID {
-		t.Errorf("ID mismatch: got %d, want %d", got.ID, projects[0].ID)
-	}
-}
+// TestE2E_Projects_List / TestE2E_Projects_GetByID / TestE2E_Projects_GetWithGroup
+// は M13 で厳格フィールド突合付き（List/Get/Search + GetWithGroup 全 6
+// response_group）の版に一本化したため e2e_projects_test.go へ移動（M12
+// clients と同パターン）。TestE2E_Estimates_GetByDocumentID は M17 docID
+// discovery helper のスコープなので本ファイルに残す。
 
 // --- Invoices ---
 
@@ -94,34 +63,6 @@ func TestE2E_Invoices_List(t *testing.T) {
 		t.Fatalf("ListInvoices: %v", err)
 	}
 	t.Logf("ListInvoices returned %d items", len(invoices))
-}
-
-// --- Projects (response_group) ---
-
-func TestE2E_Projects_GetWithGroup(t *testing.T) {
-	client := newE2EClient(t)
-	ctx := context.Background()
-
-	projects, err := client.ListProjects(ctx)
-	if err != nil {
-		skipIfNotFound(t, err, "ListProjects")
-		t.Fatalf("ListProjects: %v", err)
-	}
-	if len(projects) == 0 {
-		t.Skip("no projects available")
-	}
-
-	got, err := client.GetProjectWithGroup(ctx, projects[0].ID, "estimate")
-	if err != nil {
-		skipIfNotFound(t, err, "GetProjectWithGroup")
-		t.Fatalf("GetProjectWithGroup(%d, estimate): %v", projects[0].ID, err)
-	}
-	requirePositiveID(t, got.ID, "GetProjectWithGroup.ID")
-	if got.Estimate != nil {
-		t.Logf("Project %d has estimate: ID=%d", got.ID, got.Estimate.ID)
-	} else {
-		t.Logf("Project %d has no estimate", got.ID)
-	}
 }
 
 // --- Clients (pagination) ---
