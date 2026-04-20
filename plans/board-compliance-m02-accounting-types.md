@@ -188,24 +188,28 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 | 区分 | 見積 | 実測 |
 |------|------|------|
 | Unit テスト (RoundTripper mock) | 0 req | **0 req**（mock のため BOARD API 非接続） |
-| E1 List | 1 req | 未計測（sandbox TLS 問題で実 API 未達） |
-| E2 Get | 2 req | 未計測 |
-| E3 Search | 1 req | 未計測 |
-| **合計** | **~4 req**（予備含め 5 req 以下） | **0 req（unit のみ）** |
+| E1 List | 1 req | **1 req** PASS（0 items） |
+| E2 Get | 2 req | **1 req** Skip（List 0 件で Get 不能、Pending Re-verification） |
+| E3 Search | 1 req | **1 req** PASS（0 items） |
+| **合計** | **~4 req**（予備含め 5 req 以下） | **3 req** |
 
-### 実 API 未計測の理由
-sandbox 環境で Go runtime の macOS native TLS 検証が失敗する（`tls: failed to verify certificate: x509: OSStatus -26276`）。curl は同一ホスト `api.the-board.jp` に対して 403 を正しく返しており、ネットワーク到達性・証明書自体は有効。`SSL_CERT_FILE=/etc/ssl/cert.pem` / `GODEBUG=x509usefallbackroots=1` でも解消せず、これはインフラ側制約で M02 実装とは独立した課題。ユーザー手元（sandbox 外）での E2E 実行で検証完了できる。
+### 実 API 検証結果（2026-04-20 17:08）
+sandbox の HTTPS proxy 許可ホスト追加（`api.the-board.jp` 経由の CONNECT トンネル）により Go の TLS native verifier 問題が解消。実 API へ到達して 3 req 消費。
 
-## 結果記録（実装後 Fill）
+## 結果記録
 
 ### 発見した未マップフィールド
-（実装後記入。無ければ「なし」）
+- **実データ 0 件のため検出不能**。データ投入後の Get/List 再実行で初めて意味を持つ。Pending Re-verification に転記済み（ロードマップ参照）。
 
 ### 実 API JSON サンプル（キー列挙のみ、値は掲載しない）
-（実装後記入。`tmp/e2e-artifacts/accounting_types_*.json` の top-level キーをここに列挙）
+- `tmp/e2e-artifacts/accounting_types_0.json`: 4 bytes（空配列 `[]`）
+- `tmp/e2e-artifacts/accounting_types_search_0.json`: 4 bytes（空配列 `[]`）
+
+### データ依存 skip 規約の確立
+本 M で「List 0 件 → Get t.Skipf」のパターンを採用。理由は「Get 対象 ID が取得不能 = テスト実行不能」で、403/429 のような環境/権限異常とは別カテゴリ。ロードマップ運用ルールに正式追加（M03 以降のマスタ系で再利用）。
 
 ### Blockers
-- **sandbox 環境での実 API E2E 未実行**: Go 1.26 + macOS の native TLS verifier が sandbox で OSStatus -26276 を返すため、`go test -tags e2e` で実 API に到達できない。unit は RoundTripper mock で 5/5 Green、E2E コードは `go vet -tags e2e ./...` で compile 可能。ユーザー手元（sandbox 外）での 1 回実行で検証完了する想定。403/429 由来ではないため RATE_LIMITED ではなく、**環境依存のインフラ制約**として本ファイル / ロードマップに記録。
+なし（過去の sandbox TLS 制約は解消）
 
 ## Out of Scope（次 M 以降で扱う）
 - M03: `project_types` に同パターンを適用

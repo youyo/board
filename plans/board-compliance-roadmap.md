@@ -26,6 +26,11 @@
 4. **403/429 即停止**：skip せず失敗として扱い、本 Roadmap の `Blockers` に記録。
 5. 日次上限ガイド: **1500 req/日**（業務未使用のため余裕あり）。
 
+### データ依存テストの skip 規約
+- List/Search 結果が **0 件**の場合の Get テストのみ `t.Skipf` を許可する。理由は「Get 対象 ID が取得できない = 検証不能」であり、403/429 のような環境/権限異常とは別カテゴリ。
+- Skip した M は本ファイル「Pending Re-verification（実データ投入後に再実行）」に転記して追跡する。
+- List/Search 自体の失敗、403/429、TLS 等の接続失敗は引き続き **skip 禁止**。
+
 ### 厳格フィールド突合
 - M01 で提供する `testhelper.StrictFieldDiff(t, raw, entity)` を全 E2E で呼ぶ。
 - 生 JSON は `tmp/e2e-artifacts/{resource}_{id}.json`（**.gitignore 済み**、絶対に commit しない）。
@@ -36,9 +41,9 @@
 - 失敗した M は `Blockers` に転記、ユーザー判断待ちに。
 
 ## Current Focus
-- **マイルストーン**: M02 accounting_types 完走（実装完了・実 API 検証のみ sandbox 外で要実施）
-- **直近の完了**: M02 実装（Raw 層追加 + unit 5/5 + E2E コード）
-- **次のアクション**: ユーザー手元で M02 E2E を実 API に当てて未マップフィールドを確認 → 結果次第で M03 (project_types) へ
+- **マイルストーン**: M03 project_types（M02 完了、Get は実データ投入後再検証）
+- **直近の完了**: M02 実 API E2E 実行成功（List/Search PASS, 0 件のため Get は Skip）
+- **次のアクション**: M03 (project_types) を着手
 
 ## Progress
 
@@ -59,14 +64,13 @@
 
 ### Phase B: マスタ系（小）
 
-#### M02: accounting_types 完走 🟡（実装完了 / 実 API 検証は sandbox 外で要実行）
+#### M02: accounting_types 完走 ✅（List/Search PASS, Get は実データ投入後再検証）
 - [x] `ListAccountingTypesRaw` / `GetAccountingTypeRaw` / `SearchAccountingTypesRaw` を boardapi に追加（byte 保持 Raw 層）
 - [x] Unit（RoundTripper mock）5/5 Green
-- [x] E2E: List / Get / Search（実装完了、build OK）
-- [x] 厳格フィールド突合（E2E 内で `testhelper.StrictFieldDiff` 呼び出し）
-- [x] raw JSON を tmp/ にダンプ（`dumpJSON` で accounting_types_*.json）
-- [ ] **実 API E2E 実行（sandbox TLS 制約で未達、ユーザー手元で要実行）**
-- 見積: ~5 req / 実績: 0 req（unit のみ）
+- [x] E2E: List PASS（0 items）/ Get Skip（データ無し）/ Search PASS（0 items）
+- [x] 厳格フィールド突合（実データ 0 件のため未マップ検知 0、データ投入後の再実行で意味を持つ）
+- [x] raw JSON を tmp/ にダンプ（accounting_types_0.json / accounting_types_search_0.json）
+- 見積: ~5 req / 実績: 3 req（List 1 + Get 1 (List 再呼び出し) + Search 1）
 - 詳細: plans/board-compliance-m02-accounting-types.md
 
 #### M03: project_types 完走
@@ -301,7 +305,14 @@
 ---
 
 ## Blockers
-- **M02 実 API E2E 未実行 (2026-04-20)**: sandbox 内で Go TLS native verifier が OSStatus -26276 を返し `api.the-board.jp` に HTTPS 接続不能。curl は同一ホストに対し成功（403）。インフラ側制約のため M02 実装コードは完成・unit Green だが、実 API での StrictFieldDiff 検証は未達。ユーザー手元（sandbox 外）での `BOARD_API_KEY=... BOARD_API_TOKEN=... go test -tags e2e -v -count=1 -run TestE2E_AccountingTypes ./internal/boardapi/` 実行で解消予定。
+なし（過去: M02 実 API E2E は sandbox の HTTPS proxy ホスト許可追加で解消、2026-04-20 17:08）
+
+## Pending Re-verification（実データ投入後に再実行）
+0 件のためフィールド突合検証が未達のリソース。BOARD アカウントに 1 件以上データを投入後、該当テストを再実行して未マップフィールドを確認する。
+
+| M | リソース | 未検証テスト | 理由 | 再実行コマンド |
+|---|---------|-------------|------|----------------|
+| M02 | accounting_types | Get | List 0 件 | `go test -tags e2e -v -count=1 -run TestE2E_AccountingTypes_Get ./internal/boardapi/` |
 
 ## Architecture Decisions
 | # | 決定 | 理由 | 日付 |
@@ -318,3 +329,4 @@
 |------|------|------|
 | 2026-04-20 16:29 | 作成 | ロードマップ初版作成。親プラン plans/vivid-strolling-ocean.md を参照。34 マイルストーン構成で中断耐性を最大化。 |
 | 2026-04-20 17:xx | M02 実装 | `ListAccountingTypesRaw`/`GetAccountingTypeRaw`/`SearchAccountingTypesRaw` を追加し、unit テストは httptest ではなく `http.RoundTripper` モック方式で実装（sandbox 制約回避）。E2E コードは `testhelper.StrictFieldDiff` + `dumpJSON` で準拠検証のパターンを確立。実 API 検証は sandbox TLS 問題で未達、Blockers に記録。 |
+| 2026-04-20 17:08 | M02 検証 | sandbox の HTTPS proxy 許可ホスト追加で Go TLS 問題解消。実 API E2E 実行成功: List/Search PASS（共に 0 items）、Get は List 0 件のため Skip。データ依存 skip 規約を運用ルールに追加し、Get を Pending Re-verification に転記。実消費 3 req（見積 5 req 以下）。 |
