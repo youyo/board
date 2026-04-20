@@ -117,6 +117,96 @@ func (c *Client) SearchPayments(ctx context.Context, params PaymentSearchParams)
 	return result, nil
 }
 
+// ListPaymentsRaw retrieves all payments and returns the raw HTTP
+// response bodies merged across pages as a single JSON array. Each element
+// preserves the exact byte content returned by the BOARD API.
+//
+// Note: the real BOARD API path is /v1/expenditure_payments (Go name: payments).
+//
+// Intended for E2E strict field diff; regular callers should use
+// ListPayments.
+func (c *Client) ListPaymentsRaw(ctx context.Context, opts ...ListAllOption) ([]byte, error) {
+	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/expenditure_payments", nil)
+		if err != nil {
+			return nil, err
+		}
+		q := req.URL.Query()
+		q.Set("page", strconv.Itoa(page))
+		q.Set("per_page", strconv.Itoa(perPage))
+		req.URL.RawQuery = q.Encode()
+		return req, nil
+	}
+	items, err := c.ListAll(ctx, makeReq, opts...)
+	if err != nil {
+		return nil, err
+	}
+	out, err := json.Marshal(items)
+	if err != nil {
+		return nil, &APIError{Code: APIErrorUnknown, Message: "ListPaymentsRaw: marshal aggregate: " + err.Error()}
+	}
+	return out, nil
+}
+
+// GetPaymentRaw retrieves a single payment and returns the raw HTTP
+// response body byte-for-byte.
+//
+// Note: the real BOARD API path is /v1/expenditure_payments/{id} (Go name: payments).
+//
+// Intended for E2E strict field diff; regular callers should use
+// GetPayment.
+func (c *Client) GetPaymentRaw(ctx context.Context, id int) ([]byte, error) {
+	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/expenditure_payments/%d", id), nil)
+	if err != nil {
+		return nil, err
+	}
+	return c.DoWithRetry(req)
+}
+
+// SearchPaymentsRaw retrieves payments matching the given search parameters and
+// returns the raw HTTP response bodies merged across pages as a single JSON
+// array. Same byte-preserving guarantee as ListPaymentsRaw.
+//
+// PaymentSearchParams exposes 4 filters (VendorID, PurchaseOrderID, Status, UpdatedAtFrom).
+// Note: the real BOARD API path is /v1/expenditure_payments.
+//
+// Intended for E2E strict field diff; regular callers should use
+// SearchPayments.
+func (c *Client) SearchPaymentsRaw(ctx context.Context, params PaymentSearchParams, opts ...ListAllOption) ([]byte, error) {
+	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/expenditure_payments", nil)
+		if err != nil {
+			return nil, err
+		}
+		q := req.URL.Query()
+		q.Set("page", strconv.Itoa(page))
+		q.Set("per_page", strconv.Itoa(perPage))
+		if params.VendorID != 0 {
+			q.Set("vendor_id", strconv.Itoa(params.VendorID))
+		}
+		if params.PurchaseOrderID != 0 {
+			q.Set("purchase_order_id", strconv.Itoa(params.PurchaseOrderID))
+		}
+		if params.Status != "" {
+			q.Set("status", params.Status)
+		}
+		if params.UpdatedAtFrom != "" {
+			q.Set("updated_at_from", params.UpdatedAtFrom)
+		}
+		req.URL.RawQuery = q.Encode()
+		return req, nil
+	}
+	items, err := c.ListAll(ctx, makeReq, opts...)
+	if err != nil {
+		return nil, err
+	}
+	out, err := json.Marshal(items)
+	if err != nil {
+		return nil, &APIError{Code: APIErrorUnknown, Message: "SearchPaymentsRaw: marshal aggregate: " + err.Error()}
+	}
+	return out, nil
+}
+
 // ListPaymentsPage retrieves a single page of PaymentEntity.
 func (c *Client) ListPaymentsPage(ctx context.Context, page, perPage int) (*PageResult[PaymentEntity], error) {
 	makeReq := func(ctx context.Context, p, pp int) (*http.Request, error) {
