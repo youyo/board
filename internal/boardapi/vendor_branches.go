@@ -114,6 +114,97 @@ func (c *Client) SearchVendorBranches(ctx context.Context, params VendorBranchSe
 	return result, nil
 }
 
+// ListVendorBranchesRaw retrieves all vendor branches and returns the raw HTTP
+// response bodies merged across pages as a single JSON array. Unlike
+// ListVendorBranches, the returned bytes are byte-preserving: each element
+// JSON is exactly what the BOARD API emitted, enabling strict field diff in
+// E2E tests to detect keys that are not mapped to VendorBranchEntity.
+//
+// Note: the real BOARD API path is /v1/payee_branches (not /v1/vendor_branches).
+//
+// Intended for E2E strict field diff; regular callers should use
+// ListVendorBranches.
+func (c *Client) ListVendorBranchesRaw(ctx context.Context, opts ...ListAllOption) ([]byte, error) {
+	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/payee_branches", nil)
+		if err != nil {
+			return nil, err
+		}
+		q := req.URL.Query()
+		q.Set("page", strconv.Itoa(page))
+		q.Set("per_page", strconv.Itoa(perPage))
+		req.URL.RawQuery = q.Encode()
+		return req, nil
+	}
+	items, err := c.ListAll(ctx, makeReq, opts...)
+	if err != nil {
+		return nil, err
+	}
+	out, err := json.Marshal(items)
+	if err != nil {
+		return nil, &APIError{Code: APIErrorUnknown, Message: "ListVendorBranchesRaw: marshal aggregate: " + err.Error()}
+	}
+	return out, nil
+}
+
+// GetVendorBranchRaw retrieves a single vendor branch and returns the raw HTTP
+// response body byte-for-byte.
+//
+// Note: the real BOARD API path is /v1/payee_branches/{id}.
+//
+// Intended for E2E strict field diff; regular callers should use
+// GetVendorBranch.
+func (c *Client) GetVendorBranchRaw(ctx context.Context, id int) ([]byte, error) {
+	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/payee_branches/%d", id), nil)
+	if err != nil {
+		return nil, err
+	}
+	return c.DoWithRetry(req)
+}
+
+// SearchVendorBranchesRaw retrieves vendor branches matching the given search
+// parameters and returns the raw HTTP response bodies merged across pages as a
+// single JSON array. Same byte-preserving guarantee as ListVendorBranchesRaw.
+//
+// VendorBranchSearchParams exposes 3 filters (VendorID, Name, UpdatedAtFrom).
+// Note that the BOARD API has been observed to ignore the `name` filter across
+// 9 consecutive milestones (M03-M13), so the Name value in Search only
+// exercises request encoding, not server-side filtering.
+//
+// Intended for E2E strict field diff; regular callers should use
+// SearchVendorBranches.
+func (c *Client) SearchVendorBranchesRaw(ctx context.Context, params VendorBranchSearchParams, opts ...ListAllOption) ([]byte, error) {
+	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/payee_branches", nil)
+		if err != nil {
+			return nil, err
+		}
+		q := req.URL.Query()
+		q.Set("page", strconv.Itoa(page))
+		q.Set("per_page", strconv.Itoa(perPage))
+		if params.VendorID != 0 {
+			q.Set("vendor_id", strconv.Itoa(params.VendorID))
+		}
+		if params.Name != "" {
+			q.Set("name", params.Name)
+		}
+		if params.UpdatedAtFrom != "" {
+			q.Set("updated_at_from", params.UpdatedAtFrom)
+		}
+		req.URL.RawQuery = q.Encode()
+		return req, nil
+	}
+	items, err := c.ListAll(ctx, makeReq, opts...)
+	if err != nil {
+		return nil, err
+	}
+	out, err := json.Marshal(items)
+	if err != nil {
+		return nil, &APIError{Code: APIErrorUnknown, Message: "SearchVendorBranchesRaw: marshal aggregate: " + err.Error()}
+	}
+	return out, nil
+}
+
 // ListVendorBranchesPage retrieves a single page of VendorBranchEntity.
 func (c *Client) ListVendorBranchesPage(ctx context.Context, page, perPage int) (*PageResult[VendorBranchEntity], error) {
 	makeReq := func(ctx context.Context, p, pp int) (*http.Request, error) {
