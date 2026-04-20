@@ -9,8 +9,8 @@
 | 対象リポジトリ | /Users/youyo/src/github.com/youyo/board |
 | 親プラン | plans/vivid-strolling-ocean.md |
 | 作成日 | 2026-04-20 |
-| 最終更新 | 2026-04-20 18:05 |
-| ステータス | M07 完了（List PASS / Get SKIP（List 0 件、pending re-verification）。Unit 5/5 Green、Search Raw は M07 スコープ外として意図的未提供） |
+| 最終更新 | 2026-04-20 18:15 |
+| ステータス | M08 完了（List PASS（26 items, unmapped 0）/ Get FAIL（404 = マスタ系 4 件連続）/ Search PASS（26 items, unmapped 0, name filter 無視 = 4 件連続）。`UserEntity.Name` が逆方向不整合（実 API に name キー不在）。Unit 5/5 Green） |
 
 ## 背景と動機
 - 直近 `271cba3` で UserEntity/ContactEntity/VendorContactEntity に計 6 フィールドもの実 API 不整合が発覚。
@@ -41,9 +41,9 @@
 - 失敗した M は `Blockers` に転記、ユーザー判断待ちに。
 
 ## Current Focus
-- **マイルストーン**: M08 users
-- **直近の完了**: M07 実 API E2E 実行で **List PASS（0 items, response body `null`）/ Get SKIP（List 0 件、pending re-verification）**。`GroupEntity` 構造の準拠検証は実データ投入後に再実行（M02 accounting_types と同パターン）。Unit は 5/5 Green、Search Raw は M07 スコープ外として意図的に未提供（ロードマップ M07 定義「Get（既存 List 前提）+ 厳格突合」厳守）。リソース全体 403 や Get 404 は **発生せず**（`/v1/groups` 自体は 200 で応答）。
-- **次のアクション**: M08 (users) を着手
+- **マイルストーン**: M09 client_branches
+- **直近の完了**: M08 実 API E2E 実行で **List PASS（26 items, unmapped 0）/ Get FAIL（404 = マスタ系 4 件連続）/ Search PASS（26 items, unmapped 0, name filter 無視 4 件連続）**。271cba3 で追加された 6 フィールド（last_name / first_name / role_id / role_name / last_sign_in_at / valid_flg）は **全 26 件で完全に埋まっており実 API と完全一致**（`last_sign_in_at` は長さ 29 の ISO 8601 で null 欠落なし）。一方で **実 API に `name` キーが不在**（`UserEntity.Name` の逆方向不整合、M03/M04/M06 の `Memo` と同現象、マスタ系で 4 件目）。Unit は 5/5 Green。リソース全体 403 や 429 は発生せず。
+- **次のアクション**: M09 (client_branches) を着手
 
 ## Progress
 
@@ -157,12 +157,23 @@
 
 ### Phase C: マスタ系（中）
 
-#### M08: users Get/Search 厳格突合
-- [ ] E2E: Get（既存）+ 厳格突合
-- [ ] E2E: Search（新規）
-- [ ] UserEntity の last_sign_in_at / role_* フィールド確認
-- 見積: ~5 req
-- 詳細: plans/board-compliance-m08-users.md（着手時生成）
+#### M08: users Get/Search 厳格突合 🟡（List/Search は PASS で未マップ検出 0 / Get は API が 404 返却 = 非対応と判明。`UserEntity.Name` は逆方向不整合）
+- [x] Raw 層 3 本追加（List/Get/Search）
+- [x] Unit 5/5 Green（RoundTripper mock、共通ヘルパ再利用）
+- [x] E2E: List / Get / Search 実行
+- [x] 厳格フィールド突合: **未マップ 0 件**（271cba3 で追加された 6 フィールドが実 API と完全一致。`UserEntity` は 10 個の API 対応フィールドすべて実 API と一致）
+- [x] `GET /v1/users/{id}` は 404 を返す（List で取得した有効 ID に対しても）→ **API が個別 Get エンドポイントを提供していない**（M03/M04/M06 と同現象、マスタ系 **4 件連続**）
+- [x] `name` パラメータは無視される（検索しても全件 26 件返却、M03/M04/M06 と同現象、**4 件連続**）
+- [x] **実 API レスポンスに `name` キーは不在**（`UserEntity.Name` が逆方向不整合、M03/M04/M06 の `Memo` と同現象、マスタ系で **4 件目**）
+- [x] 既存 `e2e_test.go` の軽量 `TestE2E_Users_List` / `TestE2E_Users_GetByID` を削除し、M08 厳格突合版に一本化（M06/M07 と同パターン）
+- 見積: ~5 req / 実績: **4 req**（List 1 + Get discovery 1 + Get 本体 1 + Search 1）
+- E2E 結果: List PASS（26 items, unmapped 0）/ Get FAIL（404）/ Search PASS（26 items, unmapped 0, filter 無効）
+- 詳細: plans/board-compliance-m08-users.md
+- **フォローアップ（別 commit / 別 M で対応予定）**:
+  - `UserEntity.Name` 削除検討（マスタ系の `Memo` 削除と横並びで一括対応が効率的）。削除すると `DisplayName()` の `Name != ""` 分岐が常に false になるが、現時点でも実 API データでは必ず LastName+FirstName 経路で動作しているため安全
+  - `GetUser` / `GetUserRaw` の公開 API 妥当性（API 非対応なら削除 or エラーメッセージ明確化）。**マスタ系 4 件連続で Get 404 が確定**したため、公開 API 一括削除 or deprecate の設計判断がより強く推奨される
+  - `SearchUsers` の `Name` パラメータが効かない件をドキュメント化または削除（`name` 無視は 4 件連続で BOARD API マスタ系共通仕様）
+  - `role_id` の enum 値範囲の完全仕様化は別 M（M25-M31 Find 層）で BOARD 側ドキュメント突合
 
 ---
 
@@ -387,3 +398,4 @@
 | 2026-04-20 17:40 | M05 実装・検証 | `ListDocumentSendChannelsRaw`/`GetDocumentSendChannelRaw`/`SearchDocumentSendChannelsRaw` を M04 と同形式で追加。Unit 5/5 Green。実 API E2E で **List/Get/Search 全 3 テストが 403 Forbidden**（`許可されていません。`）を返却。同一 credentials で M02-M04 の他マスタ系は 200 を返すため、**当該アカウントに document_send_channels の権限がない or BOARD が API 提供していない**と判断。M03/M04 の「Get のみ 404」「name フィルタ無効」とは異なる **リソース全体 403** の新パターンを compliance finding として記録。フィールド突合は権限付与後に再検証（Pending Re-verification 転記）。E2E は意図的に Fail 状態で commit。実消費 3 req（見積 5 req 以下）。 |
 | 2026-04-20 17:55 | M06 実装・検証 | `ListPurchaseTypesRaw`/`GetPurchaseTypeRaw`/`SearchPurchaseTypesRaw` を M04 と完全同形で追加（エンドポイントは `/v1/expenditure_types`、命名不一致は既存仕様維持）。既存 `e2e_test.go` にあった軽量 `TestE2E_PurchaseTypes_List` は重複のため削除し、M06 の厳格突合版に一本化。Unit 5/5 Green。実 API E2E で **1 未マップ検出**（`archive_flg`、M04 と同じ）、**`Memo` フィールドが実 API に不在**（M03/M04 と同現象）、**`GET /v1/expenditure_types/{id}` が 404 = API 非対応**（M03/M04 と同現象、**マスタ系 Get 404 が 3 件連続**）、**`name` パラメータが無視される**（M03/M04 と同現象、5 items 全件返却）ことを発見。マスタ系で「Get 404 + name 無効 + archive_flg 欠落 + Memo 逆方向」パターンが 3 件で固定化。E2E は意図的に Fail 状態で commit。実消費 4 req（見積 3 req → 上限 5 req 以内）。 |
 | 2026-04-20 18:05 | M07 実装・検証 | `ListGroupsRaw` / `GetGroupRaw` を追加（**Search Raw は M07 スコープ外として意図的に未提供**、ロードマップ M07 定義「Get（既存 List 前提）+ 厳格突合（GroupEntity）」厳守）。既存 `e2e_test.go` の軽量 `TestE2E_Groups_List` は M06 と同パターンで削除し M07 厳格突合版に一本化。Unit 5/5 Green（既存 `roundTripperFunc`/`jsonResp` を再利用、Search 1 ケースの代わりに「既定 per_page=100 検証」を 5 本目として追加）。実 API E2E で **`GET /v1/groups` が 200 / 0 items / response body `null`**（M02 accounting_types と同パターン）を確認。List 0 件のため Get は `t.Skipf("pending re-verification")` で停止、List 厳格突合も実データなしのため未マップ検出機会なし。マスタ系の傾向（Get 404 / archive_flg / Memo 逆方向 / リソース 403）は M07 では **発生せず**（403/429 ともに無し）。実消費 **2 req**（List 1 + Get 内 discovery List 1）、見積 3 req 以下。Pending Re-verification に M07 を追加（データ投入後の再実行で `GroupEntity` 構造の準拠を検証）。 |
+| 2026-04-20 18:15 | M08 実装・検証 | `ListUsersRaw` / `GetUserRaw` / `SearchUsersRaw` を M06 purchase_types と同形で追加（URL は `/v1/users`、命名一致）。既存 `e2e_test.go` の軽量 `TestE2E_Users_List` / `TestE2E_Users_GetByID` は M06/M07 と同パターンで削除し M08 厳格突合版に一本化。Unit 5/5 Green（既存 `roundTripperFunc` / `jsonResp` を再利用、`UserSearchParams` は Name/Email/UpdatedAtFrom の 3 クエリ検証）。実 API E2E で **List PASS（26 items, 未マップ 0）/ Get FAIL（404 = API 非対応、M03/M04/M06 と同現象、マスタ系 4 件連続）/ Search PASS（26 items, 未マップ 0, name フィルタ無視 4 件連続）**を確認。271cba3（2026-04-17）で追加された 6 フィールド（`last_name / first_name / role_id / role_name / last_sign_in_at / valid_flg`）は **全 26 件で完全に埋まっており実 API と完全一致**（`last_sign_in_at` は全件長さ 29 の ISO 8601 で null 欠落なし、`role_id = {1,2,4}`、`valid_flg = {1}`）、修正の妥当性を実証。一方で **実 API レスポンスに `name` キーが不在**（全 26 件で `has("name") == false`）→ `UserEntity.Name` は **逆方向不整合**（M03/M04/M06 の `Memo` と同現象、マスタ系で **4 件目**）。`DisplayName()` は常に LastName+FirstName 経路で動作することを実証。リソース全体 403 / 429 / TLS 異常: **発生せず**。実消費 **4 req**（List 1 + Get discovery 1 + Get 本体 1 + Search 1）、見積 5 req 以下。Pending Re-verification 追加なし（Get のみ API 非対応の固定 Fail で pending ではない）。 |

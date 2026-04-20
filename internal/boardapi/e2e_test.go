@@ -80,47 +80,8 @@ func TestE2E_Clients_Search(t *testing.T) {
 }
 
 // --- Users ---
-
-func TestE2E_Users_List(t *testing.T) {
-	client := newE2EClient(t)
-	ctx := context.Background()
-
-	users, err := client.ListUsers(ctx)
-	if err != nil {
-		skipIfNotFound(t, err, "ListUsers")
-		t.Fatalf("ListUsers: %v", err)
-	}
-	if len(users) < 1 {
-		t.Errorf("ListUsers: expected at least 1 user, got %d", len(users))
-	}
-	t.Logf("ListUsers returned %d items", len(users))
-}
-
-func TestE2E_Users_GetByID(t *testing.T) {
-	client := newE2EClient(t)
-	ctx := context.Background()
-
-	users, err := client.ListUsers(ctx)
-	if err != nil {
-		skipIfNotFound(t, err, "ListUsers")
-		t.Fatalf("ListUsers: %v", err)
-	}
-	if len(users) == 0 {
-		t.Skip("no users available for GetByID test")
-	}
-
-	got, err := client.GetUser(ctx, users[0].ID)
-	if err != nil {
-		// BOARD API may not support individual user GET for all account types.
-		skipIfNotFound(t, err, "GetUser")
-		t.Fatalf("GetUser(%d): %v", users[0].ID, err)
-	}
-	requirePositiveID(t, got.ID, "GetUser.ID")
-	requireNonEmpty(t, got.DisplayName(), "GetUser.DisplayName")
-	if got.ID != users[0].ID {
-		t.Errorf("ID mismatch: got %d, want %d", got.ID, users[0].ID)
-	}
-}
+// TestE2E_Users_List / TestE2E_Users_GetByID は M08 で厳格フィールド突合付き
+// の版に一本化したため e2e_users_test.go へ移動（M07 groups と同形）。
 
 // --- Groups ---
 // TestE2E_Groups_List は M07 で厳格フィールド突合付きの版に一本化したため
