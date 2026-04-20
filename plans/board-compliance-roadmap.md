@@ -42,10 +42,10 @@
 - 失敗した M は `Blockers` に転記、ユーザー判断待ちに。
 
 ## Current Focus
-- **マイルストーン**: M19 orders Get + 厳格突合（Phase G 3 件目、~10 req）
-- **直近の完了**: M18 **Phase G 2 件目 = estimates Get 厳格突合**: `GetEstimateRaw` 追加、`e2e_estimates_test.go` 新規作成（M17 helper 経由）、旧 `TestE2E_Estimates_GetByDocumentID` を削除して一本化。go build/vet/test 全 Green。実消費 TBD（実 API 未実行、~3 req 見込み）。
-- **以前の完了**: M17 **Phase G 1 件目・documentID discovery helper 確立**: `findAnyDocumentID(t, client, docType)` を `e2e_helpers_test.go` に追加。Unit テスト（httptest ベース）2 本 Green。実 API smoke test（estimate）PASS: projectID=95944469 documentID=105287235。実消費 **2 req**。
-- **次のアクション**: M19 (orders Get + 厳格突合、Phase G 3 件目、~10 req) を着手
+- **マイルストーン**: M20 deliveries Get + 厳格突合（Phase G 4 件目、~10 req）
+- **直近の完了**: M19 **Phase G 3 件目 = orders Get 厳格突合**: `GetOrderRaw` 追加、`e2e_orders_test.go` 新規作成（M17 helper 経由）。go build/vet/test 全 Green。実消費 TBD（実 API 未実行、~3 req 見込み）。
+- **以前の完了**: M18 **Phase G 2 件目 = estimates Get 厳格突合**: `GetEstimateRaw` 追加、`e2e_estimates_test.go` 新規作成（M17 helper 経由）、旧 `TestE2E_Estimates_GetByDocumentID` を削除して一本化。go build/vet/test 全 Green。実消費 TBD（実 API 未実行、~3 req 見込み）。
+- **次のアクション**: M20 (deliveries Get + 厳格突合、Phase G 4 件目、~10 req) を着手
 
 ## Progress
 
@@ -340,11 +340,11 @@
 - 見積: ~5 req / 実績: ~3 req（ListProjectsPage 1 + GetProjectWithGroupRaw 1 + GetEstimateRaw 1）/ 実 API 未実行のため TBD
 - 詳細: plans/board-compliance-m18-estimates.md
 
-#### M19: orders Get + 厳格突合
-- [ ] E2E: Get（M17 helper）
-- [ ] 厳格フィールド突合（OrderEntity）
-- 見積: ~10 req
-- 詳細: plans/board-compliance-m19-orders.md（着手時生成）
+#### M19: orders Get + 厳格突合 ✅（Phase G 3 件目）
+- [x] E2E: Get（M17 helper）
+- [x] 厳格フィールド突合（OrderEntity）
+- 見積: ~10 req / 実績: ~3 req（ListProjectsPage 1 + GetProjectWithGroupRaw 1 + GetOrderRaw 1）/ 実 API 未実行のため TBD
+- 詳細: plans/board-compliance-m19-orders.md
 
 #### M20: deliveries Get + 厳格突合
 - [ ] E2E: Get（M17 helper）
@@ -495,5 +495,6 @@
 | 2026-04-21 02:05 | M17 実装・Phase G 開始 | `findAnyDocumentID(t, client, docType)` を `e2e_helpers_test.go` に追加。シグネチャ: `(t, client, docType) → (projectID, documentID int)`。probe struct 方式（`GetProjectWithGroupRaw` + anonymous struct）で全 5 docType を統一処理し、`ProjectEntity` の delivery/invoice/receipt JSON タグ単数形ミスマッチを回避。estimate/order は単一オブジェクト、delivery/invoice/receipt は複数形配列の先頭を返す。上限 `maxDiscoveryProjects=3` で rate limit 配慮。Unit テスト（httptest ベース）2 本 Green。実 API smoke test（estimate）: projectID=95944469 documentID=105287235 発見。|
 | 2026-04-21 02:12 | M17 修正（rate limit バグ修正） | `ListProjectsRaw+WithPerPage` は `ListAll` で全ページ走査するため 257 秒・約 800 req を消費する問題を発見。`ListProjectsPage(1, maxDiscoveryProjects)` に切り替えることで全ページ走査を回避。修正後の smoke test: **0.69 秒・2 req**（`ListProjectsPage` 1 + `GetProjectWithGroupRaw` 1）。|
 | 2026-04-21 03:xx | M18 実装・Phase G 2 件目 | `GetEstimateRaw` を `estimates.go` に追加（`GetVendorRaw` と同パターン）。`e2e_estimates_test.go` を新規作成し M17 `findAnyDocumentID` helper 経由の厳格突合 E2E テスト（`TestE2E_Estimates_Get` 1 本）を追加。旧 `TestE2E_Estimates_GetByDocumentID`（古い discovery パターン：全件 `ListProjects` + typed `GetProjectWithGroup`）を `e2e_test.go` から削除し一本化。go build/vet/test 全 Green（全 12 パッケージ）。e2e タグ付きコンパイル通過。実 API 未実行（~3 req 見込み: ListProjectsPage 1 + GetProjectWithGroupRaw 1 + GetEstimateRaw 1）。|
+| 2026-04-21 | M19 実装・Phase G 3 件目 | `GetOrderRaw` を `orders.go` に追加（`GetEstimateRaw` と同パターン）。`e2e_orders_test.go` を新規作成し M17 `findAnyDocumentID` helper 経由の厳格突合 E2E テスト（`TestE2E_Orders_Get` 1 本）を追加。e2e_test.go のクリーンアップは不要（M18 時点で orders 関連の古いテストは存在しなかった）。go build/vet/test 全 Green（全 12 パッケージ）。e2e タグ付きコンパイル通過。実 API 未実行（~3 req 見込み: ListProjectsPage 1 + GetProjectWithGroupRaw 1 + GetOrderRaw 1）。|
 | 2026-04-21 01:53 | M16 実装・検証・Phase F 完走 | `ListVendorsRaw` / `GetVendorRaw` / `SearchVendorsRaw` を既存 `vendors.go` に追記（URL は既存実装通り `/v1/payees`、命名不一致は維持）。既存 `e2e_test.go` の軽量 `TestE2E_Vendors_List` を削除し `e2e_vendors_test.go` の厳格版に一本化。Unit 5/5 Green（U5 は `VendorSearchParams` の **2 クエリ**（Name+UpdatedAtFrom）を検証、M15 の 4 クエリより少ない点を明示。VendorEntity は 6 フィールドと Phase F 3 件の中で最もシンプル）。実 API E2E で **Phase F 3 件目・Phase F 完走として**: ①`GET /v1/payees` が 200 / 0 items 返却（当該アカウントにベンダーデータなし、M14/M15 と同パターン）、②Get は discovery 0 件のため `t.Skipf("pending re-verification")` → Pending Re-verification に転記、③Search PASS（0 items）、④未マップ 0（空配列のため StrictFieldDiff の検証機会なし）、⑤403/429 は発生せず、⑥実パス `/v1/payees` と Go 型名 `Vendor*` の命名不一致は Unit テストのパスアサーションで確認済み。**Phase F 完走サマリ**: M14/M15/M16 全 3 件でデータ 0 件（当該アカウントはベンダー系リソース全て空）。Phase F 合計 req: **9 req**（各 3 req × 3 M）、見積 21 req から大幅削減。実消費 **3 req**（見積 5）、上限 8 req 以下。|
 | 2026-04-21 01:00 | M13 実装・検証 | `ListProjectsRaw` / `GetProjectRaw` / `GetProjectWithGroupRaw` / `SearchProjectsRaw` を M12 clients と同形で追加（URL `/v1/projects`、top-level、`ProjectSearchParams` は 5 クエリ検証で M12-M02 通算最多）。旧 `e2e_test.go` の `TestE2E_Projects_List` / `_GetByID` / `_GetWithGroup` 3 本を削除し M13 厳格突合版に一本化（`TestE2E_Estimates_GetByDocumentID` は M17/M18 スコープで残存）。Unit 6/6 Green（**U6 で GetProjectWithGroupRaw の response_group query 検証を初導入**、6 group + empty の計 7 subtest）。実 API E2E で **Phase E 2 件目・複雑度最高として多数の重要発見**: ①`GET /v1/projects/{id}` が **200 成功**（**Phase D/E コア業務系 Get 5 件連続確定**）、②**List/Search 21 未マップ**（`client / contact / delivery_status / estimate_date / group_* / invoice_dates / management_no / order_status / project_no / project_type* / tax / total / user`）、③**Get 68 未マップ**（List 21 + Get 限定 47、accounting_type* / archive_flg / client_branch / contract_* / cost_* / delivery_* / document_setting_* / hubspot / in_house_memo / invoice_* / lock_flg / payment_* / periodical_* / tags / to 等）、④**最重要 = delivery/invoice/receipt が `deliveries`/`invoices`/`receipts` 複数形配列キーで返却** → `*DocumentSummary` 単一ポインタ設計が根本的に誤り（M18-M21 スコープの構造的問題）、estimate/order は単一オブジェクトで partially 正しい、⑤DocumentSummary 内未マップ 6-7 フィールド（`details / seal_approval_status / delivery_place / blank_date_flg / document_amount_disp_kbn / valid_period` 等）、⑥`rg=all` 時に `project_costs` キーが出現（M17+ スコープ）、⑦`client_id=0`（`client` ネスト内 id が正規、M09/M10 継続）、⑧`status=空`（`order_status`/`delivery_status` が代替）、⑨**`Memo` 逆方向 9 件連続で全般仕様最終確定**（`in_house_memo` が代替候補）、⑩**name filter 無視 9 件連続で全般仕様最終確定**（2405 items 全件返却）、⑪403/429 は発生せず。E2E は意図的に Fail 状態で commit。実消費 **11 req**（List 1 + Get discovery 1 + Get 本体 1 + Search 1 + GetWithGroup discovery 1 + 6 groups 6 = 11、pin-point accuracy、上限 15 以内）。Pending Re-verification 追加なし（List 2405 items、Get 200 で完全にデータ充足）。**Phase E 2 件目サマリ**: M12 で確立した「コア業務 Get 200 継続・ネスト client-child 継続・逆方向不整合継続」が M13 で全て継承、更に **DocumentSummary 配列構造の根本的不一致** と **62 フィールド未マップ（今 M 最大規模）** の 2 大発見を得た。フォローアップ: ProjectEntity 全面改訂 / DocumentSummary 配列設計変更（最優先、M18-M21 依存）/ project_costs キー確認（M17+）。 |
