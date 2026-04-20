@@ -36,9 +36,9 @@
 - 失敗した M は `Blockers` に転記、ユーザー判断待ちに。
 
 ## Current Focus
-- **マイルストーン**: M01 基盤整備
-- **直近の完了**: ロードマップ作成（2026-04-20）
-- **次のアクション**: `/devflow:implement` で M01 を実行
+- **マイルストーン**: M02 accounting_types 完走（実装完了・実 API 検証のみ sandbox 外で要実施）
+- **直近の完了**: M02 実装（Raw 層追加 + unit 5/5 + E2E コード）
+- **次のアクション**: ユーザー手元で M02 E2E を実 API に当てて未マップフィールドを確認 → 結果次第で M03 (project_types) へ
 
 ## Progress
 
@@ -59,12 +59,15 @@
 
 ### Phase B: マスタ系（小）
 
-#### M02: accounting_types 完走
-- [ ] E2E: List / Get / Search（Search 対応なら）
-- [ ] 厳格フィールド突合
-- [ ] raw JSON を tmp/ にダンプ
-- 見積: ~5 req
-- 詳細: plans/board-compliance-m02-accounting-types.md（着手時生成）
+#### M02: accounting_types 完走 🟡（実装完了 / 実 API 検証は sandbox 外で要実行）
+- [x] `ListAccountingTypesRaw` / `GetAccountingTypeRaw` / `SearchAccountingTypesRaw` を boardapi に追加（byte 保持 Raw 層）
+- [x] Unit（RoundTripper mock）5/5 Green
+- [x] E2E: List / Get / Search（実装完了、build OK）
+- [x] 厳格フィールド突合（E2E 内で `testhelper.StrictFieldDiff` 呼び出し）
+- [x] raw JSON を tmp/ にダンプ（`dumpJSON` で accounting_types_*.json）
+- [ ] **実 API E2E 実行（sandbox TLS 制約で未達、ユーザー手元で要実行）**
+- 見積: ~5 req / 実績: 0 req（unit のみ）
+- 詳細: plans/board-compliance-m02-accounting-types.md
 
 #### M03: project_types 完走
 - [ ] E2E: List / Get / Search
@@ -298,7 +301,7 @@
 ---
 
 ## Blockers
-なし
+- **M02 実 API E2E 未実行 (2026-04-20)**: sandbox 内で Go TLS native verifier が OSStatus -26276 を返し `api.the-board.jp` に HTTPS 接続不能。curl は同一ホストに対し成功（403）。インフラ側制約のため M02 実装コードは完成・unit Green だが、実 API での StrictFieldDiff 検証は未達。ユーザー手元（sandbox 外）での `BOARD_API_KEY=... BOARD_API_TOKEN=... go test -tags e2e -v -count=1 -run TestE2E_AccountingTypes ./internal/boardapi/` 実行で解消予定。
 
 ## Architecture Decisions
 | # | 決定 | 理由 | 日付 |
@@ -314,3 +317,4 @@
 | 日時 | 種別 | 内容 |
 |------|------|------|
 | 2026-04-20 16:29 | 作成 | ロードマップ初版作成。親プラン plans/vivid-strolling-ocean.md を参照。34 マイルストーン構成で中断耐性を最大化。 |
+| 2026-04-20 17:xx | M02 実装 | `ListAccountingTypesRaw`/`GetAccountingTypeRaw`/`SearchAccountingTypesRaw` を追加し、unit テストは httptest ではなく `http.RoundTripper` モック方式で実装（sandbox 制約回避）。E2E コードは `testhelper.StrictFieldDiff` + `dumpJSON` で準拠検証のパターンを確立。実 API 検証は sandbox TLS 問題で未達、Blockers に記録。 |

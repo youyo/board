@@ -120,3 +120,79 @@ func (c *Client) ListAccountingTypesPage(ctx context.Context, page, perPage int)
 	}
 	return ListPage[AccountingTypeEntity](c, ctx, makeReq, page, perPage)
 }
+
+// ListAccountingTypesRaw retrieves all accounting types and returns the raw
+// HTTP response bodies merged across pages as a single JSON array.
+// Unlike ListAccountingTypes, the returned bytes are byte-preserving: each
+// element JSON is exactly what the BOARD API emitted, enabling strict field
+// diff in E2E tests to detect keys that are not mapped to AccountingTypeEntity.
+//
+// Intended for E2E strict field diff; regular callers should use ListAccountingTypes.
+func (c *Client) ListAccountingTypesRaw(ctx context.Context, opts ...ListAllOption) ([]byte, error) {
+	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/accounting_types", nil)
+		if err != nil {
+			return nil, err
+		}
+		q := req.URL.Query()
+		q.Set("page", strconv.Itoa(page))
+		q.Set("per_page", strconv.Itoa(perPage))
+		req.URL.RawQuery = q.Encode()
+		return req, nil
+	}
+	items, err := c.ListAll(ctx, makeReq, opts...)
+	if err != nil {
+		return nil, err
+	}
+	out, err := json.Marshal(items)
+	if err != nil {
+		return nil, &APIError{Code: APIErrorUnknown, Message: "ListAccountingTypesRaw: marshal aggregate: " + err.Error()}
+	}
+	return out, nil
+}
+
+// GetAccountingTypeRaw retrieves a single accounting type and returns the raw
+// HTTP response body byte-for-byte.
+//
+// Intended for E2E strict field diff; regular callers should use GetAccountingType.
+func (c *Client) GetAccountingTypeRaw(ctx context.Context, id int) ([]byte, error) {
+	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/accounting_types/%d", id), nil)
+	if err != nil {
+		return nil, err
+	}
+	return c.DoWithRetry(req)
+}
+
+// SearchAccountingTypesRaw retrieves accounting types matching the given search
+// parameters and returns the raw HTTP response bodies merged across pages as a
+// single JSON array. Same byte-preserving guarantee as ListAccountingTypesRaw.
+//
+// Intended for E2E strict field diff; regular callers should use SearchAccountingTypes.
+func (c *Client) SearchAccountingTypesRaw(ctx context.Context, params AccountingTypeSearchParams, opts ...ListAllOption) ([]byte, error) {
+	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/accounting_types", nil)
+		if err != nil {
+			return nil, err
+		}
+		q := req.URL.Query()
+		q.Set("page", strconv.Itoa(page))
+		q.Set("per_page", strconv.Itoa(perPage))
+		if params.Name != "" {
+			q.Set("name", params.Name)
+		}
+		if params.UpdatedAtFrom != "" {
+			q.Set("updated_at_from", params.UpdatedAtFrom)
+		}
+		req.URL.RawQuery = q.Encode()
+		return req, nil
+	}
+	items, err := c.ListAll(ctx, makeReq, opts...)
+	if err != nil {
+		return nil, err
+	}
+	out, err := json.Marshal(items)
+	if err != nil {
+		return nil, &APIError{Code: APIErrorUnknown, Message: "SearchAccountingTypesRaw: marshal aggregate: " + err.Error()}
+	}
+	return out, nil
+}
