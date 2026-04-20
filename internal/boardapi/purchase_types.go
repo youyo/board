@@ -120,3 +120,79 @@ func (c *Client) ListPurchaseTypesPage(ctx context.Context, page, perPage int) (
 	}
 	return ListPage[PurchaseTypeEntity](c, ctx, makeReq, page, perPage)
 }
+
+// ListPurchaseTypesRaw retrieves all purchase types and returns the raw HTTP
+// response bodies merged across pages as a single JSON array.
+// Unlike ListPurchaseTypes, the returned bytes are byte-preserving: each
+// element JSON is exactly what the BOARD API emitted, enabling strict field
+// diff in E2E tests to detect keys that are not mapped to PurchaseTypeEntity.
+//
+// Intended for E2E strict field diff; regular callers should use ListPurchaseTypes.
+func (c *Client) ListPurchaseTypesRaw(ctx context.Context, opts ...ListAllOption) ([]byte, error) {
+	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/expenditure_types", nil)
+		if err != nil {
+			return nil, err
+		}
+		q := req.URL.Query()
+		q.Set("page", strconv.Itoa(page))
+		q.Set("per_page", strconv.Itoa(perPage))
+		req.URL.RawQuery = q.Encode()
+		return req, nil
+	}
+	items, err := c.ListAll(ctx, makeReq, opts...)
+	if err != nil {
+		return nil, err
+	}
+	out, err := json.Marshal(items)
+	if err != nil {
+		return nil, &APIError{Code: APIErrorUnknown, Message: "ListPurchaseTypesRaw: marshal aggregate: " + err.Error()}
+	}
+	return out, nil
+}
+
+// GetPurchaseTypeRaw retrieves a single purchase type and returns the raw HTTP
+// response body byte-for-byte.
+//
+// Intended for E2E strict field diff; regular callers should use GetPurchaseType.
+func (c *Client) GetPurchaseTypeRaw(ctx context.Context, id int) ([]byte, error) {
+	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/expenditure_types/%d", id), nil)
+	if err != nil {
+		return nil, err
+	}
+	return c.DoWithRetry(req)
+}
+
+// SearchPurchaseTypesRaw retrieves purchase types matching the given search
+// parameters and returns the raw HTTP response bodies merged across pages as a
+// single JSON array. Same byte-preserving guarantee as ListPurchaseTypesRaw.
+//
+// Intended for E2E strict field diff; regular callers should use SearchPurchaseTypes.
+func (c *Client) SearchPurchaseTypesRaw(ctx context.Context, params PurchaseTypeSearchParams, opts ...ListAllOption) ([]byte, error) {
+	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/expenditure_types", nil)
+		if err != nil {
+			return nil, err
+		}
+		q := req.URL.Query()
+		q.Set("page", strconv.Itoa(page))
+		q.Set("per_page", strconv.Itoa(perPage))
+		if params.Name != "" {
+			q.Set("name", params.Name)
+		}
+		if params.UpdatedAtFrom != "" {
+			q.Set("updated_at_from", params.UpdatedAtFrom)
+		}
+		req.URL.RawQuery = q.Encode()
+		return req, nil
+	}
+	items, err := c.ListAll(ctx, makeReq, opts...)
+	if err != nil {
+		return nil, err
+	}
+	out, err := json.Marshal(items)
+	if err != nil {
+		return nil, &APIError{Code: APIErrorUnknown, Message: "SearchPurchaseTypesRaw: marshal aggregate: " + err.Error()}
+	}
+	return out, nil
+}

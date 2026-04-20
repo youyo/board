@@ -323,15 +323,5 @@ func TestE2E_Payments_List(t *testing.T) {
 }
 
 // --- PurchaseTypes (expenditure_types path) ---
-
-func TestE2E_PurchaseTypes_List(t *testing.T) {
-	client := newE2EClient(t)
-	ctx := context.Background()
-
-	pts, err := client.ListPurchaseTypes(ctx)
-	if err != nil {
-		skipIfNotFound(t, err, "ListPurchaseTypes")
-		t.Fatalf("ListPurchaseTypes: %v", err)
-	}
-	t.Logf("ListPurchaseTypes returned %d items", len(pts))
-}
+// Moved to e2e_purchase_types_test.go (M06, board-compliance roadmap):
+//   TestE2E_PurchaseTypes_List / _Get / _Search with StrictFieldDiff + dumpJSON.
