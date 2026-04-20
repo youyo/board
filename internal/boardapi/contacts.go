@@ -154,3 +154,83 @@ func (c *Client) ListContactsPage(ctx context.Context, page, perPage int) (*Page
 	}
 	return ListPage[ContactEntity](c, ctx, makeReq, page, perPage)
 }
+
+// ListContactsRaw retrieves all contacts and returns the raw HTTP response
+// bodies merged across pages as a single JSON array. Unlike ListContacts, the
+// returned bytes are byte-preserving: each element JSON is exactly what the
+// BOARD API emitted, enabling strict field diff in E2E tests to detect keys
+// that are not mapped to ContactEntity.
+//
+// Intended for E2E strict field diff; regular callers should use ListContacts.
+func (c *Client) ListContactsRaw(ctx context.Context, opts ...ListAllOption) ([]byte, error) {
+	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/contacts", nil)
+		if err != nil {
+			return nil, err
+		}
+		q := req.URL.Query()
+		q.Set("page", strconv.Itoa(page))
+		q.Set("per_page", strconv.Itoa(perPage))
+		req.URL.RawQuery = q.Encode()
+		return req, nil
+	}
+	items, err := c.ListAll(ctx, makeReq, opts...)
+	if err != nil {
+		return nil, err
+	}
+	out, err := json.Marshal(items)
+	if err != nil {
+		return nil, &APIError{Code: APIErrorUnknown, Message: "ListContactsRaw: marshal aggregate: " + err.Error()}
+	}
+	return out, nil
+}
+
+// GetContactRaw retrieves a single contact and returns the raw HTTP response
+// body byte-for-byte.
+//
+// Intended for E2E strict field diff; regular callers should use GetContact.
+func (c *Client) GetContactRaw(ctx context.Context, id int) ([]byte, error) {
+	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/contacts/%d", id), nil)
+	if err != nil {
+		return nil, err
+	}
+	return c.DoWithRetry(req)
+}
+
+// SearchContactsRaw retrieves contacts matching the given search parameters
+// and returns the raw HTTP response bodies merged across pages as a single
+// JSON array. Same byte-preserving guarantee as ListContactsRaw.
+//
+// Intended for E2E strict field diff; regular callers should use
+// SearchContacts.
+func (c *Client) SearchContactsRaw(ctx context.Context, params ContactSearchParams, opts ...ListAllOption) ([]byte, error) {
+	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/contacts", nil)
+		if err != nil {
+			return nil, err
+		}
+		q := req.URL.Query()
+		q.Set("page", strconv.Itoa(page))
+		q.Set("per_page", strconv.Itoa(perPage))
+		if params.ClientID != 0 {
+			q.Set("client_id", strconv.Itoa(params.ClientID))
+		}
+		if params.Name != "" {
+			q.Set("name", params.Name)
+		}
+		if params.Email != "" {
+			q.Set("email", params.Email)
+		}
+		req.URL.RawQuery = q.Encode()
+		return req, nil
+	}
+	items, err := c.ListAll(ctx, makeReq, opts...)
+	if err != nil {
+		return nil, err
+	}
+	out, err := json.Marshal(items)
+	if err != nil {
+		return nil, &APIError{Code: APIErrorUnknown, Message: "SearchContactsRaw: marshal aggregate: " + err.Error()}
+	}
+	return out, nil
+}

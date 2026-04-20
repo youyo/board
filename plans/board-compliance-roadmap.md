@@ -9,8 +9,8 @@
 | 対象リポジトリ | /Users/youyo/src/github.com/youyo/board |
 | 親プラン | plans/vivid-strolling-ocean.md |
 | 作成日 | 2026-04-20 |
-| 最終更新 | 2026-04-20 18:40 |
-| ステータス | M09 完了（List FAIL（10 items, unmapped **7**）/ Get FAIL（**200 成功 = マスタ系 Get 404 が Phase D で切れた**、unmapped 7 + 既存 5 フィールド逆方向不整合）/ Search FAIL（10 items, unmapped 7, name filter 無視 = **5 件連続**）。Unit 5/5 Green。`ClientBranchEntity` は 10 フィールド中 5 つが逆方向不整合（`ClientID/PostalCode/Address/Phone/Memo` が実 API に存在せず）。親 client のネスト構造 `client:{id,name,name_disp,custom_no}` が新発見） |
+| 最終更新 | 2026-04-20 18:50 |
+| ステータス | M10 完了（List FAIL（171 items, unmapped **1** = `client` ネスト）/ Get FAIL（**200 成功 = Phase D コア業務系 Get 提供が 2 件連続**、unmapped 1 + 既存 6 フィールド逆方向不整合）/ Search FAIL（171 items, unmapped 1, **name filter 無視 = 6 件連続、BOARD API 全般仕様として確定**）。Unit 5/5 Green。`ContactEntity` は 17 フィールド中 6 つが逆方向不整合（`Name/NameKana/ClientID/ClientBranchID/Memo/Phone` が実 API に不在）。ネスト構造 `client:{id,name,name_disp,custom_no}` が M09 と完全同形で再発見。**271cba3 で追加された 6 フィールド（LastName/FirstName/HonorificTitle/Department/Note/ArchiveFlg）は全件で実 API 応答に存在、fill rate も妥当で修正の正当性が実証された**） |
 
 ## 背景と動機
 - 直近 `271cba3` で UserEntity/ContactEntity/VendorContactEntity に計 6 フィールドもの実 API 不整合が発覚。
@@ -41,9 +41,9 @@
 - 失敗した M は `Blockers` に転記、ユーザー判断待ちに。
 
 ## Current Focus
-- **マイルストーン**: M10 contacts
-- **直近の完了**: M09 実 API E2E 実行で **Phase D（コア業務）1 件目の結果**: List FAIL（10 items, unmapped **7 件**）/ Get FAIL（**200 成功** = マスタ系 Get 404 パターンが Phase D で切れた、unmapped 7 件 + 既存 5 フィールド逆方向不整合で空値化）/ Search FAIL（10 items, unmapped 7 件, **name filter 無視 5 件連続**）。実 API キー構成（12 個）: `[id, name, zip, pref, address1, address2, tel, fax, archive_flg, client, updated_at, created_at]`。**親 client のネスト構造** `client:{id, name, name_disp, custom_no}` が新発見（Phase D 固有リスクが的中）。既存 `ClientBranchEntity` は 10 フィールド中 **5 フィールド**（`ClientID / PostalCode / Address / Phone / Memo`）が実 API に存在せず逆方向不整合、マッチするのは 5 つ（`id / name / fax / updated_at / created_at`）のみ。Unit 5/5 Green。403/429/リソース全体 403 は発生せず。
-- **次のアクション**: M10 (contacts, 19 フィールド) を着手
+- **マイルストーン**: M11 project_costs
+- **直近の完了**: M10 実 API E2E 実行で **Phase D（コア業務）2 件目の結果**: List FAIL（171 items, unmapped **1 件** = `client` ネスト）/ Get FAIL（**200 成功** = Phase D コア業務系 Get 提供が **2 件連続** で確定、unmapped 1 件 + `ContactEntity` 17 フィールド中 **6 フィールドが逆方向不整合**）/ Search FAIL（171 items, unmapped 1 件, **name filter 無視 6 件連続で BOARD API 全般仕様として確定**）。実 API キー構成（12 個）: `[archive_flg, client, created_at, department, email, first_name, honorific_title, id, last_name, note, title, updated_at]`。**親 client のネスト構造** `client:{id, name, name_disp, custom_no}` が M09 と完全同形で **再発見**（Phase D のネストパターンが確定化、`Client` 型の共通化候補）。既存 `ContactEntity` は 17 フィールド中 **6 フィールド**（`Name / NameKana / ClientID / ClientBranchID / Memo / Phone`）が実 API に存在せず逆方向不整合。**271cba3 で追加された 6 フィールド**（`LastName=171/171 / FirstName=140/171 / HonorificTitle=171/171 / Department=27/171 / Note=5/171 / ArchiveFlg=全件 0`）は **全て実 API 応答に存在し、fill rate も妥当**（修正の正当性が UserEntity に続いて ContactEntity でも実証された）。Unit 5/5 Green。403/429/リソース全体 403 は発生せず。実消費 **4 req**（見積 4 req、上限 10 以内）。
+- **次のアクション**: M11 (project_costs) を着手
 
 ## Progress
 
@@ -197,12 +197,25 @@
   - **`name` フィルタ無視はコア業務系でも継続確定（5 件連続）**: M10 contacts 以降のコア業務系 E2E は「filter 無視前提」で設計、Search テストは件数ではなく StrictFieldDiff と artifact 収集を主目的とする
   - **ロードマップ本文「11 フィールド」表記修正**: 実 API は 12 キー（ネスト `client` を含む。展開すれば 15）。ただし表面的なトップレベル JSON キー数 = 12
 
-#### M10: contacts 完走（19 フィールド）
-- [ ] E2E: List / Get / Search
-- [ ] 厳格突合（Name/LastName/FirstName/HonorificTitle/Department/Note/ArchiveFlg 等）
-- [ ] 既存 271cba3 で追加されたフィールドが漏れなく埋まるか検証
-- 見積: ~10 req
-- 詳細: plans/board-compliance-m10-contacts.md（着手時生成）
+#### M10: contacts 完走 🟡（Phase D 2 件目、List/Get/Search すべて意図的 Fail = 未マップ 1 フィールド（`client` ネスト）+ 既存 6 フィールド逆方向不整合。271cba3 の 6 フィールドは実 API 完全対応で修正の正当性実証）
+- [x] Raw 層 3 本追加（List/Get/Search）
+- [x] Unit 5/5 Green（RoundTripper mock、共通ヘルパ再利用、`ContactSearchParams` の `ClientID+Name+Email` の 3 クエリ検証）
+- [x] E2E: List / Get / Search 実行
+- [x] 厳格フィールド突合で 1 未マップ検出: `client`（ネスト構造）
+- [x] `GET /v1/contacts/{id}` は **200 成功**（Phase D コア業務系 Get 提供が 2 件連続で確定、M09 client_branches に続く）
+- [x] `name` パラメータは無視される（検索しても 171 items 全件返却、M03/M04/M06/M08/M09 と同現象、**6 件連続、BOARD API 全般仕様として確定**）
+- [x] **親 client のネスト構造**: `client: { id, name, name_disp, custom_no }` の 4 キー構造体（M09 と **完全同形**、`ClientRef` 型の共通化候補）
+- [x] **既存 `ContactEntity` は 6 フィールドが逆方向不整合**: `Name / NameKana / ClientID / ClientBranchID / Memo / Phone` が実 API に存在せず。対応関係は `client_id → client.id`（ネスト） / `name → 削除`（`last_name + first_name` に統合） / `name_kana → 削除`（API 応答に含まれない） / `memo → note` / `phone → 応答に不在` / `client_branch_id → 応答に不在`（contacts は client 直下で branch に紐づかない設計の可能性）
+- [x] **271cba3 追加 6 フィールドの妥当性実証**: `LastName=171/171(100%) / FirstName=140/171(82%) / HonorificTitle=171/171(100%) / Department=27/171(16%) / Note=5/171(3%) / ArchiveFlg=全件 0`。全て実 API 応答に存在、fill rate も妥当（UserEntity M08 に続き 2 件目の検証成功）
+- 見積: ~10 req / 実績: **4 req**（List 1 + Get discovery 1 + Get 本体 1 + Search 1、上限 10 req 以下）
+- E2E 結果: List FAIL（171 items, 1 unmapped）/ Get FAIL（200、1 unmapped + 6 逆方向）/ Search FAIL（171 items, 1 unmapped, filter 無視）
+- 詳細: plans/board-compliance-m10-contacts.md
+- **フォローアップ（別 commit / 別 M で対応予定、M10 は 271cba3 検証の結論として重要度高）**:
+  - **`ContactEntity` の全面改訂**（最優先別 M）: 削除候補 6 フィールド（`Name / NameKana / ClientID / ClientBranchID / Memo / Phone`）+ 追加候補 1 フィールド（`Client *ContactClient` ネスト、M09 と型共通化して `ClientRef` 抽出推奨）。271cba3 UserEntity 修正と同等規模の影響（service/find / repository / mcp / cli 総点検、特に `FindClient` の contact enrichment）
+  - **`ContactSearchParams.ClientID` / `Email` の実機能確認**: 本 M ではクエリエンコードのみ U5 で確認、実 API が本当に絞り込むかは別 M で指定 E2E 追加（`Name` は 6 件連続無視で確定）
+  - **`name` フィルタ無視 6 件連続で BOARD API 全般仕様と確定**: M11 project_costs 以降の全コア業務系 E2E は「filter 無視前提」で設計、Search テストは件数ではなく `StrictFieldDiff` と artifact 収集を主目的とする。`docs/specs/board_cli_mcp_ultra_detailed_design_ja.md` に仕様として追記推奨
+  - **ロードマップ本文「19 フィールド」表記修正**: 実 API は **12 トップレベルキー**（ネスト `client` を展開しても 15）。現行 `ContactEntity` は 17 フィールドで逆方向不整合 6 件あり、適正フィールド数は 12（Entity に ネスト `Client` を 1 として数える）
+  - **`client_branch_id` 応答不在**: contacts が client_branch に紐づかない API 応答設計と判明。find 層のロジック見直し（M25 FindClient 厳格化で併せて検討）
 
 #### M11: project_costs 完走
 - [ ] E2E: List / Get / Search
@@ -412,3 +425,4 @@
 | 2026-04-20 18:05 | M07 実装・検証 | `ListGroupsRaw` / `GetGroupRaw` を追加（**Search Raw は M07 スコープ外として意図的に未提供**、ロードマップ M07 定義「Get（既存 List 前提）+ 厳格突合（GroupEntity）」厳守）。既存 `e2e_test.go` の軽量 `TestE2E_Groups_List` は M06 と同パターンで削除し M07 厳格突合版に一本化。Unit 5/5 Green（既存 `roundTripperFunc`/`jsonResp` を再利用、Search 1 ケースの代わりに「既定 per_page=100 検証」を 5 本目として追加）。実 API E2E で **`GET /v1/groups` が 200 / 0 items / response body `null`**（M02 accounting_types と同パターン）を確認。List 0 件のため Get は `t.Skipf("pending re-verification")` で停止、List 厳格突合も実データなしのため未マップ検出機会なし。マスタ系の傾向（Get 404 / archive_flg / Memo 逆方向 / リソース 403）は M07 では **発生せず**（403/429 ともに無し）。実消費 **2 req**（List 1 + Get 内 discovery List 1）、見積 3 req 以下。Pending Re-verification に M07 を追加（データ投入後の再実行で `GroupEntity` 構造の準拠を検証）。 |
 | 2026-04-20 18:40 | M09 実装・検証 | `ListClientBranchesRaw` / `GetClientBranchRaw` / `SearchClientBranchesRaw` を M08 users と同形で追加（既存 `client_branches.go` に追記、URL `/v1/client_branches` top-level、`ClientBranchSearchParams` は `ClientID+Name` の 2 クエリ）。Unit 5/5 Green。実 API E2E で **Phase D 1 件目として重要発見を複数**: ①`GET /v1/client_branches/{id}` が **200 成功**（マスタ系 Get 404 パターンが Phase D で切れた、コア業務系は個別 Get 提供）、②**7 未マップフィールド**（`address1, address2, archive_flg, client, pref, tel, zip`）= 既存 `ClientBranchEntity` のキー名が軒並み実 API と不一致、③**既存 5 フィールドが逆方向不整合**（`ClientID / PostalCode / Address / Phone / Memo` が実 API に存在しない）、④**親 client のネスト構造** `client:{id, name, name_disp, custom_no}` が新発見（Phase D 固有リスクが的中、マスタ系では未観測）、⑤**`name` フィルタ無視 5 件連続**（マスタ系 4 件に加えコア業務系でも継続、BOARD API 全般の仕様と判断可能）、⑥リソース全体 403 / 429 は発生せず。既存 `ClientBranchEntity` 10 フィールド中マッチは 5 つ（`id / name / fax / updated_at / created_at`）のみで、Entity 全面改訂フォローアップが必要（271cba3 UserEntity 修正と同等規模）。E2E は意図的に Fail 状態で commit。実消費 **4 req**（List 1 + Get discovery 1 + Get 本体 1 + Search 1、見積 8 req → 上限 10 req 以内）。Pending Re-verification 追加なし。 |
 | 2026-04-20 18:15 | M08 実装・検証 | `ListUsersRaw` / `GetUserRaw` / `SearchUsersRaw` を M06 purchase_types と同形で追加（URL は `/v1/users`、命名一致）。既存 `e2e_test.go` の軽量 `TestE2E_Users_List` / `TestE2E_Users_GetByID` は M06/M07 と同パターンで削除し M08 厳格突合版に一本化。Unit 5/5 Green（既存 `roundTripperFunc` / `jsonResp` を再利用、`UserSearchParams` は Name/Email/UpdatedAtFrom の 3 クエリ検証）。実 API E2E で **List PASS（26 items, 未マップ 0）/ Get FAIL（404 = API 非対応、M03/M04/M06 と同現象、マスタ系 4 件連続）/ Search PASS（26 items, 未マップ 0, name フィルタ無視 4 件連続）**を確認。271cba3（2026-04-17）で追加された 6 フィールド（`last_name / first_name / role_id / role_name / last_sign_in_at / valid_flg`）は **全 26 件で完全に埋まっており実 API と完全一致**（`last_sign_in_at` は全件長さ 29 の ISO 8601 で null 欠落なし、`role_id = {1,2,4}`、`valid_flg = {1}`）、修正の妥当性を実証。一方で **実 API レスポンスに `name` キーが不在**（全 26 件で `has("name") == false`）→ `UserEntity.Name` は **逆方向不整合**（M03/M04/M06 の `Memo` と同現象、マスタ系で **4 件目**）。`DisplayName()` は常に LastName+FirstName 経路で動作することを実証。リソース全体 403 / 429 / TLS 異常: **発生せず**。実消費 **4 req**（List 1 + Get discovery 1 + Get 本体 1 + Search 1）、見積 5 req 以下。Pending Re-verification 追加なし（Get のみ API 非対応の固定 Fail で pending ではない）。 |
+| 2026-04-20 18:50 | M10 実装・検証 | `ListContactsRaw` / `GetContactRaw` / `SearchContactsRaw` を M08 users / M09 client_branches と同形で追加（URL `/v1/contacts`、top-level、`ContactSearchParams` は `ClientID+Name+Email` の 3 クエリ検証）。既存 `e2e_test.go` 等に軽量 `TestE2E_Contacts_*` は存在せず（削除対象なし）。Unit 5/5 Green。実 API E2E で **Phase D 2 件目として**: ①`GET /v1/contacts/{id}` が **200 成功**（M09 に続きコア業務系 Get 提供が 2 件連続で確定）、②**1 未マップフィールド**（`client` ネスト）= `ContactEntity` のトップレベルキーが実 API とほぼ一致、③**既存 6 フィールドが逆方向不整合**（`Name / NameKana / ClientID / ClientBranchID / Memo / Phone` が実 API に不在）、④**親 client のネスト構造** `client:{id, name, name_disp, custom_no}` が M09 と **完全同形**で再発見（Phase D のネストパターンが確定化、`ClientRef` 型の共通化候補）、⑤**`name` フィルタ無視 6 件連続**（マスタ系 4 件 + コア業務系 2 件、**BOARD API 全般の仕様として確定**）、⑥**271cba3 の 6 フィールドの妥当性実証**: `LastName=171/171(100%) / FirstName=140/171(82%) / HonorificTitle=171/171(100%) / Department=27/171(16%) / Note=5/171(3%) / ArchiveFlg=全件 0`、全て実 API 応答に存在し fill rate も妥当（UserEntity M08 に続き ContactEntity でも修正の正当性が実証）、⑦`DisplayName()` は全件で LastName+FirstName 経路（`Name` キー自体が 171 件全件で実 API に不在、M08 users と同現象、`Name`/`Memo`逆方向不整合として通算 6 件目）、⑧リソース全体 403 / 429 は発生せず。既存 `ContactEntity` 17 フィールド中マッチは 11 つ（6 逆方向不整合）、Entity 全面改訂フォローアップ必要（271cba3 UserEntity 修正と同等規模、`Client` 型の M09 との共通化検討）。E2E は意図的に Fail 状態で commit。実消費 **4 req**（List 1 + Get discovery 1 + Get 本体 1 + Search 1、見積 10 req → 上限内）。Pending Re-verification 追加なし。 |
