@@ -224,7 +224,7 @@ func TestListProjectCostsPage(t *testing.T) {
 // --- Estimates tests ---
 
 func TestGetEstimate(t *testing.T) {
-	entity := &boardapi.EstimateEntity{ID: 1, ProjectID: 10}
+	entity := &boardapi.EstimateEntity{ID: 1, Total: "90000.0"}
 	stub := &stubEstimateRepo{getResult: entity}
 	svc := newServiceWithEstimates(stub)
 	got, err := svc.GetEstimate(testCtx, 1, defaultOpts)

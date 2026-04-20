@@ -11,7 +11,12 @@ import (
 // estimates with their associated client and project.
 // Uses project response_group API to discover document IDs, then fetches via GetByDocumentID.
 // Field priority: ID > ProjectID > ClientName > ProjectName.
-// Status is a post-filter only.
+//
+// M35 NOTE: EstimateEntity は実 API 準拠に再設計されたため、Status/ClientID/ProjectID
+// フィールドは存在しない。Status post-filter および client/project enrichment は
+// 各ブランチのコンテキスト情報から復元する。
+// ID lookup では client/project を特定できないため nil を返す。
+// TODO(M25-M32): find 層の全体再設計で enrichment を復元する。
 func (s *Service) FindEstimate(ctx context.Context, q FindEstimateQuery) ([]EstimateResult, error) {
 	if q.ID == 0 && q.ProjectID == 0 && q.ClientName == "" && q.ProjectName == "" {
 		return nil, errors.New("at least one of ID, ProjectID, ClientName, or ProjectName must be set")
@@ -19,19 +24,28 @@ func (s *Service) FindEstimate(ctx context.Context, q FindEstimateQuery) ([]Esti
 
 	opts := repoOpts(q.Opts)
 
-	var estimates []boardapi.EstimateEntity
+	// results を直接ブランチ内で構築する。
+	// Status post-filter は EstimateEntity に Status フィールドが無いため無効化。
+	// TODO(M25-M32): Status post-filter を再設計で復元する。
+	results := make([]EstimateResult, 0)
 
 	switch {
 	case q.ID != 0:
-		// Direct lookup by document ID
+		// Direct lookup by document ID.
+		// client/project は特定できないため nil。
 		e, err := s.estimates.GetByDocumentID(ctx, q.ID, opts)
 		if err != nil {
 			return nil, err
 		}
-		estimates = []boardapi.EstimateEntity{*e}
+		results = append(results, EstimateResult{
+			Estimate: *e,
+			Client:   nil,
+			Project:  nil,
+		})
 
 	case q.ProjectID != 0:
-		// Lookup project with estimate group, then fetch document
+		// Lookup project with estimate group, then fetch document.
+		// project コンテキストから client/project を解決。
 		p, err := s.projects.GetByIDWithGroup(ctx, q.ProjectID, "estimate")
 		if err != nil {
 			return nil, err
@@ -42,12 +56,17 @@ func (s *Service) FindEstimate(ctx context.Context, q FindEstimateQuery) ([]Esti
 				return nil, err
 			}
 			if err == nil {
-				estimates = []boardapi.EstimateEntity{*e}
+				client, project := s.resolveClientAndProject(ctx, p.ClientID, p.ID, opts)
+				results = append(results, EstimateResult{
+					Estimate: *e,
+					Client:   client,
+					Project:  project,
+				})
 			}
 		}
 
 	case q.ClientName != "":
-		// Resolve client name → search projects with estimate group → hydrate
+		// Resolve client name → search projects with estimate group → hydrate.
 		clients, err := s.clients.Search(ctx, boardapi.ClientSearchParams{Name: q.ClientName}, opts)
 		if err != nil {
 			return nil, err
@@ -68,12 +87,17 @@ func (s *Service) FindEstimate(ctx context.Context, q FindEstimateQuery) ([]Esti
 				if err != nil {
 					return nil, err
 				}
-				estimates = append(estimates, *e)
+				client, project := s.resolveClientAndProject(ctx, p.ClientID, p.ID, opts)
+				results = append(results, EstimateResult{
+					Estimate: *e,
+					Client:   client,
+					Project:  project,
+				})
 			}
 		}
 
 	case q.ProjectName != "":
-		// Search projects by name with estimate group → hydrate
+		// Search projects by name with estimate group → hydrate.
 		projects, err := s.projects.Search(ctx, boardapi.ProjectSearchParams{Name: q.ProjectName, ResponseGroup: "estimate"}, opts)
 		if err != nil {
 			return nil, err
@@ -89,40 +113,19 @@ func (s *Service) FindEstimate(ctx context.Context, q FindEstimateQuery) ([]Esti
 			if err != nil {
 				return nil, err
 			}
-			estimates = append(estimates, *e)
+			client, project := s.resolveClientAndProject(ctx, p.ClientID, p.ID, opts)
+			results = append(results, EstimateResult{
+				Estimate: *e,
+				Client:   client,
+				Project:  project,
+			})
 		}
 	}
 
-	// Apply status post-filter
-	if q.Status != "" {
-		estimates = filterEstimatesByStatus(estimates, q.Status)
-	}
-
-	// Build results with client/project resolution
-	results := make([]EstimateResult, 0, len(estimates))
-	for _, e := range estimates {
-		client, project := s.resolveClientAndProject(ctx, e.ClientID, e.ProjectID, opts)
-		results = append(results, EstimateResult{
-			Estimate: e,
-			Client:   client,
-			Project:  project,
-		})
-
-		if q.Limit > 0 && len(results) >= q.Limit {
-			break
-		}
+	// Limit 適用
+	if q.Limit > 0 && len(results) > q.Limit {
+		results = results[:q.Limit]
 	}
 
 	return results, nil
-}
-
-// filterEstimatesByStatus filters estimates by status.
-func filterEstimatesByStatus(estimates []boardapi.EstimateEntity, status string) []boardapi.EstimateEntity {
-	filtered := make([]boardapi.EstimateEntity, 0, len(estimates))
-	for _, e := range estimates {
-		if e.Status == status {
-			filtered = append(filtered, e)
-		}
-	}
-	return filtered
 }
