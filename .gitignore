@@ -2,7 +2,7 @@
 /board
 
 # E2E raw API response artifacts (may contain customer data; never commit)
-/tmp/
+tmp/
 
 # GoReleaser output
 /dist/
