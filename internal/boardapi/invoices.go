@@ -119,6 +119,95 @@ func (c *Client) SearchInvoices(ctx context.Context, params InvoiceSearchParams)
 	return result, nil
 }
 
+// ListInvoicesRaw retrieves all invoices and returns the raw HTTP
+// response bodies merged across pages as a single JSON array. Each element
+// preserves the exact byte content returned by the BOARD API.
+//
+// Note: the real BOARD API path is /v1/invoices.
+//
+// Intended for E2E strict field diff; regular callers should use
+// ListInvoices.
+func (c *Client) ListInvoicesRaw(ctx context.Context, opts ...ListAllOption) ([]byte, error) {
+	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/invoices", nil)
+		if err != nil {
+			return nil, err
+		}
+		q := req.URL.Query()
+		q.Set("page", strconv.Itoa(page))
+		q.Set("per_page", strconv.Itoa(perPage))
+		req.URL.RawQuery = q.Encode()
+		return req, nil
+	}
+	items, err := c.ListAll(ctx, makeReq, opts...)
+	if err != nil {
+		return nil, err
+	}
+	out, err := json.Marshal(items)
+	if err != nil {
+		return nil, &APIError{Code: APIErrorUnknown, Message: "ListInvoicesRaw: marshal aggregate: " + err.Error()}
+	}
+	return out, nil
+}
+
+// GetInvoiceRaw retrieves a single invoice and returns the raw HTTP
+// response body byte-for-byte.
+//
+// Note: the real BOARD API path is /v1/invoices/{id}.
+//
+// Intended for E2E strict field diff; regular callers should use
+// GetInvoice.
+func (c *Client) GetInvoiceRaw(ctx context.Context, id int) ([]byte, error) {
+	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/invoices/%d", id), nil)
+	if err != nil {
+		return nil, err
+	}
+	return c.DoWithRetry(req)
+}
+
+// SearchInvoicesRaw retrieves invoices matching the given search parameters and
+// returns the raw HTTP response bodies merged across pages as a single JSON
+// array. Same byte-preserving guarantee as ListInvoicesRaw.
+//
+// InvoiceSearchParams exposes 4 filters (ClientID, ProjectID, Status, UpdatedAtFrom).
+//
+// Intended for E2E strict field diff; regular callers should use
+// SearchInvoices.
+func (c *Client) SearchInvoicesRaw(ctx context.Context, params InvoiceSearchParams, opts ...ListAllOption) ([]byte, error) {
+	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/invoices", nil)
+		if err != nil {
+			return nil, err
+		}
+		q := req.URL.Query()
+		q.Set("page", strconv.Itoa(page))
+		q.Set("per_page", strconv.Itoa(perPage))
+		if params.ClientID != 0 {
+			q.Set("client_id", strconv.Itoa(params.ClientID))
+		}
+		if params.ProjectID != 0 {
+			q.Set("project_id", strconv.Itoa(params.ProjectID))
+		}
+		if params.Status != "" {
+			q.Set("status", params.Status)
+		}
+		if params.UpdatedAtFrom != "" {
+			q.Set("updated_at_from", params.UpdatedAtFrom)
+		}
+		req.URL.RawQuery = q.Encode()
+		return req, nil
+	}
+	items, err := c.ListAll(ctx, makeReq, opts...)
+	if err != nil {
+		return nil, err
+	}
+	out, err := json.Marshal(items)
+	if err != nil {
+		return nil, &APIError{Code: APIErrorUnknown, Message: "SearchInvoicesRaw: marshal aggregate: " + err.Error()}
+	}
+	return out, nil
+}
+
 // ListInvoicesPage retrieves a single page of invoices.
 func (c *Client) ListInvoicesPage(ctx context.Context, page, perPage int) (*PageResult[InvoiceEntity], error) {
 	makeReq := func(ctx context.Context, p, pp int) (*http.Request, error) {
