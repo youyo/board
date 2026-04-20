@@ -38,3 +38,15 @@ func (c *Client) GetOrder(ctx context.Context, documentID int) (*OrderEntity, er
 	}
 	return &x, nil
 }
+
+// GetOrderRaw retrieves a single order and returns the raw HTTP
+// response body byte-for-byte.
+//
+// Intended for E2E strict field diff; regular callers should use GetOrder.
+func (c *Client) GetOrderRaw(ctx context.Context, documentID int) ([]byte, error) {
+	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/documents/orders/%d", documentID), nil)
+	if err != nil {
+		return nil, err
+	}
+	return c.DoWithRetry(req)
+}
