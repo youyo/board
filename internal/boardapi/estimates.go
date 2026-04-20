@@ -39,3 +39,15 @@ func (c *Client) GetEstimate(ctx context.Context, documentID int) (*EstimateEnti
 	}
 	return &x, nil
 }
+
+// GetEstimateRaw retrieves a single estimate and returns the raw HTTP
+// response body byte-for-byte.
+//
+// Intended for E2E strict field diff; regular callers should use GetEstimate.
+func (c *Client) GetEstimateRaw(ctx context.Context, documentID int) ([]byte, error) {
+	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/documents/estimates/%d", documentID), nil)
+	if err != nil {
+		return nil, err
+	}
+	return c.DoWithRetry(req)
+}
