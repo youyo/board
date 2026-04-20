@@ -237,9 +237,9 @@ sequenceDiagram
 
 | テスト | 結果 | 件数 | 未マップ数 | 備考 |
 |-------|------|------|-----------|------|
-| TestE2E_Projects_List | FAIL（意図的） | 2405 items | **20 フィールド** | name_filled=2405/2405 (100%)、code_filled=0/2405、memo_filled=0/2405 |
-| TestE2E_Projects_Get | FAIL（意図的） | 1 item | **62 フィールド** | id=95944469、client_id=0（ネスト構造）、Get > List より大幅に多い |
-| TestE2E_Projects_Search | FAIL（意図的） | 2405 items | **20 フィールド** | name filter 無視、List と同一結果 |
+| TestE2E_Projects_List | FAIL（意図的） | 2405 items | **21 フィールド** | name_filled=2405/2405 (100%)、code_filled=0/2405、memo_filled=0/2405 |
+| TestE2E_Projects_Get | FAIL（意図的） | 1 item | **68 フィールド** | id=95944469、client_id=0（ネスト構造）、Get > List より大幅に多い（List 21 + Get 限定 47） |
+| TestE2E_Projects_Search | FAIL（意図的） | 2405 items | **21 フィールド** | name filter 無視、List と同一結果 |
 | TestE2E_Projects_GetWithGroup/estimate | FAIL（意図的） | - | **26 フィールド** | estimate_present=true、estimate.id=105287235 |
 | TestE2E_Projects_GetWithGroup/order | FAIL（意図的） | - | **26 フィールド** | order_present=true、order.id=71741501 |
 | TestE2E_Projects_GetWithGroup/delivery | FAIL（意図的） | - | **21 フィールド** | delivery_present=false（この project にドキュメントなし）、`deliveries`（配列キー）が未マップ |
