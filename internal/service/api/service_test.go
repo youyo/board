@@ -281,7 +281,7 @@ func TestGetOrder(t *testing.T) {
 // --- Deliveries tests ---
 
 func TestGetDelivery(t *testing.T) {
-	entity := &boardapi.DeliveryEntity{ID: 1, ProjectID: 10}
+	entity := &boardapi.DeliveryEntity{ID: 1, Total: "90000.0", DeliveryDate: "2026-06-30"}
 	stub := &stubDeliveryRepo{getResult: entity}
 	svc := newServiceWithDeliveries(stub)
 	got, err := svc.GetDelivery(testCtx, 1, defaultOpts)

@@ -27,10 +27,8 @@ func seedDeliveryCache(t *testing.T, db *cache.DB, entities []boardapi.DeliveryE
 	ctx := context.Background()
 	for _, e := range entities {
 		raw, _ := json.Marshal(e)
-		var updatedAt sql.NullString
-		if e.UpdatedAt != "" {
-			updatedAt = sql.NullString{Valid: true, String: e.UpdatedAt}
-		}
+		// M37: DeliveryEntity は updated_at を持たないため固定値を使用する。
+		updatedAt := sql.NullString{Valid: true, String: "2026-01-01T00:00:00Z"}
 		err := rc.Upsert(ctx, cache.Entry{
 			Key: cache.EntityKey{
 				Profile:  "default",
@@ -47,9 +45,9 @@ func seedDeliveryCache(t *testing.T, db *cache.DB, entities []boardapi.DeliveryE
 }
 
 var sampleDeliveries = []boardapi.DeliveryEntity{
-	{ID: 1, ClientID: 10, ProjectID: 100, Title: "DeliveryA", Status: "draft", UpdatedAt: "2026-01-01T00:00:00Z"},
-	{ID: 2, ClientID: 10, ProjectID: 101, Title: "DeliveryB", Status: "delivered", UpdatedAt: "2026-01-02T00:00:00Z"},
-	{ID: 3, ClientID: 20, ProjectID: 102, Title: "DeliveryC", Status: "accepted", UpdatedAt: "2026-01-03T00:00:00Z"},
+	{ID: 1, Total: "50000.0", Tax: "5000.0", TaxWithholding: "0.0", DeliveryDate: "2026-01-31"},
+	{ID: 2, Total: "80000.0", Tax: "8000.0", TaxWithholding: "0.0", DeliveryDate: "2026-02-28"},
+	{ID: 3, Total: "120000.0", Tax: "12000.0", TaxWithholding: "0.0", DeliveryDate: "2026-03-31"},
 }
 
 // T_DEL03: GetByDocumentID - cache hit -> returns from cache
@@ -77,7 +75,7 @@ func TestDeliveryRepository_GetByDocumentID_CacheHit(t *testing.T) {
 func TestDeliveryRepository_GetByDocumentID_CacheMiss_APISuccess(t *testing.T) {
 	db := newTestDB(t)
 
-	target := boardapi.DeliveryEntity{ID: 99, Title: "Test Delivery", UpdatedAt: "2026-01-01T00:00:00Z"}
+	target := boardapi.DeliveryEntity{ID: 99, Total: "50000.0", DeliveryDate: "2026-06-30"}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		b, _ := json.Marshal(target)
@@ -116,7 +114,7 @@ func TestDeliveryRepository_GetByDocumentID_ForceRefresh(t *testing.T) {
 	db := newTestDB(t)
 	seedDeliveryCache(t, db, sampleDeliveries)
 
-	updated := boardapi.DeliveryEntity{ID: 1, Title: "Updated Delivery", UpdatedAt: "2026-06-01T00:00:00Z"}
+	updated := boardapi.DeliveryEntity{ID: 1, Total: "999999.0", DeliveryDate: "2026-12-31"}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		b, _ := json.Marshal(updated)
@@ -130,7 +128,7 @@ func TestDeliveryRepository_GetByDocumentID_ForceRefresh(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetByDocumentID ForceRefresh: %v", err)
 	}
-	if got == nil || got.Title != "Updated Delivery" {
-		t.Errorf("expected updated title, got %+v", got)
+	if got == nil || got.Total != "999999.0" {
+		t.Errorf("expected updated total, got %+v", got)
 	}
 }

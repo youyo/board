@@ -1864,7 +1864,7 @@ func TestGetOrder_OK(t *testing.T) {
 // M07: deliveries entity tests (T77)
 // ============================================================
 
-// T77: GetDelivery — happy path
+// T77: GetDelivery — happy path (M37: 実 API 準拠スキーマに更新)
 func TestGetDelivery_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/documents/deliveries/88" {
@@ -1872,7 +1872,7 @@ func TestGetDelivery_OK(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"id":88,"client_id":10,"project_id":100,"title":"Delivery Note 88","total_amount":600000.0,"status":"delivered","delivery_date":"2026-02-15","memo":"Delivery Complete","updated_at":"2026-02-15T00:00:00Z","created_at":"2026-02-15T00:00:00Z"}`))
+		w.Write([]byte(`{"id":88,"message":null,"total":"600000.0","tax":"60000.0","tax_withholding":"0.0","seal_approval_status":1,"document_amount_disp_kbn":1,"blank_date_flg":0,"lock_flg":0,"delivery_place":"御社指定場所","details":[{"no":1,"detail_date":null,"description":"Item A","quantity":"1.0","unit":"式","unit_price":"600000.0","price":"600000.0","tax_rate":"10.0","tax_withholding_flg":0,"tax_included_flg":0,"reduced_tax_rate_kbn":1,"section_description":null,"section_subtotal":null,"document_detail_kbn":1,"document_detail_kbn_name":"通常","deduction_applicable":false}],"delivery_date":"2026-02-15","disp_delivery_date":null,"disp_delivery_receive_date":null}`))
 	}))
 	defer ts.Close()
 
@@ -1885,8 +1885,17 @@ func TestGetDelivery_OK(t *testing.T) {
 	if got == nil {
 		t.Fatal("got nil DeliveryEntity")
 	}
-	if got.ID != 88 || got.Status != "delivered" || got.DeliveryDate != "2026-02-15" {
-		t.Errorf("GetDelivery: got %+v", got)
+	if got.ID != 88 {
+		t.Errorf("GetDelivery ID: got %d, want 88", got.ID)
+	}
+	if got.DeliveryDate != "2026-02-15" {
+		t.Errorf("GetDelivery DeliveryDate: got %q, want %q", got.DeliveryDate, "2026-02-15")
+	}
+	if got.Total != "600000.0" {
+		t.Errorf("GetDelivery Total: got %q, want %q", got.Total, "600000.0")
+	}
+	if len(got.Details) != 1 {
+		t.Errorf("GetDelivery Details len: got %d, want 1", len(got.Details))
 	}
 }
 

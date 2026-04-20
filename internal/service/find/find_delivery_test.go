@@ -10,15 +10,17 @@ import (
 
 // --- FindDelivery: Normal Cases ---
 
+// M37: DeliveryEntity に ClientID/ProjectID/Status フィールドは存在しない。
+// DeliveryDate は実在フィールドなので引き続き利用可能。
+// ID lookup では client/project は nil。ProjectID/ClientName/ProjectName ブランチでは
+// project コンテキストから enrichment を行う。
+
 func TestFindDelivery_ByID(t *testing.T) {
-	del := &boardapi.DeliveryEntity{ID: 1, ClientID: 10, ProjectID: 100, Title: "Delivery A"}
-	client := &boardapi.ClientEntity{ID: 10, Name: "Client X"}
-	project := &boardapi.ProjectEntity{ID: 100, Name: "Project Y"}
+	del := &boardapi.DeliveryEntity{ID: 1, Total: "90000.0", DeliveryDate: "2026-06-30"}
 
 	svc := newServiceWith(
-		&stubClientRepo{getResult: client},
-		nil, nil,
-		&stubProjectRepo{getResult: project},
+		nil, nil, nil,
+		&stubProjectRepo{},
 		&stubDeliveryRepo{getByDocIDResult: del},
 	)
 
@@ -29,18 +31,19 @@ func TestFindDelivery_ByID(t *testing.T) {
 	if got[0].Delivery.ID != 1 {
 		t.Errorf("delivery ID = %d, want 1", got[0].Delivery.ID)
 	}
-	if got[0].Client == nil || got[0].Client.ID != 10 {
-		t.Error("client not resolved correctly")
+	// ID lookup では client/project は特定不能なので nil
+	if got[0].Client != nil {
+		t.Errorf("expected nil client for ID-only lookup, got %+v", got[0].Client)
 	}
-	if got[0].Project == nil || got[0].Project.ID != 100 {
-		t.Error("project not resolved correctly")
+	if got[0].Project != nil {
+		t.Errorf("expected nil project for ID-only lookup, got %+v", got[0].Project)
 	}
 }
 
 func TestFindDelivery_ByProjectID(t *testing.T) {
 	docSummary := &boardapi.DocumentSummary{ID: 42}
 	project := &boardapi.ProjectEntity{ID: 100, ClientID: 10, Name: "Web Dev", Delivery: docSummary}
-	del := &boardapi.DeliveryEntity{ID: 42, ClientID: 10, ProjectID: 100, Title: "D1"}
+	del := &boardapi.DeliveryEntity{ID: 42, Total: "80000.0", DeliveryDate: "2026-06-30"}
 
 	svc := newServiceWith(
 		&stubClientRepo{getResult: &boardapi.ClientEntity{ID: 10}},
@@ -63,7 +66,7 @@ func TestFindDelivery_ByClientName(t *testing.T) {
 	projects := []boardapi.ProjectEntity{
 		{ID: 100, ClientID: 10, Name: "P1", Delivery: docSummary},
 	}
-	del := &boardapi.DeliveryEntity{ID: 1, ClientID: 10, ProjectID: 100, Title: "D1"}
+	del := &boardapi.DeliveryEntity{ID: 1, Total: "50000.0"}
 
 	svc := newServiceWith(
 		&stubClientRepo{searchResult: clients, getResult: &boardapi.ClientEntity{ID: 10}},
@@ -82,7 +85,7 @@ func TestFindDelivery_ByProjectName(t *testing.T) {
 	projects := []boardapi.ProjectEntity{
 		{ID: 100, ClientID: 10, Name: "Web Dev", Delivery: docSummary},
 	}
-	del := &boardapi.DeliveryEntity{ID: 1, ClientID: 10, ProjectID: 100, Title: "D1"}
+	del := &boardapi.DeliveryEntity{ID: 1, Total: "80000.0"}
 
 	svc := newServiceWith(
 		&stubClientRepo{getResult: &boardapi.ClientEntity{ID: 10}},
@@ -96,13 +99,16 @@ func TestFindDelivery_ByProjectName(t *testing.T) {
 	assertDeliveryResultLen(t, got, 1)
 }
 
+// TestFindDelivery_ByClientNameWithStatus: Status クエリパラメータを受け付けるが、
+// M37 時点では Status post-filter は無効（DeliveryEntity に Status フィールド無し）。
+// TODO(M25-M32): Status post-filter を再設計で復元する。
 func TestFindDelivery_ByClientNameWithStatus(t *testing.T) {
 	clients := []boardapi.ClientEntity{{ID: 10, Name: "ABC"}}
 	docSummary := &boardapi.DocumentSummary{ID: 1}
 	projects := []boardapi.ProjectEntity{
 		{ID: 100, ClientID: 10, Name: "P1", Delivery: docSummary},
 	}
-	del := &boardapi.DeliveryEntity{ID: 1, ClientID: 10, Status: "delivered", Title: "D1"}
+	del := &boardapi.DeliveryEntity{ID: 1, Total: "50000.0"}
 
 	svc := newServiceWith(
 		&stubClientRepo{searchResult: clients, getResult: &boardapi.ClientEntity{ID: 10}},
@@ -113,6 +119,7 @@ func TestFindDelivery_ByClientNameWithStatus(t *testing.T) {
 
 	got, err := svc.FindDelivery(testCtx, find.FindDeliveryQuery{ClientName: "ABC", Status: "delivered"})
 	assertNoError(t, err)
+	// Status post-filter は無効のため、条件に関係なく 1 件返る
 	assertDeliveryResultLen(t, got, 1)
 }
 
@@ -148,11 +155,12 @@ func TestFindDelivery_NoMatchByClientName(t *testing.T) {
 	assertDeliveryResultLen(t, got, 0)
 }
 
+// TestFindDelivery_ClientResolutionFailure: ID lookup では enrichment しないため
+// client error は発生しない。結果は Client=nil で正常に返る。
 func TestFindDelivery_ClientResolutionFailure(t *testing.T) {
-	del := &boardapi.DeliveryEntity{ID: 1, ClientID: 10, ProjectID: 100}
+	del := &boardapi.DeliveryEntity{ID: 1, Total: "90000.0"}
 	svc := newServiceWith(
-		&stubClientRepo{err: errors.New("client error")}, nil, nil,
-		&stubProjectRepo{getResult: &boardapi.ProjectEntity{ID: 100}},
+		nil, nil, nil, nil,
 		&stubDeliveryRepo{getByDocIDResult: del},
 	)
 
@@ -160,15 +168,16 @@ func TestFindDelivery_ClientResolutionFailure(t *testing.T) {
 	assertNoError(t, err)
 	assertDeliveryResultLen(t, got, 1)
 	if got[0].Client != nil {
-		t.Error("expected nil client on resolution failure")
+		t.Error("expected nil client for ID-only lookup")
 	}
 }
 
+// TestFindDelivery_ProjectResolutionFailure: ID lookup では enrichment しないため
+// project error は発生しない。結果は Project=nil で正常に返る。
 func TestFindDelivery_ProjectResolutionFailure(t *testing.T) {
-	del := &boardapi.DeliveryEntity{ID: 1, ClientID: 10, ProjectID: 100}
+	del := &boardapi.DeliveryEntity{ID: 1, Total: "90000.0"}
 	svc := newServiceWith(
-		&stubClientRepo{getResult: &boardapi.ClientEntity{ID: 10}}, nil, nil,
-		&stubProjectRepo{err: errors.New("project error")},
+		nil, nil, nil, nil,
 		&stubDeliveryRepo{getByDocIDResult: del},
 	)
 
@@ -176,17 +185,16 @@ func TestFindDelivery_ProjectResolutionFailure(t *testing.T) {
 	assertNoError(t, err)
 	assertDeliveryResultLen(t, got, 1)
 	if got[0].Project != nil {
-		t.Error("expected nil project on resolution failure")
+		t.Error("expected nil project for ID-only lookup")
 	}
 }
 
 // --- FindDelivery: Priority ---
 
 func TestFindDelivery_IDPriorityOverProjectID(t *testing.T) {
-	del := &boardapi.DeliveryEntity{ID: 1, ClientID: 10, Title: "By ID"}
+	del := &boardapi.DeliveryEntity{ID: 1, Total: "90000.0"}
 	svc := newServiceWith(
-		&stubClientRepo{getResult: &boardapi.ClientEntity{ID: 10}},
-		nil, nil,
+		nil, nil, nil,
 		&stubProjectRepo{},
 		&stubDeliveryRepo{getByDocIDResult: del},
 	)
@@ -210,7 +218,7 @@ func TestFindDelivery_Limit(t *testing.T) {
 		{ID: 101, ClientID: 10, Name: "P2", Delivery: docSummary2},
 		{ID: 102, ClientID: 10, Name: "P3", Delivery: docSummary3},
 	}
-	del := &boardapi.DeliveryEntity{ID: 1, Title: "D"}
+	del := &boardapi.DeliveryEntity{ID: 1, Total: "50000.0"}
 
 	svc := newServiceWith(
 		nil, nil, nil,
