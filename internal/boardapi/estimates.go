@@ -9,18 +9,20 @@ import (
 
 // EstimateEntity is a BOARD API estimate entity.
 // Retrieved via GET /v1/documents/estimates/{documentID}.
+// フィールドは実 API レスポンス（tmp/e2e-artifacts/estimates_*.json）に準拠。
 type EstimateEntity struct {
-	ID             int     `json:"id"`
-	ClientID       int     `json:"client_id"`
-	ProjectID      int     `json:"project_id"`
-	Title          string  `json:"title"`
-	TotalAmount    float64 `json:"total_amount"`
-	Status         string  `json:"status"`
-	EstimateDate   string  `json:"estimate_date"`   // ISO 8601 date
-	ExpirationDate string  `json:"expiration_date"` // ISO 8601 date
-	Memo           string  `json:"memo"`
-	UpdatedAt      string  `json:"updated_at"` // ISO 8601
-	CreatedAt      string  `json:"created_at"` // ISO 8601
+	ID                    int                    `json:"id"`
+	Message               *string                `json:"message"`
+	Total                 string                 `json:"total"`
+	Tax                   string                 `json:"tax"`
+	TaxWithholding        string                 `json:"tax_withholding"`
+	SealApprovalStatus    int                    `json:"seal_approval_status"`
+	DocumentAmountDispKbn int                    `json:"document_amount_disp_kbn"`
+	BlankDateFlg          int                    `json:"blank_date_flg"`
+	LockFlg               int                    `json:"lock_flg"`
+	DeliveryPlace         *string                `json:"delivery_place"`
+	Details               []DocumentDetailEntity `json:"details"`
+	ValidPeriod           string                 `json:"valid_period"`
 }
 
 // GetEstimate retrieves the estimate with the specified document ID.

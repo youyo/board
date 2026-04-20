@@ -1709,7 +1709,7 @@ func TestSearchProjectCosts_WithProjectID(t *testing.T) {
 // M07: estimates entity tests (T68)
 // ============================================================
 
-// T68: GetEstimate — happy path
+// T68: GetEstimate — happy path (M35: 実 API 準拠スキーマに更新)
 func TestGetEstimate_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/documents/estimates/42" {
@@ -1717,7 +1717,7 @@ func TestGetEstimate_OK(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"id":42,"client_id":10,"project_id":100,"title":"Estimate 42","total_amount":750000.0,"status":"approved","estimate_date":"2026-02-01","expiration_date":"2026-03-01","memo":"test memo","updated_at":"2026-02-01T00:00:00Z","created_at":"2026-02-01T00:00:00Z"}`))
+		w.Write([]byte(`{"id":42,"message":"test message","total":"750000.0","tax":"75000.0","tax_withholding":"0.0","seal_approval_status":1,"document_amount_disp_kbn":1,"blank_date_flg":0,"lock_flg":0,"delivery_place":null,"details":[{"no":1,"detail_date":null,"description":"Item A","quantity":"1.0","unit":"式","unit_price":"750000.0","price":"750000.0","tax_rate":"10.0","tax_withholding_flg":0,"tax_included_flg":0,"reduced_tax_rate_kbn":1,"section_description":null,"section_subtotal":null,"document_detail_kbn":1,"document_detail_kbn_name":"通常","deduction_applicable":false}],"valid_period":"御見積後１ヶ月"}`))
 	}))
 	defer ts.Close()
 
@@ -1730,11 +1730,17 @@ func TestGetEstimate_OK(t *testing.T) {
 	if got == nil {
 		t.Fatal("got nil EstimateEntity")
 	}
-	if got.ID != 42 || got.Title != "Estimate 42" || got.Status != "approved" {
-		t.Errorf("GetEstimate: got %+v", got)
+	if got.ID != 42 {
+		t.Errorf("GetEstimate ID: got %d, want 42", got.ID)
 	}
-	if got.Memo != "test memo" {
-		t.Errorf("Memo: want %q, got %q", "test memo", got.Memo)
+	if got.Total != "750000.0" {
+		t.Errorf("GetEstimate Total: got %q, want %q", got.Total, "750000.0")
+	}
+	if got.ValidPeriod != "御見積後１ヶ月" {
+		t.Errorf("GetEstimate ValidPeriod: got %q, want %q", got.ValidPeriod, "御見積後１ヶ月")
+	}
+	if len(got.Details) != 1 {
+		t.Errorf("GetEstimate Details len: got %d, want 1", len(got.Details))
 	}
 }
 
