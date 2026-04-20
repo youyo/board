@@ -79,32 +79,12 @@ func TestE2E_Clients_ListPage(t *testing.T) {
 }
 
 // --- PurchaseOrders (expenditures path) ---
-
-func TestE2E_PurchaseOrders_List(t *testing.T) {
-	client := newE2EClient(t)
-	ctx := context.Background()
-
-	pos, err := client.ListPurchaseOrders(ctx)
-	if err != nil {
-		skipIfNotFound(t, err, "ListPurchaseOrders")
-		t.Fatalf("ListPurchaseOrders: %v", err)
-	}
-	t.Logf("ListPurchaseOrders returned %d items", len(pos))
-}
+// TestE2E_PurchaseOrders_List / _Get / _Search は M23 で厳格フィールド突合付きの版に
+// 一本化したため e2e_purchase_orders_test.go へ移動（M16 vendors と同パターン）。
 
 // --- Payments (expenditure_payments path) ---
-
-func TestE2E_Payments_List(t *testing.T) {
-	client := newE2EClient(t)
-	ctx := context.Background()
-
-	payments, err := client.ListPayments(ctx)
-	if err != nil {
-		skipIfNotFound(t, err, "ListPayments")
-		t.Fatalf("ListPayments: %v", err)
-	}
-	t.Logf("ListPayments returned %d items", len(payments))
-}
+// TestE2E_Payments_List / _Get / _Search は M24 で厳格フィールド突合付きの版に
+// 一本化したため e2e_payments_test.go へ移動（M16 vendors と同パターン）。
 
 // --- PurchaseTypes (expenditure_types path) ---
 // Moved to e2e_purchase_types_test.go (M06, board-compliance roadmap):
