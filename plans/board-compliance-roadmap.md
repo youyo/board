@@ -46,13 +46,13 @@
 
 ### Phase A: 基盤整備
 
-#### M01: 厳格突合ヘルパー & tmp/ 整備
-- [ ] `.gitignore` に `tmp/` を追加
-- [ ] `internal/testhelper/strict_field_diff.go` 実装 + unit test
-- [ ] `dumpJSON()` を boardapi / find の e2e helper に追加
-- [ ] `mise test:e2e:single <pattern>` タスク定義
-- [ ] M02 着手用コメントを PR に含める
-- 見積: 0 req（unit のみ）
+#### M01: 厳格突合ヘルパー & tmp/ 整備 ✅
+- [x] `.gitignore` に `/tmp/` を追加
+- [x] `internal/testhelper/strict_field_diff.go` 実装 + unit test（13/13 Green）
+- [x] `dumpJSON()` を boardapi / find の e2e helper に追加（`findRepoRoot` で go.mod find-up）
+- [x] `mise test:e2e:single` タスク定義
+- [x] M02 着手用コメントを `internal/boardapi/e2e_test.go` 冒頭に追加
+- 見積: 0 req（unit のみ） / 実績: 0 req
 - 詳細: plans/board-compliance-m01-foundation.md
 
 ---

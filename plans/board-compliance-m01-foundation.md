@@ -113,17 +113,17 @@ run = "go test -tags e2e -v -count=1 ./... "
 
 ## Implementation Steps
 
-1. [ ] **Red**: `strict_field_diff_test.go` に表上段 5 ケースを先に書く（`go test` で Fail）
-2. [ ] **Green**: `strict_field_diff.go` の初期実装で 5 ケース通過
-3. [ ] **Red→Green**: 残 5 ケース（6-10）を追加 → 実装拡張
-4. [ ] **Refactor**: `reflect` 経由のフィールドタグ列挙を `structJSONTags(reflect.Type) map[string]reflect.Type` に抽出
-5. [ ] `.gitignore` に `/tmp/` 追加（既存行確認後）
-6. [ ] `dumpJSON` を `internal/boardapi/e2e_helpers_test.go` に追加（unit test 不要、統合時に機能確認）
-7. [ ] 同関数を `internal/service/find/e2e_helpers_test.go` にコピペ追加
-8. [ ] `mise.toml` に `test:e2e:single` タスクを追加
-9. [ ] `mise run test` / `mise run vet` で既存テストが Green
-10. [ ] M02 への導入コメントを `internal/boardapi/e2e_test.go` 冒頭に追記（「以降の新規 E2E は StrictFieldDiff + dumpJSON を必ず呼ぶこと」）
-11. [ ] commit: `feat(testhelper): E2E 厳格フィールド突合ヘルパーと生JSONダンプ機構を追加`
+1. [x] **Red**: `strict_field_diff_test.go` に 10 ケース（計画）+ 追加 3 ケース（embedded / pointer / interface / missing-in-raw）を先に書く（`go test` で build fail = Red）
+2. [x] **Green**: `strict_field_diff.go` 初期実装で 全 13 ケース通過
+3. [x] **Red→Green**: 計画の 10 ケースに加え embedded struct / pointer / interface / missing-in-raw を網羅
+4. [x] **Refactor**: フィールドタグ列挙を `structJSONFields(reflect.Type) map[string]jsonFieldInfo` に抽出、embedded 処理を `collectStructFields` に分離
+5. [x] `.gitignore` に `/tmp/` 追加
+6. [x] `dumpJSON` を `internal/boardapi/e2e_helpers_test.go` に追加（`findRepoRoot` で go.mod find-up）
+7. [x] 同関数を `internal/service/find/e2e_helpers_test.go` にコピペ追加
+8. [x] `mise.toml` に `test:e2e:single` タスクを追加
+9. [x] `go test ./...` で testhelper 13/13 Green、`go vet ./...` 0 issue
+10. [x] M02 への導入コメントを `internal/boardapi/e2e_test.go` 冒頭に追記
+11. [x] commit: `feat(testhelper): M01 E2E 厳格フィールド突合ヘルパーと生JSONダンプ機構を追加`
 
 ## Verification
 

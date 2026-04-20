@@ -8,6 +8,17 @@
 // Usage:
 //
 //	BOARD_API_KEY=<key> BOARD_API_TOKEN=<token> go test -tags e2e -v -count=1 ./internal/boardapi/ -run TestE2E
+//
+// M02 以降の新規 E2E の書き方:
+//
+//   - 実 API から取得した raw JSON を dumpJSON(t, "<resource>", id, raw) で
+//     tmp/e2e-artifacts/ に残す（.gitignore 済み）。
+//   - testhelper.StrictFieldDiff(t, raw, &TargetEntity{}) を必ず呼び、未マップ
+//     フィールドが 1 件でもあれば t.Errorf で失敗させる。
+//   - List では id=0、Get/Search では対象リソースの ID を第二引数に使う。
+//
+// これにより「Go struct に存在しないフィールドが BOARD API 側に追加された」
+// 状況を E2E で早期検知できる。
 
 package boardapi_test
 

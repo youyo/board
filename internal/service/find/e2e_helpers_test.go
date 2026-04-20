@@ -4,6 +4,7 @@ package find_test
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -85,4 +86,48 @@ func newE2EFindService(t *testing.T) (*find.Service, *boardapi.Client) {
 		Groups:         repos.Groups,
 	})
 	return svc, a.APIClient
+}
+
+// dumpJSON は BOARD API の生レスポンスを tmp/e2e-artifacts/{resource}_{id}.json に書き出す。
+// boardapi 側の e2e helper と同じパッケージ跨ぎの複製（テストパッケージ境界のため DRY 不可）。
+// M01 の 厳格フィールド突合 と組み合わせて使う。失敗は best-effort で t.Log のみ。
+func dumpJSON(t *testing.T, resource string, id int, raw []byte) {
+	t.Helper()
+	if len(raw) == 0 {
+		return
+	}
+	root, err := findRepoRoot()
+	if err != nil {
+		t.Logf("dumpJSON: repo root not found: %v", err)
+		return
+	}
+	dir := filepath.Join(root, "tmp", "e2e-artifacts")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Logf("dumpJSON: mkdir %s: %v", dir, err)
+		return
+	}
+	name := fmt.Sprintf("%s_%d.json", resource, id)
+	path := filepath.Join(dir, name)
+	if err := os.WriteFile(path, raw, 0o644); err != nil {
+		t.Logf("dumpJSON: write %s: %v", path, err)
+		return
+	}
+}
+
+// findRepoRoot は CWD から go.mod を find-up して repo root を返す。
+func findRepoRoot() (string, error) {
+	dir, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			return dir, nil
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return "", fmt.Errorf("go.mod not found from any ancestor of cwd")
+		}
+		dir = parent
+	}
 }
