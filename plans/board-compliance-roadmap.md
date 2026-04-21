@@ -48,10 +48,10 @@ enrichment バグ 3 件修正（M25: ClientBranch/Contact Search、M28: Deliveri
 FindUser/FindGroup は groups 0 件 Pending Re-verification、FindInvoice は ID モードのみ軽量 E2E で対応。
 
 ## Current Focus
-- **マイルストーン**: M39 ClientBranchEntity 実 API 準拠再設計 ✅（Phase J 1 件目）
-- **直近の完了**: M39 ClientRef 共通型追加 / ClientBranchEntity 全面再設計 / downstream 修正 / go build/vet/test 全 Green / 実 API smoke は 429 のため日次リセット後に再実行予定
-- **以前の完了**: M34 Phase I 完走（ロードマップ全 38 M）
-- **次のアクション**: M40 ContactEntity 実 API 準拠再設計（ClientRef 再利用、M39 同パターン）
+- **マイルストーン**: M40 ContactEntity 実 API 準拠再設計 ✅（Phase J 2 件目）
+- **直近の完了**: M40 ContactEntity 全面再設計 / ClientID() accessor 追加 / downstream 修正 / go build/vet/test 全 Green / 実 API smoke は 429 リセット後に再実行予定
+- **以前の完了**: M39 ClientBranchEntity 実 API 準拠再設計 ✅（Phase J 1 件目）
+- **次のアクション**: M41 VendorBranchEntity 実 API 準拠再設計（M39/M40 同パターン）
 
 ## Progress
 
@@ -537,6 +537,19 @@ FindUser/FindGroup は groups 0 件 Pending Re-verification、FindInvoice は ID
 - 見積: ~5 req / 実績: 3 req 試行（429 Rate Limit）
 - 詳細: plans/board-compliance-m39-client-branch-redesign.md
 
+#### M40: ContactEntity 実 API 準拠への再設計 ✅
+- [x] `internal/boardapi/contacts.go` ContactEntity 全面書き換え（12 フィールド）
+  - 削除: ClientID(field)/ClientBranchID/Name/NameKana/Phone/Memo（6 幻フィールド）
+  - 変更: Client *ClientRef（nested, M39 共通型再利用）/ Title/*string/Department/*string/Email/*string/Note/*string（null 対応）
+  - `ClientID()` accessor 追加（nested Client.ID を返す後方互換ブリッジ）
+  - `DisplayName()` を LastName+FirstName 専用に簡略化（Name フィールド廃止）
+- [x] downstream 修正（8 ファイル: contacts.go / client_test.go / contacts_test.go / e2e_contacts_test.go / display_name_test.go / repository/contacts_test.go / service/api/service_test.go / service/find/find_client_test.go / service/find/e2e_test.go 3 箇所）
+- [x] repository/contacts.go の filterContactsByNameEmail を DisplayName() + *string 対応に修正
+- [x] go build + go build -tags e2e + go vet + go test -count=1 ./... 全 Green
+- [x] 実 API smoke: ⏳ 429 Rate Limit（日次リセット後に再実行予定）
+- 見積: ~5 req / 実績: 未実施（429 のため）
+- 詳細: plans/board-compliance-m40-contact-redesign.md
+
 ---
 
 ## Blockers
@@ -569,6 +582,9 @@ FindUser/FindGroup は groups 0 件 Pending Re-verification、FindInvoice は ID
 | 6 | documentID は projects response_group から発見 | orders/deliveries/receipts の List 相当を API 仕様範囲内で再現 | 2026-04-20 |
 
 ## Changelog
+
+### 2026-04-21（M40: ContactEntity 実 API 準拠再設計）
+- **M40 ContactEntity 全面再設計**: M39 パターン踏襲。実 API dump（contacts_56292528.json）に基づき、6 幻フィールド（ClientID/ClientBranchID/Name/NameKana/Phone/Memo）を削除し、nested `client: *ClientRef` + nullable `Title/*string/Department/*string/Email/*string/Note/*string` に書き換え。`ClientID()` accessor 追加。`DisplayName()` を LastName+FirstName 専用に簡略化。repository の `filterContactsByNameEmail` を `DisplayName()` + `*string` nil ガード対応に修正。downstream 9 ファイルを修正。go build/vet/test 全 Green。実 API smoke は 429 のため日次リセット後に再実行予定。
 
 ### 2026-04-21（M39 追補: Phase J 開始）
 - **M39 ClientBranchEntity 全面再設計**: M09 で発見した「nested client 構造バグ」と「フィールド全面不一致（5 幻 + 7 未マップ）」を修正。`ClientRef` 共通型（client_ref.go）を新規定義し、`ClientBranchEntity` を実 API 準拠の 11 フィールド構造に書き換え。`ClientID()` accessor で後方互換を確保。downstream 8 ファイルを修正（モック JSON 更新 + accessor 呼び出し置換）。go build/vet/test 全 Green。実 API smoke は 429 Rate Limit のため日次リセット後に再実行予定。
