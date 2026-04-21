@@ -222,7 +222,7 @@ func TestE2E_FindProject_WithEstimate(t *testing.T) {
 	}
 	r := results[0]
 	if r.Estimate != nil {
-		t.Logf("Project %q enriched with estimate: id=%d title=%q", r.Project.Name, r.Estimate.ID, r.Estimate.Title)
+		t.Logf("Project %q enriched with estimate: id=%d", r.Project.Name, r.Estimate.ID)
 	} else {
 		t.Logf("Project %q has no estimate enrichment", r.Project.Name)
 	}
