@@ -2,7 +2,7 @@
 
 // E2E tests for the service/find package using real BOARD API data.
 // These tests verify cross-resource resolution (Client + Branches + Contacts, Project + Client, etc.)
-// Estimated API calls per full run: ~15 (0.5% of the 3000/day rate limit).
+// Estimated API calls per full run: ~20 (0.7% of the 3000/day rate limit).
 //
 // Usage:
 //
@@ -12,11 +12,37 @@ package find_test
 
 import (
 	"context"
+	"encoding/json"
+	"sort"
 	"testing"
 
+	"github.com/youyo/board/internal/boardapi"
 	"github.com/youyo/board/internal/repository"
 	"github.com/youyo/board/internal/service/find"
 )
+
+// idSet returns a sorted slice of IDs extracted from items using getID.
+func idSet[T any](items []T, getID func(T) int) []int {
+	out := make([]int, 0, len(items))
+	for _, it := range items {
+		out = append(out, getID(it))
+	}
+	sort.Ints(out)
+	return out
+}
+
+// intSetEqual returns true if a and b contain the same sorted int values.
+func intSetEqual(a, b []int) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
 
 // e2eOpts returns ReadOptions suitable for E2E tests.
 // No refresh flags: GetByID fetches a single entity on cache miss (fast).
@@ -59,6 +85,17 @@ func TestE2E_FindClient_ByName(t *testing.T) {
 	if r.Client.Name == "" {
 		t.Error("result.Client.Name expected non-empty")
 	}
+	// Integrity check: all branches and contacts should reference the parent client.
+	for i, b := range r.Branches {
+		if b.ClientID != 0 && b.ClientID != r.Client.ID {
+			t.Errorf("Branches[%d].ClientID=%d want=%d", i, b.ClientID, r.Client.ID)
+		}
+	}
+	for i, c := range r.Contacts {
+		if c.ClientID != 0 && c.ClientID != r.Client.ID {
+			t.Errorf("Contacts[%d].ClientID=%d want=%d", i, c.ClientID, r.Client.ID)
+		}
+	}
 	t.Logf("Client: id=%d name=%q branches=%d contacts=%d", r.Client.ID, r.Client.Name, len(r.Branches), len(r.Contacts))
 }
 
@@ -86,6 +123,100 @@ func TestE2E_FindClient_ByText(t *testing.T) {
 		t.Fatalf("FindClient(Text=%q): %v", text, err)
 	}
 	t.Logf("FindClient(Text=%q) returned %d results", text, len(results))
+
+	// Integrity check: all branches and contacts should reference their parent client.
+	for _, r := range results {
+		for i, b := range r.Branches {
+			if b.ClientID != 0 && b.ClientID != r.Client.ID {
+				t.Errorf("Text=%q result client=%d Branches[%d].ClientID=%d", text, r.Client.ID, i, b.ClientID)
+			}
+		}
+		for i, c := range r.Contacts {
+			if c.ClientID != 0 && c.ClientID != r.Client.ID {
+				t.Errorf("Text=%q result client=%d Contacts[%d].ClientID=%d", text, r.Client.ID, i, c.ClientID)
+			}
+		}
+	}
+}
+
+func TestE2E_FindClient_StrictEnrichment(t *testing.T) {
+	svc, api := newE2EFindService(t)
+	ctx := context.Background()
+
+	// 1. Discover a client with data.
+	page, err := api.ListClientsPage(ctx, 1, 1)
+	if err != nil || len(page.Items) == 0 {
+		t.Skip("no clients available")
+	}
+	targetID := page.Items[0].ID
+
+	// 2. FindClient(ID) → ClientResult.
+	results, err := svc.FindClient(ctx, find.FindClientQuery{
+		ID:   targetID,
+		Opts: e2eOpts(),
+	})
+	if err != nil {
+		t.Fatalf("FindClient(ID=%d): %v", targetID, err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("FindClient(ID=%d): expected 1 result, got %d", targetID, len(results))
+	}
+	r := results[0]
+
+	// 3. Client enrichment check.
+	if r.Client.ID != targetID {
+		t.Errorf("result.Client.ID: got=%d want=%d", r.Client.ID, targetID)
+	}
+
+	// 4. Independent raw fetch for Branches; compare count + ID set.
+	branchesRaw, err := api.SearchClientBranchesRaw(ctx, boardapi.ClientBranchSearchParams{ClientID: targetID})
+	if err != nil {
+		t.Fatalf("SearchClientBranchesRaw(ClientID=%d): %v", targetID, err)
+	}
+	var independentBranches []boardapi.ClientBranchEntity
+	if err := json.Unmarshal(branchesRaw, &independentBranches); err != nil {
+		t.Fatalf("unmarshal branches: %v", err)
+	}
+	if len(r.Branches) != len(independentBranches) {
+		t.Errorf("Branches count mismatch: FindClient=%d independent=%d", len(r.Branches), len(independentBranches))
+	}
+	expectedBranchIDs := idSet(independentBranches, func(b boardapi.ClientBranchEntity) int { return b.ID })
+	actualBranchIDs := idSet(r.Branches, func(b boardapi.ClientBranchEntity) int { return b.ID })
+	if !intSetEqual(expectedBranchIDs, actualBranchIDs) {
+		t.Errorf("Branches ID set mismatch:\n  want=%v\n  got =%v", expectedBranchIDs, actualBranchIDs)
+	}
+	// All branches should reference the parent client.
+	for i, b := range r.Branches {
+		if b.ClientID != 0 && b.ClientID != targetID {
+			t.Errorf("Branches[%d].ClientID=%d want=%d", i, b.ClientID, targetID)
+		}
+	}
+
+	// 5. Independent raw fetch for Contacts; compare count + ID set.
+	contactsRaw, err := api.SearchContactsRaw(ctx, boardapi.ContactSearchParams{ClientID: targetID})
+	if err != nil {
+		t.Fatalf("SearchContactsRaw(ClientID=%d): %v", targetID, err)
+	}
+	var independentContacts []boardapi.ContactEntity
+	if err := json.Unmarshal(contactsRaw, &independentContacts); err != nil {
+		t.Fatalf("unmarshal contacts: %v", err)
+	}
+	if len(r.Contacts) != len(independentContacts) {
+		t.Errorf("Contacts count mismatch: FindClient=%d independent=%d", len(r.Contacts), len(independentContacts))
+	}
+	expectedContactIDs := idSet(independentContacts, func(c boardapi.ContactEntity) int { return c.ID })
+	actualContactIDs := idSet(r.Contacts, func(c boardapi.ContactEntity) int { return c.ID })
+	if !intSetEqual(expectedContactIDs, actualContactIDs) {
+		t.Errorf("Contacts ID set mismatch:\n  want=%v\n  got =%v", expectedContactIDs, actualContactIDs)
+	}
+	for i, c := range r.Contacts {
+		if c.ClientID != 0 && c.ClientID != targetID {
+			t.Errorf("Contacts[%d].ClientID=%d want=%d", i, c.ClientID, targetID)
+		}
+	}
+
+	t.Logf("FindClient(ID=%d) enrichment: branches=%d contacts=%d (both matched independent API)",
+		targetID, len(r.Branches), len(r.Contacts))
 }
 
 // --- FindUser ---
