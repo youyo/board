@@ -8,19 +8,35 @@ import (
 	"strconv"
 )
 
-// VendorBranchEntity is a BOARD API vendor branch entity.
-// Corresponds to one element in the GET /v1/vendor_branches response.
+// VendorBranchEntity は BOARD API の仕入先支社エンティティ。
+// GET /v1/payee_branches のレスポンス 1 要素に対応する。
+// 実 API 一貫性（ClientBranchEntity / M39 再設計）に基づき M41 で全面再設計。
+//
+// 注意: nested オブジェクトのキー（"vendor"）は未確認（アカウントのデータが 0 件のため）。
+// ClientBranch が "client" ネストを使うことを確認済みなので "vendor" と推定する。
+// データ投入後の smoke テスト（TestE2E_VendorBranches_*）で Pending Re-verification。
 type VendorBranchEntity struct {
-	ID         int    `json:"id"`
-	VendorID   int    `json:"vendor_id"`
-	Name       string `json:"name"`
-	PostalCode string `json:"postal_code"`
-	Address    string `json:"address"`
-	Phone      string `json:"phone"`
-	Fax        string `json:"fax"`
-	Memo       string `json:"memo"`
-	UpdatedAt  string `json:"updated_at"` // ISO 8601
-	CreatedAt  string `json:"created_at"` // ISO 8601
+	ID         int        `json:"id"`
+	Vendor     *VendorRef `json:"vendor"`      // nested 構造: {id, name, name_disp, custom_no}（未確認）
+	Name       string     `json:"name"`
+	Zip        string     `json:"zip"`
+	Pref       string     `json:"pref"`
+	Address1   string     `json:"address1"`
+	Address2   string     `json:"address2"`
+	Tel        *string    `json:"tel"`         // null 可
+	Fax        *string    `json:"fax"`         // null 可
+	ArchiveFlg int        `json:"archive_flg"`
+	CreatedAt  string     `json:"created_at"`  // ISO 8601
+	UpdatedAt  string     `json:"updated_at"`  // ISO 8601
+}
+
+// VendorID は nested Vendor.ID を返す accessor（後方互換ブリッジ）。
+// Vendor が nil の場合 0 を返す。
+func (e VendorBranchEntity) VendorID() int {
+	if e.Vendor == nil {
+		return 0
+	}
+	return e.Vendor.ID
 }
 
 // VendorBranchSearchParams is the parameter for SearchVendorBranches.
