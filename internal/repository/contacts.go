@@ -162,17 +162,21 @@ func (r *ContactRepository) Search(ctx context.Context, params boardapi.ContactS
 }
 
 // filterContactsByNameEmail performs in-memory name and email filtering.
+// Name matching uses DisplayName() (LastName + FirstName).
+// Email matching dereferences the *string pointer (nil email never matches).
 func filterContactsByNameEmail(entities []boardapi.ContactEntity, name, email string) []boardapi.ContactEntity {
 	if name == "" && email == "" {
 		return entities
 	}
 	var result []boardapi.ContactEntity
 	for _, e := range entities {
-		if name != "" && !strings.Contains(e.Name, name) {
+		if name != "" && !strings.Contains(e.DisplayName(), name) {
 			continue
 		}
-		if email != "" && !strings.Contains(e.Email, email) {
-			continue
+		if email != "" {
+			if e.Email == nil || !strings.Contains(*e.Email, email) {
+				continue
+			}
 		}
 		result = append(result, e)
 	}

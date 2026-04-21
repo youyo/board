@@ -10,32 +10,33 @@ import (
 
 // ContactEntity is a BOARD API contact entity.
 // Corresponds to one element in the GET /v1/contacts response.
+// Fields are derived from the actual BOARD API response (M40 re-design).
 type ContactEntity struct {
-	ID             int    `json:"id"`
-	ClientID       int    `json:"client_id"`
-	ClientBranchID int    `json:"client_branch_id"`
-	Name           string `json:"name"`
-	NameKana       string `json:"name_kana"`
-	LastName       string `json:"last_name"`
-	FirstName      string `json:"first_name"`
-	HonorificTitle string `json:"honorific_title"`
-	Title          string `json:"title"`
-	Department     string `json:"department"`
-	Email          string `json:"email"`
-	Phone          string `json:"phone"`
-	Note           string `json:"note"`
-	Memo           string `json:"memo"`
-	ArchiveFlg     int    `json:"archive_flg"`
-	UpdatedAt      string `json:"updated_at"` // ISO 8601
-	CreatedAt      string `json:"created_at"` // ISO 8601
+	ID             int        `json:"id"`
+	Client         *ClientRef `json:"client"`
+	LastName       string     `json:"last_name"`
+	FirstName      string     `json:"first_name"`
+	HonorificTitle string     `json:"honorific_title"`
+	Title          *string    `json:"title"`
+	Department     *string    `json:"department"`
+	Email          *string    `json:"email"`
+	Note           *string    `json:"note"`
+	ArchiveFlg     int        `json:"archive_flg"`
+	CreatedAt      string     `json:"created_at"` // ISO 8601
+	UpdatedAt      string     `json:"updated_at"` // ISO 8601
 }
 
-// DisplayName returns a human-readable name.
-// Prefers Name if set, otherwise combines LastName + FirstName.
-func (c ContactEntity) DisplayName() string {
-	if c.Name != "" {
-		return c.Name
+// ClientID returns the parent client's ID.
+// Returns 0 when the nested Client is nil.
+func (c ContactEntity) ClientID() int {
+	if c.Client == nil {
+		return 0
 	}
+	return c.Client.ID
+}
+
+// DisplayName returns a human-readable name combining LastName and FirstName.
+func (c ContactEntity) DisplayName() string {
 	switch {
 	case c.LastName != "" && c.FirstName != "":
 		return c.LastName + " " + c.FirstName
