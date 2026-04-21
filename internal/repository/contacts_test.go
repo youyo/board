@@ -64,10 +64,12 @@ func newContactAPIServer(t *testing.T, entities []boardapi.ContactEntity) *httpt
 	return srv
 }
 
+func strPtr(s string) *string { return &s }
+
 var sampleContacts = []boardapi.ContactEntity{
-	{ID: 1, ClientID: 10, Name: "Taro Tanaka", Email: "tanaka@example.com", UpdatedAt: "2026-01-01T00:00:00Z"},
-	{ID: 2, ClientID: 10, Name: "Hanako Suzuki", Email: "suzuki@example.com", UpdatedAt: "2026-01-02T00:00:00Z"},
-	{ID: 3, ClientID: 20, Name: "Jiro Sato", Email: "sato@other.com", UpdatedAt: "2026-01-03T00:00:00Z"},
+	{ID: 1, Client: &boardapi.ClientRef{ID: 10}, LastName: "Tanaka", FirstName: "Taro", Email: strPtr("tanaka@example.com"), UpdatedAt: "2026-01-01T00:00:00Z"},
+	{ID: 2, Client: &boardapi.ClientRef{ID: 10}, LastName: "Suzuki", FirstName: "Hanako", Email: strPtr("suzuki@example.com"), UpdatedAt: "2026-01-02T00:00:00Z"},
+	{ID: 3, Client: &boardapi.ClientRef{ID: 20}, LastName: "Sato", FirstName: "Jiro", Email: strPtr("sato@other.com"), UpdatedAt: "2026-01-03T00:00:00Z"},
 }
 
 // T_R29: List - cache hit -> returns cached data
@@ -274,7 +276,7 @@ func TestContactRepository_GetByID_CacheMiss_APISuccess(t *testing.T) {
 	db := newTestDB(t)
 	markSynced(t, db, "contacts")
 
-	target := boardapi.ContactEntity{ID: 99, ClientID: 10, Name: "Test Contact"}
+	target := boardapi.ContactEntity{ID: 99, Client: &boardapi.ClientRef{ID: 10}, LastName: "Test", FirstName: "Contact"}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		b, _ := json.Marshal(target)
@@ -323,7 +325,7 @@ func TestContactRepository_Search_NameFilter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
-	if len(got) != 1 || got[0].Name != "Taro Tanaka" {
+	if len(got) != 1 || got[0].DisplayName() != "Tanaka Taro" {
 		t.Errorf("unexpected result: %+v", got)
 	}
 }

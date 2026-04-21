@@ -171,33 +171,31 @@ func TestE2E_Contacts_Get(t *testing.T) {
 		t.Errorf("GetContact ID mismatch: got=%d want=%d", got.ID, id)
 	}
 
-	// DisplayName() branch trace (M08 pattern, 271cba3 validation): whether
-	// the Name-first shortcut or LastName+FirstName fallback was taken. For
-	// users, the Name field was absent in the real API, forcing all records
-	// onto the fallback path. Record which happens for contacts too.
+	// DisplayName() branch trace (M40: Name field removed, always LastName+FirstName path).
 	displayName := got.DisplayName()
-	viaNameField := got.Name != ""
+
+	// Helper to get length of *string field (0 for nil).
+	ptrLen := func(s *string) int {
+		if s == nil {
+			return 0
+		}
+		return len(*s)
+	}
 
 	// Log only lengths, ids, and booleans for traceability. NEVER log the
-	// actual personal data (name/email/phone/note/memo/last_name/first_name).
-	t.Logf("TestE2E_Contacts_Get: id=%d client_id=%d client_branch_id=%d archive_flg=%d name_len=%d name_kana_len=%d last_name_len=%d first_name_len=%d honorific_title_len=%d title_len=%d department_len=%d email_len=%d phone_len=%d note_len=%d memo_len=%d display_name_len=%d display_name_via_Name_field=%v",
+	// actual personal data (last_name/first_name/email/note/title/department).
+	t.Logf("TestE2E_Contacts_Get: id=%d client_id=%d archive_flg=%d last_name_len=%d first_name_len=%d honorific_title_len=%d title_len=%d department_len=%d email_len=%d note_len=%d display_name_len=%d",
 		got.ID,
-		got.ClientID,
-		got.ClientBranchID,
+		got.ClientID(),
 		got.ArchiveFlg,
-		len(got.Name),
-		len(got.NameKana),
 		len(got.LastName),
 		len(got.FirstName),
 		len(got.HonorificTitle),
-		len(got.Title),
-		len(got.Department),
-		len(got.Email),
-		len(got.Phone),
-		len(got.Note),
-		len(got.Memo),
+		ptrLen(got.Title),
+		ptrLen(got.Department),
+		ptrLen(got.Email),
+		ptrLen(got.Note),
 		len(displayName),
-		viaNameField,
 	)
 }
 

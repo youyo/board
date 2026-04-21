@@ -1445,7 +1445,7 @@ func TestSearchClientBranches_WithClientID(t *testing.T) {
 func TestListContacts_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"client_id":10,"client_branch_id":2,"name":"Taro Tanaka","name_kana":"tanataro","title":"Manager","email":"tanaka@example.com","phone":"","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":2,"client_id":10,"client_branch_id":2,"name":"Hanako Suzuki","name_kana":"suzukihanako","title":"","email":"suzuki@example.com","phone":"","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":3,"client_id":11,"client_branch_id":3,"name":"Jiro Sato","name_kana":"satojiro","title":"","email":"sato@example.com","phone":"","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
+		w.Write([]byte(`[{"id":1,"client":{"id":10,"name":"Client A","name_disp":"Client A","custom_no":""},"last_name":"Tanaka","first_name":"Taro","honorific_title":"様","title":null,"department":null,"email":"tanaka@example.com","note":null,"archive_flg":0,"updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":2,"client":{"id":10,"name":"Client A","name_disp":"Client A","custom_no":""},"last_name":"Suzuki","first_name":"Hanako","honorific_title":"様","title":null,"department":null,"email":"suzuki@example.com","note":null,"archive_flg":0,"updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":3,"client":{"id":11,"name":"Client B","name_disp":"Client B","custom_no":""},"last_name":"Sato","first_name":"Jiro","honorific_title":"様","title":null,"department":null,"email":"sato@example.com","note":null,"archive_flg":0,"updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
 	}))
 	defer ts.Close()
 
@@ -1462,13 +1462,14 @@ func TestListContacts_OK(t *testing.T) {
 
 // T56: GetContact — happy path
 func TestGetContact_OK(t *testing.T) {
+	email := "test@example.com"
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/contacts/5" {
 			http.NotFound(w, r)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"id":5,"client_id":10,"client_branch_id":2,"name":"Ichiro Yamada","name_kana":"yamadaichiro","title":"","email":"test@example.com","phone":"","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
+		w.Write([]byte(`{"id":5,"client":{"id":10,"name":"Client A","name_disp":"Client A","custom_no":""},"last_name":"Yamada","first_name":"Ichiro","honorific_title":"様","title":null,"department":null,"email":"test@example.com","note":null,"archive_flg":0,"updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
 	}))
 	defer ts.Close()
 
@@ -1481,7 +1482,7 @@ func TestGetContact_OK(t *testing.T) {
 	if got == nil {
 		t.Fatal("got nil ContactEntity")
 	}
-	if got.ID != 5 || got.Email != "test@example.com" {
+	if got.ID != 5 || got.Email == nil || *got.Email != email {
 		t.Errorf("GetContact: got %+v", got)
 	}
 }
@@ -1492,7 +1493,7 @@ func TestSearchContacts_WithEmail(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotEmail = r.URL.Query().Get("email")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":5,"client_id":10,"client_branch_id":2,"name":"Ichiro Yamada","name_kana":"","title":"","email":"test@example.com","phone":"","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
+		w.Write([]byte(`[{"id":5,"client":{"id":10,"name":"Client A","name_disp":"Client A","custom_no":""},"last_name":"Yamada","first_name":"Ichiro","honorific_title":"様","title":null,"department":null,"email":"test@example.com","note":null,"archive_flg":0,"updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
 	}))
 	defer ts.Close()
 

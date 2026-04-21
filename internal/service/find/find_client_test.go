@@ -27,7 +27,7 @@ func TestFindClient_ByID(t *testing.T) {
 		{ID: 11, Client: &boardapi.ClientRef{ID: 1}, Name: "Branch 2"},
 	}
 	contacts := []boardapi.ContactEntity{
-		{ID: 20, ClientID: 1, Name: "Contact 1"},
+		{ID: 20, Client: &boardapi.ClientRef{ID: 1}, LastName: "Contact", FirstName: "1"},
 	}
 
 	svc := newServiceWith(

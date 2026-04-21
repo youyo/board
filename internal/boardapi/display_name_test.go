@@ -60,19 +60,19 @@ func TestContactEntity_DisplayName(t *testing.T) {
 		want   string
 	}{
 		{
-			name:   "Name only",
-			entity: boardapi.ContactEntity{Name: "佐々木 昌代"},
-			want:   "佐々木 昌代",
-		},
-		{
 			name:   "LastName and FirstName",
 			entity: boardapi.ContactEntity{LastName: "佐々木", FirstName: "昌代"},
 			want:   "佐々木 昌代",
 		},
 		{
-			name:   "Name takes priority",
-			entity: boardapi.ContactEntity{Name: "Display", LastName: "Last", FirstName: "First"},
-			want:   "Display",
+			name:   "LastName only",
+			entity: boardapi.ContactEntity{LastName: "佐々木"},
+			want:   "佐々木",
+		},
+		{
+			name:   "FirstName only",
+			entity: boardapi.ContactEntity{FirstName: "昌代"},
+			want:   "昌代",
 		},
 		{
 			name:   "all empty",

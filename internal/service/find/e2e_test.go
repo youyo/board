@@ -87,15 +87,16 @@ func TestE2E_FindClient_ByName(t *testing.T) {
 		t.Error("result.Client.Name expected non-empty")
 	}
 	// Integrity check: all branches and contacts should reference the parent client.
-	// M39: branch は ClientID() accessor 経由（nested Client）、contact は ClientID フィールド（M40 で対応予定）。
+	// M39: branch は ClientID() accessor 経由（nested Client）。
+	// M40: contact も ClientID() accessor 経由（nested Client）。
 	for i, b := range r.Branches {
 		if b.ClientID() != 0 && b.ClientID() != r.Client.ID {
 			t.Errorf("Branches[%d].ClientID=%d want=%d", i, b.ClientID(), r.Client.ID)
 		}
 	}
 	for i, c := range r.Contacts {
-		if c.ClientID != 0 && c.ClientID != r.Client.ID {
-			t.Errorf("Contacts[%d].ClientID=%d want=%d", i, c.ClientID, r.Client.ID)
+		if c.ClientID() != 0 && c.ClientID() != r.Client.ID {
+			t.Errorf("Contacts[%d].ClientID=%d want=%d", i, c.ClientID(), r.Client.ID)
 		}
 	}
 	t.Logf("Client: id=%d name=%q branches=%d contacts=%d", r.Client.ID, r.Client.Name, len(r.Branches), len(r.Contacts))
@@ -127,7 +128,7 @@ func TestE2E_FindClient_ByText(t *testing.T) {
 	t.Logf("FindClient(Text=%q) returned %d results", text, len(results))
 
 	// Integrity check: all branches and contacts should reference their parent client.
-	// M39: branch は ClientID() accessor 経由、contact は ClientID フィールド（M40 で対応予定）。
+	// M39: branch は ClientID() accessor 経由。M40: contact も ClientID() accessor 経由。
 	for _, r := range results {
 		for i, b := range r.Branches {
 			if b.ClientID() != 0 && b.ClientID() != r.Client.ID {
@@ -135,8 +136,8 @@ func TestE2E_FindClient_ByText(t *testing.T) {
 			}
 		}
 		for i, c := range r.Contacts {
-			if c.ClientID != 0 && c.ClientID != r.Client.ID {
-				t.Errorf("Text=%q result client=%d Contacts[%d].ClientID=%d", text, r.Client.ID, i, c.ClientID)
+			if c.ClientID() != 0 && c.ClientID() != r.Client.ID {
+				t.Errorf("Text=%q result client=%d Contacts[%d].ClientID=%d", text, r.Client.ID, i, c.ClientID())
 			}
 		}
 	}
@@ -214,8 +215,8 @@ func TestE2E_FindClient_StrictEnrichment(t *testing.T) {
 		t.Errorf("Contacts ID set mismatch:\n  want=%v\n  got =%v", expectedContactIDs, actualContactIDs)
 	}
 	for i, c := range r.Contacts {
-		if c.ClientID != 0 && c.ClientID != targetID {
-			t.Errorf("Contacts[%d].ClientID=%d want=%d", i, c.ClientID, targetID)
+		if c.ClientID() != 0 && c.ClientID() != targetID {
+			t.Errorf("Contacts[%d].ClientID=%d want=%d", i, c.ClientID(), targetID)
 		}
 	}
 

@@ -110,7 +110,7 @@ func TestListClientBranchesPage(t *testing.T) {
 // --- Contacts tests ---
 
 func TestListContacts(t *testing.T) {
-	stub := &stubContactRepo{listResult: []boardapi.ContactEntity{{ID: 1, Name: "ContactA"}}}
+	stub := &stubContactRepo{listResult: []boardapi.ContactEntity{{ID: 1, LastName: "Contact", FirstName: "A"}}}
 	svc := newServiceWithContacts(stub)
 	got, err := svc.ListContacts(testCtx, defaultOpts)
 	assertNoError(t, err)
@@ -118,7 +118,7 @@ func TestListContacts(t *testing.T) {
 }
 
 func TestGetContact(t *testing.T) {
-	entity := &boardapi.ContactEntity{ID: 1, Name: "ContactA"}
+	entity := &boardapi.ContactEntity{ID: 1, LastName: "Contact", FirstName: "A"}
 	stub := &stubContactRepo{getResult: entity}
 	svc := newServiceWithContacts(stub)
 	got, err := svc.GetContact(testCtx, 1, defaultOpts)
@@ -127,7 +127,7 @@ func TestGetContact(t *testing.T) {
 }
 
 func TestSearchContacts(t *testing.T) {
-	stub := &stubContactRepo{searchResult: []boardapi.ContactEntity{{ID: 2, Name: "ContactB"}}}
+	stub := &stubContactRepo{searchResult: []boardapi.ContactEntity{{ID: 2, LastName: "Contact", FirstName: "B"}}}
 	svc := newServiceWithContacts(stub)
 	got, err := svc.SearchContacts(testCtx, boardapi.ContactSearchParams{Name: "ContactB"}, defaultOpts)
 	assertNoError(t, err)

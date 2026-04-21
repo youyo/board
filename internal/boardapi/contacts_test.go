@@ -33,9 +33,10 @@ func newContactsMockClient(rt roundTripperFunc) *boardapi.Client {
 // single page response is served. The exact JSON bytes the server emits must
 // be preserved inside the returned array payload (element contents and order
 // must not change) because StrictFieldDiff relies on the original response
-// shape. All 17 ContactEntity keys are expected to survive the round trip.
+// shape. All 12 ContactEntity keys are expected to survive the round trip
+// (M40 re-design: nested client, nullable fields, phantom fields removed).
 func TestListContactsRaw_SinglePage(t *testing.T) {
-	page1 := `[{"id":1,"client_id":10,"client_branch_id":0,"name":"Yamada Taro","name_kana":"ヤマダ タロウ","last_name":"Yamada","first_name":"Taro","honorific_title":"様","title":"部長","department":"Sales","email":"taro@example.com","phone":"03-0000-0000","note":"main contact","memo":"vip","archive_flg":0,"updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}]`
+	page1 := `[{"id":1,"client":{"id":10,"name":"Client A","name_disp":"Client A","custom_no":""},"last_name":"Yamada","first_name":"Taro","honorific_title":"様","title":null,"department":null,"email":"taro@example.com","note":null,"archive_flg":0,"updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}]`
 	var gotPath string
 	var gotQuery url.Values
 	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
@@ -64,12 +65,13 @@ func TestListContactsRaw_SinglePage(t *testing.T) {
 		t.Fatalf("expected 1 element, got %d", len(arr))
 	}
 	got := arr[0]
-	// All 17 ContactEntity json tags must survive round-tripping so
+	// All 12 ContactEntity json tags must survive round-tripping so
 	// StrictFieldDiff can detect any unmapped BOARD API keys.
+	// Removed phantom fields: client_id, client_branch_id, name, name_kana, phone, memo.
 	wantKeys := []string{
-		"id", "client_id", "client_branch_id", "name", "name_kana",
+		"id", "client",
 		"last_name", "first_name", "honorific_title", "title", "department",
-		"email", "phone", "note", "memo", "archive_flg",
+		"email", "note", "archive_flg",
 		"updated_at", "created_at",
 	}
 	for _, k := range wantKeys {
@@ -84,11 +86,11 @@ func TestListContactsRaw_SinglePage(t *testing.T) {
 // 1 item on page 2. Result must be a JSON array of 3 items.
 func TestListContactsRaw_MultiPage(t *testing.T) {
 	page1Items := []string{
-		`{"id":1,"client_id":10,"client_branch_id":0,"name":"A","name_kana":"","last_name":"","first_name":"","honorific_title":"","title":"","department":"","email":"","phone":"","note":"","memo":"","archive_flg":0,"updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}`,
-		`{"id":2,"client_id":10,"client_branch_id":0,"name":"B","name_kana":"","last_name":"","first_name":"","honorific_title":"","title":"","department":"","email":"","phone":"","note":"","memo":"","archive_flg":0,"updated_at":"2024-01-02T00:00:00+09:00","created_at":"2023-01-02T00:00:00+09:00"}`,
+		`{"id":1,"client":{"id":10,"name":"A Corp","name_disp":"A Corp","custom_no":""},"last_name":"A","first_name":"","honorific_title":"","title":null,"department":null,"email":null,"note":null,"archive_flg":0,"updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}`,
+		`{"id":2,"client":{"id":10,"name":"A Corp","name_disp":"A Corp","custom_no":""},"last_name":"B","first_name":"","honorific_title":"","title":null,"department":null,"email":null,"note":null,"archive_flg":0,"updated_at":"2024-01-02T00:00:00+09:00","created_at":"2023-01-02T00:00:00+09:00"}`,
 	}
 	page2Items := []string{
-		`{"id":3,"client_id":11,"client_branch_id":0,"name":"C","name_kana":"","last_name":"","first_name":"","honorific_title":"","title":"","department":"","email":"","phone":"","note":"","memo":"","archive_flg":0,"updated_at":"2024-01-03T00:00:00+09:00","created_at":"2023-01-03T00:00:00+09:00"}`,
+		`{"id":3,"client":{"id":11,"name":"B Corp","name_disp":"B Corp","custom_no":""},"last_name":"C","first_name":"","honorific_title":"","title":null,"department":null,"email":null,"note":null,"archive_flg":0,"updated_at":"2024-01-03T00:00:00+09:00","created_at":"2023-01-03T00:00:00+09:00"}`,
 	}
 	var pageCount int
 	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
@@ -134,7 +136,7 @@ func TestListContactsRaw_MultiPage(t *testing.T) {
 
 // U3: GetContactRaw returns body exactly as served (single object).
 func TestGetContactRaw_Success(t *testing.T) {
-	body := []byte(`{"id":42,"client_id":10,"client_branch_id":5,"name":"","name_kana":"","last_name":"Sato","first_name":"Hanako","honorific_title":"様","title":"","department":"","email":"hanako@example.com","phone":"","note":"","memo":"","archive_flg":0,"updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}`)
+	body := []byte(`{"id":42,"client":{"id":10,"name":"Client A","name_disp":"Client A","custom_no":""},"last_name":"Sato","first_name":"Hanako","honorific_title":"様","title":null,"department":null,"email":"hanako@example.com","note":null,"archive_flg":0,"updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}`)
 	var gotPath string
 	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
 		gotPath = r.URL.Path
@@ -187,7 +189,7 @@ func TestGetContactRaw_NotFound(t *testing.T) {
 // (client_id/name), contacts exposes 3 filters: client_id as a hierarchical
 // filter plus name and email as keyword filters.
 func TestSearchContactsRaw_QueryParams(t *testing.T) {
-	page1 := `[{"id":7,"client_id":123,"client_branch_id":0,"name":"keyword","name_kana":"","last_name":"","first_name":"","honorific_title":"","title":"","department":"","email":"x@y.z","phone":"","note":"","memo":"","archive_flg":0,"updated_at":"2024-02-01T00:00:00+09:00","created_at":"2024-02-01T00:00:00+09:00"}]`
+	page1 := `[{"id":7,"client":{"id":123,"name":"Corp","name_disp":"Corp","custom_no":""},"last_name":"keyword","first_name":"","honorific_title":"","title":null,"department":null,"email":"x@y.z","note":null,"archive_flg":0,"updated_at":"2024-02-01T00:00:00+09:00","created_at":"2024-02-01T00:00:00+09:00"}]`
 	var observedClientID, observedName, observedEmail string
 	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
 		observedClientID = r.URL.Query().Get("client_id")
