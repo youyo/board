@@ -8,41 +8,47 @@ import (
 	"strconv"
 )
 
-// VendorContactEntity is a BOARD API vendor contact entity.
-// Corresponds to one element in the GET /v1/vendor_contacts response.
+// VendorContactEntity は BOARD API の仕入先担当者エンティティ。
+// GET /v1/payee_contacts のレスポンス 1 要素に対応する。
+// ContactEntity（M40 再設計）と同型のパターンを vendor 側に適用し M42 で全面再設計。
+//
+// 注意: nested オブジェクトのキー（"vendor"）は未確認（アカウントのデータが 0 件のため）。
+// ContactEntity が "client" ネストを使うことを確認済みなので "vendor" と推定する。
+// データ投入後の smoke テスト（TestE2E_VendorContacts_*）で Pending Re-verification。
 type VendorContactEntity struct {
-	ID             int    `json:"id"`
-	VendorID       int    `json:"vendor_id"`
-	VendorBranchID int    `json:"vendor_branch_id"`
-	Name           string `json:"name"`
-	NameKana       string `json:"name_kana"`
-	LastName       string `json:"last_name"`
-	FirstName      string `json:"first_name"`
-	HonorificTitle string `json:"honorific_title"`
-	Title          string `json:"title"`
-	Department     string `json:"department"`
-	Email          string `json:"email"`
-	Phone          string `json:"phone"`
-	Note           string `json:"note"`
-	Memo           string `json:"memo"`
-	ArchiveFlg     int    `json:"archive_flg"`
-	UpdatedAt      string `json:"updated_at"` // ISO 8601
-	CreatedAt      string `json:"created_at"` // ISO 8601
+	ID             int        `json:"id"`
+	Vendor         *VendorRef `json:"vendor"`          // nested 構造: {id, name, name_disp, custom_no}（未確認）
+	LastName       string     `json:"last_name"`
+	FirstName      string     `json:"first_name"`
+	HonorificTitle string     `json:"honorific_title"`
+	Title          *string    `json:"title"`           // null 可
+	Department     *string    `json:"department"`      // null 可
+	Email          *string    `json:"email"`           // null 可
+	Note           *string    `json:"note"`            // null 可
+	ArchiveFlg     int        `json:"archive_flg"`
+	CreatedAt      string     `json:"created_at"`      // ISO 8601
+	UpdatedAt      string     `json:"updated_at"`      // ISO 8601
 }
 
-// DisplayName returns a human-readable name.
-// Prefers Name if set, otherwise combines LastName + FirstName.
-func (vc VendorContactEntity) DisplayName() string {
-	if vc.Name != "" {
-		return vc.Name
+// VendorID は nested Vendor.ID を返す accessor（後方互換ブリッジ）。
+// Vendor が nil の場合 0 を返す。
+func (e VendorContactEntity) VendorID() int {
+	if e.Vendor == nil {
+		return 0
 	}
+	return e.Vendor.ID
+}
+
+// DisplayName は人名を返す。LastName + FirstName を結合する。
+// Name フィールドは M42 再設計で廃止（ContactEntity と同様）。
+func (e VendorContactEntity) DisplayName() string {
 	switch {
-	case vc.LastName != "" && vc.FirstName != "":
-		return vc.LastName + " " + vc.FirstName
-	case vc.LastName != "":
-		return vc.LastName
-	case vc.FirstName != "":
-		return vc.FirstName
+	case e.LastName != "" && e.FirstName != "":
+		return e.LastName + " " + e.FirstName
+	case e.LastName != "":
+		return e.LastName
+	case e.FirstName != "":
+		return e.FirstName
 	default:
 		return ""
 	}
