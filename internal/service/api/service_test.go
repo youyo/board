@@ -292,7 +292,7 @@ func TestGetDelivery(t *testing.T) {
 // --- Receipts tests ---
 
 func TestGetReceipt(t *testing.T) {
-	entity := &boardapi.ReceiptEntity{ID: 1, ProjectID: 10}
+	entity := &boardapi.ReceiptEntity{ID: 1, Total: "90000.0", ReceiptDate: "2026-06-30"}
 	stub := &stubReceiptRepo{getResult: entity}
 	svc := newServiceWithReceipts(stub)
 	got, err := svc.GetReceipt(testCtx, 1, defaultOpts)

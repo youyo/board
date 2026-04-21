@@ -1903,7 +1903,7 @@ func TestGetDelivery_OK(t *testing.T) {
 // M07: receipts entity tests (T80)
 // ============================================================
 
-// T80: GetReceipt — happy path
+// T80: GetReceipt — happy path (M38: 実 API 準拠スキーマに更新)
 func TestGetReceipt_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/documents/receipts/99" {
@@ -1911,7 +1911,7 @@ func TestGetReceipt_OK(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"id":99,"client_id":10,"project_id":100,"title":"Receipt 99","total_amount":900000.0,"status":"issued","receipt_date":"2026-03-31","memo":"Issued","updated_at":"2026-03-31T00:00:00Z","created_at":"2026-03-31T00:00:00Z"}`))
+		w.Write([]byte(`{"id":99,"message":null,"total":"900000.0","tax":"90000.0","tax_withholding":"0.0","seal_approval_status":1,"document_amount_disp_kbn":1,"blank_date_flg":0,"lock_flg":0,"delivery_place":null,"details":[{"no":1,"detail_date":null,"description":"Item A","quantity":"1.0","unit":"式","unit_price":"900000.0","price":"900000.0","tax_rate":"10.0","tax_withholding_flg":0,"tax_included_flg":0,"reduced_tax_rate_kbn":1,"section_description":null,"section_subtotal":null,"document_detail_kbn":1,"document_detail_kbn_name":"通常","deduction_applicable":false}],"receipt_date":"2026-03-31","disp_receipt_date":null}`))
 	}))
 	defer ts.Close()
 
@@ -1924,8 +1924,17 @@ func TestGetReceipt_OK(t *testing.T) {
 	if got == nil {
 		t.Fatal("got nil ReceiptEntity")
 	}
-	if got.ID != 99 || got.TotalAmount != 900000.0 || got.ReceiptDate != "2026-03-31" {
-		t.Errorf("GetReceipt: got %+v", got)
+	if got.ID != 99 {
+		t.Errorf("GetReceipt ID: got %d, want 99", got.ID)
+	}
+	if got.ReceiptDate != "2026-03-31" {
+		t.Errorf("GetReceipt ReceiptDate: got %q, want %q", got.ReceiptDate, "2026-03-31")
+	}
+	if got.Total != "900000.0" {
+		t.Errorf("GetReceipt Total: got %q, want %q", got.Total, "900000.0")
+	}
+	if len(got.Details) != 1 {
+		t.Errorf("GetReceipt Details len: got %d, want 1", len(got.Details))
 	}
 }
 

@@ -2,7 +2,7 @@
 
 // E2E tests for /v1/documents/receipts against the real BOARD API.
 //
-// Scope (M21, board-compliance roadmap): Phase G (document) 5th milestone.
+// Scope (M21/M38, board-compliance roadmap): Phase G (document) 5th milestone.
 // receipts は document 系エンドポイントで Get のみ提供（List/Search は対象外）。
 // documentID discovery は M17 で確立した findAnyDocumentID helper を経由する。
 //
@@ -19,7 +19,7 @@
 // re-verification" — tracked in the roadmap and re-run once data is seeded.
 //
 // PII handling: raw artifacts are written under tmp/e2e-artifacts/ (gitignored)
-// for manual inspection. t.Logf output avoids leaking PII (title text, memo);
+// for manual inspection. t.Logf output avoids leaking PII (message text);
 // only lengths, ids, and numeric fields are logged.
 //
 // Usage (single-shot):
@@ -79,11 +79,11 @@ func TestE2E_Receipts_Get(t *testing.T) {
 	if got.ID != docID {
 		t.Errorf("GetReceipt ID mismatch: got=%d want=%d", got.ID, docID)
 	}
-	if got.ProjectID != projectID {
-		t.Errorf("GetReceipt ProjectID mismatch: got=%d want=%d", got.ProjectID, projectID)
-	}
 	// Log only lengths and numeric IDs (non-PII) for traceability.
-	// Do NOT log title text or memo raw values.
-	t.Logf("TestE2E_Receipts_Get: id=%d title_len=%d project_id=%d total=%.0f receipt_date=%s",
-		got.ID, len(got.Title), got.ProjectID, got.TotalAmount, got.ReceiptDate)
+	var msgLen int
+	if got.Message != nil {
+		msgLen = len(*got.Message)
+	}
+	t.Logf("TestE2E_Receipts_Get: id=%d message_len=%d total=%s tax=%s details_count=%d receipt_date=%s",
+		got.ID, msgLen, got.Total, got.Tax, len(got.Details), got.ReceiptDate)
 }
