@@ -35,8 +35,9 @@ func newClientBranchesMockClient(rt roundTripperFunc) *boardapi.Client {
 // be preserved inside the returned array payload (element contents and order
 // must not change) because StrictFieldDiff relies on the original response
 // shape.
+// M39: mock JSON updated to real API schema (client nested, zip/pref/address1/address2/tel/archive_flg).
 func TestListClientBranchesRaw_SinglePage(t *testing.T) {
-	page1 := `[{"id":1,"client_id":10,"name":"Head Office","postal_code":"100-0001","address":"Tokyo","phone":"03-0000-0000","fax":"03-0000-0001","memo":"main","updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}]`
+	page1 := `[{"id":1,"client":{"id":10,"name":"株式会社テスト","name_disp":"テスト","custom_no":""},"name":"Head Office","zip":"100-0001","pref":"東京都","address1":"千代田区1-1","address2":"","tel":null,"fax":null,"archive_flg":0,"updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}]`
 	var gotPath string
 	var gotQuery url.Values
 	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
@@ -66,8 +67,9 @@ func TestListClientBranchesRaw_SinglePage(t *testing.T) {
 	}
 	got := arr[0]
 	wantKeys := []string{
-		"id", "client_id", "name", "postal_code", "address",
-		"phone", "fax", "memo", "updated_at", "created_at",
+		"id", "client", "name", "zip", "pref",
+		"address1", "address2", "tel", "fax", "archive_flg",
+		"updated_at", "created_at",
 	}
 	for _, k := range wantKeys {
 		if _, ok := got[k]; !ok {
@@ -79,13 +81,14 @@ func TestListClientBranchesRaw_SinglePage(t *testing.T) {
 // U2: ListClientBranchesRaw concatenates multiple pages into a single valid
 // JSON array. per_page=2 forces pagination; server returns 2 items on page 1
 // and 1 item on page 2. Result must be a JSON array of 3 items.
+// M39: mock JSON updated to real API schema.
 func TestListClientBranchesRaw_MultiPage(t *testing.T) {
 	page1Items := []string{
-		`{"id":1,"client_id":10,"name":"A","postal_code":"","address":"","phone":"","fax":"","memo":"","updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}`,
-		`{"id":2,"client_id":10,"name":"B","postal_code":"","address":"","phone":"","fax":"","memo":"","updated_at":"2024-01-02T00:00:00+09:00","created_at":"2023-01-02T00:00:00+09:00"}`,
+		`{"id":1,"client":{"id":10,"name":"A社","name_disp":"A","custom_no":""},"name":"A","zip":"","pref":"","address1":"","address2":"","tel":null,"fax":null,"archive_flg":0,"updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}`,
+		`{"id":2,"client":{"id":10,"name":"A社","name_disp":"A","custom_no":""},"name":"B","zip":"","pref":"","address1":"","address2":"","tel":null,"fax":null,"archive_flg":0,"updated_at":"2024-01-02T00:00:00+09:00","created_at":"2023-01-02T00:00:00+09:00"}`,
 	}
 	page2Items := []string{
-		`{"id":3,"client_id":11,"name":"C","postal_code":"","address":"","phone":"","fax":"","memo":"","updated_at":"2024-01-03T00:00:00+09:00","created_at":"2023-01-03T00:00:00+09:00"}`,
+		`{"id":3,"client":{"id":11,"name":"B社","name_disp":"B","custom_no":""},"name":"C","zip":"","pref":"","address1":"","address2":"","tel":null,"fax":null,"archive_flg":0,"updated_at":"2024-01-03T00:00:00+09:00","created_at":"2023-01-03T00:00:00+09:00"}`,
 	}
 	var pageCount int
 	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
@@ -130,8 +133,9 @@ func TestListClientBranchesRaw_MultiPage(t *testing.T) {
 }
 
 // U3: GetClientBranchRaw returns body exactly as served (single object).
+// M39: mock JSON updated to real API schema.
 func TestGetClientBranchRaw_Success(t *testing.T) {
-	body := []byte(`{"id":42,"client_id":10,"name":"Branch","postal_code":"100-0002","address":"Tokyo 2","phone":"03-1111-2222","fax":"03-1111-2223","memo":"sub","updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}`)
+	body := []byte(`{"id":42,"client":{"id":10,"name":"株式会社テスト","name_disp":"テスト","custom_no":""},"name":"Branch","zip":"100-0002","pref":"東京都","address1":"千代田区1-2","address2":"テストビル2F","tel":"03-1111-2222","fax":"03-1111-2223","archive_flg":0,"updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}`)
 	var gotPath string
 	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
 		gotPath = r.URL.Path
@@ -182,8 +186,9 @@ func TestGetClientBranchRaw_NotFound(t *testing.T) {
 // U5: SearchClientBranchesRaw sends client_id / name in the query and returns body.
 // Unlike users (name/email/updated_at_from), client_branches exposes client_id
 // as a hierarchical filter (Phase D core-business pattern) plus name.
+// M39: mock JSON updated to real API schema.
 func TestSearchClientBranchesRaw_QueryParams(t *testing.T) {
-	page1 := `[{"id":7,"client_id":123,"name":"keyword","postal_code":"","address":"","phone":"","fax":"","memo":"","updated_at":"2024-02-01T00:00:00+09:00","created_at":"2024-02-01T00:00:00+09:00"}]`
+	page1 := `[{"id":7,"client":{"id":123,"name":"株式会社テスト","name_disp":"テスト","custom_no":""},"name":"keyword","zip":"","pref":"","address1":"","address2":"","tel":null,"fax":null,"archive_flg":0,"updated_at":"2024-02-01T00:00:00+09:00","created_at":"2024-02-01T00:00:00+09:00"}]`
 	var observedClientID, observedName string
 	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
 		observedClientID = r.URL.Query().Get("client_id")

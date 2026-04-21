@@ -87,9 +87,10 @@ func TestE2E_FindClient_ByName(t *testing.T) {
 		t.Error("result.Client.Name expected non-empty")
 	}
 	// Integrity check: all branches and contacts should reference the parent client.
+	// M39: branch は ClientID() accessor 経由（nested Client）、contact は ClientID フィールド（M40 で対応予定）。
 	for i, b := range r.Branches {
-		if b.ClientID != 0 && b.ClientID != r.Client.ID {
-			t.Errorf("Branches[%d].ClientID=%d want=%d", i, b.ClientID, r.Client.ID)
+		if b.ClientID() != 0 && b.ClientID() != r.Client.ID {
+			t.Errorf("Branches[%d].ClientID=%d want=%d", i, b.ClientID(), r.Client.ID)
 		}
 	}
 	for i, c := range r.Contacts {
@@ -126,10 +127,11 @@ func TestE2E_FindClient_ByText(t *testing.T) {
 	t.Logf("FindClient(Text=%q) returned %d results", text, len(results))
 
 	// Integrity check: all branches and contacts should reference their parent client.
+	// M39: branch は ClientID() accessor 経由、contact は ClientID フィールド（M40 で対応予定）。
 	for _, r := range results {
 		for i, b := range r.Branches {
-			if b.ClientID != 0 && b.ClientID != r.Client.ID {
-				t.Errorf("Text=%q result client=%d Branches[%d].ClientID=%d", text, r.Client.ID, i, b.ClientID)
+			if b.ClientID() != 0 && b.ClientID() != r.Client.ID {
+				t.Errorf("Text=%q result client=%d Branches[%d].ClientID=%d", text, r.Client.ID, i, b.ClientID())
 			}
 		}
 		for i, c := range r.Contacts {
@@ -187,9 +189,10 @@ func TestE2E_FindClient_StrictEnrichment(t *testing.T) {
 		t.Errorf("Branches ID set mismatch:\n  want=%v\n  got =%v", expectedBranchIDs, actualBranchIDs)
 	}
 	// All branches should reference the parent client.
+	// M39: branch は ClientID() accessor 経由。
 	for i, b := range r.Branches {
-		if b.ClientID != 0 && b.ClientID != targetID {
-			t.Errorf("Branches[%d].ClientID=%d want=%d", i, b.ClientID, targetID)
+		if b.ClientID() != 0 && b.ClientID() != targetID {
+			t.Errorf("Branches[%d].ClientID=%d want=%d", i, b.ClientID(), targetID)
 		}
 	}
 

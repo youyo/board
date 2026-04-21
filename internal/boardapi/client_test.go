@@ -1365,11 +1365,11 @@ func TestSearchClients_WithUpdatedAtFrom(t *testing.T) {
 // M06: client_branches entity tests (T52-T54)
 // ============================================================
 
-// T52: ListClientBranches — happy path
+// T52: ListClientBranches — happy path（M39 新スキーマ: client nested + zip/pref/address1/address2/tel/archive_flg）
 func TestListClientBranches_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"client_id":10,"name":"Tokyo Branch","postal_code":"100-0001","address":"Tokyo","phone":"03-0000-0000","fax":"","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
+		w.Write([]byte(`[{"id":1,"client":{"id":10,"name":"株式会社テスト","name_disp":"テスト","custom_no":""},"name":"Tokyo Branch","zip":"100-0001","pref":"東京都","address1":"千代田区1-1","address2":"","tel":null,"fax":null,"archive_flg":0,"updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
 	}))
 	defer ts.Close()
 
@@ -1382,12 +1382,12 @@ func TestListClientBranches_OK(t *testing.T) {
 	if len(result) != 1 {
 		t.Errorf("want 1 client branch, got %d", len(result))
 	}
-	if result[0].ID != 1 || result[0].ClientID != 10 || result[0].Name != "Tokyo Branch" {
+	if result[0].ID != 1 || result[0].ClientID() != 10 || result[0].Name != "Tokyo Branch" {
 		t.Errorf("result[0]: got %+v", result[0])
 	}
 }
 
-// T53: GetClientBranch — happy path
+// T53: GetClientBranch — happy path（M39 新スキーマ）
 func TestGetClientBranch_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/client_branches/1" {
@@ -1395,7 +1395,7 @@ func TestGetClientBranch_OK(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"id":1,"client_id":5,"name":"Osaka Branch","postal_code":"530-0001","address":"Osaka","phone":"06-0000-0000","fax":"","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
+		w.Write([]byte(`{"id":1,"client":{"id":5,"name":"株式会社大阪","name_disp":"大阪","custom_no":""},"name":"Osaka Branch","zip":"530-0001","pref":"大阪府","address1":"梅田1-1","address2":"","tel":null,"fax":null,"archive_flg":0,"updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
 	}))
 	defer ts.Close()
 
@@ -1413,13 +1413,13 @@ func TestGetClientBranch_OK(t *testing.T) {
 	}
 }
 
-// T54: SearchClientBranches — with ClientID parameter
+// T54: SearchClientBranches — with ClientID parameter（M39 新スキーマ）
 func TestSearchClientBranches_WithClientID(t *testing.T) {
 	var gotClientID string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotClientID = r.URL.Query().Get("client_id")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":2,"client_id":10,"name":"Nagoya Branch","postal_code":"","address":"","phone":"","fax":"","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
+		w.Write([]byte(`[{"id":2,"client":{"id":10,"name":"株式会社名古屋","name_disp":"名古屋","custom_no":""},"name":"Nagoya Branch","zip":"","pref":"","address1":"","address2":"","tel":null,"fax":null,"archive_flg":0,"updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
 	}))
 	defer ts.Close()
 

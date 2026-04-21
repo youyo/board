@@ -124,8 +124,17 @@ func TestE2E_ClientBranches_Get(t *testing.T) {
 		t.Errorf("GetClientBranch ID mismatch: got=%d want=%d", got.ID, id)
 	}
 	// Log only lengths and the client_id (numeric, not PII) for traceability.
-	t.Logf("TestE2E_ClientBranches_Get: id=%d client_id=%d name_len=%d address_len=%d phone_len=%d fax_len=%d memo_len=%d postal_code_len=%d",
-		got.ID, got.ClientID, len(got.Name), len(got.Address), len(got.Phone), len(got.Fax), len(got.Memo), len(got.PostalCode))
+	// M39: フィールドを新スキーマ（zip/pref/address1/address2/tel）に更新。ClientID は accessor 経由。
+	telLen := 0
+	if got.Tel != nil {
+		telLen = len(*got.Tel)
+	}
+	faxLen := 0
+	if got.Fax != nil {
+		faxLen = len(*got.Fax)
+	}
+	t.Logf("TestE2E_ClientBranches_Get: id=%d client_id=%d name_len=%d zip_len=%d pref_len=%d address1_len=%d address2_len=%d tel_len=%d fax_len=%d archive_flg=%d",
+		got.ID, got.ClientID(), len(got.Name), len(got.Zip), len(got.Pref), len(got.Address1), len(got.Address2), telLen, faxLen, got.ArchiveFlg)
 }
 
 // TestE2E_ClientBranches_Search exercises Search with a non-matching name and

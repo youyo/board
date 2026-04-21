@@ -64,10 +64,12 @@ func newClientBranchAPIServer(t *testing.T, entities []boardapi.ClientBranchEnti
 	return srv
 }
 
+// M39: sampleClientBranches を実 API 準拠の新スキーマに更新。
+// ClientID は廃止（フィールドから accessor へ）、Client ネスト構造を使用。
 var sampleClientBranches = []boardapi.ClientBranchEntity{
-	{ID: 1, ClientID: 10, Name: "Tokyo Branch", UpdatedAt: "2026-01-01T00:00:00Z"},
-	{ID: 2, ClientID: 10, Name: "Osaka Branch", UpdatedAt: "2026-01-02T00:00:00Z"},
-	{ID: 3, ClientID: 20, Name: "Nagoya Branch", UpdatedAt: "2026-01-03T00:00:00Z"},
+	{ID: 1, Client: &boardapi.ClientRef{ID: 10, Name: "株式会社テスト", NameDisp: "テスト", CustomNo: ""}, Name: "Tokyo Branch", UpdatedAt: "2026-01-01T00:00:00Z"},
+	{ID: 2, Client: &boardapi.ClientRef{ID: 10, Name: "株式会社テスト", NameDisp: "テスト", CustomNo: ""}, Name: "Osaka Branch", UpdatedAt: "2026-01-02T00:00:00Z"},
+	{ID: 3, Client: &boardapi.ClientRef{ID: 20, Name: "株式会社サンプル", NameDisp: "サンプル", CustomNo: ""}, Name: "Nagoya Branch", UpdatedAt: "2026-01-03T00:00:00Z"},
 }
 
 // T_R16: List - cache hit, autoRefresh=false -> returns cached data
@@ -274,7 +276,7 @@ func TestClientBranchRepository_GetByID_CacheMiss_APISuccess(t *testing.T) {
 	db := newTestDB(t)
 	markSynced(t, db, "client_branches")
 
-	target := boardapi.ClientBranchEntity{ID: 99, ClientID: 10, Name: "Test Branch"}
+	target := boardapi.ClientBranchEntity{ID: 99, Client: &boardapi.ClientRef{ID: 10, Name: "株式会社テスト", NameDisp: "テスト", CustomNo: ""}, Name: "Test Branch"}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		b, _ := json.Marshal(target)

@@ -21,9 +21,10 @@ func TestNew(t *testing.T) {
 
 func TestFindClient_ByID(t *testing.T) {
 	client := &boardapi.ClientEntity{ID: 1, Name: "Client A"}
+	// M39: ClientID フィールド廃止 → Client nested 構造に変更。
 	branches := []boardapi.ClientBranchEntity{
-		{ID: 10, ClientID: 1, Name: "Branch 1"},
-		{ID: 11, ClientID: 1, Name: "Branch 2"},
+		{ID: 10, Client: &boardapi.ClientRef{ID: 1}, Name: "Branch 1"},
+		{ID: 11, Client: &boardapi.ClientRef{ID: 1}, Name: "Branch 2"},
 	}
 	contacts := []boardapi.ContactEntity{
 		{ID: 20, ClientID: 1, Name: "Contact 1"},
