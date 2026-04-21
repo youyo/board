@@ -48,10 +48,10 @@ enrichment バグ 3 件修正（M25: ClientBranch/Contact Search、M28: Deliveri
 FindUser/FindGroup は groups 0 件 Pending Re-verification、FindInvoice は ID モードのみ軽量 E2E で対応。
 
 ## Current Focus
-- **マイルストーン**: M40 ContactEntity 実 API 準拠再設計 ✅（Phase J 2 件目）
-- **直近の完了**: M40 ContactEntity 全面再設計 / ClientID() accessor 追加 / downstream 修正 / go build/vet/test 全 Green / 実 API smoke は 429 リセット後に再実行予定
-- **以前の完了**: M39 ClientBranchEntity 実 API 準拠再設計 ✅（Phase J 1 件目）
-- **次のアクション**: M41 VendorBranchEntity 実 API 準拠再設計（M39/M40 同パターン）
+- **マイルストーン**: M41 VendorBranchEntity 実 API 準拠再設計 ✅（Phase J 3 件目）
+- **直近の完了**: M41 VendorBranchEntity 全面再設計 / VendorRef 共通型新規作成 / VendorID() accessor / downstream 修正 / go build/vet/test 全 Green
+- **以前の完了**: M40 ContactEntity 再設計 ✅ / M39 ClientBranchEntity 再設計 ✅
+- **次のアクション**: M42 VendorContactEntity 実 API 準拠再設計（Phase J 最終）
 
 ## Progress
 
@@ -550,6 +550,20 @@ FindUser/FindGroup は groups 0 件 Pending Re-verification、FindInvoice は ID
 - 見積: ~5 req / 実績: 未実施（429 のため）
 - 詳細: plans/board-compliance-m40-contact-redesign.md
 
+#### M41: VendorBranchEntity 実 API 準拠への再設計 ✅
+- [x] `internal/boardapi/vendor_ref.go` 新規作成（VendorRef 共通型: ClientRef と同型）
+- [x] `internal/boardapi/vendor_branches.go` VendorBranchEntity 全面書き換え（12 フィールド）
+  - 削除: VendorID(field)/PostalCode/Address/Phone/Memo（5 幻フィールド）
+  - 追加: Vendor *VendorRef（nested, 未確認 "vendor" キー推定）/ Zip/Pref/Address1/Address2/Tel/*string/ArchiveFlg
+  - Fax: string → *string（null 対応）
+  - `VendorID()` accessor 追加（nested Vendor.ID を返す後方互換ブリッジ）
+- [x] downstream 修正（7 ファイル: vendor_branches_test.go / client_test.go / e2e_vendor_branches_test.go / repository/vendor_branches.go / repository/vendor_branches_test.go / service/api/service_test.go / service/find/find_vendor_test.go）
+- [x] go build + go vet + go test -count=1 ./... 全 Green
+- [x] 実 API smoke: データ 0 件のため Skip（Pending Re-verification 維持）
+- 見積: 0 req（unit のみ、実データ無し） / 実績: 0 req
+- 詳細: plans/board-compliance-m41-vendor-branch-redesign.md
+- **未確認ポイント**: nested キーが "vendor" か "payee" かは smoke 未実施のため未確定
+
 ---
 
 ## Blockers
@@ -582,6 +596,9 @@ FindUser/FindGroup は groups 0 件 Pending Re-verification、FindInvoice は ID
 | 6 | documentID は projects response_group から発見 | orders/deliveries/receipts の List 相当を API 仕様範囲内で再現 | 2026-04-20 |
 
 ## Changelog
+
+### 2026-04-21（M41: VendorBranchEntity 実 API 準拠再設計）
+- **M41 VendorBranchEntity 全面再設計**: M39/M40 パターン踏襲。`VendorRef` 共通型（vendor_ref.go）を新規定義し、`VendorBranchEntity` を推定実 API 準拠の 12 フィールド構造に書き換え。5 幻フィールド（VendorID/PostalCode/Address/Phone/Memo）を削除し、nested `vendor: *VendorRef` + Zip/Pref/Address1/Address2 + nullable `Tel/*string / Fax/*string` + ArchiveFlg に変更。`VendorID()` accessor で後方互換を確保。repository の `filterVendorBranches` を accessor 呼び出しに修正。downstream 7 ファイルを修正（モック JSON 更新 + wantKeys 更新 + accessor 呼び出し置換）。go build/vet/test 全 Green。実 API smoke はデータ 0 件のため Skip（Pending Re-verification 維持）。未確認: nested キー "vendor" vs "payee"（データ投入後に smoke で検証予定）。
 
 ### 2026-04-21（M40: ContactEntity 実 API 準拠再設計）
 - **M40 ContactEntity 全面再設計**: M39 パターン踏襲。実 API dump（contacts_56292528.json）に基づき、6 幻フィールド（ClientID/ClientBranchID/Name/NameKana/Phone/Memo）を削除し、nested `client: *ClientRef` + nullable `Title/*string/Department/*string/Email/*string/Note/*string` に書き換え。`ClientID()` accessor 追加。`DisplayName()` を LastName+FirstName 専用に簡略化。repository の `filterContactsByNameEmail` を `DisplayName()` + `*string` nil ガード対応に修正。downstream 9 ファイルを修正。go build/vet/test 全 Green。実 API smoke は 429 のため日次リセット後に再実行予定。
