@@ -17,6 +17,9 @@ import (
 // Status post-filter および client/project enrichment は各ブランチのコンテキスト情報から復元する。
 // ID lookup では client/project を特定できないため nil を返す。
 // TODO(M25-M32): find 層の全体再設計で enrichment を復元する。
+//
+// M28 FIX: BOARD API は response_group=delivery で "deliveries" 複数形配列を返す。
+// ProjectEntity.Deliveries ([]DocumentSummary) を参照するよう修正。
 func (s *Service) FindDelivery(ctx context.Context, q FindDeliveryQuery) ([]DeliveryResult, error) {
 	if q.ID == 0 && q.ProjectID == 0 && q.ClientName == "" && q.ProjectName == "" {
 		return nil, errors.New("at least one of ID, ProjectID, ClientName, or ProjectName must be set")
@@ -46,12 +49,14 @@ func (s *Service) FindDelivery(ctx context.Context, q FindDeliveryQuery) ([]Deli
 	case q.ProjectID != 0:
 		// Lookup project with delivery group, then fetch document.
 		// project コンテキストから client/project を解決。
+		// NOTE: BOARD API は response_group=delivery で "deliveries" 複数形配列を返す。
+		// ProjectEntity.Deliveries ([]DocumentSummary) を参照し、先頭要素を使用する。
 		p, err := s.projects.GetByIDWithGroup(ctx, q.ProjectID, "delivery")
 		if err != nil {
 			return nil, err
 		}
-		if p.Delivery != nil {
-			d, err := s.deliveries.GetByDocumentID(ctx, p.Delivery.ID, opts)
+		if len(p.Deliveries) > 0 {
+			d, err := s.deliveries.GetByDocumentID(ctx, p.Deliveries[0].ID, opts)
 			if err != nil && !boardapi.IsNotFound(err) {
 				return nil, err
 			}
@@ -77,10 +82,10 @@ func (s *Service) FindDelivery(ctx context.Context, q FindDeliveryQuery) ([]Deli
 				return nil, err
 			}
 			for _, p := range projects {
-				if p.Delivery == nil {
+				if len(p.Deliveries) == 0 {
 					continue
 				}
-				d, err := s.deliveries.GetByDocumentID(ctx, p.Delivery.ID, opts)
+				d, err := s.deliveries.GetByDocumentID(ctx, p.Deliveries[0].ID, opts)
 				if boardapi.IsNotFound(err) {
 					continue
 				}
@@ -103,10 +108,10 @@ func (s *Service) FindDelivery(ctx context.Context, q FindDeliveryQuery) ([]Deli
 			return nil, err
 		}
 		for _, p := range projects {
-			if p.Delivery == nil {
+			if len(p.Deliveries) == 0 {
 				continue
 			}
-			d, err := s.deliveries.GetByDocumentID(ctx, p.Delivery.ID, opts)
+			d, err := s.deliveries.GetByDocumentID(ctx, p.Deliveries[0].ID, opts)
 			if boardapi.IsNotFound(err) {
 				continue
 			}

@@ -22,11 +22,17 @@ type ProjectEntity struct {
 	UpdatedAt string `json:"updated_at"` // ISO 8601
 	CreatedAt string `json:"created_at"` // ISO 8601
 	// Optional document summaries (only populated when response_group is specified)
+	// estimate と order は API が単一オブジェクトで返す（単数形キー）。
 	Estimate *DocumentSummary `json:"estimate,omitempty"`
 	Order    *DocumentSummary `json:"order,omitempty"`
-	Delivery *DocumentSummary `json:"delivery,omitempty"`
-	Invoice  *DocumentSummary `json:"invoice,omitempty"`
-	Receipt  *DocumentSummary `json:"receipt,omitempty"`
+	// delivery / invoice / receipt は API が複数形配列で返す。
+	// 後方互換のため単数形フィールドも残すが、delivery/receipt の参照は Deliveries/Receipts を使うこと。
+	Delivery   *DocumentSummary  `json:"delivery,omitempty"`
+	Deliveries []DocumentSummary `json:"deliveries,omitempty"`
+	Invoice    *DocumentSummary  `json:"invoice,omitempty"`
+	Invoices   []DocumentSummary `json:"invoices,omitempty"`
+	Receipt    *DocumentSummary  `json:"receipt,omitempty"`
+	Receipts   []DocumentSummary `json:"receipts,omitempty"`
 }
 
 // ProjectSearchParams is the parameter for SearchProjects.

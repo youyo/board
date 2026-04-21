@@ -14,6 +14,9 @@ import (
 // DeliveryDate は実在フィールドなので引き続き利用可能。
 // ID lookup では client/project は nil。ProjectID/ClientName/ProjectName ブランチでは
 // project コンテキストから enrichment を行う。
+//
+// M28 FIX: BOARD API は response_group=delivery で "deliveries" 複数形配列を返す。
+// モックデータも ProjectEntity.Deliveries ([]DocumentSummary) で設定すること。
 
 func TestFindDelivery_ByID(t *testing.T) {
 	del := &boardapi.DeliveryEntity{ID: 1, Total: "90000.0", DeliveryDate: "2026-06-30"}
@@ -41,8 +44,8 @@ func TestFindDelivery_ByID(t *testing.T) {
 }
 
 func TestFindDelivery_ByProjectID(t *testing.T) {
-	docSummary := &boardapi.DocumentSummary{ID: 42}
-	project := &boardapi.ProjectEntity{ID: 100, ClientID: 10, Name: "Web Dev", Delivery: docSummary}
+	docSummary := boardapi.DocumentSummary{ID: 42}
+	project := &boardapi.ProjectEntity{ID: 100, ClientID: 10, Name: "Web Dev", Deliveries: []boardapi.DocumentSummary{docSummary}}
 	del := &boardapi.DeliveryEntity{ID: 42, Total: "80000.0", DeliveryDate: "2026-06-30"}
 
 	svc := newServiceWith(
@@ -62,9 +65,9 @@ func TestFindDelivery_ByProjectID(t *testing.T) {
 
 func TestFindDelivery_ByClientName(t *testing.T) {
 	clients := []boardapi.ClientEntity{{ID: 10, Name: "ABC Corp"}}
-	docSummary := &boardapi.DocumentSummary{ID: 1}
+	docSummary := boardapi.DocumentSummary{ID: 1}
 	projects := []boardapi.ProjectEntity{
-		{ID: 100, ClientID: 10, Name: "P1", Delivery: docSummary},
+		{ID: 100, ClientID: 10, Name: "P1", Deliveries: []boardapi.DocumentSummary{docSummary}},
 	}
 	del := &boardapi.DeliveryEntity{ID: 1, Total: "50000.0"}
 
@@ -81,9 +84,9 @@ func TestFindDelivery_ByClientName(t *testing.T) {
 }
 
 func TestFindDelivery_ByProjectName(t *testing.T) {
-	docSummary := &boardapi.DocumentSummary{ID: 1}
+	docSummary := boardapi.DocumentSummary{ID: 1}
 	projects := []boardapi.ProjectEntity{
-		{ID: 100, ClientID: 10, Name: "Web Dev", Delivery: docSummary},
+		{ID: 100, ClientID: 10, Name: "Web Dev", Deliveries: []boardapi.DocumentSummary{docSummary}},
 	}
 	del := &boardapi.DeliveryEntity{ID: 1, Total: "80000.0"}
 
@@ -104,9 +107,9 @@ func TestFindDelivery_ByProjectName(t *testing.T) {
 // TODO(M25-M32): Status post-filter を再設計で復元する。
 func TestFindDelivery_ByClientNameWithStatus(t *testing.T) {
 	clients := []boardapi.ClientEntity{{ID: 10, Name: "ABC"}}
-	docSummary := &boardapi.DocumentSummary{ID: 1}
+	docSummary := boardapi.DocumentSummary{ID: 1}
 	projects := []boardapi.ProjectEntity{
-		{ID: 100, ClientID: 10, Name: "P1", Delivery: docSummary},
+		{ID: 100, ClientID: 10, Name: "P1", Deliveries: []boardapi.DocumentSummary{docSummary}},
 	}
 	del := &boardapi.DeliveryEntity{ID: 1, Total: "50000.0"}
 
@@ -210,13 +213,13 @@ func TestFindDelivery_IDPriorityOverProjectID(t *testing.T) {
 // --- FindDelivery: Limit ---
 
 func TestFindDelivery_Limit(t *testing.T) {
-	docSummary1 := &boardapi.DocumentSummary{ID: 1}
-	docSummary2 := &boardapi.DocumentSummary{ID: 2}
-	docSummary3 := &boardapi.DocumentSummary{ID: 3}
+	docSummary1 := boardapi.DocumentSummary{ID: 1}
+	docSummary2 := boardapi.DocumentSummary{ID: 2}
+	docSummary3 := boardapi.DocumentSummary{ID: 3}
 	projects := []boardapi.ProjectEntity{
-		{ID: 100, ClientID: 10, Name: "P1", Delivery: docSummary1},
-		{ID: 101, ClientID: 10, Name: "P2", Delivery: docSummary2},
-		{ID: 102, ClientID: 10, Name: "P3", Delivery: docSummary3},
+		{ID: 100, ClientID: 10, Name: "P1", Deliveries: []boardapi.DocumentSummary{docSummary1}},
+		{ID: 101, ClientID: 10, Name: "P2", Deliveries: []boardapi.DocumentSummary{docSummary2}},
+		{ID: 102, ClientID: 10, Name: "P3", Deliveries: []boardapi.DocumentSummary{docSummary3}},
 	}
 	del := &boardapi.DeliveryEntity{ID: 1, Total: "50000.0"}
 
