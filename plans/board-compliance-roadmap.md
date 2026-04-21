@@ -48,10 +48,10 @@ enrichment バグ 3 件修正（M25: ClientBranch/Contact Search、M28: Deliveri
 FindUser/FindGroup は groups 0 件 Pending Re-verification、FindInvoice は ID モードのみ軽量 E2E で対応。
 
 ## Current Focus
-- **マイルストーン**: M41 VendorBranchEntity 実 API 準拠再設計 ✅（Phase J 3 件目）
-- **直近の完了**: M41 VendorBranchEntity 全面再設計 / VendorRef 共通型新規作成 / VendorID() accessor / downstream 修正 / go build/vet/test 全 Green
-- **以前の完了**: M40 ContactEntity 再設計 ✅ / M39 ClientBranchEntity 再設計 ✅
-- **次のアクション**: M42 VendorContactEntity 実 API 準拠再設計（Phase J 最終）
+- **マイルストーン**: **ロードマップ全走完了（38 + 4 = 42 マイルストーン）** ✅
+- **直近の完了**: M42 VendorContactEntity 全面再設計 / VendorID() accessor / DisplayName() 更新 / downstream 修正 / go build/vet/test 全 Green（Phase J 完走）
+- **以前の完了**: M41 VendorBranchEntity ✅ / M40 ContactEntity ✅ / M39 ClientBranchEntity ✅
+- **次のアクション**: なし（全 42 M 完了）。vendor データ投入後に Pending Re-verification を再実行
 
 ## Progress
 
@@ -564,6 +564,28 @@ FindUser/FindGroup は groups 0 件 Pending Re-verification、FindInvoice は ID
 - 詳細: plans/board-compliance-m41-vendor-branch-redesign.md
 - **未確認ポイント**: nested キーが "vendor" か "payee" かは smoke 未実施のため未確定
 
+#### M42: VendorContactEntity 実 API 準拠への再設計 ✅（Phase J 完走）
+- [x] `internal/boardapi/vendor_contacts.go` VendorContactEntity 全面書き換え（11 フィールド）
+  - 削除: VendorID(field)/VendorBranchID/Name/NameKana/Phone/Memo（6 幻フィールド）
+  - 変更: Title/Department/Email/Note: string → *string（null 対応）
+  - 追加: Vendor *VendorRef（nested, M41 共通型再利用）
+  - `VendorID()` accessor 追加（nested Vendor.ID を返す後方互換ブリッジ）
+  - `DisplayName()` を LastName+FirstName 専用に更新（Name フィールド廃止、ContactEntity と同様）
+- [x] downstream 修正（8 ファイル: vendor_contacts_test.go / client_test.go / e2e_vendor_contacts_test.go / display_name_test.go / repository/vendor_contacts.go / repository/vendor_contacts_test.go / service/api/service_test.go / service/find/find_vendor_test.go）
+- [x] repository/vendor_contacts.go の filterVendorContacts を VendorID()/DisplayName()/*string nil ガード対応に修正
+- [x] go build + go vet + go test -count=1 ./... 全 Green
+- [x] 実 API smoke: データ 0 件のため Skip（Pending Re-verification 維持）
+- 見積: 0 req（unit のみ、実データ無し） / 実績: 0 req
+- 詳細: plans/board-compliance-m42-vendor-contact-redesign.md
+- **未確認ポイント**: nested キーが "vendor" か "payee" かは smoke 未実施のため未確定
+
+---
+
+## 🎉 Phase J 完走 / ロードマップ全走完了（42 マイルストーン）
+
+M39-M42 の 4 マイルストーンにより、ClientBranch/Contact/VendorBranch/VendorContact の 4 Entity が実 API 準拠構造に再設計完了。
+これにて全 42 マイルストーン（M01-M38 準拠検証 + Phase J M39-M42 Entity 再設計）のロードマップが完走した。
+
 ---
 
 ## Blockers
@@ -596,6 +618,11 @@ FindUser/FindGroup は groups 0 件 Pending Re-verification、FindInvoice は ID
 | 6 | documentID は projects response_group から発見 | orders/deliveries/receipts の List 相当を API 仕様範囲内で再現 | 2026-04-20 |
 
 ## Changelog
+
+### 2026-04-21（M42: VendorContactEntity 実 API 準拠再設計 / Phase J 完走）
+- **M42 VendorContactEntity 全面再設計**: M40/ContactEntity パターン踏襲。6 幻フィールド（VendorID/VendorBranchID/Name/NameKana/Phone/Memo）を削除し、nested `vendor: *VendorRef`（M41 共通型再利用）+ nullable `Title/*string/Department/*string/Email/*string/Note/*string` に変更。`VendorID()` accessor 追加、`DisplayName()` を LastName+FirstName 専用に更新（Name フィールド廃止）。repository の `filterVendorContacts` を `VendorID()` accessor + `DisplayName()` + `*string` nil ガード対応に修正。downstream 8 ファイルを修正。go build/vet/test 全 Green。実 API smoke はデータ 0 件のため Skip（Pending Re-verification 維持）。
+- **Phase J 完走**: M39（ClientBranch）/ M40（Contact）/ M41（VendorBranch）/ M42（VendorContact）の 4 M で Phase J 完走。
+- **ロードマップ全走完了**: 全 42 マイルストーン（M01-M38 準拠検証 + Phase J M39-M42 Entity 再設計）完走。
 
 ### 2026-04-21（M41: VendorBranchEntity 実 API 準拠再設計）
 - **M41 VendorBranchEntity 全面再設計**: M39/M40 パターン踏襲。`VendorRef` 共通型（vendor_ref.go）を新規定義し、`VendorBranchEntity` を推定実 API 準拠の 12 フィールド構造に書き換え。5 幻フィールド（VendorID/PostalCode/Address/Phone/Memo）を削除し、nested `vendor: *VendorRef` + Zip/Pref/Address1/Address2 + nullable `Tel/*string / Fax/*string` + ArchiveFlg に変更。`VendorID()` accessor で後方互換を確保。repository の `filterVendorBranches` を accessor 呼び出しに修正。downstream 7 ファイルを修正（モック JSON 更新 + wantKeys 更新 + accessor 呼び出し置換）。go build/vet/test 全 Green。実 API smoke はデータ 0 件のため Skip（Pending Re-verification 維持）。未確認: nested キー "vendor" vs "payee"（データ投入後に smoke で検証予定）。
