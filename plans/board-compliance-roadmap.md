@@ -42,10 +42,10 @@
 - 失敗した M は `Blockers` に転記、ユーザー判断待ちに。
 
 ## Current Focus
-- **マイルストーン**: M29 FindReceipt 新規 E2E（Phase H 5 件目）
-- **直近の完了**: M28 **Phase H 4 件目 = FindDelivery 新規 E2E + ProjectEntity.Deliveries fix**: TDD Red→Green→Refactor で ProjectEntity.Delivery 単数形マッピングバグを修正。ByProjectID PASS（deliveryID=64955390, delivery_date="2026-06-30" ✓, Project enrichment ✓）/ ByID PASS（Client=nil, Project=nil 仕様通り）/ ClientName・ProjectName は cache-warm SKIP。厳格フィールド突合 PASS（DeliveryEntity 未マップ 0）。fix コミット 1 件 + test コミット 1 件 + docs コミット 1 件。
-- **以前の完了**: M27 FindOrder 新規 E2E / M26 FindProject 全パス検証 / M25 FindClient 厳格化 + enrichment バグ修正。
-- **次のアクション**: M29 (FindReceipt 新規 E2E + ProjectEntity.Receipts fix、Phase H 5 件目) を着手
+- **マイルストーン**: M30 FindVendor / FindPurchaseOrder / FindPayment 新規 E2E（Phase H 6 件目）
+- **直近の完了**: M29 **Phase H 5 件目 = FindReceipt 新規 E2E + ProjectEntity.Receipts 複数形参照 fix**: TDD Red→Green→Refactor で ProjectEntity.Receipt 単数形マッピングバグを修正（M28 と同パターン）。ByProjectID PASS（receiptID=28480168, receipt_date="2026-04-30" ✓, Project enrichment ✓）/ ByID PASS（Client=nil, Project=nil 仕様通り）/ ClientName・ProjectName は cache-warm SKIP。厳格フィールド突合 PASS（ReceiptEntity 未マップ 0）。fix コミット 1 件 + test コミット 1 件 + docs コミット 1 件。
+- **以前の完了**: M28 FindDelivery 新規 E2E + Deliveries fix / M27 FindOrder 新規 E2E / M26 FindProject 全パス検証。
+- **次のアクション**: M30 (FindVendor / FindPurchaseOrder / FindPayment 新規 E2E、Phase H 6 件目) を着手
 
 ## Progress
 
@@ -444,10 +444,19 @@
 - E2E 結果: PASS 2 + SKIP 2（cache-warm SKIP）
 - 詳細: plans/board-compliance-m28-find-delivery.md
 
-#### M29: FindReceipt 新規 E2E
-- [ ] ProjectID → FindReceipt
-- 見積: ~10 req
-- 詳細: plans/board-compliance-m29-find-receipt.md（着手時生成）
+#### M29: FindReceipt 新規 E2E ✅（Phase H 5 件目）
+- [x] TestE2E_FindReceipt_ByProjectID_Strict（ProjectID モード、receipt_date フィールド確認、Client/Project enrichment 独立 API 突合）
+- [x] TestE2E_FindReceipt_ByID_Strict（ID モード、Client=nil/Project=nil 仕様通り確認）
+- [x] TestE2E_FindReceipt_ByClientName_Strict（cache-warm SKIP）
+- [x] TestE2E_FindReceipt_ByProjectName_Strict（cache-warm SKIP）
+- [x] **fix(find)**: FindReceipt ProjectID/ClientName/ProjectName ブランチを `p.Receipts[0]` 参照に変更
+- [x] find_receipt_test.go のモックデータを Receipts に変更（unit テスト Green 維持）
+- **TDD サイクル**: Red（ByProjectID 0 件返却確認）→ Green（Receipts 参照修正）→ Refactor（unit test mock 統一）
+- **厳格フィールド突合 PASS**: GetReceiptRaw 独立突合、未マップ 0 件
+- **receipt_date 確認**: "2026-04-30" が正しく unmarshal されることを確認
+- 実消費: ~20 req
+- E2E 結果: PASS 2 + SKIP 2（cache-warm SKIP）
+- 詳細: plans/board-compliance-m29-find-receipt.md
 
 #### M30: FindVendor / FindPurchaseOrder / FindPayment 新規 E2E
 - [ ] 3 Find サービスそれぞれで成功パス検証
@@ -547,3 +556,4 @@
 | 2026-04-21 10:xx | M26 実装・Phase H 2 件目 | FindProject の 5 モード（ID/ClientName/Name/Text/Status）を E2E で厳格検証。**新規テスト 5 本追加**: TestE2E_FindProject_StrictEnrichment_ByID / ByName_Strict / ByClientName_Strict / ByText_Strict / ByStatus_Strict。**enrichment バグなし**: ProjectEntity.ClientID は `json:"client_id"` フラットマッピングであり M25 の nested-unmarshal バグは発現しない（fix コミットなし）。**data-dependent skip 2 件**: StrictEnrichment_ByID は先頭 5 件が全て ClientID=0 / ByStatus_Strict はステータス全件空。**ByText_Strict PASS**: 「弘前市」prefix で 4 results、全 result が prefix を Name/Code/Memo に含むことを確認。**BOARD API name filter 無視継続**: SearchClients(Name="株式会社WAND") が 299 件全返却（7+ 件連続継続）。実消費 ~10 req。go build/vet/test 全 Green。コミット 2 件（test + docs）。 |
 | 2026-04-21 | M27 実装・Phase H 3 件目 | FindOrder の 4 モード（ID/ProjectID/ClientName/ProjectName）を E2E で検証。**新規テスト 4 本 + helper 追加**: TestE2E_FindOrder_ByProjectID_Strict PASS（projectID=95944469, orderID=71741501, Project enrichment ✓, ClientID=0→nil 正常）/ TestE2E_FindOrder_ByID_Strict PASS（Client=nil, Project=nil ID モード仕様通り）/ ClientName・ProjectName は初回フルフェッチタイムアウトのため cache-warm SKIP。厳格フィールド突合 PASS（OrderEntity 未マップ 0）。**findProjectWithDocType helper 新設**（topN=50 で advisor 指摘 top-5 見逃しを回避）。**発見**: ProjectEntity.Delivery/Receipt 単数形マッピング問題（M28/M29 で fix 予定）。実消費 ~20 req。go build/vet/test 全 Green。コミット 2 件（test + docs）。 |
 | 2026-04-21 | M28 実装・Phase H 4 件目 | FindDelivery の 4 モード検証 + ProjectEntity.Delivery 単数形マッピングバグ修正。**TDD Red**: TestE2E_FindDelivery_ByProjectID_Strict が FindDelivery(ProjectID=95944469) で 0 件返却を確認（ProjectEntity.Delivery が常に nil = bug）。**根本原因**: BOARD API は "deliveries" 複数形配列を返すが ProjectEntity.Delivery は `json:"delivery"` 単数形タグ。**Green**: ProjectEntity に `Deliveries []DocumentSummary` (`json:"deliveries,omitempty"`) を追加、find_delivery.go を `p.Delivery → p.Deliveries[0]` 参照に修正。**Refactor**: unit テストのモックデータを Deliveries に統一。**PASS 確認**: deliveryID=64955390, delivery_date="2026-06-30", Project enrichment ✓。厳格フィールド突合 PASS（DeliveryEntity 未マップ 0）。go build/vet/test 全 Green（全 12 パッケージ）。コミット 3 件（fix + test + docs）。 |
+| 2026-04-21 | M29 実装・Phase H 5 件目 | FindReceipt の 4 モード検証 + ProjectEntity.Receipt 単数形マッピングバグ修正（M28 と同パターン）。Receipts フィールドは M28 で既に ProjectEntity に追加済みのため、変更は find_receipt.go + find_receipt_test.go のみ。**TDD Red**: TestE2E_FindReceipt_ByProjectID_Strict が FindReceipt(ProjectID=95960734) で 0 件返却を確認。**Green**: find_receipt.go を `p.Receipt → p.Receipts[0]` 参照に修正。**PASS 確認**: receiptID=28480168, receipt_date="2026-04-30", Project enrichment ✓。厳格フィールド突合 PASS（ReceiptEntity 未マップ 0）。go build/vet/test 全 Green（全 12 パッケージ）。コミット 3 件（fix + test + docs）。 |
