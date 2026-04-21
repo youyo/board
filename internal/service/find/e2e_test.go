@@ -845,3 +845,137 @@ func TestE2E_FindOrder_ByProjectName_Strict(t *testing.T) {
 	t.Skip("ProjectName mode requires pre-warmed cache; skipping to avoid full-fetch timeout. " +
 		"Run after cache is warm: go test -tags e2e -timeout 30m -run TestE2E_FindOrder_ByProjectName_Strict ./internal/service/find/")
 }
+
+// --- FindDelivery (M28) ---
+
+// TestE2E_FindDelivery_ByProjectID_Strict は ProjectID モードで
+// FindDelivery が正しく Delivery を返し、Client/Project enrichment が整合していることを検証する。
+// M28: ProjectEntity.Delivery（単数形）→ Deliveries（複数形配列）への fix 後に PASS を期待。
+func TestE2E_FindDelivery_ByProjectID_Strict(t *testing.T) {
+	svc, apiClient := newE2EFindService(t)
+	ctx := context.Background()
+
+	// discovery: 先頭 50 件から delivery を持つプロジェクトを探す
+	projectID, expectedDocID := findProjectWithDocType(t, apiClient, "delivery", 50)
+	if projectID == 0 || expectedDocID == 0 {
+		t.Skip("no project with delivery found in top-50; pending re-verification")
+	}
+
+	// pre-fetch: projectID の ClientID を取得（enrichment 検証用）
+	pr, err := apiClient.GetProjectWithGroup(ctx, projectID, "delivery")
+	if err != nil {
+		t.Fatalf("GetProjectWithGroup(%d, delivery): %v", projectID, err)
+	}
+
+	results, err := svc.FindDelivery(ctx, find.FindDeliveryQuery{
+		ProjectID: projectID,
+		Opts:      e2eOpts(),
+	})
+	if err != nil {
+		t.Fatalf("FindDelivery(ProjectID=%d): %v", projectID, err)
+	}
+	if len(results) == 0 {
+		t.Fatalf("FindDelivery(ProjectID=%d): expected >= 1 result, got 0 (possible ProjectEntity.Deliveries mapping bug)", projectID)
+	}
+	r := results[0]
+
+	// Delivery ID 一致確認
+	if r.Delivery.ID != expectedDocID {
+		t.Errorf("r.Delivery.ID: got=%d want=%d", r.Delivery.ID, expectedDocID)
+	}
+
+	// delivery_date フィールド確認（DeliveryEntity 固有）
+	if r.Delivery.DeliveryDate == "" {
+		t.Errorf("r.Delivery.DeliveryDate is empty (should be non-empty per e2e-artifacts)")
+	}
+
+	// 独立 raw fetch で厳格フィールド突合
+	raw, err := apiClient.GetDeliveryRaw(ctx, expectedDocID)
+	if err != nil {
+		t.Fatalf("GetDeliveryRaw(%d): %v", expectedDocID, err)
+	}
+	if diff := strictFieldDiff(t, raw, &boardapi.DeliveryEntity{}); len(diff) > 0 {
+		t.Errorf("DeliveryEntity unmapped fields: %v", diff)
+	}
+
+	// Client enrichment
+	if pr.ClientID == 0 {
+		if r.Client != nil {
+			t.Errorf("r.Client expected nil (project.ClientID=0), got id=%d", r.Client.ID)
+		}
+		t.Logf("Client enrichment: project.ClientID=0, r.Client=nil (expected)")
+	} else {
+		if r.Client == nil {
+			t.Errorf("r.Client is nil but project.ClientID=%d (enrichment missing)", pr.ClientID)
+		} else if r.Client.ID != pr.ClientID {
+			t.Errorf("r.Client.ID: got=%d want=%d", r.Client.ID, pr.ClientID)
+		} else {
+			t.Logf("Client enrichment OK: id=%d", r.Client.ID)
+		}
+	}
+
+	// Project enrichment
+	if r.Project == nil {
+		t.Errorf("r.Project is nil (enrichment missing)")
+	} else if r.Project.ID != projectID {
+		t.Errorf("r.Project.ID: got=%d want=%d", r.Project.ID, projectID)
+	} else {
+		t.Logf("Project enrichment OK: id=%d name=%q", r.Project.ID, r.Project.Name)
+	}
+
+	t.Logf("FindDelivery(ProjectID=%d): delivery.ID=%d delivery_date=%q client_resolved=%v project_resolved=%v",
+		projectID, r.Delivery.ID, r.Delivery.DeliveryDate, r.Client != nil, r.Project != nil)
+}
+
+// TestE2E_FindDelivery_ByID_Strict は ID モードで FindDelivery が直接 Delivery を返し、
+// Client/Project が nil（ID モード仕様）であることを検証する。
+func TestE2E_FindDelivery_ByID_Strict(t *testing.T) {
+	svc, apiClient := newE2EFindService(t)
+	ctx := context.Background()
+
+	_, docID := findProjectWithDocType(t, apiClient, "delivery", 50)
+	if docID == 0 {
+		t.Skip("no delivery found in top-50; pending re-verification")
+	}
+
+	results, err := svc.FindDelivery(ctx, find.FindDeliveryQuery{
+		ID:   docID,
+		Opts: e2eOpts(),
+	})
+	if err != nil {
+		t.Fatalf("FindDelivery(ID=%d): %v", docID, err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("FindDelivery(ID=%d): expected 1 result, got %d", docID, len(results))
+	}
+	r := results[0]
+
+	if r.Delivery.ID != docID {
+		t.Errorf("r.Delivery.ID: got=%d want=%d", r.Delivery.ID, docID)
+	}
+	if r.Delivery.DeliveryDate == "" {
+		t.Errorf("r.Delivery.DeliveryDate is empty")
+	}
+	// ID モード仕様: Client/Project は特定不可なので nil
+	if r.Client != nil {
+		t.Errorf("r.Client expected nil in ID mode, got id=%d", r.Client.ID)
+	}
+	if r.Project != nil {
+		t.Errorf("r.Project expected nil in ID mode, got id=%d", r.Project.ID)
+	}
+
+	t.Logf("FindDelivery(ID=%d): delivery.ID=%d delivery_date=%q client=nil project=nil (ID mode OK)",
+		docID, r.Delivery.ID, r.Delivery.DeliveryDate)
+}
+
+// TestE2E_FindDelivery_ByClientName_Strict は ClientName モード。cache-warm SKIP。
+func TestE2E_FindDelivery_ByClientName_Strict(t *testing.T) {
+	t.Skip("ClientName mode requires pre-warmed cache; skipping to avoid full-fetch timeout. " +
+		"Run after cache is warm: go test -tags e2e -timeout 30m -run TestE2E_FindDelivery_ByClientName_Strict ./internal/service/find/")
+}
+
+// TestE2E_FindDelivery_ByProjectName_Strict は ProjectName モード。cache-warm SKIP。
+func TestE2E_FindDelivery_ByProjectName_Strict(t *testing.T) {
+	t.Skip("ProjectName mode requires pre-warmed cache; skipping to avoid full-fetch timeout. " +
+		"Run after cache is warm: go test -tags e2e -timeout 30m -run TestE2E_FindDelivery_ByProjectName_Strict ./internal/service/find/")
+}
