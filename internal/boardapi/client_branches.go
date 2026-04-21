@@ -8,19 +8,31 @@ import (
 	"strconv"
 )
 
-// ClientBranchEntity is a BOARD API customer branch entity.
-// Corresponds to one element in the GET /v1/client_branches response.
+// ClientBranchEntity は BOARD API の顧客支社エンティティ。
+// GET /v1/client_branches のレスポンス 1 要素に対応する。
+// 実 API レスポンス（tmp/e2e-artifacts/client_branches_*.json）に基づき M39 で全面再設計。
 type ClientBranchEntity struct {
-	ID         int    `json:"id"`
-	ClientID   int    `json:"client_id"`
-	Name       string `json:"name"`
-	PostalCode string `json:"postal_code"`
-	Address    string `json:"address"`
-	Phone      string `json:"phone"`
-	Fax        string `json:"fax"`
-	Memo       string `json:"memo"`
-	UpdatedAt  string `json:"updated_at"` // ISO 8601
-	CreatedAt  string `json:"created_at"` // ISO 8601
+	ID         int        `json:"id"`
+	Client     *ClientRef `json:"client"`      // nested 構造: {id, name, name_disp, custom_no}
+	Name       string     `json:"name"`
+	Zip        string     `json:"zip"`
+	Pref       string     `json:"pref"`
+	Address1   string     `json:"address1"`
+	Address2   string     `json:"address2"`
+	Tel        *string    `json:"tel"`         // null 可
+	Fax        *string    `json:"fax"`         // null 可
+	ArchiveFlg int        `json:"archive_flg"`
+	CreatedAt  string     `json:"created_at"`  // ISO 8601
+	UpdatedAt  string     `json:"updated_at"`  // ISO 8601
+}
+
+// ClientID は nested Client.ID を返す accessor（後方互換ブリッジ）。
+// Client が nil の場合 0 を返す。
+func (e ClientBranchEntity) ClientID() int {
+	if e.Client == nil {
+		return 0
+	}
+	return e.Client.ID
 }
 
 // ClientBranchSearchParams is the parameter for SearchClientBranches.
