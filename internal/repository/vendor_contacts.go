@@ -147,18 +147,23 @@ func (r *VendorContactRepository) Search(ctx context.Context, params boardapi.Ve
 	return filterVendorContacts(all, params), nil
 }
 
-// filterVendorContacts performs in-memory filtering.
+// filterVendorContacts は in-memory フィルタリングを行う。
+// VendorID は accessor（VendorID()）経由で参照する（M42 再設計: nested Vendor 構造）。
+// Name は DisplayName()（LastName+FirstName）で部分一致検索する。
+// Email は *string 型のため nil ガード付きで参照する。
 func filterVendorContacts(entities []boardapi.VendorContactEntity, params boardapi.VendorContactSearchParams) []boardapi.VendorContactEntity {
 	var result []boardapi.VendorContactEntity
 	for _, e := range entities {
-		if params.VendorID != 0 && e.VendorID != params.VendorID {
+		if params.VendorID != 0 && e.VendorID() != params.VendorID {
 			continue
 		}
-		if params.Name != "" && !strings.Contains(e.Name, params.Name) {
+		if params.Name != "" && !strings.Contains(e.DisplayName(), params.Name) {
 			continue
 		}
-		if params.Email != "" && e.Email != params.Email {
-			continue
+		if params.Email != "" {
+			if e.Email == nil || !strings.Contains(*e.Email, params.Email) {
+				continue
+			}
 		}
 		result = append(result, e)
 	}

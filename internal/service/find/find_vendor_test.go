@@ -17,7 +17,7 @@ func TestFindVendor_ByID(t *testing.T) {
 		{ID: 11, Vendor: &boardapi.VendorRef{ID: 1}, Name: "Branch 2"},
 	}
 	contacts := []boardapi.VendorContactEntity{
-		{ID: 20, VendorID: 1, Name: "Contact 1"},
+		{ID: 20, Vendor: &boardapi.VendorRef{ID: 1}, LastName: "Contact 1"},
 	}
 
 	svc := newServiceWith(

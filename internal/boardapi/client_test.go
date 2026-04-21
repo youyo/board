@@ -2229,7 +2229,7 @@ func TestSearchVendorBranches_WithName(t *testing.T) {
 func TestListVendorContacts_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"vendor_id":1,"vendor_branch_id":10,"name":"Taro Yamada","name_kana":"YAMADATARO","title":"Manager","email":"yamada@example.com","phone":"03-0000-0001","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":2,"vendor_id":1,"vendor_branch_id":10,"name":"Hanako Suzuki","name_kana":"SUZUKIHANAKO","title":"Section Chief","email":"suzuki@example.com","phone":"03-0000-0002","memo":"","updated_at":"2026-01-02T00:00:00Z","created_at":"2026-01-02T00:00:00Z"}]`))
+		w.Write([]byte(`[{"id":1,"vendor":{"id":1,"name":"Vendor A","name_disp":"Vendor A","custom_no":"V001"},"last_name":"Yamada","first_name":"Taro","honorific_title":"様","title":"Manager","department":"営業部","email":"yamada@example.com","note":null,"archive_flg":0,"updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":2,"vendor":{"id":1,"name":"Vendor A","name_disp":"Vendor A","custom_no":"V001"},"last_name":"Suzuki","first_name":"Hanako","honorific_title":"様","title":"Section Chief","department":"管理部","email":"suzuki@example.com","note":null,"archive_flg":0,"updated_at":"2026-01-02T00:00:00Z","created_at":"2026-01-02T00:00:00Z"}]`))
 	}))
 	defer ts.Close()
 
@@ -2242,7 +2242,11 @@ func TestListVendorContacts_OK(t *testing.T) {
 	if len(result) != 2 {
 		t.Errorf("want 2 vendor contacts, got %d", len(result))
 	}
-	if result[0].ID != 1 || result[0].Email != "yamada@example.com" {
+	email := ""
+	if result[0].Email != nil {
+		email = *result[0].Email
+	}
+	if result[0].ID != 1 || email != "yamada@example.com" {
 		t.Errorf("vendorContact[0]: got %+v", result[0])
 	}
 }
@@ -2277,7 +2281,7 @@ func TestGetVendorContact_OK(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"id":1,"vendor_id":1,"vendor_branch_id":10,"name":"Taro Yamada","name_kana":"YAMADATARO","title":"Manager","email":"yamada@example.com","phone":"03-0000-0001","memo":"test memo","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
+		w.Write([]byte(`{"id":1,"vendor":{"id":1,"name":"Vendor A","name_disp":"Vendor A","custom_no":"V001"},"last_name":"Yamada","first_name":"Taro","honorific_title":"様","title":"Manager","department":"営業部","email":"yamada@example.com","note":null,"archive_flg":0,"updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
 	}))
 	defer ts.Close()
 
@@ -2290,7 +2294,11 @@ func TestGetVendorContact_OK(t *testing.T) {
 	if got == nil {
 		t.Fatal("got nil VendorContactEntity")
 	}
-	if got.ID != 1 || got.Email != "yamada@example.com" {
+	gotEmail := ""
+	if got.Email != nil {
+		gotEmail = *got.Email
+	}
+	if got.ID != 1 || gotEmail != "yamada@example.com" {
 		t.Errorf("GetVendorContact: got %+v", got)
 	}
 }

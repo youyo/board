@@ -36,7 +36,8 @@ func newVendorContactsMockClient(rt roundTripperFunc) *boardapi.Client {
 // shape. URL path must be /v1/payee_contacts (the real BOARD API path, not
 // /v1/vendor_contacts).
 func TestListVendorContactsRaw_SinglePage(t *testing.T) {
-	page1 := `[{"id":1,"vendor_id":10,"vendor_branch_id":5,"name":"Taro Yamada","name_kana":"タロウ ヤマダ","last_name":"Yamada","first_name":"Taro","honorific_title":"様","title":"部長","department":"営業部","email":"taro@example.com","phone":"03-0000-0000","note":"note","memo":"memo","archive_flg":0,"updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}]`
+	// 新スキーマ（M42 再設計）: vendor nested / last_name / first_name / title(*string) / department(*string) / email(*string) / note(*string) / archive_flg
+	page1 := `[{"id":1,"vendor":{"id":10,"name":"Vendor X","name_disp":"Vendor X","custom_no":"VX01"},"last_name":"Yamada","first_name":"Taro","honorific_title":"様","title":"部長","department":"営業部","email":"taro@example.com","note":"note","archive_flg":0,"updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}]`
 	var gotPath string
 	var gotQuery url.Values
 	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
@@ -66,10 +67,10 @@ func TestListVendorContactsRaw_SinglePage(t *testing.T) {
 		t.Fatalf("expected 1 element, got %d", len(arr))
 	}
 	got := arr[0]
+	// 新スキーマのキーを検証（旧: vendor_id/vendor_branch_id/name/name_kana/phone/memo は廃止）
 	wantKeys := []string{
-		"id", "vendor_id", "vendor_branch_id", "name", "name_kana",
-		"last_name", "first_name", "honorific_title", "title", "department",
-		"email", "phone", "note", "memo", "archive_flg",
+		"id", "vendor", "last_name", "first_name", "honorific_title",
+		"title", "department", "email", "note", "archive_flg",
 		"updated_at", "created_at",
 	}
 	for _, k := range wantKeys {
@@ -84,11 +85,11 @@ func TestListVendorContactsRaw_SinglePage(t *testing.T) {
 // and 1 item on page 2. Result must be a JSON array of 3 items.
 func TestListVendorContactsRaw_MultiPage(t *testing.T) {
 	page1Items := []string{
-		`{"id":1,"vendor_id":10,"vendor_branch_id":5,"name":"A","name_kana":"","last_name":"","first_name":"","honorific_title":"","title":"","department":"","email":"","phone":"","note":"","memo":"","archive_flg":0,"updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}`,
-		`{"id":2,"vendor_id":10,"vendor_branch_id":5,"name":"B","name_kana":"","last_name":"","first_name":"","honorific_title":"","title":"","department":"","email":"","phone":"","note":"","memo":"","archive_flg":0,"updated_at":"2024-01-02T00:00:00+09:00","created_at":"2023-01-02T00:00:00+09:00"}`,
+		`{"id":1,"vendor":{"id":10,"name":"VX","name_disp":"VX","custom_no":""},"last_name":"A","first_name":"","honorific_title":"","title":null,"department":null,"email":null,"note":null,"archive_flg":0,"updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}`,
+		`{"id":2,"vendor":{"id":10,"name":"VX","name_disp":"VX","custom_no":""},"last_name":"B","first_name":"","honorific_title":"","title":null,"department":null,"email":null,"note":null,"archive_flg":0,"updated_at":"2024-01-02T00:00:00+09:00","created_at":"2023-01-02T00:00:00+09:00"}`,
 	}
 	page2Items := []string{
-		`{"id":3,"vendor_id":11,"vendor_branch_id":6,"name":"C","name_kana":"","last_name":"","first_name":"","honorific_title":"","title":"","department":"","email":"","phone":"","note":"","memo":"","archive_flg":0,"updated_at":"2024-01-03T00:00:00+09:00","created_at":"2023-01-03T00:00:00+09:00"}`,
+		`{"id":3,"vendor":{"id":11,"name":"VY","name_disp":"VY","custom_no":""},"last_name":"C","first_name":"","honorific_title":"","title":null,"department":null,"email":null,"note":null,"archive_flg":0,"updated_at":"2024-01-03T00:00:00+09:00","created_at":"2023-01-03T00:00:00+09:00"}`,
 	}
 	var pageCount int
 	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
@@ -135,7 +136,7 @@ func TestListVendorContactsRaw_MultiPage(t *testing.T) {
 // U3: GetVendorContactRaw returns body exactly as served (single object).
 // Path must be /v1/payee_contacts/42 (real BOARD API path).
 func TestGetVendorContactRaw_Success(t *testing.T) {
-	body := []byte(`{"id":42,"vendor_id":10,"vendor_branch_id":5,"name":"Taro Yamada","name_kana":"タロウ ヤマダ","last_name":"Yamada","first_name":"Taro","honorific_title":"様","title":"部長","department":"営業部","email":"taro@example.com","phone":"03-0000-0000","note":"note","memo":"memo","archive_flg":0,"updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}`)
+	body := []byte(`{"id":42,"vendor":{"id":10,"name":"Vendor X","name_disp":"Vendor X","custom_no":"VX01"},"last_name":"Yamada","first_name":"Taro","honorific_title":"様","title":"部長","department":"営業部","email":"taro@example.com","note":"note","archive_flg":0,"updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}`)
 	var gotPath string
 	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
 		gotPath = r.URL.Path
@@ -189,7 +190,7 @@ func TestGetVendorContactRaw_NotFound(t *testing.T) {
 // more than M14's VendorBranchSearchParams (VendorID, Name, UpdatedAtFrom).
 // This test ensures all four query params are correctly encoded.
 func TestSearchVendorContactsRaw_QueryParams(t *testing.T) {
-	page1 := `[{"id":7,"vendor_id":123,"vendor_branch_id":5,"name":"keyword","name_kana":"","last_name":"","first_name":"","honorific_title":"","title":"","department":"","email":"test@example.com","phone":"","note":"","memo":"","archive_flg":0,"updated_at":"2024-02-01T00:00:00+09:00","created_at":"2024-02-01T00:00:00+09:00"}]`
+	page1 := `[{"id":7,"vendor":{"id":123,"name":"VZ","name_disp":"VZ","custom_no":""},"last_name":"keyword","first_name":"","honorific_title":"","title":null,"department":null,"email":"test@example.com","note":null,"archive_flg":0,"updated_at":"2024-02-01T00:00:00+09:00","created_at":"2024-02-01T00:00:00+09:00"}]`
 	var observedVendorID, observedName, observedEmail, observedUpdatedFrom string
 	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
 		observedVendorID = r.URL.Query().Get("vendor_id")

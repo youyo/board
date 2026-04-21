@@ -61,9 +61,9 @@ func newVendorContactAPIServer(t *testing.T, entities []boardapi.VendorContactEn
 }
 
 var sampleVendorContacts = []boardapi.VendorContactEntity{
-	{ID: 1, VendorID: 10, Name: "ContactA", Email: "a@vendor.com", UpdatedAt: "2026-01-01T00:00:00Z"},
-	{ID: 2, VendorID: 10, Name: "ContactB", Email: "b@vendor.com", UpdatedAt: "2026-01-02T00:00:00Z"},
-	{ID: 3, VendorID: 20, Name: "ContactC", Email: "c@vendor.com", UpdatedAt: "2026-01-03T00:00:00Z"},
+	{ID: 1, Vendor: &boardapi.VendorRef{ID: 10}, LastName: "ContactA", Email: strPtr("a@vendor.com"), UpdatedAt: "2026-01-01T00:00:00Z"},
+	{ID: 2, Vendor: &boardapi.VendorRef{ID: 10}, LastName: "ContactB", Email: strPtr("b@vendor.com"), UpdatedAt: "2026-01-02T00:00:00Z"},
+	{ID: 3, Vendor: &boardapi.VendorRef{ID: 20}, LastName: "ContactC", Email: strPtr("c@vendor.com"), UpdatedAt: "2026-01-03T00:00:00Z"},
 }
 
 // T_VCO01: List - cache hit -> returns cached data
@@ -126,7 +126,7 @@ func TestVendorContactRepository_GetByID_CacheMiss_APISuccess(t *testing.T) {
 	db := newTestDB(t)
 	markSynced(t, db, "vendor_contacts")
 
-	target := boardapi.VendorContactEntity{ID: 99, VendorID: 10, Name: "Test Contact", Email: "test@vendor.com", UpdatedAt: "2026-01-01T00:00:00Z"}
+	target := boardapi.VendorContactEntity{ID: 99, Vendor: &boardapi.VendorRef{ID: 10}, LastName: "Test Contact", Email: strPtr("test@vendor.com"), UpdatedAt: "2026-01-01T00:00:00Z"}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		b, _ := json.Marshal(target)
@@ -194,7 +194,7 @@ func TestVendorContactRepository_Search_EmailFilter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
-	if len(got) != 1 || got[0].Email != "a@vendor.com" {
+	if len(got) != 1 || got[0].Email == nil || *got[0].Email != "a@vendor.com" {
 		t.Errorf("unexpected result: %+v", got)
 	}
 }

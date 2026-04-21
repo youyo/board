@@ -357,7 +357,7 @@ func TestSearchVendorBranches(t *testing.T) {
 // --- VendorContacts tests ---
 
 func TestListVendorContacts(t *testing.T) {
-	stub := &stubVendorContactRepo{listResult: []boardapi.VendorContactEntity{{ID: 1, VendorID: 5}}}
+	stub := &stubVendorContactRepo{listResult: []boardapi.VendorContactEntity{{ID: 1, Vendor: &boardapi.VendorRef{ID: 5}}}}
 	svc := newServiceWithVendorContacts(stub)
 	got, err := svc.ListVendorContacts(testCtx, defaultOpts)
 	assertNoError(t, err)
@@ -365,7 +365,7 @@ func TestListVendorContacts(t *testing.T) {
 }
 
 func TestGetVendorContact(t *testing.T) {
-	entity := &boardapi.VendorContactEntity{ID: 1, VendorID: 5}
+	entity := &boardapi.VendorContactEntity{ID: 1, Vendor: &boardapi.VendorRef{ID: 5}}
 	stub := &stubVendorContactRepo{getResult: entity}
 	svc := newServiceWithVendorContacts(stub)
 	got, err := svc.GetVendorContact(testCtx, 1, defaultOpts)
@@ -374,7 +374,7 @@ func TestGetVendorContact(t *testing.T) {
 }
 
 func TestSearchVendorContacts(t *testing.T) {
-	stub := &stubVendorContactRepo{searchResult: []boardapi.VendorContactEntity{{ID: 2, VendorID: 5}}}
+	stub := &stubVendorContactRepo{searchResult: []boardapi.VendorContactEntity{{ID: 2, Vendor: &boardapi.VendorRef{ID: 5}}}}
 	svc := newServiceWithVendorContacts(stub)
 	got, err := svc.SearchVendorContacts(testCtx, boardapi.VendorContactSearchParams{VendorID: 5}, defaultOpts)
 	assertNoError(t, err)

@@ -130,12 +130,25 @@ func TestE2E_VendorContacts_Get(t *testing.T) {
 		t.Errorf("GetVendorContact ID mismatch: got=%d want=%d", got.ID, id)
 	}
 	// Log only lengths and numeric IDs (non-PII) for traceability.
-	// Do NOT log name / email / phone / department raw values.
-	t.Logf("TestE2E_VendorContacts_Get: id=%d vendor_id=%d vendor_branch_id=%d archive_flg=%d name_len=%d name_kana_len=%d last_name_len=%d first_name_len=%d honorific_title_len=%d title_len=%d department_len=%d email_len=%d phone_len=%d note_len=%d memo_len=%d",
-		got.ID, got.VendorID, got.VendorBranchID, got.ArchiveFlg,
-		len(got.Name), len(got.NameKana), len(got.LastName), len(got.FirstName),
-		len(got.HonorificTitle), len(got.Title), len(got.Department),
-		len(got.Email), len(got.Phone), len(got.Note), len(got.Memo))
+	// M42 再設計: VendorID() は accessor（nested Vendor.ID）、Name/NameKana/Phone/Memo/VendorBranchID は廃止。
+	// Title/Department/Email/Note は *string のため nil ガード付きで長さを計算する。
+	titleLen, deptLen, emailLen, noteLen := 0, 0, 0, 0
+	if got.Title != nil {
+		titleLen = len(*got.Title)
+	}
+	if got.Department != nil {
+		deptLen = len(*got.Department)
+	}
+	if got.Email != nil {
+		emailLen = len(*got.Email)
+	}
+	if got.Note != nil {
+		noteLen = len(*got.Note)
+	}
+	t.Logf("TestE2E_VendorContacts_Get: id=%d vendor_id=%d archive_flg=%d last_name_len=%d first_name_len=%d honorific_title_len=%d title_len=%d department_len=%d email_len=%d note_len=%d",
+		got.ID, got.VendorID(), got.ArchiveFlg,
+		len(got.LastName), len(got.FirstName),
+		len(got.HonorificTitle), titleLen, deptLen, emailLen, noteLen)
 }
 
 // TestE2E_VendorContacts_Search exercises Search with a non-matching name and

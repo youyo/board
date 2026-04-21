@@ -90,6 +90,8 @@ func TestContactEntity_DisplayName(t *testing.T) {
 	}
 }
 
+// TestVendorContactEntity_DisplayName は M42 再設計後の DisplayName() を検証する。
+// Name フィールドは廃止（ContactEntity と同様）。LastName + FirstName のみで構成。
 func TestVendorContactEntity_DisplayName(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -97,19 +99,19 @@ func TestVendorContactEntity_DisplayName(t *testing.T) {
 		want   string
 	}{
 		{
-			name:   "Name only",
-			entity: boardapi.VendorContactEntity{Name: "田中 太郎"},
-			want:   "田中 太郎",
-		},
-		{
 			name:   "LastName and FirstName",
 			entity: boardapi.VendorContactEntity{LastName: "田中", FirstName: "太郎"},
 			want:   "田中 太郎",
 		},
 		{
-			name:   "Name takes priority",
-			entity: boardapi.VendorContactEntity{Name: "Display", LastName: "Last", FirstName: "First"},
-			want:   "Display",
+			name:   "LastName only",
+			entity: boardapi.VendorContactEntity{LastName: "田中"},
+			want:   "田中",
+		},
+		{
+			name:   "FirstName only",
+			entity: boardapi.VendorContactEntity{FirstName: "太郎"},
+			want:   "太郎",
 		},
 		{
 			name:   "all empty",
