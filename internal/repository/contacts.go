@@ -137,26 +137,41 @@ func (r *ContactRepository) GetByID(ctx context.Context, id int, opts ReadOption
 	return entity, nil
 }
 
-// Search returns contacts filtered by the given parameters from the cache.
+// Search returns contacts filtered by the given parameters.
+// When ClientID is set, the API-side client_id filter is used directly because
+// the BOARD API response does not include a flat client_id field; it nests the
+// parent client as {"client": {"id": N, ...}}. In-memory filtering on
+// ContactEntity.ClientID (which is always 0 after unmarshal) would silently
+// return zero results. Name/Email-only searches fall back to a full list with
+// in-memory filtering (BOARD API ignores name/email parameters).
 func (r *ContactRepository) Search(ctx context.Context, params boardapi.ContactSearchParams, opts ReadOptions) ([]boardapi.ContactEntity, error) {
+	if params.ClientID != 0 {
+		// Use API-side filter; apply Name/Email in-memory afterward if needed.
+		entities, err := r.api.SearchContacts(ctx, params)
+		if err != nil {
+			return nil, err
+		}
+		return filterContactsByNameEmail(entities, params.Name, params.Email), nil
+	}
+	// Name/Email-only (or empty) filter: fall back to full list + in-memory.
 	all, err := r.List(ctx, opts)
 	if err != nil {
 		return nil, err
 	}
-	return filterContacts(all, params), nil
+	return filterContactsByNameEmail(all, params.Name, params.Email), nil
 }
 
-// filterContacts performs in-memory filtering.
-func filterContacts(entities []boardapi.ContactEntity, params boardapi.ContactSearchParams) []boardapi.ContactEntity {
+// filterContactsByNameEmail performs in-memory name and email filtering.
+func filterContactsByNameEmail(entities []boardapi.ContactEntity, name, email string) []boardapi.ContactEntity {
+	if name == "" && email == "" {
+		return entities
+	}
 	var result []boardapi.ContactEntity
 	for _, e := range entities {
-		if params.ClientID != 0 && e.ClientID != params.ClientID {
+		if name != "" && !strings.Contains(e.Name, name) {
 			continue
 		}
-		if params.Name != "" && !strings.Contains(e.Name, params.Name) {
-			continue
-		}
-		if params.Email != "" && !strings.Contains(e.Email, params.Email) {
+		if email != "" && !strings.Contains(e.Email, email) {
 			continue
 		}
 		result = append(result, e)

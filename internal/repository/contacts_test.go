@@ -224,13 +224,20 @@ func TestContactRepository_Search_EmailFilter(t *testing.T) {
 	}
 }
 
-// T_R37: Search - ClientID filter
+// T_R37: Search - ClientID filter -> calls API directly (not cache) and returns API results.
+// The BOARD API nests the parent client as {"client": {"id": N, ...}} rather than
+// providing a flat client_id field, so in-memory ClientID filtering is unreliable.
+// Search with ClientID now delegates to api.SearchContacts which sends client_id
+// as a query parameter to the API, bypassing the cache entirely for this code path.
 func TestContactRepository_Search_ClientIDFilter(t *testing.T) {
 	db := newTestDB(t)
+	// Cache contains all three contacts but Search(ClientID:10) should bypass cache
+	// and call the API directly. The mock API returns only the ClientID=10 contacts.
 	seedContactCache(t, db, sampleContacts)
 	markSynced(t, db, "contacts")
 
-	srv := newContactAPIServer(t, nil)
+	clientID10Contacts := sampleContacts[:2] // ID=1 and ID=2, both ClientID=10
+	srv := newContactAPIServer(t, clientID10Contacts)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeContactRepo(t, db, apiClient, false)

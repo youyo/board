@@ -137,26 +137,43 @@ func (r *ClientBranchRepository) GetByID(ctx context.Context, id int, opts ReadO
 	return entity, nil
 }
 
-// Search returns client branches filtered by the given parameters from the cache.
+// Search returns client branches filtered by the given parameters.
+// When ClientID is set, the API-side client_id filter is used directly because
+// the BOARD API response does not include a flat client_id field; it nests the
+// parent client as {"client": {"id": N, ...}}. In-memory filtering on
+// ClientBranchEntity.ClientID (which is always 0 after unmarshal) would
+// silently return zero results. Name-only searches fall back to a full list
+// with in-memory filtering (BOARD API ignores the name parameter).
 func (r *ClientBranchRepository) Search(ctx context.Context, params boardapi.ClientBranchSearchParams, opts ReadOptions) ([]boardapi.ClientBranchEntity, error) {
+	if params.ClientID != 0 {
+		// Use API-side filter; apply Name in-memory afterward if needed.
+		entities, err := r.api.SearchClientBranches(ctx, params)
+		if err != nil {
+			return nil, err
+		}
+		if params.Name == "" {
+			return entities, nil
+		}
+		return filterClientBranchesByName(entities, params.Name), nil
+	}
+	// Name-only (or empty) filter: fall back to full list + in-memory.
 	all, err := r.List(ctx, opts)
 	if err != nil {
 		return nil, err
 	}
-	return filterClientBranches(all, params), nil
+	return filterClientBranchesByName(all, params.Name), nil
 }
 
-// filterClientBranches performs in-memory filtering.
-func filterClientBranches(entities []boardapi.ClientBranchEntity, params boardapi.ClientBranchSearchParams) []boardapi.ClientBranchEntity {
+// filterClientBranchesByName performs in-memory name filtering.
+func filterClientBranchesByName(entities []boardapi.ClientBranchEntity, name string) []boardapi.ClientBranchEntity {
+	if name == "" {
+		return entities
+	}
 	var result []boardapi.ClientBranchEntity
 	for _, e := range entities {
-		if params.ClientID != 0 && e.ClientID != params.ClientID {
-			continue
+		if strings.Contains(e.Name, name) {
+			result = append(result, e)
 		}
-		if params.Name != "" && !strings.Contains(e.Name, params.Name) {
-			continue
-		}
-		result = append(result, e)
 	}
 	return result
 }

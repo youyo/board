@@ -205,13 +205,20 @@ func TestClientBranchRepository_List_DeltaRefreshAPIError_StaleCache(t *testing.
 	}
 }
 
-// T_R23: Search - ClientID filter -> returns items matching ClientID
+// T_R23: Search - ClientID filter -> calls API directly (not cache) and returns API results.
+// The BOARD API nests the parent client as {"client": {"id": N, ...}} rather than
+// providing a flat client_id field, so in-memory ClientID filtering is unreliable.
+// Search with ClientID now delegates to api.SearchClientBranches which sends client_id
+// as a query parameter to the API, bypassing the cache entirely for this code path.
 func TestClientBranchRepository_Search_ClientIDFilter(t *testing.T) {
 	db := newTestDB(t)
+	// Cache contains all three branches but Search(ClientID:10) should bypass cache
+	// and call the API directly. The mock API returns only the ClientID=10 branches.
 	seedClientBranchCache(t, db, sampleClientBranches)
 	markSynced(t, db, "client_branches")
 
-	srv := newClientBranchAPIServer(t, nil)
+	clientID10Branches := sampleClientBranches[:2] // ID=1 and ID=2, both ClientID=10
+	srv := newClientBranchAPIServer(t, clientID10Branches)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeClientBranchRepo(t, db, apiClient, false)
