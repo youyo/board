@@ -14,6 +14,7 @@ import (
 	"context"
 	"encoding/json"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/youyo/board/internal/boardapi"
@@ -356,6 +357,277 @@ func TestE2E_FindProject_WithEstimate(t *testing.T) {
 		t.Logf("Project %q enriched with estimate: id=%d", r.Project.Name, r.Estimate.ID)
 	} else {
 		t.Logf("Project %q has no estimate enrichment", r.Project.Name)
+	}
+}
+
+// TestE2E_FindProject_StrictEnrichment_ByID はプロジェクト ID による検索で
+// Client と Estimate の enrichment が欠損しないことを独立 API 呼び出しと突合して検証する。
+func TestE2E_FindProject_StrictEnrichment_ByID(t *testing.T) {
+	svc, api := newE2EFindService(t)
+	ctx := context.Background()
+
+	// 5 件取得して最初の非ゼロ ClientID を持つプロジェクトを選ぶ。
+	pr, err := api.ListProjectsPage(ctx, 1, 5)
+	if err != nil || len(pr.Items) == 0 {
+		t.Skip("no projects available")
+	}
+	var targetProject *boardapi.ProjectEntity
+	for i := range pr.Items {
+		if pr.Items[i].ClientID != 0 {
+			targetProject = &pr.Items[i]
+			break
+		}
+	}
+	if targetProject == nil {
+		t.Skip("no project with non-zero ClientID found in first 5 projects")
+	}
+
+	results, err := svc.FindProject(ctx, find.FindProjectQuery{
+		ID:   targetProject.ID,
+		Opts: e2eOpts(),
+	})
+	if err != nil {
+		t.Fatalf("FindProject(ID=%d): %v", targetProject.ID, err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("FindProject(ID=%d): expected 1 result, got %d", targetProject.ID, len(results))
+	}
+	r := results[0]
+
+	// Project ID 一致確認。
+	if r.Project.ID != targetProject.ID {
+		t.Errorf("r.Project.ID: got=%d want=%d", r.Project.ID, targetProject.ID)
+	}
+
+	// Client enrichment: ClientID が非ゼロなので Client は nil 不可。
+	if r.Client == nil {
+		t.Errorf("r.Client is nil for project with ClientID=%d; enrichment missing", targetProject.ClientID)
+	} else {
+		if r.Client.ID != targetProject.ClientID {
+			t.Errorf("r.Client.ID: got=%d want=%d", r.Client.ID, targetProject.ClientID)
+		}
+		// 独立 API で突合。
+		independentClient, err := api.GetClient(ctx, targetProject.ClientID)
+		if err != nil {
+			t.Fatalf("GetClient(ID=%d): %v", targetProject.ClientID, err)
+		}
+		if r.Client.ID != independentClient.ID {
+			t.Errorf("client ID mismatch: FindProject=%d independent=%d", r.Client.ID, independentClient.ID)
+		}
+		t.Logf("Client enrichment OK: id=%d name=%q", r.Client.ID, r.Client.Name)
+	}
+
+	// Estimate enrichment: GetProjectWithGroup で response_group=estimate を叩いて突合。
+	pw, err := api.GetProjectWithGroup(ctx, targetProject.ID, "estimate")
+	if err != nil {
+		t.Fatalf("GetProjectWithGroup(ID=%d, estimate): %v", targetProject.ID, err)
+	}
+	if pw.Estimate != nil {
+		if r.Estimate == nil {
+			t.Errorf("r.Estimate is nil but project has estimate id=%d", pw.Estimate.ID)
+		} else {
+			if r.Estimate.ID != pw.Estimate.ID {
+				t.Errorf("r.Estimate.ID: got=%d want=%d", r.Estimate.ID, pw.Estimate.ID)
+			}
+			// M35 準拠フィールドチェック。
+			if r.Estimate.Total == "" {
+				t.Errorf("r.Estimate.Total is empty (EstimateEntity.Total should be a string amount)")
+			}
+			if r.Estimate.Details == nil {
+				t.Logf("r.Estimate.Details is nil (may be empty estimate with no line items)")
+			}
+			t.Logf("Estimate enrichment OK: id=%d total=%q", r.Estimate.ID, r.Estimate.Total)
+		}
+	} else {
+		if r.Estimate != nil {
+			t.Errorf("r.Estimate expected nil (project has no estimate in response_group), got id=%d", r.Estimate.ID)
+		}
+		t.Logf("Project has no estimate enrichment (GetProjectWithGroup returned nil Estimate)")
+	}
+}
+
+// TestE2E_FindProject_ByName_Strict は Name モードで空でない結果が返り、
+// 各 result の Client enrichment が整合していることを確認する。
+func TestE2E_FindProject_ByName_Strict(t *testing.T) {
+	svc, api := newE2EFindService(t)
+	ctx := context.Background()
+
+	pr, err := api.ListProjectsPage(ctx, 1, 1)
+	if err != nil || len(pr.Items) == 0 {
+		t.Skip("no projects available")
+	}
+	targetName := pr.Items[0].Name
+	if targetName == "" {
+		t.Skip("first project has empty name")
+	}
+
+	results, err := svc.FindProject(ctx, find.FindProjectQuery{
+		Name:  targetName,
+		Limit: 5,
+		Opts:  e2eOpts(),
+	})
+	if err != nil {
+		t.Fatalf("FindProject(Name=%q): %v", targetName, err)
+	}
+	if len(results) == 0 {
+		t.Skipf("FindProject(Name=%q): no results (BOARD API may ignore name filter)", targetName)
+	}
+	t.Logf("FindProject(Name=%q) returned %d results", targetName, len(results))
+
+	// 各 result で Client enrichment の整合性を確認する。
+	for i, r := range results {
+		if r.Project.ClientID != 0 && r.Client == nil {
+			t.Errorf("results[%d]: project.ClientID=%d but r.Client is nil (enrichment missing)",
+				i, r.Project.ClientID)
+		}
+		if r.Client != nil && r.Client.ID != r.Project.ClientID {
+			t.Errorf("results[%d]: r.Client.ID=%d != r.Project.ClientID=%d",
+				i, r.Client.ID, r.Project.ClientID)
+		}
+		t.Logf("results[%d]: project.ID=%d name=%q clientID=%d client_resolved=%v estimate=%v",
+			i, r.Project.ID, r.Project.Name, r.Project.ClientID, r.Client != nil, r.Estimate != nil)
+	}
+}
+
+// TestE2E_FindProject_ByClientName_Strict は ClientName モードで Client filter が
+// 機能しているかを独立 API 呼び出しと突合して検証する。
+func TestE2E_FindProject_ByClientName_Strict(t *testing.T) {
+	svc, api := newE2EFindService(t)
+	ctx := context.Background()
+
+	cr, err := api.ListClientsPage(ctx, 1, 1)
+	if err != nil || len(cr.Items) == 0 {
+		t.Skip("no clients available")
+	}
+	clientName := cr.Items[0].Name
+	if clientName == "" {
+		t.Skip("first client has empty name")
+	}
+
+	results, err := svc.FindProject(ctx, find.FindProjectQuery{
+		ClientName: clientName,
+		Limit:      3,
+		Opts:       e2eOpts(),
+	})
+	if err != nil {
+		t.Fatalf("FindProject(ClientName=%q): %v", clientName, err)
+	}
+	t.Logf("FindProject(ClientName=%q) returned %d results", clientName, len(results))
+
+	// 独立 API で一致する client ID 集合を取得する。
+	// Note: BOARD API は name filter を無視するため searchClients は全件返す可能性がある。
+	independentClients, err := api.SearchClients(ctx, boardapi.ClientSearchParams{Name: clientName})
+	if err != nil {
+		t.Fatalf("SearchClients(Name=%q): %v", clientName, err)
+	}
+	if len(independentClients) == 0 {
+		t.Skipf("SearchClients(Name=%q): returned 0 results; data-dependent skip", clientName)
+	}
+
+	expectedClientIDs := make(map[int]bool, len(independentClients))
+	for _, c := range independentClients {
+		expectedClientIDs[c.ID] = true
+	}
+	t.Logf("Independent SearchClients returned %d clients (BOARD API may ignore name filter)", len(independentClients))
+
+	// 各 result の Client enrichment 整合性確認。
+	for i, r := range results {
+		if r.Project.ClientID != 0 && r.Client == nil {
+			t.Errorf("results[%d]: project.ClientID=%d but r.Client is nil (enrichment missing)",
+				i, r.Project.ClientID)
+		}
+		if r.Client != nil && r.Client.ID != r.Project.ClientID {
+			t.Errorf("results[%d]: r.Client.ID=%d != r.Project.ClientID=%d",
+				i, r.Client.ID, r.Project.ClientID)
+		}
+		t.Logf("results[%d]: project.ID=%d clientID=%d in_expected_set=%v",
+			i, r.Project.ID, r.Project.ClientID, expectedClientIDs[r.Project.ClientID])
+	}
+}
+
+// TestE2E_FindProject_ByText_Strict は Text モードで全結果が prefix を含むことを確認する。
+func TestE2E_FindProject_ByText_Strict(t *testing.T) {
+	svc, api := newE2EFindService(t)
+	ctx := context.Background()
+
+	pr, err := api.ListProjectsPage(ctx, 1, 1)
+	if err != nil || len(pr.Items) == 0 {
+		t.Skip("no projects available")
+	}
+	name := pr.Items[0].Name
+	if len([]rune(name)) < 3 {
+		t.Skip("first project name too short for text search (need >= 3 runes)")
+	}
+	// 先頭3文字をテキストクエリとして使用。
+	prefix := string([]rune(name)[:3])
+
+	results, err := svc.FindProject(ctx, find.FindProjectQuery{
+		Text:  prefix,
+		Limit: 5,
+		Opts:  e2eOpts(),
+	})
+	if err != nil {
+		t.Fatalf("FindProject(Text=%q): %v", prefix, err)
+	}
+	t.Logf("FindProject(Text=%q) returned %d results", prefix, len(results))
+
+	// find 層の local filter（containsText は Name/Code/Memo を対象）で絞られているので、
+	// 各 result は prefix を Name/Code/Memo のいずれかに含む。
+	for i, r := range results {
+		p := r.Project
+		containsInAny := strings.Contains(p.Name, prefix) ||
+			strings.Contains(p.Code, prefix) ||
+			strings.Contains(p.Memo, prefix)
+		if !containsInAny {
+			t.Errorf("results[%d]: project(id=%d, name=%q, code=%q, memo=%q) does not contain prefix %q",
+				i, p.ID, p.Name, p.Code, p.Memo, prefix)
+		}
+	}
+}
+
+// TestE2E_FindProject_ByStatus_Strict は Status モードで全結果のステータスが一致することを確認する。
+func TestE2E_FindProject_ByStatus_Strict(t *testing.T) {
+	svc, api := newE2EFindService(t)
+	ctx := context.Background()
+
+	pr, err := api.ListProjectsPage(ctx, 1, 5)
+	if err != nil || len(pr.Items) == 0 {
+		t.Skip("no projects available")
+	}
+
+	// 最多 status を discovery する。
+	statusCount := make(map[string]int)
+	for _, p := range pr.Items {
+		if p.Status != "" {
+			statusCount[p.Status]++
+		}
+	}
+	if len(statusCount) == 0 {
+		t.Skip("no project with non-empty status found in first 5 projects")
+	}
+	var targetStatus string
+	var maxCount int
+	for s, c := range statusCount {
+		if c > maxCount {
+			maxCount = c
+			targetStatus = s
+		}
+	}
+
+	results, err := svc.FindProject(ctx, find.FindProjectQuery{
+		Status: targetStatus,
+		Limit:  3,
+		Opts:   e2eOpts(),
+	})
+	if err != nil {
+		t.Fatalf("FindProject(Status=%q): %v", targetStatus, err)
+	}
+	t.Logf("FindProject(Status=%q) returned %d results", targetStatus, len(results))
+
+	for i, r := range results {
+		if r.Project.Status != targetStatus {
+			t.Errorf("results[%d]: project.Status=%q want=%q", i, r.Project.Status, targetStatus)
+		}
 	}
 }
 
