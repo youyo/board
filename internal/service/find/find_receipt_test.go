@@ -14,6 +14,9 @@ import (
 // ReceiptDate は実在フィールドなので引き続き利用可能。
 // ID lookup では client/project は nil。ProjectID/ClientName/ProjectName ブランチでは
 // project コンテキストから enrichment を行う。
+//
+// M29 FIX: BOARD API は response_group=receipt で "receipts" 複数形配列を返す。
+// モックデータも ProjectEntity.Receipts ([]DocumentSummary) で設定すること。
 
 func TestFindReceipt_ByID(t *testing.T) {
 	rec := &boardapi.ReceiptEntity{ID: 1, Total: "90000.0", ReceiptDate: "2026-06-30"}
@@ -41,8 +44,8 @@ func TestFindReceipt_ByID(t *testing.T) {
 }
 
 func TestFindReceipt_ByProjectID(t *testing.T) {
-	docSummary := &boardapi.DocumentSummary{ID: 42}
-	project := &boardapi.ProjectEntity{ID: 100, ClientID: 10, Name: "Web Dev", Receipt: docSummary}
+	docSummary := boardapi.DocumentSummary{ID: 42}
+	project := &boardapi.ProjectEntity{ID: 100, ClientID: 10, Name: "Web Dev", Receipts: []boardapi.DocumentSummary{docSummary}}
 	rec := &boardapi.ReceiptEntity{ID: 42, Total: "80000.0", ReceiptDate: "2026-06-30"}
 
 	svc := newServiceWith(
@@ -62,9 +65,9 @@ func TestFindReceipt_ByProjectID(t *testing.T) {
 
 func TestFindReceipt_ByClientName(t *testing.T) {
 	clients := []boardapi.ClientEntity{{ID: 10, Name: "ABC Corp"}}
-	docSummary := &boardapi.DocumentSummary{ID: 1}
+	docSummary := boardapi.DocumentSummary{ID: 1}
 	projects := []boardapi.ProjectEntity{
-		{ID: 100, ClientID: 10, Name: "P1", Receipt: docSummary},
+		{ID: 100, ClientID: 10, Name: "P1", Receipts: []boardapi.DocumentSummary{docSummary}},
 	}
 	rec := &boardapi.ReceiptEntity{ID: 1, Total: "50000.0"}
 
@@ -81,9 +84,9 @@ func TestFindReceipt_ByClientName(t *testing.T) {
 }
 
 func TestFindReceipt_ByProjectName(t *testing.T) {
-	docSummary := &boardapi.DocumentSummary{ID: 1}
+	docSummary := boardapi.DocumentSummary{ID: 1}
 	projects := []boardapi.ProjectEntity{
-		{ID: 100, ClientID: 10, Name: "Web Dev", Receipt: docSummary},
+		{ID: 100, ClientID: 10, Name: "Web Dev", Receipts: []boardapi.DocumentSummary{docSummary}},
 	}
 	rec := &boardapi.ReceiptEntity{ID: 1, Total: "80000.0"}
 
@@ -104,9 +107,9 @@ func TestFindReceipt_ByProjectName(t *testing.T) {
 // TODO(M25-M32): Status post-filter を再設計で復元する。
 func TestFindReceipt_ByClientNameWithStatus(t *testing.T) {
 	clients := []boardapi.ClientEntity{{ID: 10, Name: "ABC"}}
-	docSummary := &boardapi.DocumentSummary{ID: 1}
+	docSummary := boardapi.DocumentSummary{ID: 1}
 	projects := []boardapi.ProjectEntity{
-		{ID: 100, ClientID: 10, Name: "P1", Receipt: docSummary},
+		{ID: 100, ClientID: 10, Name: "P1", Receipts: []boardapi.DocumentSummary{docSummary}},
 	}
 	rec := &boardapi.ReceiptEntity{ID: 1, Total: "50000.0"}
 
@@ -210,13 +213,13 @@ func TestFindReceipt_IDPriorityOverProjectID(t *testing.T) {
 // --- FindReceipt: Limit ---
 
 func TestFindReceipt_Limit(t *testing.T) {
-	docSummary1 := &boardapi.DocumentSummary{ID: 1}
-	docSummary2 := &boardapi.DocumentSummary{ID: 2}
-	docSummary3 := &boardapi.DocumentSummary{ID: 3}
+	docSummary1 := boardapi.DocumentSummary{ID: 1}
+	docSummary2 := boardapi.DocumentSummary{ID: 2}
+	docSummary3 := boardapi.DocumentSummary{ID: 3}
 	projects := []boardapi.ProjectEntity{
-		{ID: 100, ClientID: 10, Name: "P1", Receipt: docSummary1},
-		{ID: 101, ClientID: 10, Name: "P2", Receipt: docSummary2},
-		{ID: 102, ClientID: 10, Name: "P3", Receipt: docSummary3},
+		{ID: 100, ClientID: 10, Name: "P1", Receipts: []boardapi.DocumentSummary{docSummary1}},
+		{ID: 101, ClientID: 10, Name: "P2", Receipts: []boardapi.DocumentSummary{docSummary2}},
+		{ID: 102, ClientID: 10, Name: "P3", Receipts: []boardapi.DocumentSummary{docSummary3}},
 	}
 	rec := &boardapi.ReceiptEntity{ID: 1, Total: "50000.0"}
 

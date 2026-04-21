@@ -17,6 +17,9 @@ import (
 // Status post-filter および client/project enrichment は各ブランチのコンテキスト情報から復元する。
 // ID lookup では client/project を特定できないため nil を返す。
 // TODO(M25-M32): find 層の全体再設計で enrichment を復元する。
+//
+// M29 FIX: BOARD API は response_group=receipt で "receipts" 複数形配列を返す。
+// ProjectEntity.Receipts ([]DocumentSummary) を参照するよう修正。
 func (s *Service) FindReceipt(ctx context.Context, q FindReceiptQuery) ([]ReceiptResult, error) {
 	if q.ID == 0 && q.ProjectID == 0 && q.ClientName == "" && q.ProjectName == "" {
 		return nil, errors.New("at least one of ID, ProjectID, ClientName, or ProjectName must be set")
@@ -46,12 +49,14 @@ func (s *Service) FindReceipt(ctx context.Context, q FindReceiptQuery) ([]Receip
 	case q.ProjectID != 0:
 		// Lookup project with receipt group, then fetch document.
 		// project コンテキストから client/project を解決。
+		// NOTE: BOARD API は response_group=receipt で "receipts" 複数形配列を返す。
+		// ProjectEntity.Receipts ([]DocumentSummary) を参照し、先頭要素を使用する。
 		p, err := s.projects.GetByIDWithGroup(ctx, q.ProjectID, "receipt")
 		if err != nil {
 			return nil, err
 		}
-		if p.Receipt != nil {
-			r, err := s.receipts.GetByDocumentID(ctx, p.Receipt.ID, opts)
+		if len(p.Receipts) > 0 {
+			r, err := s.receipts.GetByDocumentID(ctx, p.Receipts[0].ID, opts)
 			if err != nil && !boardapi.IsNotFound(err) {
 				return nil, err
 			}
@@ -77,10 +82,10 @@ func (s *Service) FindReceipt(ctx context.Context, q FindReceiptQuery) ([]Receip
 				return nil, err
 			}
 			for _, p := range projects {
-				if p.Receipt == nil {
+				if len(p.Receipts) == 0 {
 					continue
 				}
-				r, err := s.receipts.GetByDocumentID(ctx, p.Receipt.ID, opts)
+				r, err := s.receipts.GetByDocumentID(ctx, p.Receipts[0].ID, opts)
 				if boardapi.IsNotFound(err) {
 					continue
 				}
@@ -103,10 +108,10 @@ func (s *Service) FindReceipt(ctx context.Context, q FindReceiptQuery) ([]Receip
 			return nil, err
 		}
 		for _, p := range projects {
-			if p.Receipt == nil {
+			if len(p.Receipts) == 0 {
 				continue
 			}
-			r, err := s.receipts.GetByDocumentID(ctx, p.Receipt.ID, opts)
+			r, err := s.receipts.GetByDocumentID(ctx, p.Receipts[0].ID, opts)
 			if boardapi.IsNotFound(err) {
 				continue
 			}
