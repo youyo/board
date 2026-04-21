@@ -48,10 +48,10 @@ enrichment バグ 3 件修正（M25: ClientBranch/Contact Search、M28: Deliveri
 FindUser/FindGroup は groups 0 件 Pending Re-verification、FindInvoice は ID モードのみ軽量 E2E で対応。
 
 ## Current Focus
-- **マイルストーン**: M34 ドキュメント反映（Phase I 2 件目）✅ **ロードマップ全走完了**
-- **直近の完了**: M34 **仕様書§39 追加** / CLAUDE.md テスト戦略節新規 / memory/learning-e2e-strict-compliance.md 記録 / ロードマップ Changelog 総括
-- **以前の完了**: M33 per-batch smoke 集約完了（rate limit 制約下での段階的検証）
-- **次のアクション**: なし（ロードマップ全 38 M 完了）
+- **マイルストーン**: M39 ClientBranchEntity 実 API 準拠再設計 ✅（Phase J 1 件目）
+- **直近の完了**: M39 ClientRef 共通型追加 / ClientBranchEntity 全面再設計 / downstream 修正 / go build/vet/test 全 Green / 実 API smoke は 429 のため日次リセット後に再実行予定
+- **以前の完了**: M34 Phase I 完走（ロードマップ全 38 M）
+- **次のアクション**: M40 ContactEntity 実 API 準拠再設計（ClientRef 再利用、M39 同パターン）
 
 ## Progress
 
@@ -522,6 +522,23 @@ FindUser/FindGroup は groups 0 件 Pending Re-verification、FindInvoice は ID
 
 ---
 
+### Phase J: Entity 実 API 準拠再設計（追補）
+
+#### M39: ClientBranchEntity 実 API 準拠への再設計 ✅
+- [x] `internal/boardapi/client_ref.go` 新規作成（ClientRef 共通型: id/name/name_disp/custom_no）
+- [x] `internal/boardapi/client_branches.go` ClientBranchEntity 全面書き換え（11 フィールド）
+  - 削除: ClientID(field)/PostalCode/Address/Phone/Memo（5 幻フィールド）
+  - 追加: Client *ClientRef / Zip / Pref / Address1 / Address2 / Tel *string / ArchiveFlg（7 フィールド）
+  - Fax を `string` → `*string`（null 対応）
+  - `ClientID()` accessor 追加（後方互換ブリッジ）
+- [x] downstream 修正（8 ファイル: client_test.go / client_branches_test.go / e2e_client_branches_test.go / repository/client_branches_test.go / service/find/find_client_test.go / service/find/e2e_test.go）
+- [x] go build + go build -tags e2e + go vet + go test -count=1 ./... 全 Green
+- [x] 実 API smoke: ⏳ 429 Rate Limit（日次リセット後に再実行予定）
+- 見積: ~5 req / 実績: 3 req 試行（429 Rate Limit）
+- 詳細: plans/board-compliance-m39-client-branch-redesign.md
+
+---
+
 ## Blockers
 なし（過去: M02 実 API E2E は sandbox の HTTPS proxy ホスト許可追加で解消、2026-04-20 17:08）
 
@@ -552,6 +569,9 @@ FindUser/FindGroup は groups 0 件 Pending Re-verification、FindInvoice は ID
 | 6 | documentID は projects response_group から発見 | orders/deliveries/receipts の List 相当を API 仕様範囲内で再現 | 2026-04-20 |
 
 ## Changelog
+
+### 2026-04-21（M39 追補: Phase J 開始）
+- **M39 ClientBranchEntity 全面再設計**: M09 で発見した「nested client 構造バグ」と「フィールド全面不一致（5 幻 + 7 未マップ）」を修正。`ClientRef` 共通型（client_ref.go）を新規定義し、`ClientBranchEntity` を実 API 準拠の 11 フィールド構造に書き換え。`ClientID()` accessor で後方互換を確保。downstream 8 ファイルを修正（モック JSON 更新 + accessor 呼び出し置換）。go build/vet/test 全 Green。実 API smoke は 429 Rate Limit のため日次リセット後に再実行予定。
 
 ### 2026-04-21（最終更新：Phase I 完走）
 - **M33 Per-batch Smoke 集約**: 当初予定の `go test -tags e2e ./...` 単発実行は rate limit 429 制約で不可と判明。代替として M01-M32 + M35-M38 各マイルストーンで実施済みの per-batch テスト結果を集約。ロードマップ全体の compliance 検証が完了したことを確認。
