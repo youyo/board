@@ -66,6 +66,29 @@ CLI / MCP
 - CLI command に業務ロジックを書かない
 - secrets をログ・エラー・pretty 出力に出さない
 
+## テスト戦略
+
+### BOARD API 準拠検証ロードマップ
+- **目的**: 全 22 リソース × (List/Get/Search) × (boardapi/find 層) の E2E で、実 API との厳格フィールド突合
+- **実施**: board-compliance roadmap（M01-M38）により 38 マイルストーン完了
+- **検証手法**: StrictFieldDiff helper で生 JSON と Go Entity の全フィールド突合
+- **Rate Limit 対応**: per-batch テスト（M 単位）で段階的実施。単発 `go test -tags e2e ./...` は 3 req/sec 制約で実施不可
+- **詳細**: `plans/board-compliance-roadmap.md` および各 M の plan ファイル、仕様書§39 参照
+
+### テスト実行コマンド
+```bash
+# ユニットテスト
+go test -count=1 ./...
+
+# E2E テスト（per-batch、M 単位で実行）
+go test -tags e2e -v -count=1 -run TestE2E_XXX ./internal/boardapi/
+go test -tags e2e -v -count=1 -run TestE2E_XXX ./internal/service/find/
+
+# 型チェック・フォーマット
+go vet ./...
+gofmt -s -w .
+```
+
 ## 計画ファイル
 
 - スペック: `docs/specs/board_cli_mcp_ultra_detailed_design_ja.md`

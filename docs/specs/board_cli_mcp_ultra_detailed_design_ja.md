@@ -1793,3 +1793,46 @@ function refreshResource(profile, resource, mode):
 - 実装責務を `cli / service / repository / refresh / cache / boardapi` に明確分離する
 
 以上をもって、本設計書を実装の正とする。
+
+---
+
+## 39. BOARD API 準拠検証と発見された不整合
+
+### 概要
+board-compliance roadmap（M01-M38）により、本設計を実 API に照合して以下の不整合と修正を実施した。
+
+### 主要な発見と修正
+
+1. **Document 系 Entity の根本設計ズレ（M35-M38）**:
+   - EstimateEntity / OrderEntity / DeliveryEntity / ReceiptEntity の複数形・単数形フィールド定義が API 実応答と不整合
+   - Title / Status / Amount / TaxAmount フィールドの実マッピング確認と修正
+
+2. **Nested Unmarshal バグ（M09, M25）**:
+   - ClientBranchEntity / ContactEntity の `client_id` が unmarshal 後常に 0 となるバグを検出
+   - 根本原因: BOARD API は `{"client": {"id": N}}` ネスト構造を返す（フラット `client_id` ではない）
+   - 修正: ClientBranchRepository.Search / ContactRepository.Search を API-side filter に変更
+
+3. **ProjectEntity の複数形配列対応（M28-M29）**:
+   - ProjectEntity.Delivery（単数形）→ ProjectEntity.Deliveries（複数形配列）への修正
+   - ProjectEntity.Receipt（単数形）→ ProjectEntity.Receipts（複数形配列）への修正
+
+4. **逆方向フィールド不整合パターン（M08+）**:
+   - Memo / Code フィールドなど、Go Entity に定義されているが実 API 応答に不在のフィールド
+   - StrictFieldDiff helper で全テストで検証し、未マップフィールド 0 を確認
+
+5. **Get > List 情報量差モデル（M12）**:
+   - 単一リソース Get は List より多くのフィールドを返すことが判明
+   - Entity 設計に List と Get の応答差を反映
+
+### 検証手法
+
+- `internal/testhelper.StrictFieldDiff()` で生 JSON と Go Entity の全フィールドを突合
+- E2E テストで実 API に対して List / Get / Search の全パスを通し、未マップフィールド 0 を達成
+- per-batch テスト（M 単位）で rate limit 制約下での段階的検証が現実的
+
+### 検証状況
+
+- Phase A-H（M01-M32）: 全 32 マイルストーン実施済み
+- Phase G 追補（M35-M38）: Document 系 Entity 根本修正 4 マイルストーン完了
+- 総計: 38 マイルストーン、BOARD API 準拠検証・修正サイクル確立
+- 詳細は `plans/board-compliance-roadmap.md` および各 M の plan ファイル参照
