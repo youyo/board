@@ -10,7 +10,7 @@
 | 親プラン | plans/vivid-strolling-ocean.md |
 | 作成日 | 2026-04-20 |
 | 最終更新 | 2026-04-21 |
-| ステータス | M24 完了（**Phase G 8 件目・Phase G 完走・payments List/Get/Search 厳格突合**。`ListPaymentsRaw` / `GetPaymentRaw` / `SearchPaymentsRaw` を `payments.go` に追加。`e2e_payments_test.go` 新規作成。go build/vet/test 全 Green。実 API 未実行（~4 req 見込み）。**Phase G 全 8 件（M17-M24）完走。**） ※履歴は下記に保持 |
+| ステータス | M38 完了（**Phase G 追補完走・ReceiptEntity 実 API 準拠再設計**。M35-M38 で 4 document Entity（estimate/order/delivery/receipt）を全面書き換え。実 API smoke 全 PASS（unmapped 0）。go build/vet/test 全 Green。） ※履歴は下記に保持 |
 | ステータス履歴 | M15 完了（**Phase F 2 件目・vendor_contacts（payee_contacts 実パス）**。List PASS（0 items）/ Get SKIP（0 items = data-dependent skip、Pending Re-verification）/ Search PASS（0 items）。Unit 5/5 Green。実消費 3 req（見積 8、大幅少）。**Phase F 2 件目所見**: M14 と同パターン、当該アカウントにベンダー担当者データなし → `GET /v1/payee_contacts/{id}` の 200/404 は未確認（Pending Re-verification）。未マップ 0（空配列のため）。実パス `/v1/payee_contacts` と Go 型名 `VendorContact*` の命名不一致は Unit テストで実パスアサーション済みで確認。VendorContactSearchParams 4 クエリ（VendorID/Name/Email/UpdatedAtFrom）全てエンコード確認。） / M14 完了（**Phase F 1 件目・vendor_branches（payee_branches 実パス）**。List PASS（0 items）/ Get SKIP（0 items = data-dependent skip、Pending Re-verification）/ Search PASS（0 items）。Unit 5/5 Green。実消費 3 req（見積 8、大幅少）。**Phase F 初回所見**: 当該アカウントにベンダー支店データなし → `GET /v1/payee_branches/{id}` の 200/404 は未確認（Pending Re-verification）。未マップ 0（空配列のため）。実パス `/v1/payee_branches` と Go 型名 `VendorBranch*` の命名不一致は Unit テストで実パスアサーション済みで確認。） / M12 完了（**Phase E 1 件目、Get > List 情報量差モデル新発見、`Memo` 逆方向 8 件連続で BOARD API 全般仕様最終確定**。List FAIL（299 items, unmapped **15**）/ Get FAIL（**200 成功 = Phase D/E コア業務系 Get 4 件連続 200**、unmapped **29** = List 15 + Get 限定 14）/ Search FAIL（299 items, unmapped 15, name filter 無視 **7 件連続**）。Unit 5/5 Green。`ClientEntity` は 6 フィールド中 **2 つ（Code/Memo）が逆方向不整合**、**既存 Entity の根本不足が M12 で最大規模（271cba3 の 3 倍規模）**に到達。**ネスト構造は発現せず** → M11 確定「ネストは client の子リソース特有」法則に沿う（clients 自身はフラット）。Get は List より 14 フィールド多い情報リッチ応答（**新 2 段階モデル**）。実消費 4 req（見積 5 以下、pin-point accuracy）） / M11 完了（**Phase D 完走、3 件連続 Get 200 確定**。List FAIL（22 items, unmapped **4** = `cost / description / invoice_date / payment_date`）/ Get FAIL（**200 成功 = Phase D コア業務系 Get 提供が 3 件連続確定**、unmapped 4 + 既存 4 フィールド逆方向不整合）/ Search FAIL（22 items, unmapped 4, `ProjectID=0` 非付与で全件返却）。Unit 5/5 Green。`ProjectCostEntity` は 8 フィールド中 **半分（4 つ）が逆方向不整合**（`Name/CostType/Amount/Memo` が実 API に不在）。**ネスト構造は発現せず** → ネストパターンは "client の子" 特有と確定。**概念モデルが根本ズレ**: Entity は「労務費/資材費の集計」想定、実 API は「仕訳的 expense entry（`description`+`cost`+`invoice_date`+`payment_date`）」。Memo 逆方向パターン **7 件連続**で全般仕様確定。実消費 4 req（pin-point accuracy）） |
 
 ## 背景と動機
@@ -43,8 +43,8 @@
 
 ## Current Focus
 - **マイルストーン**: M25 FindClient 厳格化（Phase H 1 件目）
-- **直近の完了**: M24 **Phase G 8 件目・Phase G 完走 = payments List/Get/Search 厳格突合**: `ListPaymentsRaw` / `GetPaymentRaw` / `SearchPaymentsRaw` 追加、`e2e_payments_test.go` 新規作成。go build/vet/test 全 Green。実消費 TBD（実 API 未実行、~4 req 見込み）。**Phase G 全 8 件（M17-M24）完走。**
-- **以前の完了**: M23 **Phase G 7 件目 = purchase_orders List/Get/Search 厳格突合**: `ListPurchaseOrdersRaw` / `GetPurchaseOrderRaw` / `SearchPurchaseOrdersRaw` 追加、`e2e_purchase_orders_test.go` 新規作成。旧テスト削除。go build/vet/test 全 Green。
+- **直近の完了**: M38 **Phase G 追補完走 = ReceiptEntity 実 API 準拠再設計**: ReceiptEntity を全面書き換え（ClientID/ProjectID/Title/TotalAmount 等を削除、Total/Tax/Details/ReceiptDate 等に置換）。e2e/find/repository/service_test.go を全 downstream 修正。実 API smoke PASS（unmapped 0、details_count=3）。
+- **以前の完了**: M37 DeliveryEntity / M36 OrderEntity / M35 EstimateEntity + DocumentDetailEntity 共通 Entity 追加。Phase G 追補 M35-M38 全 4 件で実 API smoke PASS。
 - **次のアクション**: M25 (FindClient 厳格化、Phase H 1 件目) を着手
 
 ## Progress
