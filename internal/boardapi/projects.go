@@ -32,7 +32,7 @@ type ProjectEntity struct {
 	Invoice    *DocumentSummary  `json:"invoice,omitempty"`
 	Invoices   []DocumentSummary `json:"invoices,omitempty"`
 	Receipt    *DocumentSummary  `json:"receipt,omitempty"`
-	Receipts   []DocumentSummary `json:"receipts,omitempty"`
+	Receipts   []DocumentSummary `json:"receipts,omitempty"` // M29 FIX: API は "receipts" 複数形配列で返す
 }
 
 // ProjectSearchParams is the parameter for SearchProjects.
