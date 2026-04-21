@@ -2088,7 +2088,7 @@ func TestSearchVendors_WithUpdatedAtFrom(t *testing.T) {
 func TestListVendorBranches_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":10,"vendor_id":1,"name":"Tokyo Branch","postal_code":"100-0001","address":"Chiyoda, Tokyo","phone":"03-0000-0001","fax":"","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":11,"vendor_id":1,"name":"Osaka Branch","postal_code":"530-0001","address":"Osaka City, Osaka","phone":"06-0000-0001","fax":"","memo":"","updated_at":"2026-01-02T00:00:00Z","created_at":"2026-01-02T00:00:00Z"}]`))
+		w.Write([]byte(`[{"id":10,"vendor":{"id":1,"name":"Vendor A","name_disp":"Vendor A","custom_no":"V001"},"name":"Tokyo Branch","zip":"100-0001","pref":"東京都","address1":"千代田区","address2":"","tel":"03-0000-0001","fax":null,"archive_flg":0,"updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":11,"vendor":{"id":1,"name":"Vendor A","name_disp":"Vendor A","custom_no":"V001"},"name":"Osaka Branch","zip":"530-0001","pref":"大阪府","address1":"大阪市","address2":"","tel":"06-0000-0001","fax":null,"archive_flg":0,"updated_at":"2026-01-02T00:00:00Z","created_at":"2026-01-02T00:00:00Z"}]`))
 	}))
 	defer ts.Close()
 
@@ -2101,7 +2101,7 @@ func TestListVendorBranches_OK(t *testing.T) {
 	if len(result) != 2 {
 		t.Errorf("want 2 vendor branches, got %d", len(result))
 	}
-	if result[0].ID != 10 || result[0].VendorID != 1 || result[0].PostalCode != "100-0001" {
+	if result[0].ID != 10 || result[0].VendorID() != 1 || result[0].Zip != "100-0001" {
 		t.Errorf("vendorBranch[0]: got %+v", result[0])
 	}
 }
@@ -2136,7 +2136,7 @@ func TestGetVendorBranch_OK(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"id":10,"vendor_id":1,"name":"Tokyo Branch","postal_code":"100-0001","address":"Chiyoda, Tokyo","phone":"03-0000-0001","fax":"","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
+		w.Write([]byte(`{"id":10,"vendor":{"id":1,"name":"Vendor A","name_disp":"Vendor A","custom_no":"V001"},"name":"Tokyo Branch","zip":"100-0001","pref":"東京都","address1":"千代田区","address2":"","tel":"03-0000-0001","fax":null,"archive_flg":0,"updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
 	}))
 	defer ts.Close()
 
@@ -2149,7 +2149,7 @@ func TestGetVendorBranch_OK(t *testing.T) {
 	if got == nil {
 		t.Fatal("got nil VendorBranchEntity")
 	}
-	if got.ID != 10 || got.PostalCode != "100-0001" {
+	if got.ID != 10 || got.Zip != "100-0001" {
 		t.Errorf("GetVendorBranch: got %+v", got)
 	}
 }

@@ -36,7 +36,8 @@ func newVendorBranchesMockClient(rt roundTripperFunc) *boardapi.Client {
 // shape. URL path must be /v1/payee_branches (the real BOARD API path, not
 // /v1/vendor_branches).
 func TestListVendorBranchesRaw_SinglePage(t *testing.T) {
-	page1 := `[{"id":1,"vendor_id":10,"name":"Main Branch","postal_code":"100-0001","address":"Tokyo","phone":"03-0000-0000","fax":"03-0000-0001","memo":"main","updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}]`
+	// 新スキーマ（M41 再設計）: vendor nested / zip / pref / address1 / address2 / tel / fax(*string) / archive_flg
+	page1 := `[{"id":1,"vendor":{"id":10,"name":"Vendor X","name_disp":"Vendor X","custom_no":"VX01"},"name":"Main Branch","zip":"100-0001","pref":"東京都","address1":"千代田区","address2":"","tel":"03-0000-0000","fax":null,"archive_flg":0,"updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}]`
 	var gotPath string
 	var gotQuery url.Values
 	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
@@ -66,9 +67,10 @@ func TestListVendorBranchesRaw_SinglePage(t *testing.T) {
 		t.Fatalf("expected 1 element, got %d", len(arr))
 	}
 	got := arr[0]
+	// 新スキーマのキーを検証（旧: vendor_id/postal_code/address/phone/memo は廃止）
 	wantKeys := []string{
-		"id", "vendor_id", "name", "postal_code", "address",
-		"phone", "fax", "memo", "updated_at", "created_at",
+		"id", "vendor", "name", "zip", "pref",
+		"address1", "address2", "tel", "fax", "archive_flg", "updated_at", "created_at",
 	}
 	for _, k := range wantKeys {
 		if _, ok := got[k]; !ok {
@@ -82,11 +84,11 @@ func TestListVendorBranchesRaw_SinglePage(t *testing.T) {
 // and 1 item on page 2. Result must be a JSON array of 3 items.
 func TestListVendorBranchesRaw_MultiPage(t *testing.T) {
 	page1Items := []string{
-		`{"id":1,"vendor_id":10,"name":"A","postal_code":"","address":"","phone":"","fax":"","memo":"","updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}`,
-		`{"id":2,"vendor_id":10,"name":"B","postal_code":"","address":"","phone":"","fax":"","memo":"","updated_at":"2024-01-02T00:00:00+09:00","created_at":"2023-01-02T00:00:00+09:00"}`,
+		`{"id":1,"vendor":{"id":10,"name":"VX","name_disp":"VX","custom_no":""},"name":"A","zip":"","pref":"","address1":"","address2":"","tel":null,"fax":null,"archive_flg":0,"updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}`,
+		`{"id":2,"vendor":{"id":10,"name":"VX","name_disp":"VX","custom_no":""},"name":"B","zip":"","pref":"","address1":"","address2":"","tel":null,"fax":null,"archive_flg":0,"updated_at":"2024-01-02T00:00:00+09:00","created_at":"2023-01-02T00:00:00+09:00"}`,
 	}
 	page2Items := []string{
-		`{"id":3,"vendor_id":11,"name":"C","postal_code":"","address":"","phone":"","fax":"","memo":"","updated_at":"2024-01-03T00:00:00+09:00","created_at":"2023-01-03T00:00:00+09:00"}`,
+		`{"id":3,"vendor":{"id":11,"name":"VY","name_disp":"VY","custom_no":""},"name":"C","zip":"","pref":"","address1":"","address2":"","tel":null,"fax":null,"archive_flg":0,"updated_at":"2024-01-03T00:00:00+09:00","created_at":"2023-01-03T00:00:00+09:00"}`,
 	}
 	var pageCount int
 	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
@@ -133,7 +135,7 @@ func TestListVendorBranchesRaw_MultiPage(t *testing.T) {
 // U3: GetVendorBranchRaw returns body exactly as served (single object).
 // Path must be /v1/payee_branches/42 (real BOARD API path).
 func TestGetVendorBranchRaw_Success(t *testing.T) {
-	body := []byte(`{"id":42,"vendor_id":10,"name":"Branch","postal_code":"100-0002","address":"Tokyo 2","phone":"03-1111-2222","fax":"03-1111-2223","memo":"sub","updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}`)
+	body := []byte(`{"id":42,"vendor":{"id":10,"name":"Vendor X","name_disp":"Vendor X","custom_no":"VX01"},"name":"Branch","zip":"100-0002","pref":"東京都","address1":"港区","address2":"","tel":"03-1111-2222","fax":"03-1111-2223","archive_flg":0,"updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}`)
 	var gotPath string
 	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
 		gotPath = r.URL.Path
@@ -187,7 +189,7 @@ func TestGetVendorBranchRaw_NotFound(t *testing.T) {
 // more than M09's ClientBranchSearchParams (ClientID, Name). This test ensures
 // all three query params are correctly encoded.
 func TestSearchVendorBranchesRaw_QueryParams(t *testing.T) {
-	page1 := `[{"id":7,"vendor_id":123,"name":"keyword","postal_code":"","address":"","phone":"","fax":"","memo":"","updated_at":"2024-02-01T00:00:00+09:00","created_at":"2024-02-01T00:00:00+09:00"}]`
+	page1 := `[{"id":7,"vendor":{"id":123,"name":"VZ","name_disp":"VZ","custom_no":""},"name":"keyword","zip":"","pref":"","address1":"","address2":"","tel":null,"fax":null,"archive_flg":0,"updated_at":"2024-02-01T00:00:00+09:00","created_at":"2024-02-01T00:00:00+09:00"}]`
 	var observedVendorID, observedName, observedUpdatedFrom string
 	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
 		observedVendorID = r.URL.Query().Get("vendor_id")

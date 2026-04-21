@@ -330,7 +330,7 @@ func TestSearchVendors(t *testing.T) {
 // --- VendorBranches tests ---
 
 func TestListVendorBranches(t *testing.T) {
-	stub := &stubVendorBranchRepo{listResult: []boardapi.VendorBranchEntity{{ID: 1, VendorID: 5}}}
+	stub := &stubVendorBranchRepo{listResult: []boardapi.VendorBranchEntity{{ID: 1, Vendor: &boardapi.VendorRef{ID: 5}}}}
 	svc := newServiceWithVendorBranches(stub)
 	got, err := svc.ListVendorBranches(testCtx, defaultOpts)
 	assertNoError(t, err)
@@ -338,7 +338,7 @@ func TestListVendorBranches(t *testing.T) {
 }
 
 func TestGetVendorBranch(t *testing.T) {
-	entity := &boardapi.VendorBranchEntity{ID: 1, VendorID: 5}
+	entity := &boardapi.VendorBranchEntity{ID: 1, Vendor: &boardapi.VendorRef{ID: 5}}
 	stub := &stubVendorBranchRepo{getResult: entity}
 	svc := newServiceWithVendorBranches(stub)
 	got, err := svc.GetVendorBranch(testCtx, 1, defaultOpts)
@@ -347,7 +347,7 @@ func TestGetVendorBranch(t *testing.T) {
 }
 
 func TestSearchVendorBranches(t *testing.T) {
-	stub := &stubVendorBranchRepo{searchResult: []boardapi.VendorBranchEntity{{ID: 2, VendorID: 5}}}
+	stub := &stubVendorBranchRepo{searchResult: []boardapi.VendorBranchEntity{{ID: 2, Vendor: &boardapi.VendorRef{ID: 5}}}}
 	svc := newServiceWithVendorBranches(stub)
 	got, err := svc.SearchVendorBranches(testCtx, boardapi.VendorBranchSearchParams{VendorID: 5}, defaultOpts)
 	assertNoError(t, err)

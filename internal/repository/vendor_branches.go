@@ -151,7 +151,7 @@ func (r *VendorBranchRepository) Search(ctx context.Context, params boardapi.Ven
 func filterVendorBranches(entities []boardapi.VendorBranchEntity, params boardapi.VendorBranchSearchParams) []boardapi.VendorBranchEntity {
 	var result []boardapi.VendorBranchEntity
 	for _, e := range entities {
-		if params.VendorID != 0 && e.VendorID != params.VendorID {
+		if params.VendorID != 0 && e.VendorID() != params.VendorID {
 			continue
 		}
 		if params.Name != "" && !strings.Contains(e.Name, params.Name) {

@@ -13,8 +13,8 @@ import (
 func TestFindVendor_ByID(t *testing.T) {
 	vendor := &boardapi.VendorEntity{ID: 1, Name: "Vendor A"}
 	branches := []boardapi.VendorBranchEntity{
-		{ID: 10, VendorID: 1, Name: "Branch 1"},
-		{ID: 11, VendorID: 1, Name: "Branch 2"},
+		{ID: 10, Vendor: &boardapi.VendorRef{ID: 1}, Name: "Branch 1"},
+		{ID: 11, Vendor: &boardapi.VendorRef{ID: 1}, Name: "Branch 2"},
 	}
 	contacts := []boardapi.VendorContactEntity{
 		{ID: 20, VendorID: 1, Name: "Contact 1"},

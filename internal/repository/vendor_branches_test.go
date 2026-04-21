@@ -61,9 +61,9 @@ func newVendorBranchAPIServer(t *testing.T, entities []boardapi.VendorBranchEnti
 }
 
 var sampleVendorBranches = []boardapi.VendorBranchEntity{
-	{ID: 1, VendorID: 10, Name: "BranchA", UpdatedAt: "2026-01-01T00:00:00Z"},
-	{ID: 2, VendorID: 10, Name: "BranchB", UpdatedAt: "2026-01-02T00:00:00Z"},
-	{ID: 3, VendorID: 20, Name: "BranchC", UpdatedAt: "2026-01-03T00:00:00Z"},
+	{ID: 1, Vendor: &boardapi.VendorRef{ID: 10}, Name: "BranchA", UpdatedAt: "2026-01-01T00:00:00Z"},
+	{ID: 2, Vendor: &boardapi.VendorRef{ID: 10}, Name: "BranchB", UpdatedAt: "2026-01-02T00:00:00Z"},
+	{ID: 3, Vendor: &boardapi.VendorRef{ID: 20}, Name: "BranchC", UpdatedAt: "2026-01-03T00:00:00Z"},
 }
 
 // T_VBR01: List - cache hit -> returns cached data
@@ -126,7 +126,7 @@ func TestVendorBranchRepository_GetByID_CacheMiss_APISuccess(t *testing.T) {
 	db := newTestDB(t)
 	markSynced(t, db, "vendor_branches")
 
-	target := boardapi.VendorBranchEntity{ID: 99, VendorID: 10, Name: "Test Branch", UpdatedAt: "2026-01-01T00:00:00Z"}
+	target := boardapi.VendorBranchEntity{ID: 99, Vendor: &boardapi.VendorRef{ID: 10}, Name: "Test Branch", UpdatedAt: "2026-01-01T00:00:00Z"}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		b, _ := json.Marshal(target)
