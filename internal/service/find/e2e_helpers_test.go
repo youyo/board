@@ -12,6 +12,7 @@ import (
 	"github.com/youyo/board/internal/app"
 	"github.com/youyo/board/internal/boardapi"
 	"github.com/youyo/board/internal/service/find"
+	"github.com/youyo/board/internal/testhelper"
 )
 
 // skipIfRateLimit skips the test when err is a boardapi 429 Rate Limit error.
@@ -112,6 +113,29 @@ func dumpJSON(t *testing.T, resource string, id int, raw []byte) {
 		t.Logf("dumpJSON: write %s: %v", path, err)
 		return
 	}
+}
+
+// strictFieldDiff は生 JSON と Go struct の json タグを突合し、
+// 未マップフィールドを返す。boardapi 層の E2E helper と同パターン（パッケージ境界のため複製）。
+func strictFieldDiff(t *testing.T, raw []byte, target any) []string {
+	t.Helper()
+	return testhelper.StrictFieldDiff(t, raw, target)
+}
+
+// projectIDOrZero は project が nil でなければ ID を、nil なら 0 を返す。
+func projectIDOrZero(p *boardapi.ProjectEntity) int {
+	if p == nil {
+		return 0
+	}
+	return p.ID
+}
+
+// clientIDOrZero は client が nil でなければ ID を、nil なら 0 を返す。
+func clientIDOrZero(c *boardapi.ClientEntity) int {
+	if c == nil {
+		return 0
+	}
+	return c.ID
 }
 
 // findRepoRoot は CWD から go.mod を find-up して repo root を返す。

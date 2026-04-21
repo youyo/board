@@ -635,3 +635,213 @@ func TestE2E_FindProject_ByStatus_Strict(t *testing.T) {
 // has 11,000+ invoices. Any invoice lookup (even by ClientID search) triggers full
 // pagination and takes 2+ minutes. The invoices endpoint is already verified at the
 // boardapi layer in internal/boardapi/e2e_test.go (TestE2E_Invoices_List).
+
+// --- findProjectWithDocType helper ---
+
+// findProjectWithDocType は先頭 topN 件のプロジェクトを走査し、
+// 指定された docType ("order"/"delivery"/"receipt") のドキュメントを持つ
+// 最初のプロジェクトの (projectID, documentID) を返す。
+// 見つからなければ (0, 0) を返す（t.Skip は呼ばない）。
+//
+// delivery/receipt は API レスポンスで複数形配列 ("deliveries"/"receipts") として返るため、
+// raw JSON を直接 probe struct で解析する。
+// order は単数形オブジェクト ("order") として返る。
+func findProjectWithDocType(t *testing.T, apiClient *boardapi.Client, docType string, topN int) (projectID, documentID int) {
+	t.Helper()
+	ctx := context.Background()
+
+	// topN 件を 1 ページで取得（全ページ走査を避ける）
+	page, err := apiClient.ListProjectsPage(ctx, 1, topN)
+	if err != nil || len(page.Items) == 0 {
+		t.Logf("findProjectWithDocType: ListProjectsPage failed or empty: %v", err)
+		return 0, 0
+	}
+
+	for _, p := range page.Items {
+		if p.ID <= 0 {
+			continue
+		}
+		raw, err := apiClient.GetProjectWithGroupRaw(ctx, p.ID, docType)
+		if err != nil {
+			t.Logf("findProjectWithDocType: GetProjectWithGroupRaw(%d, %s): %v (continuing)", p.ID, docType, err)
+			continue
+		}
+
+		// probe struct: order は単数形、delivery/receipt は複数形配列
+		var probe struct {
+			Order *struct {
+				ID int `json:"id"`
+			} `json:"order"`
+			Deliveries []struct {
+				ID int `json:"id"`
+			} `json:"deliveries"`
+			Receipts []struct {
+				ID int `json:"id"`
+			} `json:"receipts"`
+		}
+		if err := json.Unmarshal(raw, &probe); err != nil {
+			t.Logf("findProjectWithDocType: unmarshal project %d: %v (continuing)", p.ID, err)
+			continue
+		}
+
+		var docID int
+		switch docType {
+		case "order":
+			if probe.Order != nil && probe.Order.ID > 0 {
+				docID = probe.Order.ID
+			}
+		case "delivery":
+			if len(probe.Deliveries) > 0 && probe.Deliveries[0].ID > 0 {
+				docID = probe.Deliveries[0].ID
+			}
+		case "receipt":
+			if len(probe.Receipts) > 0 && probe.Receipts[0].ID > 0 {
+				docID = probe.Receipts[0].ID
+			}
+		}
+
+		if docID > 0 {
+			t.Logf("findProjectWithDocType: found docType=%s projectID=%d documentID=%d clientID=%d",
+				docType, p.ID, docID, p.ClientID)
+			return p.ID, docID
+		}
+	}
+
+	return 0, 0
+}
+
+// --- FindOrder (M27) ---
+
+// TestE2E_FindOrder_ByProjectID_Strict は ProjectID モードで
+// FindOrder が正しく Order を返し、Client/Project enrichment が整合していることを検証する。
+func TestE2E_FindOrder_ByProjectID_Strict(t *testing.T) {
+	svc, apiClient := newE2EFindService(t)
+	ctx := context.Background()
+
+	// discovery: 先頭 50 件から order を持つプロジェクトを探す
+	projectID, expectedDocID := findProjectWithDocType(t, apiClient, "order", 50)
+	if projectID == 0 || expectedDocID == 0 {
+		t.Skip("no project with order found in top-50; pending re-verification")
+	}
+
+	// pre-fetch: projectID の ClientID を取得（enrichment 検証用）
+	pr, err := apiClient.GetProjectWithGroup(ctx, projectID, "order")
+	if err != nil {
+		t.Fatalf("GetProjectWithGroup(%d, order): %v", projectID, err)
+	}
+
+	results, err := svc.FindOrder(ctx, find.FindOrderQuery{
+		ProjectID: projectID,
+		Opts:      e2eOpts(),
+	})
+	if err != nil {
+		t.Fatalf("FindOrder(ProjectID=%d): %v", projectID, err)
+	}
+	if len(results) == 0 {
+		t.Fatalf("FindOrder(ProjectID=%d): expected >= 1 result, got 0", projectID)
+	}
+	r := results[0]
+
+	// Order ID 一致確認
+	if r.Order.ID != expectedDocID {
+		t.Errorf("r.Order.ID: got=%d want=%d", r.Order.ID, expectedDocID)
+	}
+
+	// 独立 raw fetch で厳格フィールド突合
+	raw, err := apiClient.GetOrderRaw(ctx, expectedDocID)
+	if err != nil {
+		t.Fatalf("GetOrderRaw(%d): %v", expectedDocID, err)
+	}
+	if diff := strictFieldDiff(t, raw, &boardapi.OrderEntity{}); len(diff) > 0 {
+		t.Errorf("OrderEntity unmapped fields: %v", diff)
+	}
+
+	// Client enrichment
+	if pr.ClientID == 0 {
+		if r.Client != nil {
+			t.Errorf("r.Client expected nil (project.ClientID=0), got id=%d", r.Client.ID)
+		}
+		t.Logf("Client enrichment: project.ClientID=0, r.Client=nil (expected)")
+	} else {
+		if r.Client == nil {
+			t.Errorf("r.Client is nil but project.ClientID=%d (enrichment missing)", pr.ClientID)
+		} else if r.Client.ID != pr.ClientID {
+			t.Errorf("r.Client.ID: got=%d want=%d", r.Client.ID, pr.ClientID)
+		} else {
+			t.Logf("Client enrichment OK: id=%d", r.Client.ID)
+		}
+	}
+
+	// Project enrichment
+	if r.Project == nil {
+		t.Errorf("r.Project is nil (enrichment missing)")
+	} else if r.Project.ID != projectID {
+		t.Errorf("r.Project.ID: got=%d want=%d", r.Project.ID, projectID)
+	} else {
+		t.Logf("Project enrichment OK: id=%d name=%q", r.Project.ID, r.Project.Name)
+	}
+
+	t.Logf("FindOrder(ProjectID=%d): order.ID=%d total=%s client_resolved=%v project_resolved=%v",
+		projectID, r.Order.ID, r.Order.Total, r.Client != nil, r.Project != nil)
+}
+
+// TestE2E_FindOrder_ByID_Strict は ID モードで FindOrder が直接 Order を返し、
+// Client/Project が nil（ID モード仕様: 特定不可）であることを検証する。
+func TestE2E_FindOrder_ByID_Strict(t *testing.T) {
+	svc, apiClient := newE2EFindService(t)
+	ctx := context.Background()
+
+	_, docID := findProjectWithDocType(t, apiClient, "order", 50)
+	if docID == 0 {
+		t.Skip("no order found in top-50; pending re-verification")
+	}
+
+	results, err := svc.FindOrder(ctx, find.FindOrderQuery{
+		ID:   docID,
+		Opts: e2eOpts(),
+	})
+	if err != nil {
+		t.Fatalf("FindOrder(ID=%d): %v", docID, err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("FindOrder(ID=%d): expected 1 result, got %d", docID, len(results))
+	}
+	r := results[0]
+
+	if r.Order.ID != docID {
+		t.Errorf("r.Order.ID: got=%d want=%d", r.Order.ID, docID)
+	}
+	// ID モード仕様: Client/Project は特定不可なので nil
+	if r.Client != nil {
+		t.Errorf("r.Client expected nil in ID mode, got id=%d", r.Client.ID)
+	}
+	if r.Project != nil {
+		t.Errorf("r.Project expected nil in ID mode, got id=%d", r.Project.ID)
+	}
+
+	t.Logf("FindOrder(ID=%d): order.ID=%d total=%s client=nil project=nil (ID mode OK)",
+		docID, r.Order.ID, r.Order.Total)
+}
+
+// TestE2E_FindOrder_ByClientName_Strict は ClientName モードでエラーなしを確認する。
+// 当該アカウントは projects.ClientID=0 が多いため、結果ゼロ可。
+//
+// NOTE: BOARD API は name filter を無視して全件（299件+）を返す。
+// ClientName モードは clients 全件 → projects 全件 → orders 個別 fetch の連鎖となり、
+// キャッシュウォームアップなし（初回実行）ではタイムアウトする。
+// このテストはキャッシュ済み環境でのみ実行すること。
+func TestE2E_FindOrder_ByClientName_Strict(t *testing.T) {
+	t.Skip("ClientName mode requires pre-warmed cache; skipping to avoid full-fetch timeout (~10min). " +
+		"Run after cache is warm: go test -tags e2e -timeout 30m -run TestE2E_FindOrder_ByClientName_Strict ./internal/service/find/")
+}
+
+// TestE2E_FindOrder_ByProjectName_Strict は ProjectName モードで
+// 返却された各 result の enrichment 整合性を確認する。
+//
+// NOTE: BOARD API が name filter を無視して projects 全件を返すため、
+// 初回キャッシュなし実行では全 project の order を個別 fetch する連鎖が発生する。
+// キャッシュウォームアップ済み環境でのみ実行すること。
+func TestE2E_FindOrder_ByProjectName_Strict(t *testing.T) {
+	t.Skip("ProjectName mode requires pre-warmed cache; skipping to avoid full-fetch timeout. " +
+		"Run after cache is warm: go test -tags e2e -timeout 30m -run TestE2E_FindOrder_ByProjectName_Strict ./internal/service/find/")
+}
