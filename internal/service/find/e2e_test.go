@@ -1113,3 +1113,440 @@ func TestE2E_FindReceipt_ByProjectName_Strict(t *testing.T) {
 	t.Skip("ProjectName mode requires pre-warmed cache; skipping to avoid full-fetch timeout. " +
 		"Run after cache is warm: go test -tags e2e -timeout 30m -run TestE2E_FindReceipt_ByProjectName_Strict ./internal/service/find/")
 }
+
+// --- FindVendor (M30) ---
+
+// TestE2E_FindVendor_StrictEnrichment は ID モードで FindVendor が正しく Vendor を返し、
+// Branches/Contacts の enrichment が独立 API 呼び出しと件数・ID 集合で一致することを検証する。
+//
+// 当該アカウントは vendors 0 件のためデータ投入まで pending re-verification。
+// データが存在する場合は M25 と同型の enrichment バグ（VendorID フィルタ in-memory 誤動作）を検出する可能性がある。
+func TestE2E_FindVendor_StrictEnrichment(t *testing.T) {
+	svc, api := newE2EFindService(t)
+	ctx := context.Background()
+
+	// 1. vendor 一覧取得 → 0 件ならスキップ
+	page, err := api.ListVendorsPage(ctx, 1, 1)
+	if err != nil {
+		t.Fatalf("ListVendorsPage: %v", err)
+	}
+	if len(page.Items) == 0 {
+		t.Skip("no vendors; pending re-verification (vendor data not yet populated in this BOARD account)")
+	}
+	targetID := page.Items[0].ID
+
+	// 2. FindVendor(ID) → VendorResult
+	results, err := svc.FindVendor(ctx, find.FindVendorQuery{
+		ID:   targetID,
+		Opts: e2eOpts(),
+	})
+	if err != nil {
+		t.Fatalf("FindVendor(ID=%d): %v", targetID, err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("FindVendor(ID=%d): expected 1 result, got %d", targetID, len(results))
+	}
+	r := results[0]
+
+	// 3. Vendor ID 一致確認
+	if r.Vendor.ID != targetID {
+		t.Errorf("r.Vendor.ID: got=%d want=%d", r.Vendor.ID, targetID)
+	}
+
+	// 4. 独立 raw fetch で Branches 件数・ID 集合を突合
+	branchesRaw, err := api.SearchVendorBranchesRaw(ctx, boardapi.VendorBranchSearchParams{VendorID: targetID})
+	if err != nil {
+		t.Fatalf("SearchVendorBranchesRaw(VendorID=%d): %v", targetID, err)
+	}
+	var independentBranches []boardapi.VendorBranchEntity
+	if err := json.Unmarshal(branchesRaw, &independentBranches); err != nil {
+		t.Fatalf("unmarshal vendor branches: %v", err)
+	}
+	// data-dependent: Search が 1+ 件で FindVendor が 0 件なら enrichment バグ
+	if len(independentBranches) > 0 && len(r.Branches) == 0 {
+		t.Errorf("Branches enrichment bug detected: independent API returned %d branches, FindVendor returned 0",
+			len(independentBranches))
+	}
+	if len(r.Branches) != len(independentBranches) {
+		t.Errorf("Branches count mismatch: FindVendor=%d independent=%d", len(r.Branches), len(independentBranches))
+	}
+	expectedBranchIDs := idSet(independentBranches, func(b boardapi.VendorBranchEntity) int { return b.ID })
+	actualBranchIDs := idSet(r.Branches, func(b boardapi.VendorBranchEntity) int { return b.ID })
+	if !intSetEqual(expectedBranchIDs, actualBranchIDs) {
+		t.Errorf("Branches ID set mismatch:\n  want=%v\n  got =%v", expectedBranchIDs, actualBranchIDs)
+	}
+	// 全 branch が親 vendor を参照していること
+	for i, b := range r.Branches {
+		if b.VendorID != 0 && b.VendorID != targetID {
+			t.Errorf("Branches[%d].VendorID=%d want=%d", i, b.VendorID, targetID)
+		}
+	}
+
+	// 5. 独立 raw fetch で Contacts 件数・ID 集合を突合
+	contactsRaw, err := api.SearchVendorContactsRaw(ctx, boardapi.VendorContactSearchParams{VendorID: targetID})
+	if err != nil {
+		t.Fatalf("SearchVendorContactsRaw(VendorID=%d): %v", targetID, err)
+	}
+	var independentContacts []boardapi.VendorContactEntity
+	if err := json.Unmarshal(contactsRaw, &independentContacts); err != nil {
+		t.Fatalf("unmarshal vendor contacts: %v", err)
+	}
+	// data-dependent: Search が 1+ 件で FindVendor が 0 件なら enrichment バグ
+	if len(independentContacts) > 0 && len(r.Contacts) == 0 {
+		t.Errorf("Contacts enrichment bug detected: independent API returned %d contacts, FindVendor returned 0",
+			len(independentContacts))
+	}
+	if len(r.Contacts) != len(independentContacts) {
+		t.Errorf("Contacts count mismatch: FindVendor=%d independent=%d", len(r.Contacts), len(independentContacts))
+	}
+	expectedContactIDs := idSet(independentContacts, func(c boardapi.VendorContactEntity) int { return c.ID })
+	actualContactIDs := idSet(r.Contacts, func(c boardapi.VendorContactEntity) int { return c.ID })
+	if !intSetEqual(expectedContactIDs, actualContactIDs) {
+		t.Errorf("Contacts ID set mismatch:\n  want=%v\n  got =%v", expectedContactIDs, actualContactIDs)
+	}
+	for i, c := range r.Contacts {
+		if c.VendorID != 0 && c.VendorID != targetID {
+			t.Errorf("Contacts[%d].VendorID=%d want=%d", i, c.VendorID, targetID)
+		}
+	}
+
+	t.Logf("FindVendor(ID=%d) enrichment: branches=%d contacts=%d (both matched independent API)",
+		targetID, len(r.Branches), len(r.Contacts))
+}
+
+// TestE2E_FindVendor_ByName は Name モードで vendor データ待ちのため SKIP。
+func TestE2E_FindVendor_ByName(t *testing.T) {
+	t.Skip("vendors 0 件; pending re-verification (vendor data not yet populated in this BOARD account)")
+}
+
+// TestE2E_FindVendor_ByText は Text モードで vendor データ待ちのため SKIP。
+func TestE2E_FindVendor_ByText(t *testing.T) {
+	t.Skip("vendors 0 件; pending re-verification (vendor data not yet populated in this BOARD account)")
+}
+
+// --- FindPurchaseOrder (M30) ---
+
+// TestE2E_FindPurchaseOrder_ByID_Strict は ID モードで FindPurchaseOrder が正しく PurchaseOrder を返し、
+// Vendor enrichment が整合していることを検証する。
+//
+// 当該アカウントは purchase_orders 0 件のため pending re-verification。
+func TestE2E_FindPurchaseOrder_ByID_Strict(t *testing.T) {
+	svc, api := newE2EFindService(t)
+	ctx := context.Background()
+
+	// 1 件取得 → 0 件ならスキップ
+	page, err := api.ListPurchaseOrdersPage(ctx, 1, 1)
+	if err != nil {
+		t.Fatalf("ListPurchaseOrdersPage: %v", err)
+	}
+	if len(page.Items) == 0 {
+		t.Skip("no purchase_orders; pending re-verification (purchase_order data not yet populated in this BOARD account)")
+	}
+	targetPO := page.Items[0]
+
+	results, err := svc.FindPurchaseOrder(ctx, find.FindPurchaseOrderQuery{
+		ID:   targetPO.ID,
+		Opts: e2eOpts(),
+	})
+	if err != nil {
+		t.Fatalf("FindPurchaseOrder(ID=%d): %v", targetPO.ID, err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("FindPurchaseOrder(ID=%d): expected 1 result, got %d", targetPO.ID, len(results))
+	}
+	r := results[0]
+
+	// PO ID 一致確認
+	if r.PurchaseOrder.ID != targetPO.ID {
+		t.Errorf("r.PurchaseOrder.ID: got=%d want=%d", r.PurchaseOrder.ID, targetPO.ID)
+	}
+
+	// Vendor enrichment: VendorID 非ゼロなら nil 不可
+	if targetPO.VendorID != 0 {
+		if r.Vendor == nil {
+			t.Errorf("r.Vendor is nil but PurchaseOrder.VendorID=%d (enrichment missing)", targetPO.VendorID)
+		} else if r.Vendor.ID != targetPO.VendorID {
+			t.Errorf("r.Vendor.ID: got=%d want=%d", r.Vendor.ID, targetPO.VendorID)
+		} else {
+			t.Logf("Vendor enrichment OK: id=%d", r.Vendor.ID)
+		}
+	}
+
+	// Project enrichment: ProjectID 非ゼロなら nil 不可
+	if targetPO.ProjectID != 0 {
+		if r.Project == nil {
+			t.Errorf("r.Project is nil but PurchaseOrder.ProjectID=%d (enrichment missing)", targetPO.ProjectID)
+		} else if r.Project.ID != targetPO.ProjectID {
+			t.Errorf("r.Project.ID: got=%d want=%d", r.Project.ID, targetPO.ProjectID)
+		} else {
+			t.Logf("Project enrichment OK: id=%d", r.Project.ID)
+		}
+	}
+
+	t.Logf("FindPurchaseOrder(ID=%d): title=%q status=%q vendor_id=%d project_id=%d vendor_resolved=%v project_resolved=%v",
+		targetPO.ID, r.PurchaseOrder.Title, r.PurchaseOrder.Status, targetPO.VendorID, targetPO.ProjectID,
+		r.Vendor != nil, r.Project != nil)
+}
+
+// TestE2E_FindPurchaseOrder_ByVendorName_Strict は VendorName モード。
+// vendor 0 件のためスキップ。
+func TestE2E_FindPurchaseOrder_ByVendorName_Strict(t *testing.T) {
+	t.Skip("vendors 0 件; pending re-verification (vendor data not yet populated in this BOARD account)")
+}
+
+// TestE2E_FindPurchaseOrder_ByProjectName_Strict は ProjectName モード。
+// cache-warm が必要なためスキップ（全 project 走査 → 全件 PO 個別 fetch の連鎖を防ぐ）。
+func TestE2E_FindPurchaseOrder_ByProjectName_Strict(t *testing.T) {
+	t.Skip("ProjectName mode requires pre-warmed cache; skipping to avoid full-fetch timeout. " +
+		"Run after cache is warm: go test -tags e2e -timeout 30m -run TestE2E_FindPurchaseOrder_ByProjectName_Strict ./internal/service/find/")
+}
+
+// TestE2E_FindPurchaseOrder_ByText_Strict は Text モードで PurchaseOrder データ待ちのため SKIP。
+func TestE2E_FindPurchaseOrder_ByText_Strict(t *testing.T) {
+	svc, api := newE2EFindService(t)
+	ctx := context.Background()
+
+	// 1 件取得 → 0 件ならスキップ
+	page, err := api.ListPurchaseOrdersPage(ctx, 1, 1)
+	if err != nil {
+		t.Fatalf("ListPurchaseOrdersPage: %v", err)
+	}
+	if len(page.Items) == 0 {
+		t.Skip("no purchase_orders; pending re-verification")
+	}
+	targetPO := page.Items[0]
+	if targetPO.Title == "" {
+		t.Skip("first purchase_order has empty title; cannot form text query")
+	}
+	titleRunes := []rune(targetPO.Title)
+	if len(titleRunes) < 2 {
+		t.Skip("first purchase_order title too short for text search (need >= 2 runes)")
+	}
+	prefix := string(titleRunes[:2])
+
+	results, err := svc.FindPurchaseOrder(ctx, find.FindPurchaseOrderQuery{
+		Text:  prefix,
+		Limit: 5,
+		Opts:  e2eOpts(),
+	})
+	if err != nil {
+		t.Fatalf("FindPurchaseOrder(Text=%q): %v", prefix, err)
+	}
+	t.Logf("FindPurchaseOrder(Text=%q) returned %d results", prefix, len(results))
+
+	// 各 result は prefix を Title または Memo に含む
+	for i, r := range results {
+		po := r.PurchaseOrder
+		containsInAny := strings.Contains(po.Title, prefix) || strings.Contains(po.Memo, prefix)
+		if !containsInAny {
+			t.Errorf("results[%d]: PurchaseOrder(id=%d, title=%q, memo=%q) does not contain prefix %q",
+				i, po.ID, po.Title, po.Memo, prefix)
+		}
+	}
+}
+
+// TestE2E_FindPurchaseOrder_ByStatus_Strict は Status モードで PurchaseOrder データ待ちのため SKIP。
+func TestE2E_FindPurchaseOrder_ByStatus_Strict(t *testing.T) {
+	svc, api := newE2EFindService(t)
+	ctx := context.Background()
+
+	// 5 件取得して status を discovery する
+	page, err := api.ListPurchaseOrdersPage(ctx, 1, 5)
+	if err != nil {
+		t.Fatalf("ListPurchaseOrdersPage: %v", err)
+	}
+	if len(page.Items) == 0 {
+		t.Skip("no purchase_orders; pending re-verification")
+	}
+
+	statusCount := make(map[string]int)
+	for _, po := range page.Items {
+		if po.Status != "" {
+			statusCount[po.Status]++
+		}
+	}
+	if len(statusCount) == 0 {
+		t.Skip("no purchase_order with non-empty status found in first 5 items")
+	}
+	var targetStatus string
+	var maxCount int
+	for s, c := range statusCount {
+		if c > maxCount {
+			maxCount = c
+			targetStatus = s
+		}
+	}
+
+	results, err := svc.FindPurchaseOrder(ctx, find.FindPurchaseOrderQuery{
+		Status: targetStatus,
+		Limit:  3,
+		Opts:   e2eOpts(),
+	})
+	if err != nil {
+		t.Fatalf("FindPurchaseOrder(Status=%q): %v", targetStatus, err)
+	}
+	t.Logf("FindPurchaseOrder(Status=%q) returned %d results", targetStatus, len(results))
+
+	for i, r := range results {
+		if r.PurchaseOrder.Status != targetStatus {
+			t.Errorf("results[%d]: PurchaseOrder.Status=%q want=%q", i, r.PurchaseOrder.Status, targetStatus)
+		}
+	}
+}
+
+// --- FindPayment (M30) ---
+
+// TestE2E_FindPayment_ByID_Strict は ID モードで FindPayment が正しく Payment を返し、
+// Vendor enrichment が整合していることを検証する。
+//
+// 当該アカウントは payments 0 件のため pending re-verification。
+func TestE2E_FindPayment_ByID_Strict(t *testing.T) {
+	svc, api := newE2EFindService(t)
+	ctx := context.Background()
+
+	// 1 件取得 → 0 件ならスキップ
+	page, err := api.ListPaymentsPage(ctx, 1, 1)
+	if err != nil {
+		t.Fatalf("ListPaymentsPage: %v", err)
+	}
+	if len(page.Items) == 0 {
+		t.Skip("no payments; pending re-verification (payment data not yet populated in this BOARD account)")
+	}
+	targetPayment := page.Items[0]
+
+	results, err := svc.FindPayment(ctx, find.FindPaymentQuery{
+		ID:   targetPayment.ID,
+		Opts: e2eOpts(),
+	})
+	if err != nil {
+		t.Fatalf("FindPayment(ID=%d): %v", targetPayment.ID, err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("FindPayment(ID=%d): expected 1 result, got %d", targetPayment.ID, len(results))
+	}
+	r := results[0]
+
+	// Payment ID 一致確認
+	if r.Payment.ID != targetPayment.ID {
+		t.Errorf("r.Payment.ID: got=%d want=%d", r.Payment.ID, targetPayment.ID)
+	}
+
+	// Vendor enrichment: VendorID 非ゼロなら nil 不可
+	if targetPayment.VendorID != 0 {
+		if r.Vendor == nil {
+			t.Errorf("r.Vendor is nil but Payment.VendorID=%d (enrichment missing)", targetPayment.VendorID)
+		} else if r.Vendor.ID != targetPayment.VendorID {
+			t.Errorf("r.Vendor.ID: got=%d want=%d", r.Vendor.ID, targetPayment.VendorID)
+		} else {
+			t.Logf("Vendor enrichment OK: id=%d", r.Vendor.ID)
+		}
+	}
+
+	t.Logf("FindPayment(ID=%d): status=%q vendor_id=%d purchase_order_id=%d vendor_resolved=%v",
+		targetPayment.ID, r.Payment.Status, targetPayment.VendorID, targetPayment.PurchaseOrderID,
+		r.Vendor != nil)
+}
+
+// TestE2E_FindPayment_ByVendorName_Strict は VendorName モード。
+// vendor 0 件のためスキップ。
+func TestE2E_FindPayment_ByVendorName_Strict(t *testing.T) {
+	t.Skip("vendors 0 件; pending re-verification (vendor data not yet populated in this BOARD account)")
+}
+
+// TestE2E_FindPayment_ByPurchaseOrderID_Strict は PurchaseOrderID モード。
+// purchase_orders 0 件のためスキップ。
+func TestE2E_FindPayment_ByPurchaseOrderID_Strict(t *testing.T) {
+	t.Skip("purchase_orders 0 件; pending re-verification (purchase_order data not yet populated in this BOARD account)")
+}
+
+// TestE2E_FindPayment_ByText_Strict は Text モードで Payment データ待ちのため SKIP。
+func TestE2E_FindPayment_ByText_Strict(t *testing.T) {
+	svc, api := newE2EFindService(t)
+	ctx := context.Background()
+
+	// 1 件取得 → 0 件ならスキップ
+	page, err := api.ListPaymentsPage(ctx, 1, 1)
+	if err != nil {
+		t.Fatalf("ListPaymentsPage: %v", err)
+	}
+	if len(page.Items) == 0 {
+		t.Skip("no payments; pending re-verification")
+	}
+	targetPayment := page.Items[0]
+	if targetPayment.Memo == "" {
+		t.Skip("first payment has empty memo; cannot form text query")
+	}
+	memoRunes := []rune(targetPayment.Memo)
+	if len(memoRunes) < 2 {
+		t.Skip("first payment memo too short for text search (need >= 2 runes)")
+	}
+	prefix := string(memoRunes[:2])
+
+	results, err := svc.FindPayment(ctx, find.FindPaymentQuery{
+		Text:  prefix,
+		Limit: 5,
+		Opts:  e2eOpts(),
+	})
+	if err != nil {
+		t.Fatalf("FindPayment(Text=%q): %v", prefix, err)
+	}
+	t.Logf("FindPayment(Text=%q) returned %d results", prefix, len(results))
+
+	// 各 result は prefix を Memo に含む
+	for i, r := range results {
+		p := r.Payment
+		if !strings.Contains(p.Memo, prefix) {
+			t.Errorf("results[%d]: Payment(id=%d, memo=%q) does not contain prefix %q",
+				i, p.ID, p.Memo, prefix)
+		}
+	}
+}
+
+// TestE2E_FindPayment_ByStatus_Strict は Status モードで Payment データ待ちのため SKIP。
+func TestE2E_FindPayment_ByStatus_Strict(t *testing.T) {
+	svc, api := newE2EFindService(t)
+	ctx := context.Background()
+
+	// 5 件取得して status を discovery する
+	page, err := api.ListPaymentsPage(ctx, 1, 5)
+	if err != nil {
+		t.Fatalf("ListPaymentsPage: %v", err)
+	}
+	if len(page.Items) == 0 {
+		t.Skip("no payments; pending re-verification")
+	}
+
+	statusCount := make(map[string]int)
+	for _, p := range page.Items {
+		if p.Status != "" {
+			statusCount[p.Status]++
+		}
+	}
+	if len(statusCount) == 0 {
+		t.Skip("no payment with non-empty status found in first 5 items")
+	}
+	var targetStatus string
+	var maxCount int
+	for s, c := range statusCount {
+		if c > maxCount {
+			maxCount = c
+			targetStatus = s
+		}
+	}
+
+	results, err := svc.FindPayment(ctx, find.FindPaymentQuery{
+		Status: targetStatus,
+		Limit:  3,
+		Opts:   e2eOpts(),
+	})
+	if err != nil {
+		t.Fatalf("FindPayment(Status=%q): %v", targetStatus, err)
+	}
+	t.Logf("FindPayment(Status=%q) returned %d results", targetStatus, len(results))
+
+	for i, r := range results {
+		if r.Payment.Status != targetStatus {
+			t.Errorf("results[%d]: Payment.Status=%q want=%q", i, r.Payment.Status, targetStatus)
+		}
+	}
+}
