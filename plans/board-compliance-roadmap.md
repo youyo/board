@@ -42,10 +42,10 @@
 - 失敗した M は `Blockers` に転記、ユーザー判断待ちに。
 
 ## Current Focus
-- **マイルストーン**: M27 FindOrder 新規 E2E（Phase H 3 件目）
-- **直近の完了**: M26 **Phase H 2 件目 = FindProject 全パス検証**: 5 モード（ID/ClientName/Name/Text/Status）を E2E で実施。enrichment バグなし（ProjectEntity.ClientID はフラット構造で unmarshal 正常）。Text モード 4 results で prefix 含有確認。2 モードが data-dependent skip（このアカウントのプロジェクトは ClientID=0 多数 + Status 空）。fix コミットなし。
-- **以前の完了**: M25 FindClient 厳格化 + enrichment バグ修正 / M38 ReceiptEntity 実 API 準拠再設計 / M35-M37 EstimateEntity/OrderEntity/DeliveryEntity 全面書き換え（Phase G 追補）。
-- **次のアクション**: M27 (FindOrder 新規 E2E、Phase H 3 件目) を着手
+- **マイルストーン**: M28 FindDelivery 新規 E2E（Phase H 4 件目）
+- **直近の完了**: M27 **Phase H 3 件目 = FindOrder 新規 E2E**: 4 モード（ID/ProjectID/ClientName/ProjectName）を実施。ByProjectID PASS（order.ID=71741501, Project enrichment ✓, ClientID=0→nil 正常）/ ByID PASS（Client=nil, Project=nil 仕様通り）/ ClientName・ProjectName は初回フルフェッチタイムアウトのため cache-warm SKIP。厳格フィールド突合 PASS（OrderEntity 未マップ 0）。fix コミットなし。ProjectEntity.Delivery/Receipt の単数形マッピング問題を発見（M28/M29 で fix 予定）。
+- **以前の完了**: M26 FindProject 全パス検証 / M25 FindClient 厳格化 + enrichment バグ修正 / M38 ReceiptEntity 実 API 準拠再設計。
+- **次のアクション**: M28 (FindDelivery 新規 E2E + ProjectEntity.Delivery 単数形マッピング fix、Phase H 4 件目) を着手
 
 ## Progress
 
@@ -415,11 +415,19 @@
 - E2E 結果: PASS 3 + SKIP 2（全テスト成功）
 - 詳細: plans/board-compliance-m26-find-project.md
 
-#### M27: FindOrder 新規 E2E
-- [ ] ProjectID → FindOrder の結果検証
-- [ ] FindEstimate と対比して実装対称性を確認
-- 見積: ~10 req
-- 詳細: plans/board-compliance-m27-find-order.md（着手時生成）
+#### M27: FindOrder 新規 E2E ✅（Phase H 3 件目）
+- [x] TestE2E_FindOrder_ByProjectID_Strict（ProjectID モード、Client/Project enrichment 独立 API 突合）
+- [x] TestE2E_FindOrder_ByID_Strict（ID モード、Client=nil/Project=nil 仕様通り確認）
+- [x] TestE2E_FindOrder_ByClientName_Strict（cache-warm SKIP、タイムアウト回避）
+- [x] TestE2E_FindOrder_ByProjectName_Strict（cache-warm SKIP、タイムアウト回避）
+- [x] findProjectWithDocType helper 追加（service/find e2e_test 用 topN=50 discovery）
+- [x] strictFieldDiff / projectIDOrZero / clientIDOrZero helper 追加（e2e_helpers_test）
+- **enrichment バグなし**: OrderEntity フラット構造、ClientID=0 で nil 返却が正常動作
+- **厳格フィールド突合 PASS**: GetOrderRaw 独立突合、未マップ 0 件
+- **発見事項**: ProjectEntity.Delivery/Receipt 単数形マッピング問題（M28/M29 で fix）
+- 実消費: ~20 req（discovery 50 件 × 2 テスト + GetOrderRaw + GetProjectWithGroup）
+- E2E 結果: PASS 2 + SKIP 2（cache-warm SKIP）
+- 詳細: plans/board-compliance-m27-find-order.md
 
 #### M28: FindDelivery 新規 E2E
 - [ ] ProjectID → FindDelivery
@@ -527,3 +535,4 @@
 | 2026-04-21 01:00 | M13 実装・検証 | `ListProjectsRaw` / `GetProjectRaw` / `GetProjectWithGroupRaw` / `SearchProjectsRaw` を M12 clients と同形で追加（URL `/v1/projects`、top-level、`ProjectSearchParams` は 5 クエリ検証で M12-M02 通算最多）。旧 `e2e_test.go` の `TestE2E_Projects_List` / `_GetByID` / `_GetWithGroup` 3 本を削除し M13 厳格突合版に一本化（`TestE2E_Estimates_GetByDocumentID` は M17/M18 スコープで残存）。Unit 6/6 Green（**U6 で GetProjectWithGroupRaw の response_group query 検証を初導入**、6 group + empty の計 7 subtest）。実 API E2E で **Phase E 2 件目・複雑度最高として多数の重要発見**: ①`GET /v1/projects/{id}` が **200 成功**（**Phase D/E コア業務系 Get 5 件連続確定**）、②**List/Search 21 未マップ**（`client / contact / delivery_status / estimate_date / group_* / invoice_dates / management_no / order_status / project_no / project_type* / tax / total / user`）、③**Get 68 未マップ**（List 21 + Get 限定 47、accounting_type* / archive_flg / client_branch / contract_* / cost_* / delivery_* / document_setting_* / hubspot / in_house_memo / invoice_* / lock_flg / payment_* / periodical_* / tags / to 等）、④**最重要 = delivery/invoice/receipt が `deliveries`/`invoices`/`receipts` 複数形配列キーで返却** → `*DocumentSummary` 単一ポインタ設計が根本的に誤り（M18-M21 スコープの構造的問題）、estimate/order は単一オブジェクトで partially 正しい、⑤DocumentSummary 内未マップ 6-7 フィールド（`details / seal_approval_status / delivery_place / blank_date_flg / document_amount_disp_kbn / valid_period` 等）、⑥`rg=all` 時に `project_costs` キーが出現（M17+ スコープ）、⑦`client_id=0`（`client` ネスト内 id が正規、M09/M10 継続）、⑧`status=空`（`order_status`/`delivery_status` が代替）、⑨**`Memo` 逆方向 9 件連続で全般仕様最終確定**（`in_house_memo` が代替候補）、⑩**name filter 無視 9 件連続で全般仕様最終確定**（2405 items 全件返却）、⑪403/429 は発生せず。E2E は意図的に Fail 状態で commit。実消費 **11 req**（List 1 + Get discovery 1 + Get 本体 1 + Search 1 + GetWithGroup discovery 1 + 6 groups 6 = 11、pin-point accuracy、上限 15 以内）。Pending Re-verification 追加なし（List 2405 items、Get 200 で完全にデータ充足）。**Phase E 2 件目サマリ**: M12 で確立した「コア業務 Get 200 継続・ネスト client-child 継続・逆方向不整合継続」が M13 で全て継承、更に **DocumentSummary 配列構造の根本的不一致** と **62 フィールド未マップ（今 M 最大規模）** の 2 大発見を得た。フォローアップ: ProjectEntity 全面改訂 / DocumentSummary 配列設計変更（最優先、M18-M21 依存）/ project_costs キー確認（M17+）。 |
 | 2026-04-21 10:xx | M25 実装・Phase H 開始 | TestE2E_FindClient_StrictEnrichment を新規追加し FindClient(ID) の branches/contacts enrichment を独立 raw API と突合。**compliance 欠損を Red で検出**: branches=0 / contacts=0（独立 raw API は 10 / 171）。**根本原因確定**: BOARD API は `client_id` フラットフィールドでなく `{"client": {"id": N}}` ネスト構造を返す（M09/M10 記録済み「逆方向不整合」）。ClientBranchEntity.ClientID / ContactEntity.ClientID が unmarshal 後常に 0 → `filterClientBranches(e.ClientID != params.ClientID)` が全件除外。`ClientBranchRepository.Search` と `ContactRepository.Search` を API-side filter（api.SearchClientBranches / api.SearchContacts）経由に修正。T_R23 / T_R37 unit test もモックデータ付きに修正。**修正後 Green**: branches=10 contacts=171（独立 API 突合 OK）。副産物として EstimateEntity.Title コンパイルエラー（M35 波及漏れ）を fix。VendorBranchRepository / VendorContactRepository も同パターンの潜在バグを発見（データなしのため未表面化、別 M 対応）。実消費 ~10 req。go build/vet/test 全 Green（全 12 パッケージ）。コミット 3 件 (fix+fix+test) + docs 1 件。 |
 | 2026-04-21 10:xx | M26 実装・Phase H 2 件目 | FindProject の 5 モード（ID/ClientName/Name/Text/Status）を E2E で厳格検証。**新規テスト 5 本追加**: TestE2E_FindProject_StrictEnrichment_ByID / ByName_Strict / ByClientName_Strict / ByText_Strict / ByStatus_Strict。**enrichment バグなし**: ProjectEntity.ClientID は `json:"client_id"` フラットマッピングであり M25 の nested-unmarshal バグは発現しない（fix コミットなし）。**data-dependent skip 2 件**: StrictEnrichment_ByID は先頭 5 件が全て ClientID=0 / ByStatus_Strict はステータス全件空。**ByText_Strict PASS**: 「弘前市」prefix で 4 results、全 result が prefix を Name/Code/Memo に含むことを確認。**BOARD API name filter 無視継続**: SearchClients(Name="株式会社WAND") が 299 件全返却（7+ 件連続継続）。実消費 ~10 req。go build/vet/test 全 Green。コミット 2 件（test + docs）。 |
+| 2026-04-21 | M27 実装・Phase H 3 件目 | FindOrder の 4 モード（ID/ProjectID/ClientName/ProjectName）を E2E で検証。**新規テスト 4 本 + helper 追加**: TestE2E_FindOrder_ByProjectID_Strict PASS（projectID=95944469, orderID=71741501, Project enrichment ✓, ClientID=0→nil 正常）/ TestE2E_FindOrder_ByID_Strict PASS（Client=nil, Project=nil ID モード仕様通り）/ ClientName・ProjectName は初回フルフェッチタイムアウトのため cache-warm SKIP。厳格フィールド突合 PASS（OrderEntity 未マップ 0）。**findProjectWithDocType helper 新設**（topN=50 で advisor 指摘 top-5 見逃しを回避）。**発見**: ProjectEntity.Delivery/Receipt 単数形マッピング問題（M28/M29 で fix 予定）。実消費 ~20 req。go build/vet/test 全 Green。コミット 2 件（test + docs）。 |
