@@ -1,0 +1,37 @@
+version: "2"
+
+run:
+  timeout: 5m
+  go: "1.26"
+
+linters:
+  default: none
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - ineffassign
+    - unused
+
+  settings:
+    staticcheck:
+      checks:
+        - all
+        - "-ST1000"
+
+  exclusions:
+    paths:
+      - tmp
+      - dist
+    rules:
+      - linters:
+          - errcheck
+        text: "(Close|Write)"
+      - path: _test\.go
+        linters:
+          - errcheck
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
