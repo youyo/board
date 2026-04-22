@@ -1,5 +1,9 @@
 # Roadmap: BOARD CLI / MCP 統合ツール
 
+> **Archived: 2026-04-22** — このロードマップは全マイルストーン完走済みです。
+> 現行の進行中計画は `plans/board-phase-k-roadmap.md`、準拠検証ロードマップは `plans/board-compliance-roadmap.md` を参照してください。
+> 同時期に作成された個別 `board-m*.md` も本ディレクトリ（`plans/archive/`）へ移設しています。
+
 ## Meta
 | 項目 | 値 |
 |------|---|

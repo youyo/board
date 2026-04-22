@@ -9,7 +9,7 @@
 | 対象リポジトリ | /Users/youyo/src/github.com/youyo/board |
 | 作成日 | 2026-04-22 |
 | 最終更新 | 2026-04-22 |
-| ステータス | 進行中（M47 完了） |
+| ステータス | 完了（M43-M48 全完走）✅ |
 | 親計画 | plans/tender-squishing-dusk.md |
 | 併走計画 | plans/board-compliance-roadmap.md（42 M 完走済） |
 
@@ -20,9 +20,9 @@
 - 補助的に lint/docs/archive を閉じて v0.4.0 リリースへ
 
 ## Current Focus
-- **マイルストーン**: M48 旧ロードマップ archive 化
-- **直近の完了**: M47 ユーザー向けドキュメント一括整備（2026-04-22）
-- **次のアクション**: M48 詳細計画 `plans/board-phase-k-m48-roadmap-archive.md` を生成し実装開始
+- **ステータス**: Phase K 全マイルストーン完走 ✅
+- **直近の完了**: M48 旧ロードマップ archive 化（2026-04-22）
+- **次のアクション**: v0.4.0 リリース準備（ユーザー手動でタグ付け。CHANGELOG に Breaking changes と `board cache clear` 必須案内を記載）
 
 ## Progress
 
@@ -73,12 +73,12 @@
 - [x] README.md / README_ja.md に docs/ 動線追加
 - 📄 詳細: plans/board-phase-k-m47-user-docs.md ✅
 
-### M48: 旧ロードマップ archive 化
-- [ ] `plans/archive/` ディレクトリ作成
-- [ ] `plans/board-roadmap.md` → `plans/archive/board-roadmap-v1.md` 移動
-- [ ] 先頭に archived 日付と理由を追記
-- [ ] CLAUDE.md / phase-k-roadmap / compliance-roadmap の参照を更新
-- 📄 詳細: plans/board-phase-k-m48-roadmap-archive.md（着手時生成）
+### M48: 旧ロードマップ archive 化 ✅ 完了
+- [x] `plans/archive/` ディレクトリ作成
+- [x] `plans/board-roadmap.md` → `plans/archive/board-roadmap.md` 移動（併せて旧 `board-m01`〜`board-m36` 系 24 件も archive に移設）
+- [x] 先頭に archived 日付と理由を追記
+- [x] CLAUDE.md / phase-k-roadmap の参照を更新
+- 📄 詳細: plans/board-phase-k-m48-roadmap-archive.md ✅
 
 ## 依存関係
 
