@@ -76,28 +76,28 @@ func TestE2E_Clients_List(t *testing.T) {
 		t.Fatalf("unmarshal list: %v", err)
 	}
 
-	// Aggregate stats only. Never log individual names, codes, or memos.
+	// Aggregate stats only. Never log individual names or values.
 	var (
-		nameFilled int
-		codeFilled int
-		memoFilled int
+		nameFilled     int
+		customNoFilled int
+		noteFilled     int
 	)
 	for _, cl := range items {
 		if cl.Name != "" {
 			nameFilled++
 		}
-		if cl.Code != "" {
-			codeFilled++
+		if cl.CustomNo != nil && *cl.CustomNo != "" {
+			customNoFilled++
 		}
-		if cl.Memo != "" {
-			memoFilled++
+		if cl.Note != nil && *cl.Note != "" {
+			noteFilled++
 		}
 	}
 	t.Logf("TestE2E_Clients_List: %d items returned", len(items))
-	t.Logf("distribution: name_filled=%d/%d code_filled=%d/%d memo_filled=%d/%d",
+	t.Logf("distribution: name_filled=%d/%d custom_no_filled=%d/%d note_filled=%d/%d",
 		nameFilled, len(items),
-		codeFilled, len(items),
-		memoFilled, len(items),
+		customNoFilled, len(items),
+		noteFilled, len(items),
 	)
 }
 
@@ -152,13 +152,21 @@ func TestE2E_Clients_Get(t *testing.T) {
 		t.Errorf("GetClient ID mismatch: got=%d want=%d", got.ID, id)
 	}
 
-	// Log only lengths and presence booleans. NEVER log the actual name,
-	// code, or memo values — client records are commercially sensitive.
-	t.Logf("TestE2E_Clients_Get: id=%d name_len=%d code_len=%d memo_len=%d has_updated_at=%v has_created_at=%v",
+	// Log only lengths and presence booleans. NEVER log the actual values
+	// — client records are commercially sensitive.
+	customNoLen := 0
+	if got.CustomNo != nil {
+		customNoLen = len(*got.CustomNo)
+	}
+	noteLen := 0
+	if got.Note != nil {
+		noteLen = len(*got.Note)
+	}
+	t.Logf("TestE2E_Clients_Get: id=%d name_len=%d custom_no_len=%d note_len=%d has_updated_at=%v has_created_at=%v",
 		got.ID,
 		len(got.Name),
-		len(got.Code),
-		len(got.Memo),
+		customNoLen,
+		noteLen,
 		got.UpdatedAt != "",
 		got.CreatedAt != "",
 	)
