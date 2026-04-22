@@ -8,8 +8,8 @@
 | 制約 | 破壊的変更（SQLite cache invalidate 必要）、Rate Limit 3 req/sec, 3000/day 遵守 |
 | 対象リポジトリ | /Users/youyo/src/github.com/youyo/board |
 | 作成日 | 2026-04-22 |
-| 最終更新 | 2026-04-22 17:10 |
-| ステータス | 未着手 |
+| 最終更新 | 2026-04-22 18:03 |
+| ステータス | 進行中（M43 完了） |
 | 親計画 | plans/tender-squishing-dusk.md |
 | 併走計画 | plans/board-compliance-roadmap.md（42 M 完走済） |
 
@@ -20,20 +20,20 @@
 - 補助的に lint/docs/archive を閉じて v0.4.0 リリースへ
 
 ## Current Focus
-- **マイルストーン**: M43 ClientEntity 全面再設計
-- **直近の完了**: Phase K ロードマップ起票（本ファイル）
-- **次のアクション**: M43 詳細計画 `plans/board-phase-k-m43-client-entity.md` に従い実装開始
+- **マイルストーン**: M44 ProjectEntity 全面再設計
+- **直近の完了**: M43 ClientEntity 全面再設計（2026-04-22）
+- **次のアクション**: M44 詳細計画 `plans/board-phase-k-m44-project-entity.md` を生成し実装開始
 
 ## Progress
 
-### M43: ClientEntity 全面再設計（Breaking）
-- [ ] `internal/boardapi/clients.go` の 6 フィールド → 実 API 準拠 33 フィールド（削除 2 + 既存 4 + 追加 29 - 削除分）に書き換え
-- [ ] `Code` / `Memo` フィールドを削除（逆方向不整合）
-- [ ] 15（List/Search 共通）+ 14（Get 限定）= 29 フィールドを追加
-- [ ] `*string` nullable 方針で Get 限定 14 フィールドを保持
-- [ ] downstream 12-15 ファイル修正（repository / service/find / cli / output / test）
-- [ ] `go build / vet / test` 全 Green
-- [ ] 実 API smoke test PASS（List/Get/Search）
+### M43: ClientEntity 全面再設計（Breaking）✅ 完了
+- [x] `internal/boardapi/clients.go` の 6 フィールド → 実 API 準拠 33 フィールド（削除 2 + 既存 4 + 追加 29）に書き換え
+- [x] `Code` / `Memo` フィールドを削除（逆方向不整合を解消）
+- [x] 15（List/Search 共通）+ 14（Get 限定）= 29 フィールドを追加
+- [x] `*string` nullable 方針で Get 限定 14 フィールドを保持
+- [x] downstream 修正（service/find: derefString ヘルパー追加 + find_client.go + テスト更新）
+- [x] `go build / vet / test` 全 Green
+- [x] 実 API smoke test PASS（List 299 件 / Get 1 件 / Search 299 件、未マップ 0）
 - 📄 詳細: plans/board-phase-k-m43-client-entity.md ✅
 
 ### M44: ProjectEntity 全面再設計（Breaking / 最大規模）
@@ -113,3 +113,4 @@ M45 (ProjectCost, 独立) ──┘
 | 日時 | 種別 | 内容 |
 |------|------|------|
 | 2026-04-22 17:10 | 作成 | Phase K ロードマップ初版。親計画 plans/tender-squishing-dusk.md に基づき 6 M 構成で起票 |
+| 2026-04-22 18:03 | M43 完了 | ClientEntity を 6 フィールドから 33 フィールドへ全面再設計。Code/Memo を削除し CustomNo/Note に置換。Unit test 6 件追加（U1-U6）。downstream 修正 4 ファイル（find_client.go, text_match.go, find_client_test.go, e2e_clients_test.go）。E2E smoke: List 299 件 / Get / Search 全 PASS 未マップ 0。commit: 3b87f78, 5ee83fa, 71d0b4f |
