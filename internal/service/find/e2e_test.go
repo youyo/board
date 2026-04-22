@@ -1445,8 +1445,8 @@ func TestE2E_FindVendor_StrictEnrichment(t *testing.T) {
 	}
 	// 全 branch が親 vendor を参照していること
 	for i, b := range r.Branches {
-		if b.VendorID != 0 && b.VendorID != targetID {
-			t.Errorf("Branches[%d].VendorID=%d want=%d", i, b.VendorID, targetID)
+		if vid := b.VendorID(); vid != 0 && vid != targetID {
+			t.Errorf("Branches[%d].VendorID=%d want=%d", i, vid, targetID)
 		}
 	}
 
@@ -1473,8 +1473,8 @@ func TestE2E_FindVendor_StrictEnrichment(t *testing.T) {
 		t.Errorf("Contacts ID set mismatch:\n  want=%v\n  got =%v", expectedContactIDs, actualContactIDs)
 	}
 	for i, c := range r.Contacts {
-		if c.VendorID != 0 && c.VendorID != targetID {
-			t.Errorf("Contacts[%d].VendorID=%d want=%d", i, c.VendorID, targetID)
+		if vid := c.VendorID(); vid != 0 && vid != targetID {
+			t.Errorf("Contacts[%d].VendorID=%d want=%d", i, vid, targetID)
 		}
 	}
 

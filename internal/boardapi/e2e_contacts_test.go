@@ -95,10 +95,10 @@ func TestE2E_Contacts_List(t *testing.T) {
 		if c.HonorificTitle != "" {
 			honorificFilled++
 		}
-		if c.Department != "" {
+		if c.Department != nil && *c.Department != "" {
 			departmentFilled++
 		}
-		if c.Note != "" {
+		if c.Note != nil && *c.Note != "" {
 			noteFilled++
 		}
 		if c.ArchiveFlg == 0 {
