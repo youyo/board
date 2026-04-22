@@ -61,7 +61,8 @@ func (s *Service) FindDelivery(ctx context.Context, q FindDeliveryQuery) ([]Deli
 				return nil, err
 			}
 			if err == nil {
-				client, project := s.resolveClientAndProject(ctx, p.ClientID, p.ID, opts)
+				// p は *ProjectEntity (GetByIDWithGroup の戻り値)
+				client, project := s.resolveClientAndProject(ctx, projectClientIDPtr(p), p.ID, opts)
 				results = append(results, DeliveryResult{
 					Delivery: *d,
 					Client:   client,
@@ -92,7 +93,7 @@ func (s *Service) FindDelivery(ctx context.Context, q FindDeliveryQuery) ([]Deli
 				if err != nil {
 					return nil, err
 				}
-				client, project := s.resolveClientAndProject(ctx, p.ClientID, p.ID, opts)
+				client, project := s.resolveClientAndProject(ctx, projectClientID(p), p.ID, opts)
 				results = append(results, DeliveryResult{
 					Delivery: *d,
 					Client:   client,
@@ -118,7 +119,7 @@ func (s *Service) FindDelivery(ctx context.Context, q FindDeliveryQuery) ([]Deli
 			if err != nil {
 				return nil, err
 			}
-			client, project := s.resolveClientAndProject(ctx, p.ClientID, p.ID, opts)
+			client, project := s.resolveClientAndProject(ctx, projectClientID(p), p.ID, opts)
 			results = append(results, DeliveryResult{
 				Delivery: *d,
 				Client:   client,

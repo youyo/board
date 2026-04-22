@@ -45,7 +45,7 @@ func TestFindDelivery_ByID(t *testing.T) {
 
 func TestFindDelivery_ByProjectID(t *testing.T) {
 	docSummary := boardapi.DocumentSummary{ID: 42}
-	project := &boardapi.ProjectEntity{ID: 100, ClientID: 10, Name: "Web Dev", Deliveries: []boardapi.DocumentSummary{docSummary}}
+	project := &boardapi.ProjectEntity{ID: 100, Client: &boardapi.ClientRef{ID: 10}, Name: "Web Dev", Deliveries: []boardapi.DocumentSummary{docSummary}}
 	del := &boardapi.DeliveryEntity{ID: 42, Total: "80000.0", DeliveryDate: "2026-06-30"}
 
 	svc := newServiceWith(
@@ -67,7 +67,7 @@ func TestFindDelivery_ByClientName(t *testing.T) {
 	clients := []boardapi.ClientEntity{{ID: 10, Name: "ABC Corp"}}
 	docSummary := boardapi.DocumentSummary{ID: 1}
 	projects := []boardapi.ProjectEntity{
-		{ID: 100, ClientID: 10, Name: "P1", Deliveries: []boardapi.DocumentSummary{docSummary}},
+		{ID: 100, Client: &boardapi.ClientRef{ID: 10}, Name: "P1", Deliveries: []boardapi.DocumentSummary{docSummary}},
 	}
 	del := &boardapi.DeliveryEntity{ID: 1, Total: "50000.0"}
 
@@ -86,7 +86,7 @@ func TestFindDelivery_ByClientName(t *testing.T) {
 func TestFindDelivery_ByProjectName(t *testing.T) {
 	docSummary := boardapi.DocumentSummary{ID: 1}
 	projects := []boardapi.ProjectEntity{
-		{ID: 100, ClientID: 10, Name: "Web Dev", Deliveries: []boardapi.DocumentSummary{docSummary}},
+		{ID: 100, Client: &boardapi.ClientRef{ID: 10}, Name: "Web Dev", Deliveries: []boardapi.DocumentSummary{docSummary}},
 	}
 	del := &boardapi.DeliveryEntity{ID: 1, Total: "80000.0"}
 
@@ -109,7 +109,7 @@ func TestFindDelivery_ByClientNameWithStatus(t *testing.T) {
 	clients := []boardapi.ClientEntity{{ID: 10, Name: "ABC"}}
 	docSummary := boardapi.DocumentSummary{ID: 1}
 	projects := []boardapi.ProjectEntity{
-		{ID: 100, ClientID: 10, Name: "P1", Deliveries: []boardapi.DocumentSummary{docSummary}},
+		{ID: 100, Client: &boardapi.ClientRef{ID: 10}, Name: "P1", Deliveries: []boardapi.DocumentSummary{docSummary}},
 	}
 	del := &boardapi.DeliveryEntity{ID: 1, Total: "50000.0"}
 
@@ -217,9 +217,9 @@ func TestFindDelivery_Limit(t *testing.T) {
 	docSummary2 := boardapi.DocumentSummary{ID: 2}
 	docSummary3 := boardapi.DocumentSummary{ID: 3}
 	projects := []boardapi.ProjectEntity{
-		{ID: 100, ClientID: 10, Name: "P1", Deliveries: []boardapi.DocumentSummary{docSummary1}},
-		{ID: 101, ClientID: 10, Name: "P2", Deliveries: []boardapi.DocumentSummary{docSummary2}},
-		{ID: 102, ClientID: 10, Name: "P3", Deliveries: []boardapi.DocumentSummary{docSummary3}},
+		{ID: 100, Client: &boardapi.ClientRef{ID: 10}, Name: "P1", Deliveries: []boardapi.DocumentSummary{docSummary1}},
+		{ID: 101, Client: &boardapi.ClientRef{ID: 10}, Name: "P2", Deliveries: []boardapi.DocumentSummary{docSummary2}},
+		{ID: 102, Client: &boardapi.ClientRef{ID: 10}, Name: "P3", Deliveries: []boardapi.DocumentSummary{docSummary3}},
 	}
 	del := &boardapi.DeliveryEntity{ID: 1, Total: "50000.0"}
 

@@ -57,7 +57,8 @@ func TestFindInvoice_ByClientName(t *testing.T) {
 }
 
 func TestFindInvoice_ByProjectName(t *testing.T) {
-	projects := []boardapi.ProjectEntity{{ID: 100, ClientID: 10, Name: "Web Dev"}}
+	// M44: ClientID 廃止、Client nested に統合
+	projects := []boardapi.ProjectEntity{{ID: 100, Client: &boardapi.ClientRef{ID: 10}, Name: "Web Dev"}}
 	invoices := []boardapi.InvoiceEntity{{ID: 1, ClientID: 10, ProjectID: 100, Title: "I1"}}
 
 	svc := newServiceWith(

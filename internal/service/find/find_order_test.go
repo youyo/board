@@ -41,7 +41,7 @@ func TestFindOrder_ByID(t *testing.T) {
 
 func TestFindOrder_ByProjectID(t *testing.T) {
 	docSummary := &boardapi.DocumentSummary{ID: 42}
-	project := &boardapi.ProjectEntity{ID: 100, ClientID: 10, Name: "Web Dev", Order: docSummary}
+	project := &boardapi.ProjectEntity{ID: 100, Client: &boardapi.ClientRef{ID: 10}, Name: "Web Dev", Order: docSummary}
 	ord := &boardapi.OrderEntity{ID: 42, Total: "80000.0"}
 
 	svc := newServiceWith(
@@ -63,7 +63,7 @@ func TestFindOrder_ByClientName(t *testing.T) {
 	clients := []boardapi.ClientEntity{{ID: 10, Name: "ABC Corp"}}
 	docSummary := &boardapi.DocumentSummary{ID: 1}
 	projects := []boardapi.ProjectEntity{
-		{ID: 100, ClientID: 10, Name: "P1", Order: docSummary},
+		{ID: 100, Client: &boardapi.ClientRef{ID: 10}, Name: "P1", Order: docSummary},
 	}
 	ord := &boardapi.OrderEntity{ID: 1, Total: "50000.0"}
 
@@ -82,7 +82,7 @@ func TestFindOrder_ByClientName(t *testing.T) {
 func TestFindOrder_ByProjectName(t *testing.T) {
 	docSummary := &boardapi.DocumentSummary{ID: 1}
 	projects := []boardapi.ProjectEntity{
-		{ID: 100, ClientID: 10, Name: "Web Dev", Order: docSummary},
+		{ID: 100, Client: &boardapi.ClientRef{ID: 10}, Name: "Web Dev", Order: docSummary},
 	}
 	ord := &boardapi.OrderEntity{ID: 1, Total: "80000.0"}
 
@@ -105,7 +105,7 @@ func TestFindOrder_ByClientNameWithStatus(t *testing.T) {
 	clients := []boardapi.ClientEntity{{ID: 10, Name: "ABC"}}
 	docSummary := &boardapi.DocumentSummary{ID: 1}
 	projects := []boardapi.ProjectEntity{
-		{ID: 100, ClientID: 10, Name: "P1", Order: docSummary},
+		{ID: 100, Client: &boardapi.ClientRef{ID: 10}, Name: "P1", Order: docSummary},
 	}
 	ord := &boardapi.OrderEntity{ID: 1, Total: "50000.0"}
 
@@ -213,9 +213,9 @@ func TestFindOrder_Limit(t *testing.T) {
 	docSummary2 := &boardapi.DocumentSummary{ID: 2}
 	docSummary3 := &boardapi.DocumentSummary{ID: 3}
 	projects := []boardapi.ProjectEntity{
-		{ID: 100, ClientID: 10, Name: "P1", Order: docSummary1},
-		{ID: 101, ClientID: 10, Name: "P2", Order: docSummary2},
-		{ID: 102, ClientID: 10, Name: "P3", Order: docSummary3},
+		{ID: 100, Client: &boardapi.ClientRef{ID: 10}, Name: "P1", Order: docSummary1},
+		{ID: 101, Client: &boardapi.ClientRef{ID: 10}, Name: "P2", Order: docSummary2},
+		{ID: 102, Client: &boardapi.ClientRef{ID: 10}, Name: "P3", Order: docSummary3},
 	}
 	ord := &boardapi.OrderEntity{ID: 1, Total: "50000.0"}
 

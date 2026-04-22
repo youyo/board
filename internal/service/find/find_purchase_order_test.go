@@ -56,7 +56,8 @@ func TestFindPurchaseOrder_ByVendorName(t *testing.T) {
 }
 
 func TestFindPurchaseOrder_ByProjectName(t *testing.T) {
-	projects := []boardapi.ProjectEntity{{ID: 100, ClientID: 10, Name: "Web Dev"}}
+	// M44: ClientID 廃止、Client nested に統合
+	projects := []boardapi.ProjectEntity{{ID: 100, Client: &boardapi.ClientRef{ID: 10}, Name: "Web Dev"}}
 	pos := []boardapi.PurchaseOrderEntity{
 		{ID: 1, VendorID: 10, ProjectID: 100, Title: "PO1"},
 	}

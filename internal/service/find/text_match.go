@@ -1,6 +1,10 @@
 package find
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/youyo/board/internal/boardapi"
+)
 
 // containsText returns true if any of the given fields contain the text
 // as a case-insensitive substring.
@@ -20,4 +24,23 @@ func derefString(s *string) string {
 		return ""
 	}
 	return *s
+}
+
+// projectClientID は ProjectEntity の nested Client から client ID を取得する。
+// M44: ClientID フィールド廃止に伴い Client.ID 参照に統合。
+// Client が nil の場合は 0 を返す。
+func projectClientID(p boardapi.ProjectEntity) int {
+	if p.Client == nil {
+		return 0
+	}
+	return p.Client.ID
+}
+
+// projectClientIDPtr は *ProjectEntity の nested Client から client ID を取得する。
+// nil の ProjectEntity の場合は 0 を返す。
+func projectClientIDPtr(p *boardapi.ProjectEntity) int {
+	if p == nil || p.Client == nil {
+		return 0
+	}
+	return p.Client.ID
 }

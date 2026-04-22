@@ -11,7 +11,7 @@ import (
 // --- FindProject: Normal Cases ---
 
 func TestFindProject_ByID(t *testing.T) {
-	project := &boardapi.ProjectEntity{ID: 1, ClientID: 10, Name: "Project A"}
+	project := &boardapi.ProjectEntity{ID: 1, Client: &boardapi.ClientRef{ID: 10}, Name: "Project A"}
 	client := &boardapi.ClientEntity{ID: 10, Name: "Client X"}
 
 	svc := newServiceWith(
@@ -41,11 +41,11 @@ func TestFindProject_ByClientName(t *testing.T) {
 		{ID: 11, Name: "ABC Inc"},
 	}
 	projects10 := []boardapi.ProjectEntity{
-		{ID: 1, ClientID: 10, Name: "P1"},
-		{ID: 2, ClientID: 10, Name: "P2"},
+		{ID: 1, Client: &boardapi.ClientRef{ID: 10}, Name: "P1"},
+		{ID: 2, Client: &boardapi.ClientRef{ID: 10}, Name: "P2"},
 	}
 	projects11 := []boardapi.ProjectEntity{
-		{ID: 3, ClientID: 11, Name: "P3"},
+		{ID: 3, Client: &boardapi.ClientRef{ID: 11}, Name: "P3"},
 	}
 
 	clientRepo := &stubClientRepo{searchResult: clients}
@@ -72,7 +72,7 @@ func TestFindProject_ByClientName(t *testing.T) {
 
 func TestFindProject_ByName(t *testing.T) {
 	projects := []boardapi.ProjectEntity{
-		{ID: 1, ClientID: 10, Name: "Dev Project"},
+		{ID: 1, Client: &boardapi.ClientRef{ID: 10}, Name: "Dev Project"},
 	}
 	client := &boardapi.ClientEntity{ID: 10, Name: "Client X"}
 
@@ -90,8 +90,8 @@ func TestFindProject_ByName(t *testing.T) {
 func TestFindProject_ByClientNameWithStatus(t *testing.T) {
 	clients := []boardapi.ClientEntity{{ID: 10, Name: "ABC"}}
 	projects := []boardapi.ProjectEntity{
-		{ID: 1, ClientID: 10, Name: "P1", Status: "active"},
-		{ID: 2, ClientID: 10, Name: "P2", Status: "closed"},
+		{ID: 1, Client: &boardapi.ClientRef{ID: 10}, Name: "P1", OrderStatusName: "active"},
+		{ID: 2, Client: &boardapi.ClientRef{ID: 10}, Name: "P2", OrderStatusName: "closed"},
 	}
 	client := &boardapi.ClientEntity{ID: 10, Name: "ABC"}
 
@@ -104,15 +104,16 @@ func TestFindProject_ByClientNameWithStatus(t *testing.T) {
 	got, err := svc.FindProject(testCtx, find.FindProjectQuery{ClientName: "ABC", Status: "active"})
 	assertNoError(t, err)
 	assertProjectResultLen(t, got, 1)
-	if got[0].Project.Status != "active" {
-		t.Errorf("status = %q, want active", got[0].Project.Status)
+	// M44: Status フィールド廃止。OrderStatusName で代替。
+	if got[0].Project.OrderStatusName != "active" {
+		t.Errorf("order_status_name = %q, want active", got[0].Project.OrderStatusName)
 	}
 }
 
 func TestFindProject_ByText(t *testing.T) {
 	allProjects := []boardapi.ProjectEntity{
-		{ID: 1, ClientID: 10, Name: "Web App", Code: "WA", Memo: "search target"},
-		{ID: 2, ClientID: 10, Name: "API", Code: "API", Memo: "normal"},
+		{ID: 1, Client: &boardapi.ClientRef{ID: 10}, Name: "Web App", ManagementNo: strPtr("WA"), InHouseMemo: strPtr("search target")},
+		{ID: 2, Client: &boardapi.ClientRef{ID: 10}, Name: "API", ManagementNo: strPtr("API"), InHouseMemo: strPtr("normal")},
 	}
 	client := &boardapi.ClientEntity{ID: 10, Name: "Client X"}
 
@@ -177,7 +178,7 @@ func TestFindProject_ClientSearchOK_ProjectSearchFails(t *testing.T) {
 // --- FindProject: Priority Cases ---
 
 func TestFindProject_IDPriorityOverClientName(t *testing.T) {
-	project := &boardapi.ProjectEntity{ID: 1, ClientID: 10, Name: "By ID"}
+	project := &boardapi.ProjectEntity{ID: 1, Client: &boardapi.ClientRef{ID: 10}, Name: "By ID"}
 	client := &boardapi.ClientEntity{ID: 10, Name: "Client"}
 
 	svc := newServiceWith(
@@ -204,9 +205,9 @@ func TestFindProject_IDPriorityOverClientName(t *testing.T) {
 
 func TestFindProject_Limit(t *testing.T) {
 	projects := []boardapi.ProjectEntity{
-		{ID: 1, ClientID: 10, Name: "P1"},
-		{ID: 2, ClientID: 10, Name: "P2"},
-		{ID: 3, ClientID: 10, Name: "P3"},
+		{ID: 1, Client: &boardapi.ClientRef{ID: 10}, Name: "P1"},
+		{ID: 2, Client: &boardapi.ClientRef{ID: 10}, Name: "P2"},
+		{ID: 3, Client: &boardapi.ClientRef{ID: 10}, Name: "P3"},
 	}
 	client := &boardapi.ClientEntity{ID: 10, Name: "Client"}
 
@@ -225,9 +226,9 @@ func TestFindProject_Limit(t *testing.T) {
 
 func TestFindProject_StatusOnly(t *testing.T) {
 	allProjects := []boardapi.ProjectEntity{
-		{ID: 1, ClientID: 10, Name: "P1", Status: "active"},
-		{ID: 2, ClientID: 10, Name: "P2", Status: "closed"},
-		{ID: 3, ClientID: 10, Name: "P3", Status: "active"},
+		{ID: 1, Client: &boardapi.ClientRef{ID: 10}, Name: "P1", OrderStatusName: "active"},
+		{ID: 2, Client: &boardapi.ClientRef{ID: 10}, Name: "P2", OrderStatusName: "closed"},
+		{ID: 3, Client: &boardapi.ClientRef{ID: 10}, Name: "P3", OrderStatusName: "active"},
 	}
 	client := &boardapi.ClientEntity{ID: 10, Name: "Client"}
 
@@ -237,6 +238,7 @@ func TestFindProject_StatusOnly(t *testing.T) {
 		&stubProjectRepo{listResult: allProjects},
 	)
 
+	// FindProjectQuery.Status は order_status_name / delivery_status_name で in-memory フィルタ
 	got, err := svc.FindProject(testCtx, find.FindProjectQuery{Status: "active"})
 	assertNoError(t, err)
 	assertProjectResultLen(t, got, 2)

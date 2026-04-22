@@ -158,16 +158,24 @@ func (r *ProjectRepository) Search(ctx context.Context, params boardapi.ProjectS
 
 // filterProjects performs in-memory filtering.
 // UpdatedAtFrom is used as a delta fetch cursor and is not included in the filter.
+// NOTE: Status フィルタは BOARD API の order_status_name / delivery_status_name
+// の完全一致でフィルタリングする。実 API でも status パラメータは無視されるため
+// in-memory での name ベースフィルタで代替する。
 func filterProjects(entities []boardapi.ProjectEntity, params boardapi.ProjectSearchParams) []boardapi.ProjectEntity {
 	var result []boardapi.ProjectEntity
 	for _, e := range entities {
-		if params.ClientID != 0 && e.ClientID != params.ClientID {
-			continue
+		// M44: ClientID は nested Client.ID に統合
+		if params.ClientID != 0 {
+			if e.Client == nil || e.Client.ID != params.ClientID {
+				continue
+			}
 		}
 		if params.Name != "" && !strings.Contains(e.Name, params.Name) {
 			continue
 		}
-		if params.Status != "" && e.Status != params.Status {
+		// M44: Status は order_status_name / delivery_status_name で代替
+		// BOARD API 実測で status パラメータは無視されるため name ベースで in-memory フィルタ
+		if params.Status != "" && e.OrderStatusName != params.Status && e.DeliveryStatusName != params.Status {
 			continue
 		}
 		result = append(result, e)

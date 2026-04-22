@@ -52,25 +52,27 @@ func (s *Service) FindProject(ctx context.Context, q FindProjectQuery) ([]Projec
 		projects = result
 
 	case q.Text != "":
-		// Text search: list all, filter by name/code/memo
+		// Text search: list all, filter by name / management_no / in_house_memo
+		// M44: Code/Memo は廃止。ManagementNo/InHouseMemo で代替。
 		all, err := s.projects.List(ctx, opts)
 		if err != nil {
 			return nil, err
 		}
 		for _, p := range all {
-			if containsText(q.Text, p.Name, p.Code, p.Memo) {
+			if containsText(q.Text, p.Name, derefString(p.ManagementNo), derefString(p.InHouseMemo)) {
 				projects = append(projects, p)
 			}
 		}
 
 	case q.Status != "":
-		// Status-only search: list all, filter by status
+		// Status-only search: list all, filter by order_status_name / delivery_status_name
+		// M44: Status フィールド廃止。OrderStatusName/DeliveryStatusName で代替。
 		all, err := s.projects.List(ctx, opts)
 		if err != nil {
 			return nil, err
 		}
 		for _, p := range all {
-			if p.Status == q.Status {
+			if p.OrderStatusName == q.Status || p.DeliveryStatusName == q.Status {
 				projects = append(projects, p)
 			}
 		}
@@ -103,8 +105,9 @@ func (s *Service) FindProject(ctx context.Context, q FindProjectQuery) ([]Projec
 // Both resolutions are non-fatal: nil is returned on lookup error.
 func (s *Service) resolveProjectClient(ctx context.Context, project boardapi.ProjectEntity, opts repository.ReadOptions) (ProjectResult, error) {
 	var client *boardapi.ClientEntity
-	if project.ClientID != 0 {
-		c, err := s.clients.GetByID(ctx, project.ClientID, opts)
+	// M44: ClientID → nested Client.ID に統合
+	if project.Client != nil && project.Client.ID != 0 {
+		c, err := s.clients.GetByID(ctx, project.Client.ID, opts)
 		if err != nil {
 			// Client resolution failure is non-fatal; project still returned
 			client = nil
@@ -130,11 +133,12 @@ func (s *Service) resolveProjectClient(ctx context.Context, project boardapi.Pro
 	}, nil
 }
 
-// filterByStatus filters projects by status.
+// filterByStatus filters projects by order_status_name or delivery_status_name.
+// M44: Status フィールド廃止に伴い OrderStatusName/DeliveryStatusName で代替。
 func filterByStatus(projects []boardapi.ProjectEntity, status string) []boardapi.ProjectEntity {
 	filtered := make([]boardapi.ProjectEntity, 0, len(projects))
 	for _, p := range projects {
-		if p.Status == status {
+		if p.OrderStatusName == status || p.DeliveryStatusName == status {
 			filtered = append(filtered, p)
 		}
 	}

@@ -13,6 +13,9 @@ import (
 
 var testCtx = context.Background()
 
+// strPtr は文字列を *string に変換するテストヘルパー。
+func strPtr(s string) *string { return &s }
+
 // --- Assertion helpers ---
 
 func assertNoError(t *testing.T, err error) {

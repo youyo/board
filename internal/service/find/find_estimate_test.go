@@ -41,7 +41,7 @@ func TestFindEstimate_ByID(t *testing.T) {
 
 func TestFindEstimate_ByProjectID(t *testing.T) {
 	docSummary := &boardapi.DocumentSummary{ID: 42}
-	project := &boardapi.ProjectEntity{ID: 100, ClientID: 10, Name: "Web Dev", Estimate: docSummary}
+	project := &boardapi.ProjectEntity{ID: 100, Client: &boardapi.ClientRef{ID: 10}, Name: "Web Dev", Estimate: docSummary}
 	est := &boardapi.EstimateEntity{ID: 42, Total: "50000.0"}
 
 	svc := newServiceWith(
@@ -60,7 +60,7 @@ func TestFindEstimate_ByProjectID(t *testing.T) {
 }
 
 func TestFindEstimate_ByProjectID_NoEstimate(t *testing.T) {
-	project := &boardapi.ProjectEntity{ID: 100, ClientID: 10, Name: "Web Dev", Estimate: nil}
+	project := &boardapi.ProjectEntity{ID: 100, Client: &boardapi.ClientRef{ID: 10}, Name: "Web Dev", Estimate: nil}
 
 	svc := newServiceWith(
 		nil, nil, nil,
@@ -77,7 +77,7 @@ func TestFindEstimate_ByClientName(t *testing.T) {
 	clients := []boardapi.ClientEntity{{ID: 10, Name: "ABC Corp"}}
 	docSummary := &boardapi.DocumentSummary{ID: 1}
 	projects := []boardapi.ProjectEntity{
-		{ID: 100, ClientID: 10, Name: "P1", Estimate: docSummary},
+		{ID: 100, Client: &boardapi.ClientRef{ID: 10}, Name: "P1", Estimate: docSummary},
 	}
 	est := &boardapi.EstimateEntity{ID: 1, Total: "50000.0"}
 
@@ -96,7 +96,7 @@ func TestFindEstimate_ByClientName(t *testing.T) {
 func TestFindEstimate_ByProjectName(t *testing.T) {
 	docSummary := &boardapi.DocumentSummary{ID: 1}
 	projects := []boardapi.ProjectEntity{
-		{ID: 100, ClientID: 10, Name: "Web Dev", Estimate: docSummary},
+		{ID: 100, Client: &boardapi.ClientRef{ID: 10}, Name: "Web Dev", Estimate: docSummary},
 	}
 	est := &boardapi.EstimateEntity{ID: 1, Total: "80000.0"}
 
@@ -120,7 +120,7 @@ func TestFindEstimate_ByClientNameWithStatus(t *testing.T) {
 	clients := []boardapi.ClientEntity{{ID: 10, Name: "ABC"}}
 	docSummary := &boardapi.DocumentSummary{ID: 1}
 	projects := []boardapi.ProjectEntity{
-		{ID: 100, ClientID: 10, Name: "P1", Estimate: docSummary},
+		{ID: 100, Client: &boardapi.ClientRef{ID: 10}, Name: "P1", Estimate: docSummary},
 	}
 	est := &boardapi.EstimateEntity{ID: 1, Total: "50000.0"}
 
@@ -235,9 +235,9 @@ func TestFindEstimate_Limit(t *testing.T) {
 	docSummary2 := &boardapi.DocumentSummary{ID: 2}
 	docSummary3 := &boardapi.DocumentSummary{ID: 3}
 	projects := []boardapi.ProjectEntity{
-		{ID: 100, ClientID: 10, Name: "P1", Estimate: docSummary1},
-		{ID: 101, ClientID: 10, Name: "P2", Estimate: docSummary2},
-		{ID: 102, ClientID: 10, Name: "P3", Estimate: docSummary3},
+		{ID: 100, Client: &boardapi.ClientRef{ID: 10}, Name: "P1", Estimate: docSummary1},
+		{ID: 101, Client: &boardapi.ClientRef{ID: 10}, Name: "P2", Estimate: docSummary2},
+		{ID: 102, Client: &boardapi.ClientRef{ID: 10}, Name: "P3", Estimate: docSummary3},
 	}
 	est := &boardapi.EstimateEntity{ID: 1, Total: "50000.0"}
 

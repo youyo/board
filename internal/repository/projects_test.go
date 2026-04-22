@@ -64,10 +64,11 @@ func newProjectAPIServer(t *testing.T, entities []boardapi.ProjectEntity) *httpt
 	return srv
 }
 
+// M44: ClientID/Status フィールド廃止。Client nested / OrderStatusName で代替。
 var sampleProjects = []boardapi.ProjectEntity{
-	{ID: 1, ClientID: 10, Name: "ProjectA", Status: "active", UpdatedAt: "2026-01-01T00:00:00Z"},
-	{ID: 2, ClientID: 10, Name: "ProjectB", Status: "closed", UpdatedAt: "2026-01-02T00:00:00Z"},
-	{ID: 3, ClientID: 20, Name: "ProjectC", Status: "active", UpdatedAt: "2026-01-03T00:00:00Z"},
+	{ID: 1, Client: &boardapi.ClientRef{ID: 10}, Name: "ProjectA", OrderStatusName: "active", UpdatedAt: "2026-01-01T00:00:00Z"},
+	{ID: 2, Client: &boardapi.ClientRef{ID: 10}, Name: "ProjectB", OrderStatusName: "closed", UpdatedAt: "2026-01-02T00:00:00Z"},
+	{ID: 3, Client: &boardapi.ClientRef{ID: 20}, Name: "ProjectC", OrderStatusName: "active", UpdatedAt: "2026-01-03T00:00:00Z"},
 }
 
 // T_R42: List - cache hit -> returns cached data
@@ -268,7 +269,8 @@ func TestProjectRepository_GetByID_CacheMiss_APISuccess(t *testing.T) {
 	db := newTestDB(t)
 	markSynced(t, db, "projects")
 
-	target := boardapi.ProjectEntity{ID: 99, ClientID: 10, Name: "Test Project", Status: "active"}
+	// M44: ClientID/Status フィールド廃止
+	target := boardapi.ProjectEntity{ID: 99, Client: &boardapi.ClientRef{ID: 10}, Name: "Test Project", OrderStatusName: "active"}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		b, _ := json.Marshal(target)
