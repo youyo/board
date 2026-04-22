@@ -8,8 +8,8 @@
 | 制約 | 破壊的変更（SQLite cache invalidate 必要）、Rate Limit 3 req/sec, 3000/day 遵守 |
 | 対象リポジトリ | /Users/youyo/src/github.com/youyo/board |
 | 作成日 | 2026-04-22 |
-| 最終更新 | 2026-04-22 18:03 |
-| ステータス | 進行中（M43 完了） |
+| 最終更新 | 2026-04-22 18:45 |
+| ステータス | 進行中（M44 完了） |
 | 親計画 | plans/tender-squishing-dusk.md |
 | 併走計画 | plans/board-compliance-roadmap.md（42 M 完走済） |
 
@@ -20,9 +20,9 @@
 - 補助的に lint/docs/archive を閉じて v0.4.0 リリースへ
 
 ## Current Focus
-- **マイルストーン**: M44 ProjectEntity 全面再設計
-- **直近の完了**: M43 ClientEntity 全面再設計（2026-04-22）
-- **次のアクション**: M44 詳細計画 `plans/board-phase-k-m44-project-entity.md` を生成し実装開始
+- **マイルストーン**: M45 ProjectCostEntity 全面再設計
+- **直近の完了**: M44 ProjectEntity 全面再設計（2026-04-22）
+- **次のアクション**: M45 詳細計画 `plans/board-phase-k-m45-project-cost-entity.md` を生成し実装開始
 
 ## Progress
 
@@ -36,16 +36,16 @@
 - [x] 実 API smoke test PASS（List 299 件 / Get 1 件 / Search 299 件、未マップ 0）
 - 📄 詳細: plans/board-phase-k-m43-client-entity.md ✅
 
-### M44: ProjectEntity 全面再設計（Breaking / 最大規模）
-- [ ] `internal/boardapi/projects.go` の 13 フィールド → 81 フィールドに書き換え
-- [ ] `Status` / `Code` / `Memo` / `Delivery/Invoice/Receipt 単一ポインタ` を削除
-- [ ] 21 + 47 = 68 フィールドを追加
-- [ ] `Deliveries/Invoices/Receipts` を `[]DocumentSummary` 配列化
-- [ ] nested 型の確定（ClientRef 再利用、ContactRef/UserRef/ClientBranchRef/ProjectTypeRef/AccountingTypeRef/GroupRef 等の新規型）
-- [ ] DocumentSummary に 6-7 フィールド追加
-- [ ] downstream 15-18 ファイル修正
-- [ ] response_group 全 6 バリアントで smoke test
-- 📄 詳細: plans/board-phase-k-m44-project-entity.md（着手時生成）
+### M44: ProjectEntity 全面再設計（Breaking / 最大規模）✅ 完了
+- [x] `internal/boardapi/projects.go` の 13 フィールド → 72 フィールドに書き換え
+- [x] `Status` / `Code` / `Memo` / `Delivery/Invoice/Receipt 単一ポインタ` を削除
+- [x] 21 + 47 = 68 フィールドを追加
+- [x] `Deliveries/Invoices/Receipts` を `[]DocumentSummary` 配列化
+- [x] nested 型の確定（ClientRef 再利用、ContactRef/UserRef/ClientBranchRef/HubspotRef 新規）
+- [x] DocumentSummary に 17 フィールド追加（共通 5 + type-specific 12）
+- [x] downstream 9 ファイル修正
+- [x] response_group 全 6 バリアントで smoke test PASS（未マップ 0）
+- 📄 詳細: plans/board-phase-k-m44-project-entity.md ✅
 
 ### M45: ProjectCostEntity 全面再設計（Breaking）
 - [ ] `internal/boardapi/project_costs.go` を概念モデルから書き直し
@@ -114,3 +114,4 @@ M45 (ProjectCost, 独立) ──┘
 |------|------|------|
 | 2026-04-22 17:10 | 作成 | Phase K ロードマップ初版。親計画 plans/tender-squishing-dusk.md に基づき 6 M 構成で起票 |
 | 2026-04-22 18:03 | M43 完了 | ClientEntity を 6 フィールドから 33 フィールドへ全面再設計。Code/Memo を削除し CustomNo/Note に置換。Unit test 6 件追加（U1-U6）。downstream 修正 4 ファイル（find_client.go, text_match.go, find_client_test.go, e2e_clients_test.go）。E2E smoke: List 299 件 / Get / Search 全 PASS 未マップ 0。commit: 3b87f78, 5ee83fa, 71d0b4f |
+| 2026-04-22 18:45 | M44 完了 | ProjectEntity を 13 フィールドから 72 フィールドへ全面再設計（最大規模）。Status/Code/Memo/Delivery・Invoice・Receipt 単数ポインタを削除。nested 型 5 件新規追加（UserRef/ContactRef/ClientBranchRef/CompanyBranchRef/HubspotRef）。DocumentSummary を 17 フィールド拡張。Deliveries/Invoices/Receipts を []DocumentSummary 配列化。Unit test 12 件追加（U1-U12）。downstream 修正 9 ファイル（projects.go, find_project.go, text_match.go, find_estimate/order/delivery/receipt/invoice.go, helpers_test.go 等）。E2E smoke: List/Get/Search/GetWithGroup 全 6 variants PASS 未マップ 0。commit: 88139f9, b20c138, 0d1f652, f1c2eee, 2c5e254 |
