@@ -79,7 +79,7 @@ func (s *Service) FindProject(ctx context.Context, q FindProjectQuery) ([]Projec
 	}
 
 	// Apply status post-filter (for non-status-only search modes)
-	if q.Status != "" && q.ID == 0 && !(q.ClientName == "" && q.Name == "" && q.Text == "") {
+	if q.Status != "" && q.ID == 0 && (q.ClientName != "" || q.Name != "" || q.Text != "") {
 		projects = filterByStatus(projects, q.Status)
 	}
 

@@ -422,10 +422,7 @@ func TestDo_ErrorMessage_Fallback(t *testing.T) {
 func TestDo_ContextCancellation(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// delay response even if request comes in (will be cancelled during test)
-		select {
-		case <-r.Context().Done():
-			return
-		}
+		<-r.Context().Done() //nolint:staticcheck
 	}))
 	defer ts.Close()
 

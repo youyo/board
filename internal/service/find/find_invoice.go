@@ -77,7 +77,7 @@ func (s *Service) FindInvoice(ctx context.Context, q FindInvoiceQuery) ([]Invoic
 	}
 
 	// Apply status post-filter for non-status-only search modes
-	if q.Status != "" && q.ID == 0 && !(q.ClientName == "" && q.ProjectName == "" && q.Text == "") {
+	if q.Status != "" && q.ID == 0 && (q.ClientName != "" || q.ProjectName != "" || q.Text != "") {
 		invoices = filterInvoicesByStatus(invoices, q.Status)
 	}
 

@@ -28,7 +28,7 @@ func NewConfigureListProfilesCmd() *cobra.Command {
 			sort.Strings(names)
 
 			for _, name := range names {
-				fmt.Fprintln(cmd.OutOrStdout(), name)
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), name)
 			}
 			return nil
 		},

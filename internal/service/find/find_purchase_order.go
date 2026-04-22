@@ -78,7 +78,7 @@ func (s *Service) FindPurchaseOrder(ctx context.Context, q FindPurchaseOrderQuer
 	}
 
 	// Apply status post-filter for non-status-only search modes
-	if q.Status != "" && q.ID == 0 && !(q.VendorName == "" && q.ProjectName == "" && q.Text == "") {
+	if q.Status != "" && q.ID == 0 && (q.VendorName != "" || q.ProjectName != "" || q.Text != "") {
 		purchaseOrders = filterPurchaseOrdersByStatus(purchaseOrders, q.Status)
 	}
 

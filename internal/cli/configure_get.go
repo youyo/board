@@ -32,7 +32,7 @@ func NewConfigureGetCmd() *cobra.Command {
 				val = maskSecret(val)
 			}
 
-			fmt.Fprintln(cmd.OutOrStdout(), val)
+			_, _ = fmt.Fprintln(cmd.OutOrStdout(), val)
 			return nil
 		},
 	}

@@ -37,7 +37,7 @@ func newMCPServeCmd() *cobra.Command {
 
 			srv := mcpserver.New(findSvc)
 
-			fmt.Fprintf(cmd.OutOrStdout(), "Starting MCP server on %s:%d...\n", host, port)
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Starting MCP server on %s:%d...\n", host, port)
 
 			if err := srv.Start(cmd.Context(), host, port); err != nil {
 				return fmt.Errorf("mcp serve: %w", err)

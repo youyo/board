@@ -29,9 +29,9 @@ func main() {
 			if apiErr.RetryAfter > 0 {
 				result["retry_after_seconds"] = int(apiErr.RetryAfter.Seconds())
 			}
-			json.NewEncoder(os.Stderr).Encode(result)
+			_ = json.NewEncoder(os.Stderr).Encode(result)
 		} else {
-			json.NewEncoder(os.Stderr).Encode(map[string]interface{}{
+			_ = json.NewEncoder(os.Stderr).Encode(map[string]interface{}{
 				"error":   true,
 				"message": err.Error(),
 			})

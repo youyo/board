@@ -19,7 +19,7 @@ func NewConfigureCurrentProfileCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			fmt.Fprintln(cmd.OutOrStdout(), cfg.CurrentProfile)
+			_, _ = fmt.Fprintln(cmd.OutOrStdout(), cfg.CurrentProfile)
 			return nil
 		},
 	}

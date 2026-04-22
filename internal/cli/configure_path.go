@@ -14,7 +14,7 @@ func NewConfigurePathCmd() *cobra.Command {
 		Short: "Show the path to the configuration file",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Fprintln(cmd.OutOrStdout(), config.ConfigPath())
+			_, _ = fmt.Fprintln(cmd.OutOrStdout(), config.ConfigPath())
 			return nil
 		},
 	}

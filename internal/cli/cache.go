@@ -101,12 +101,12 @@ func newCacheExpireCmd() *cobra.Command {
 				if err := a.SyncStore.Expire(cmd.Context(), a.ProfileName, resource, now); err != nil {
 					return fmt.Errorf("cache expire: %w", err)
 				}
-				fmt.Fprintf(os.Stdout, "{\"expired\":%q}\n", resource)
+				_, _ = fmt.Fprintf(os.Stdout, "{\"expired\":%q}\n", resource)
 			} else {
 				if err := a.SyncStore.ExpireAll(cmd.Context(), a.ProfileName, now); err != nil {
 					return fmt.Errorf("cache expire: %w", err)
 				}
-				fmt.Fprintf(os.Stdout, "{\"expired\":\"all\"}\n")
+				_, _ = fmt.Fprintf(os.Stdout, "{\"expired\":\"all\"}\n")
 			}
 			return nil
 		},
@@ -138,7 +138,7 @@ func newCacheClearCmd() *cobra.Command {
 				if err := a.SyncStore.Delete(cmd.Context(), a.ProfileName, resource); err != nil {
 					return fmt.Errorf("cache clear: sync_state: %w", err)
 				}
-				fmt.Fprintf(os.Stdout, "{\"cleared\":%q}\n", resource)
+				_, _ = fmt.Fprintf(os.Stdout, "{\"cleared\":%q}\n", resource)
 			} else {
 				// Delete all resources: remove all rows from resource_cache and sync_state.
 				// resource_cache has no DeleteAllProfiles equivalent,
@@ -152,7 +152,7 @@ func newCacheClearCmd() *cobra.Command {
 				if err := a.SyncStore.DeleteAll(cmd.Context(), a.ProfileName); err != nil {
 					return fmt.Errorf("cache clear: sync_state: %w", err)
 				}
-				fmt.Fprintf(os.Stdout, "{\"cleared\":\"all\"}\n")
+				_, _ = fmt.Fprintf(os.Stdout, "{\"cleared\":\"all\"}\n")
 			}
 			return nil
 		},
@@ -174,7 +174,7 @@ func newCachePathCmd() *cobra.Command {
 				return errNoApp
 			}
 			// Retrieve the DB path via app (DB.DSN is unexported, so it is passed from app).
-			fmt.Fprintln(os.Stdout, a.DBPath)
+			_, _ = fmt.Fprintln(os.Stdout, a.DBPath)
 			return nil
 		},
 	}

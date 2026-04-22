@@ -63,7 +63,7 @@ func runConfigure(cmd *cobra.Command, in io.Reader, profileName string) error {
 
 	// ask helper: returns defaultVal when input is empty.
 	ask := func(prompt string, defaultVal string) string {
-		fmt.Fprintf(cmd.OutOrStdout(), "%s [%s]: ", prompt, defaultVal)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s [%s]: ", prompt, defaultVal)
 		if scanner.Scan() {
 			line := strings.TrimSpace(scanner.Text())
 			if line != "" {
@@ -81,7 +81,7 @@ func runConfigure(cmd *cobra.Command, in io.Reader, profileName string) error {
 
 	// Question 3: api_key (current value is masked)
 	maskedKey := maskSecret(prof.APIKey)
-	fmt.Fprintf(cmd.OutOrStdout(), "API Key [%s]: ", maskedKey)
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "API Key [%s]: ", maskedKey)
 	if scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if line != "" {
@@ -91,7 +91,7 @@ func runConfigure(cmd *cobra.Command, in io.Reader, profileName string) error {
 
 	// Question 4: api_token (current value is masked)
 	maskedToken := maskSecret(prof.APIToken)
-	fmt.Fprintf(cmd.OutOrStdout(), "API Token [%s]: ", maskedToken)
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "API Token [%s]: ", maskedToken)
 	if scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if line != "" {
@@ -145,7 +145,7 @@ func runConfigure(cmd *cobra.Command, in io.Reader, profileName string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintln(cmd.OutOrStdout(), string(b))
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), string(b))
 	return nil
 }
 

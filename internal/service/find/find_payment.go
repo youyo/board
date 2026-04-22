@@ -72,7 +72,7 @@ func (s *Service) FindPayment(ctx context.Context, q FindPaymentQuery) ([]Paymen
 	}
 
 	// Apply status post-filter for non-status-only search modes
-	if q.Status != "" && q.ID == 0 && !(q.VendorName == "" && q.PurchaseOrderID == 0 && q.Text == "") {
+	if q.Status != "" && q.ID == 0 && (q.VendorName != "" || q.PurchaseOrderID != 0 || q.Text != "") {
 		payments = filterPaymentsByStatus(payments, q.Status)
 	}
 
