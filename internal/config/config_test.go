@@ -343,7 +343,6 @@ func TestSetCurrentProfile(t *testing.T) {
 	}
 }
 
-
 // ApplyEnvOverrides tests
 
 func TestApplyEnvOverrides_BothSet(t *testing.T) {

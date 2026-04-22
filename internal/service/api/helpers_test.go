@@ -78,12 +78,12 @@ func (s *stubContactRepo) ListPage(_ context.Context, _, _ int) (*boardapi.PageR
 
 // stubProjectRepo is a stub implementation of ProjectRepo.
 type stubProjectRepo struct {
-	listResult          []boardapi.ProjectEntity
-	getResult           *boardapi.ProjectEntity
-	searchResult        []boardapi.ProjectEntity
-	listPageResult      *boardapi.PageResult[boardapi.ProjectEntity]
-	getWithGroupResult  *boardapi.ProjectEntity
-	err                 error
+	listResult         []boardapi.ProjectEntity
+	getResult          *boardapi.ProjectEntity
+	searchResult       []boardapi.ProjectEntity
+	listPageResult     *boardapi.PageResult[boardapi.ProjectEntity]
+	getWithGroupResult *boardapi.ProjectEntity
+	err                error
 }
 
 func (s *stubProjectRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.ProjectEntity, error) {

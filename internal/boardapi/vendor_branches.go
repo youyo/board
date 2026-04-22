@@ -17,17 +17,17 @@ import (
 // データ投入後の smoke テスト（TestE2E_VendorBranches_*）で Pending Re-verification。
 type VendorBranchEntity struct {
 	ID         int        `json:"id"`
-	Vendor     *VendorRef `json:"vendor"`      // nested 構造: {id, name, name_disp, custom_no}（未確認）
+	Vendor     *VendorRef `json:"vendor"` // nested 構造: {id, name, name_disp, custom_no}（未確認）
 	Name       string     `json:"name"`
 	Zip        string     `json:"zip"`
 	Pref       string     `json:"pref"`
 	Address1   string     `json:"address1"`
 	Address2   string     `json:"address2"`
-	Tel        *string    `json:"tel"`         // null 可
-	Fax        *string    `json:"fax"`         // null 可
+	Tel        *string    `json:"tel"` // null 可
+	Fax        *string    `json:"fax"` // null 可
 	ArchiveFlg int        `json:"archive_flg"`
-	CreatedAt  string     `json:"created_at"`  // ISO 8601
-	UpdatedAt  string     `json:"updated_at"`  // ISO 8601
+	CreatedAt  string     `json:"created_at"` // ISO 8601
+	UpdatedAt  string     `json:"updated_at"` // ISO 8601
 }
 
 // VendorID は nested Vendor.ID を返す accessor（後方互換ブリッジ）。

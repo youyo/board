@@ -39,13 +39,13 @@ type ProjectEntity struct {
 	EstimateDate *string  `json:"estimate_date"` // ISO date
 	InvoiceDates []string `json:"invoice_dates"` // 空配列あり
 
-	OrderStatus        int    `json:"order_status"`          // 1/2/3...
-	OrderStatusName    string `json:"order_status_name"`     // 「見積中(中)」等
-	DeliveryStatus     int    `json:"delivery_status"`       // 1/2/3...
-	DeliveryStatusName string `json:"delivery_status_name"`  // 「未着手」等
+	OrderStatus        int    `json:"order_status"`         // 1/2/3...
+	OrderStatusName    string `json:"order_status_name"`    // 「見積中(中)」等
+	DeliveryStatus     int    `json:"delivery_status"`      // 1/2/3...
+	DeliveryStatusName string `json:"delivery_status_name"` // 「未着手」等
 
-	ProjectTypeID   *int    `json:"project_type_id"`   // null 可
-	ProjectTypeName *string `json:"project_type_name"` // null 可
+	ProjectTypeID    *int    `json:"project_type_id"`   // null 可
+	ProjectTypeName  *string `json:"project_type_name"` // null 可
 	ProjectType2ID   *int    `json:"project_type2_id"`
 	ProjectType2Name *string `json:"project_type2_name"`
 	ProjectType3ID   *int    `json:"project_type3_id"`
@@ -62,21 +62,21 @@ type ProjectEntity struct {
 	Hubspot       *HubspotRef       `json:"hubspot"`        // {hubspot_deal_id: null}
 
 	// 表示区分（disp_kbn）系 8 フィールド
-	ClientNameDispKbn              int    `json:"client_name_disp_kbn"`
-	ClientNameDispKbnName          string `json:"client_name_disp_kbn_name"`
-	ClientNameForPostDispKbn       int    `json:"client_name_for_post_disp_kbn"`
-	ClientNameForPostDispKbnName   string `json:"client_name_for_post_disp_kbn_name"`
-	CompanyNameDispKbn             int    `json:"company_name_disp_kbn"`
-	CompanyNameDispKbnName         string `json:"company_name_disp_kbn_name"`
-	CompanyNameForPostDispKbn      int    `json:"company_name_for_post_disp_kbn"`
-	CompanyNameForPostDispKbnName  string `json:"company_name_for_post_disp_kbn_name"`
+	ClientNameDispKbn             int    `json:"client_name_disp_kbn"`
+	ClientNameDispKbnName         string `json:"client_name_disp_kbn_name"`
+	ClientNameForPostDispKbn      int    `json:"client_name_for_post_disp_kbn"`
+	ClientNameForPostDispKbnName  string `json:"client_name_for_post_disp_kbn_name"`
+	CompanyNameDispKbn            int    `json:"company_name_disp_kbn"`
+	CompanyNameDispKbnName        string `json:"company_name_disp_kbn_name"`
+	CompanyNameForPostDispKbn     int    `json:"company_name_for_post_disp_kbn"`
+	CompanyNameForPostDispKbnName string `json:"company_name_for_post_disp_kbn_name"`
 
 	// 金額・集計系 4 フィールド
 	// 注意: BOARD API は cost_total/cost_tax が int、invoice_total/invoice_tax が string という型混在
-	CostTotal    int     `json:"cost_total"`     // 数値（0 観測）
-	CostTax      int     `json:"cost_tax"`       // 数値
-	InvoiceTotal *string `json:"invoice_total"`  // "270000.0"
-	InvoiceTax   *string `json:"invoice_tax"`    // "27000.0"
+	CostTotal    int     `json:"cost_total"`    // 数値（0 観測）
+	CostTax      int     `json:"cost_tax"`      // 数値
+	InvoiceTotal *string `json:"invoice_total"` // "270000.0"
+	InvoiceTax   *string `json:"invoice_tax"`   // "27000.0"
 
 	// 日付系 3 フィールド
 	DeliveryDate     *string `json:"delivery_date"`      // トップレベル納期
@@ -90,33 +90,33 @@ type ProjectEntity struct {
 	PaymentMethodKbnName string  `json:"payment_method_kbn_name"` // 「銀行振込」等
 
 	// 請求タイミング・契約管理系 11 フィールド
-	InvoiceTimingKbn              int     `json:"invoice_timing_kbn"`               // 2=定期請求
-	InvoiceTimingKbnName          string  `json:"invoice_timing_kbn_name"`           // 「定期請求」等
-	ContractStartDate             *string `json:"contract_start_date"`              // 旧 StartDate の代替
-	ContractEndDate               *string `json:"contract_end_date"`                // 旧 EndDate の代替
-	PeriodicalInvoiceInterval     *int    `json:"periodical_invoice_interval"`
-	PeriodicalInvoicePaymentKbn   *int    `json:"periodical_invoice_payment_kbn"`
-	ContractEndAlertFlg           int     `json:"contract_end_alert_flg"`            // 0/1
-	AutoRenewalFlg                int     `json:"auto_renewal_flg"`                  // 0/1
-	AutoRenewalPeriodMonth        *int    `json:"auto_renewal_period_month"`
-	MonthlyInvoicePaymentKbn      *int    `json:"monthly_invoice_payment_kbn"`
-	DeliveryDocumentKbn           int     `json:"delivery_document_kbn"`
+	InvoiceTimingKbn            int     `json:"invoice_timing_kbn"`      // 2=定期請求
+	InvoiceTimingKbnName        string  `json:"invoice_timing_kbn_name"` // 「定期請求」等
+	ContractStartDate           *string `json:"contract_start_date"`     // 旧 StartDate の代替
+	ContractEndDate             *string `json:"contract_end_date"`       // 旧 EndDate の代替
+	PeriodicalInvoiceInterval   *int    `json:"periodical_invoice_interval"`
+	PeriodicalInvoicePaymentKbn *int    `json:"periodical_invoice_payment_kbn"`
+	ContractEndAlertFlg         int     `json:"contract_end_alert_flg"` // 0/1
+	AutoRenewalFlg              int     `json:"auto_renewal_flg"`       // 0/1
+	AutoRenewalPeriodMonth      *int    `json:"auto_renewal_period_month"`
+	MonthlyInvoicePaymentKbn    *int    `json:"monthly_invoice_payment_kbn"`
+	DeliveryDocumentKbn         int     `json:"delivery_document_kbn"`
 
 	// 会計区分 6 フィールド
-	AccountingTypeID    *int    `json:"accounting_type_id"`    // null 可
-	AccountingTypeName  *string `json:"accounting_type_name"`  // null 可
+	AccountingTypeID    *int    `json:"accounting_type_id"`   // null 可
+	AccountingTypeName  *string `json:"accounting_type_name"` // null 可
 	AccountingType2ID   *int    `json:"accounting_type2_id"`
 	AccountingType2Name *string `json:"accounting_type2_name"`
 	AccountingType3ID   *int    `json:"accounting_type3_id"`
 	AccountingType3Name *string `json:"accounting_type3_name"`
 
 	// その他 8 フィールド
-	Tags                []string `json:"tags"`                 // 空配列あり
-	InHouseMemo         *string  `json:"in_house_memo"`        // 旧 Memo の代替
-	To                  *string  `json:"to"`                   // 送付先 To
-	CC                  *string  `json:"cc"`                   // 送付先 CC
-	LockFlg             int      `json:"lock_flg"`             // 0/1
-	ArchiveFlg          int      `json:"archive_flg"`          // 0/1
+	Tags                []string `json:"tags"`          // 空配列あり
+	InHouseMemo         *string  `json:"in_house_memo"` // 旧 Memo の代替
+	To                  *string  `json:"to"`            // 送付先 To
+	CC                  *string  `json:"cc"`            // 送付先 CC
+	LockFlg             int      `json:"lock_flg"`      // 0/1
+	ArchiveFlg          int      `json:"archive_flg"`   // 0/1
 	DocumentSettingID   *int     `json:"document_setting_id"`
 	DocumentSettingName *string  `json:"document_setting_name"`
 

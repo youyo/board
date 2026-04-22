@@ -32,36 +32,36 @@ type ClientEntity struct {
 
 	// 共通フィールド（List/Search/Get 全て返却）
 	NameDisp                     string  `json:"name_disp"`
-	Title                        *string `json:"title"`                          // null 可
-	Zip                          *string `json:"zip"`                            // null 可
-	Pref                         *string `json:"pref"`                           // null 可
-	Address1                     *string `json:"address1"`                       // null 可
-	Address2                     *string `json:"address2"`                       // null 可
-	Tel                          *string `json:"tel"`                            // null 可
-	Fax                          *string `json:"fax"`                            // null 可
+	Title                        *string `json:"title"`    // null 可
+	Zip                          *string `json:"zip"`      // null 可
+	Pref                         *string `json:"pref"`     // null 可
+	Address1                     *string `json:"address1"` // null 可
+	Address2                     *string `json:"address2"` // null 可
+	Tel                          *string `json:"tel"`      // null 可
+	Fax                          *string `json:"fax"`      // null 可
 	PaymentTermID                int     `json:"payment_term_id"`
 	PaymentTermName              string  `json:"payment_term_name"`
-	CompanyNumber                *string `json:"company_number"`                 // null 可
-	InvoiceSystemNumber          *string `json:"invoice_system_number"`          // null 可
+	CompanyNumber                *string `json:"company_number"`        // null 可
+	InvoiceSystemNumber          *string `json:"invoice_system_number"` // null 可
 	InvoiceSystemNumberValidated bool    `json:"invoice_system_number_validated"`
 	InvoiceSystemIssuerType      int     `json:"invoice_system_issuer_type"`
 	InvoiceSystemIssuerTypeName  string  `json:"invoice_system_issuer_type_name"`
 
 	// Get 限定フィールド（List では返却されない）
-	AccountingCode       *string  `json:"accounting_code,omitempty"`
-	ArchiveFlg           int      `json:"archive_flg,omitempty"`
-	BankChargeToClientFlg int     `json:"bank_charge_to_client_flg,omitempty"`
-	BasicAgreementFlg    int      `json:"basic_agreement_flg,omitempty"`
-	CC                   *string  `json:"cc,omitempty"`
-	CompanyBankID        *int     `json:"company_bank_id,omitempty"`
-	CompanyBankName      *string  `json:"company_bank_name,omitempty"`
-	CustomNo             *string  `json:"custom_no,omitempty"`             // 旧 Code の代替
-	DocumentSendType     int      `json:"document_send_type,omitempty"`
-	DocumentSendTypeName string   `json:"document_send_type_name,omitempty"`
-	NdaFlg               int      `json:"nda_flg,omitempty"`
-	Note                 *string  `json:"note,omitempty"`                  // 旧 Memo の代替
-	Tags                 []string `json:"tags,omitempty"`
-	To                   *string  `json:"to,omitempty"`
+	AccountingCode        *string  `json:"accounting_code,omitempty"`
+	ArchiveFlg            int      `json:"archive_flg,omitempty"`
+	BankChargeToClientFlg int      `json:"bank_charge_to_client_flg,omitempty"`
+	BasicAgreementFlg     int      `json:"basic_agreement_flg,omitempty"`
+	CC                    *string  `json:"cc,omitempty"`
+	CompanyBankID         *int     `json:"company_bank_id,omitempty"`
+	CompanyBankName       *string  `json:"company_bank_name,omitempty"`
+	CustomNo              *string  `json:"custom_no,omitempty"` // 旧 Code の代替
+	DocumentSendType      int      `json:"document_send_type,omitempty"`
+	DocumentSendTypeName  string   `json:"document_send_type_name,omitempty"`
+	NdaFlg                int      `json:"nda_flg,omitempty"`
+	Note                  *string  `json:"note,omitempty"` // 旧 Memo の代替
+	Tags                  []string `json:"tags,omitempty"`
+	To                    *string  `json:"to,omitempty"`
 }
 
 // ClientSearchParams is the parameter for SearchClients.

@@ -55,10 +55,10 @@ func TestE2E_Projects_List(t *testing.T) {
 
 	// Aggregate stats only — never log individual project names or sensitive values.
 	var (
-		nameFilled          int
-		orderStatusFilled   int
+		nameFilled           int
+		orderStatusFilled    int
 		deliveryStatusFilled int
-		clientFilled        int
+		clientFilled         int
 	)
 	orderStatusDist := map[string]int{}
 	deliveryStatusDist := map[string]int{}

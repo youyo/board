@@ -76,13 +76,13 @@ func TestE2E_ProjectCosts_List(t *testing.T) {
 
 	// Aggregate stats only. Never log individual descriptions or cost values.
 	var (
-		costNonZero        int
-		costSum            int
-		costMin            int
-		costMax            int
-		invoiceDateFilled  int
-		paymentDateFilled  int
-		descriptionFilled  int
+		costNonZero       int
+		costSum           int
+		costMin           int
+		costMax           int
+		invoiceDateFilled int
+		paymentDateFilled int
+		descriptionFilled int
 	)
 	for i, pc := range items {
 		if pc.Cost != 0 {

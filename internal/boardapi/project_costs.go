@@ -17,12 +17,12 @@ import (
 type ProjectCostEntity struct {
 	ID          int     `json:"id"`
 	ProjectID   int     `json:"project_id"`
-	Description string  `json:"description"`   // 支払い内容の説明
-	Cost        int     `json:"cost"`           // 金額（整数）
-	InvoiceDate *string `json:"invoice_date"`   // 請求日（ISO date）、null 可
-	PaymentDate *string `json:"payment_date"`   // 支払日（ISO date）、null 可
-	UpdatedAt   string  `json:"updated_at"`     // ISO 8601
-	CreatedAt   string  `json:"created_at"`     // ISO 8601
+	Description string  `json:"description"`  // 支払い内容の説明
+	Cost        int     `json:"cost"`         // 金額（整数）
+	InvoiceDate *string `json:"invoice_date"` // 請求日（ISO date）、null 可
+	PaymentDate *string `json:"payment_date"` // 支払日（ISO date）、null 可
+	UpdatedAt   string  `json:"updated_at"`   // ISO 8601
+	CreatedAt   string  `json:"created_at"`   // ISO 8601
 }
 
 // ProjectCostSearchParams is the parameter for SearchProjectCosts.
