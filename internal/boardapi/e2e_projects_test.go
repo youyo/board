@@ -2,42 +2,17 @@
 
 // E2E tests for /v1/projects against the real BOARD API.
 //
-// Scope (M13, board-compliance roadmap): Phase E (core business re-verification)
-// 2nd milestone — the most complex milestone in the roadmap due to the
-// response_group matrix. projects is the 2nd-tier parent resource (just below
-// clients) and fans out into estimates/orders/deliveries/invoices/receipts/
-// purchase_orders/project_costs.
+// Scope (M44, board-compliance roadmap): Phase K — ProjectEntity 全面再設計後の
+// 実 API との厳格フィールド突合。M13 版を M44 の 72 フィールド + DocumentSummary 拡張に対応。
 //
-//   - List          (TestE2E_Projects_List)         : 1 req expected
-//   - Get           (TestE2E_Projects_Get)          : 2 req expected (list to discover id + get)
-//   - Search        (TestE2E_Projects_Search)       : 1 req expected
-//   - GetWithGroup  (TestE2E_Projects_GetWithGroup) : 7 req expected (list discovery once, then 6 subtests for estimate/order/delivery/invoice/receipt/all)
+//   - List          (TestE2E_Projects_List)          : 1 req expected
+//   - Get           (TestE2E_Projects_Get)           : 2 req expected (list discovery + get)
+//   - Search        (TestE2E_Projects_Search)        : 1 req expected
+//   - GetWithGroup  (TestE2E_Projects_GetWithGroup)  : 7 req expected (1 list + 6 rg subtests)
 //
-// Total budget: 11 req (plan cap 15). 1 endpoint 1 execution. No skip on
-// 403/429: the BOARD compliance roadmap requires immediate failure so that
-// environment or permission issues are not silently masked.
+// Total budget: 11 req (plan cap 15).
 //
-// Data-dependent skip: when the List response is empty, all dependent tests
-// skip with "pending re-verification" — tracked in the roadmap "Pending
-// Re-verification" table and re-run once data is seeded. For projects a
-// zero-item outcome is unlikely on a production account but the skip branch
-// is retained for defensive symmetry with M02-M12.
-//
-// Phase E 2nd note: M09/M10/M11/M12 confirmed core-business resources return
-// 200 on Get-by-id. M12 additionally introduced the "Get > List information
-// difference" model. M13 differs from M12 in that projects uses an explicit
-// response_group parameter to enrich the response with DocumentSummary
-// sub-entities (estimate/order/delivery/invoice/receipt), rather than M12's
-// automatic expansion. All 6 response_groups are exercised individually so
-// the unmapped-field surface of DocumentSummary can be fully characterised.
-//
-// PII handling: projects contain customer identifiers, project names, codes,
-// and internal memos which are commercially sensitive. Raw artifacts are
-// written under tmp/e2e-artifacts/ (gitignored) for manual inspection. t.Logf
-// output intentionally avoids leaking project names, codes, or memos — only
-// lengths, ids, boolean presence, and aggregate counts are logged.
-//
-// Usage (single-shot):
+// Usage (single-shot per test):
 //
 //	BOARD_API_KEY=... BOARD_API_TOKEN=... go test -tags e2e -v -count=1 \
 //	    -run TestE2E_Projects_List ./internal/boardapi/
@@ -55,16 +30,15 @@ import (
 )
 
 // TestE2E_Projects_List exercises GET /v1/projects and verifies that every
-// JSON key returned by the BOARD API is mapped on ProjectEntity. Aggregate
-// statistics (name / code / memo non-empty counts, status distribution) are
-// logged without leaking individual values.
+// JSON key returned by the BOARD API is mapped on ProjectEntity.
+// M44: 旧フィールド（name_filled/code_filled/memo_filled/status）を
+// 新フィールド（order_status_name/delivery_status_name/in_house_memo）に更新。
 func TestE2E_Projects_List(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
 
 	raw, err := client.ListProjectsRaw(ctx)
 	if err != nil {
-		// Roadmap rule: 403/429 must NOT be skipped, they must fail the test.
 		t.Fatalf("ListProjectsRaw: %v", err)
 	}
 
@@ -79,44 +53,49 @@ func TestE2E_Projects_List(t *testing.T) {
 		t.Fatalf("unmarshal list: %v", err)
 	}
 
-	// Aggregate stats only. Never log individual names, codes, or memos.
+	// Aggregate stats only — never log individual project names or sensitive values.
 	var (
-		nameFilled int
-		codeFilled int
-		memoFilled int
+		nameFilled          int
+		orderStatusFilled   int
+		deliveryStatusFilled int
+		clientFilled        int
 	)
-	statusDist := map[string]int{}
+	orderStatusDist := map[string]int{}
+	deliveryStatusDist := map[string]int{}
 	for _, p := range items {
 		if p.Name != "" {
 			nameFilled++
 		}
-		if p.Code != "" {
-			codeFilled++
+		if p.OrderStatusName != "" {
+			orderStatusFilled++
 		}
-		if p.Memo != "" {
-			memoFilled++
+		if p.DeliveryStatusName != "" {
+			deliveryStatusFilled++
 		}
-		statusDist[p.Status]++
+		if p.Client != nil {
+			clientFilled++
+		}
+		orderStatusDist[p.OrderStatusName]++
+		deliveryStatusDist[p.DeliveryStatusName]++
 	}
 	t.Logf("TestE2E_Projects_List: %d items returned", len(items))
-	t.Logf("distribution: name_filled=%d/%d code_filled=%d/%d memo_filled=%d/%d",
+	t.Logf("distribution: name_filled=%d/%d order_status_filled=%d/%d delivery_status_filled=%d/%d client_filled=%d/%d",
 		nameFilled, len(items),
-		codeFilled, len(items),
-		memoFilled, len(items),
+		orderStatusFilled, len(items),
+		deliveryStatusFilled, len(items),
+		clientFilled, len(items),
 	)
-	// status is a bounded enum (e.g. active/closed/archived); small
-	// cardinality is public info, not PII.
-	if len(statusDist) <= 20 {
-		t.Logf("status distribution (count by value): %v", statusDist)
-	} else {
-		t.Logf("status has %d unique values (large cardinality; omitting detail)", len(statusDist))
+	// order_status_name / delivery_status_name は bounded enum; 小カーディナリティはパブリック情報
+	if len(orderStatusDist) <= 20 {
+		t.Logf("order_status distribution: %v", orderStatusDist)
+	}
+	if len(deliveryStatusDist) <= 20 {
+		t.Logf("delivery_status distribution: %v", deliveryStatusDist)
 	}
 }
 
-// TestE2E_Projects_Get discovers a project id via List and fetches its detail,
-// applying strict field diff on the single-object response. Phase E 2nd: 200
-// is expected based on M09/M10/M11/M12 precedent; any 404/403 surfaces as a
-// Fatal to highlight a regression in core-business Get support.
+// TestE2E_Projects_Get discovers a project ID via List and fetches its detail,
+// applying strict field diff on the 72-field single-object response.
 func TestE2E_Projects_Get(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
@@ -130,12 +109,7 @@ func TestE2E_Projects_Get(t *testing.T) {
 		t.Fatalf("unmarshal list for discovery: %v", err)
 	}
 	if len(items) == 0 {
-		// Data-dependent skip: distinct from the roadmap "no skip on 403/429"
-		// rule, which targets rate-limit / permission failures. Zero data
-		// means Get cannot be exercised; tracked under "Pending
-		// Re-verification" in plans/board-compliance-roadmap.md and re-run
-		// once data is seeded.
-		t.Skipf("projects list returned 0 items; Get pending re-verification (see roadmap Pending Re-verification)")
+		t.Skipf("projects list returned 0 items; Get pending re-verification")
 	}
 
 	id := items[0].ID
@@ -145,9 +119,6 @@ func TestE2E_Projects_Get(t *testing.T) {
 
 	getRaw, err := client.GetProjectRaw(ctx, id)
 	if err != nil {
-		// Phase E note: M09-M12 confirmed core-business resources return 200
-		// on Get-by-id. If M13 regresses to 404 it's a new finding worthy of
-		// immediate halt and roadmap capture. 403 is similarly surfaced.
 		t.Fatalf("GetProjectRaw(%d): %v", id, err)
 	}
 
@@ -165,33 +136,32 @@ func TestE2E_Projects_Get(t *testing.T) {
 		t.Errorf("GetProject ID mismatch: got=%d want=%d", got.ID, id)
 	}
 
-	// Log only lengths and presence booleans. NEVER log the actual name,
-	// code, or memo values — project records are commercially sensitive.
-	t.Logf("TestE2E_Projects_Get: id=%d client_id=%d name_len=%d code_len=%d status_len=%d start_date_len=%d end_date_len=%d memo_len=%d has_updated_at=%v has_created_at=%v estimate_present=%v order_present=%v delivery_present=%v invoice_present=%v receipt_present=%v",
+	// Log only lengths and presence booleans — project records are commercially sensitive.
+	t.Logf("TestE2E_Projects_Get: id=%d name_len=%d order_status=%d delivery_status=%d"+
+		" has_client=%v client_id=%d has_user=%v has_hubspot=%v"+
+		" contract_start=%v contract_end=%v has_updated_at=%v",
 		got.ID,
-		got.ClientID,
 		len(got.Name),
-		len(got.Code),
-		len(got.Status),
-		len(got.StartDate),
-		len(got.EndDate),
-		len(got.Memo),
+		got.OrderStatus,
+		got.DeliveryStatus,
+		got.Client != nil,
+		func() int {
+			if got.Client != nil {
+				return got.Client.ID
+			}
+			return 0
+		}(),
+		got.User != nil,
+		got.Hubspot != nil,
+		got.ContractStartDate != nil,
+		got.ContractEndDate != nil,
 		got.UpdatedAt != "",
-		got.CreatedAt != "",
-		got.Estimate != nil,
-		got.Order != nil,
-		got.Delivery != nil,
-		got.Invoice != nil,
-		got.Receipt != nil,
 	)
 }
 
 // TestE2E_Projects_Search exercises Search with a non-matching name and
-// verifies that the (possibly full) JSON array still passes strict field
-// diff. The BOARD API has been observed to ignore the `name` filter across 7
-// consecutive milestones (M03/M04/M06/M08/M09/M10/M12) so Search is expected
-// to return every project regardless of the query value; this test focuses on
-// StrictFieldDiff and artifact collection rather than server-side filtering.
+// verifies that the (possibly full) JSON array still passes strict field diff.
+// BOARD API は name フィルタを無視することがコンプライアンスロードマップで確認済み。
 func TestE2E_Projects_Search(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
@@ -218,24 +188,13 @@ func TestE2E_Projects_Search(t *testing.T) {
 
 // TestE2E_Projects_GetWithGroup exercises all 6 response_group variants
 // (estimate / order / delivery / invoice / receipt / all) against the same
-// project to characterise the DocumentSummary surface for each group. The
-// discovery List is shared across all 6 subtests, keeping the total request
-// count to 7 (1 list + 6 groups).
+// project. M44: DocumentSummary 拡張 + Deliveries/Invoices/Receipts 配列化 に対応。
 //
-// Each subtest:
-//  1. calls GetProjectWithGroupRaw(id, group)
-//  2. writes tmp/e2e-artifacts/projects_rg_<group>_<id>.json
-//  3. runs StrictFieldDiff against ProjectEntity — which recursively covers
-//     DocumentSummary via the 5 optional pointer fields (Estimate/Order/
-//     Delivery/Invoice/Receipt). Unmapped keys surface at both the top level
-//     and inside each DocumentSummary.
-//  4. logs a boolean presence map of the 5 summary pointers so the caller can
-//     tell which documents the project actually owns.
-//
-// Phase E insight: M12 clients established an implicit "Get > List info diff"
-// model. M13 projects uses an explicit response_group matrix. The 6-variant
-// pass in a single test is the most efficient way to characterise both the
-// matrix semantics and the DocumentSummary schema in a single tmp/ dump set.
+// 各サブテスト:
+//  1. GetProjectWithGroupRaw(id, group) 呼び出し
+//  2. tmp/e2e-artifacts/projects_rg_<group>_<id>.json に書き込み
+//  3. StrictFieldDiff を ProjectEntity に適用（DocumentSummary も再帰的にカバー）
+//  4. estimate/order 単数 / deliveries/invoices/receipts 配列の presence ログ
 func TestE2E_Projects_GetWithGroup(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
@@ -249,7 +208,7 @@ func TestE2E_Projects_GetWithGroup(t *testing.T) {
 		t.Fatalf("unmarshal list for discovery: %v", err)
 	}
 	if len(items) == 0 {
-		t.Skipf("projects list returned 0 items; GetWithGroup pending re-verification (see roadmap Pending Re-verification)")
+		t.Skipf("projects list returned 0 items; GetWithGroup pending re-verification")
 	}
 
 	id := items[0].ID
@@ -264,9 +223,6 @@ func TestE2E_Projects_GetWithGroup(t *testing.T) {
 		t.Run(group, func(t *testing.T) {
 			raw, err := client.GetProjectWithGroupRaw(ctx, id, group)
 			if err != nil {
-				// 403/404/429 must all fail fast — a Phase E regression or a
-				// response_group that the API does not accept is worth a
-				// roadmap capture.
 				t.Fatalf("GetProjectWithGroupRaw(%d, %s): %v", id, group, err)
 			}
 
@@ -284,46 +240,37 @@ func TestE2E_Projects_GetWithGroup(t *testing.T) {
 				t.Errorf("GetProjectWithGroup ID mismatch: got=%d want=%d", got.ID, id)
 			}
 
-			// DocumentSummary presence map. "all" is expected to populate
-			// every pointer when the project actually has the document;
-			// single-group variants populate only the matching field (or nil
-			// if the project has no such document).
-			t.Logf("rg=%s: estimate_present=%v order_present=%v delivery_present=%v invoice_present=%v receipt_present=%v",
+			// M44: 単数形 Invoice/Delivery/Receipt 廃止、配列形式で確認
+			t.Logf("rg=%s: estimate_present=%v order_present=%v deliveries_count=%d invoices_count=%d receipts_count=%d project_costs_len=%d",
 				group,
 				got.Estimate != nil,
 				got.Order != nil,
-				got.Delivery != nil,
-				got.Invoice != nil,
-				got.Receipt != nil,
+				len(got.Deliveries),
+				len(got.Invoices),
+				len(got.Receipts),
+				len(got.ProjectCosts),
 			)
 
-			// When DocumentSummary is populated, log only id and LockFlg
-			// (public enum-like) plus length of Total/Tax/TaxWithholding
-			// (decimal strings, commercially sensitive; log length only).
+			// DocumentSummary presence の詳細ログ（ID, LockFlg のみ — 金額は商業機密）
 			if s := got.Estimate; s != nil {
-				t.Logf("rg=%s estimate: id=%d lock_flg=%d total_len=%d tax_len=%d tax_withholding_len=%d message_present=%v",
-					group, s.ID, s.LockFlg,
-					len(s.Total), len(s.Tax), len(s.TaxWithholding), s.Message != nil)
+				t.Logf("rg=%s estimate: id=%d lock_flg=%d total_len=%d details_count=%d valid_period_present=%v",
+					group, s.ID, s.LockFlg, len(s.Total), len(s.Details), s.ValidPeriod != nil)
 			}
 			if s := got.Order; s != nil {
-				t.Logf("rg=%s order: id=%d lock_flg=%d total_len=%d tax_len=%d tax_withholding_len=%d message_present=%v",
-					group, s.ID, s.LockFlg,
-					len(s.Total), len(s.Tax), len(s.TaxWithholding), s.Message != nil)
+				t.Logf("rg=%s order: id=%d lock_flg=%d total_len=%d details_count=%d",
+					group, s.ID, s.LockFlg, len(s.Total), len(s.Details))
 			}
-			if s := got.Delivery; s != nil {
-				t.Logf("rg=%s delivery: id=%d lock_flg=%d total_len=%d tax_len=%d tax_withholding_len=%d message_present=%v",
-					group, s.ID, s.LockFlg,
-					len(s.Total), len(s.Tax), len(s.TaxWithholding), s.Message != nil)
+			for i, d := range got.Deliveries {
+				t.Logf("rg=%s deliveries[%d]: id=%d delivery_date_present=%v delivery_place_present=%v details_count=%d",
+					group, i, d.ID, d.DeliveryDate != nil, d.DeliveryPlace != nil, len(d.Details))
 			}
-			if s := got.Invoice; s != nil {
-				t.Logf("rg=%s invoice: id=%d lock_flg=%d total_len=%d tax_len=%d tax_withholding_len=%d message_present=%v",
-					group, s.ID, s.LockFlg,
-					len(s.Total), len(s.Tax), len(s.TaxWithholding), s.Message != nil)
+			for i, inv := range got.Invoices {
+				t.Logf("rg=%s invoices[%d]: id=%d invoice_date_present=%v payment_limit_present=%v details_count=%d",
+					group, i, inv.ID, inv.InvoiceDate != nil, inv.PaymentLimitDate != nil, len(inv.Details))
 			}
-			if s := got.Receipt; s != nil {
-				t.Logf("rg=%s receipt: id=%d lock_flg=%d total_len=%d tax_len=%d tax_withholding_len=%d message_present=%v",
-					group, s.ID, s.LockFlg,
-					len(s.Total), len(s.Tax), len(s.TaxWithholding), s.Message != nil)
+			for i, r := range got.Receipts {
+				t.Logf("rg=%s receipts[%d]: id=%d receipt_date_present=%v details_count=%d",
+					group, i, r.ID, r.ReceiptDate != nil, len(r.Details))
 			}
 		})
 	}

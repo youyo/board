@@ -547,13 +547,14 @@ func TestE2E_FindProject_StrictEnrichment_ByID(t *testing.T) {
 	}
 	var targetProject *boardapi.ProjectEntity
 	for i := range pr.Items {
-		if pr.Items[i].ClientID != 0 {
+		// M44: ClientID 廃止、Client nested の ID で判定
+		if pr.Items[i].Client != nil && pr.Items[i].Client.ID != 0 {
 			targetProject = &pr.Items[i]
 			break
 		}
 	}
 	if targetProject == nil {
-		t.Skip("no project with non-zero ClientID found in first 5 projects")
+		t.Skip("no project with non-zero Client.ID found in first 5 projects")
 	}
 
 	results, err := svc.FindProject(ctx, find.FindProjectQuery{
@@ -573,17 +574,21 @@ func TestE2E_FindProject_StrictEnrichment_ByID(t *testing.T) {
 		t.Errorf("r.Project.ID: got=%d want=%d", r.Project.ID, targetProject.ID)
 	}
 
-	// Client enrichment: ClientID が非ゼロなので Client は nil 不可。
+	// Client enrichment: M44: Client nested の ID で判定
+	targetClientID := 0
+	if targetProject.Client != nil {
+		targetClientID = targetProject.Client.ID
+	}
 	if r.Client == nil {
-		t.Errorf("r.Client is nil for project with ClientID=%d; enrichment missing", targetProject.ClientID)
+		t.Errorf("r.Client is nil for project with Client.ID=%d; enrichment missing", targetClientID)
 	} else {
-		if r.Client.ID != targetProject.ClientID {
-			t.Errorf("r.Client.ID: got=%d want=%d", r.Client.ID, targetProject.ClientID)
+		if r.Client.ID != targetClientID {
+			t.Errorf("r.Client.ID: got=%d want=%d", r.Client.ID, targetClientID)
 		}
 		// 独立 API で突合。
-		independentClient, err := api.GetClient(ctx, targetProject.ClientID)
+		independentClient, err := api.GetClient(ctx, targetClientID)
 		if err != nil {
-			t.Fatalf("GetClient(ID=%d): %v", targetProject.ClientID, err)
+			t.Fatalf("GetClient(ID=%d): %v", targetClientID, err)
 		}
 		if r.Client.ID != independentClient.ID {
 			t.Errorf("client ID mismatch: FindProject=%d independent=%d", r.Client.ID, independentClient.ID)
@@ -649,17 +654,22 @@ func TestE2E_FindProject_ByName_Strict(t *testing.T) {
 	t.Logf("FindProject(Name=%q) returned %d results", targetName, len(results))
 
 	// 各 result で Client enrichment の整合性を確認する。
+	// M44: ClientID 廃止、Client nested の ID で判定
 	for i, r := range results {
-		if r.Project.ClientID != 0 && r.Client == nil {
-			t.Errorf("results[%d]: project.ClientID=%d but r.Client is nil (enrichment missing)",
-				i, r.Project.ClientID)
+		pClientID := 0
+		if r.Project.Client != nil {
+			pClientID = r.Project.Client.ID
 		}
-		if r.Client != nil && r.Client.ID != r.Project.ClientID {
-			t.Errorf("results[%d]: r.Client.ID=%d != r.Project.ClientID=%d",
-				i, r.Client.ID, r.Project.ClientID)
+		if pClientID != 0 && r.Client == nil {
+			t.Errorf("results[%d]: project.Client.ID=%d but r.Client is nil (enrichment missing)",
+				i, pClientID)
 		}
-		t.Logf("results[%d]: project.ID=%d name=%q clientID=%d client_resolved=%v estimate=%v",
-			i, r.Project.ID, r.Project.Name, r.Project.ClientID, r.Client != nil, r.Estimate != nil)
+		if r.Client != nil && r.Client.ID != pClientID {
+			t.Errorf("results[%d]: r.Client.ID=%d != r.Project.Client.ID=%d",
+				i, r.Client.ID, pClientID)
+		}
+		t.Logf("results[%d]: project.ID=%d name=%q client_id=%d client_resolved=%v estimate=%v",
+			i, r.Project.ID, r.Project.Name, pClientID, r.Client != nil, r.Estimate != nil)
 	}
 }
 
@@ -705,17 +715,22 @@ func TestE2E_FindProject_ByClientName_Strict(t *testing.T) {
 	t.Logf("Independent SearchClients returned %d clients (BOARD API may ignore name filter)", len(independentClients))
 
 	// 各 result の Client enrichment 整合性確認。
+	// M44: ClientID 廃止、Client nested の ID で判定
 	for i, r := range results {
-		if r.Project.ClientID != 0 && r.Client == nil {
-			t.Errorf("results[%d]: project.ClientID=%d but r.Client is nil (enrichment missing)",
-				i, r.Project.ClientID)
+		pClientID := 0
+		if r.Project.Client != nil {
+			pClientID = r.Project.Client.ID
 		}
-		if r.Client != nil && r.Client.ID != r.Project.ClientID {
-			t.Errorf("results[%d]: r.Client.ID=%d != r.Project.ClientID=%d",
-				i, r.Client.ID, r.Project.ClientID)
+		if pClientID != 0 && r.Client == nil {
+			t.Errorf("results[%d]: project.Client.ID=%d but r.Client is nil (enrichment missing)",
+				i, pClientID)
 		}
-		t.Logf("results[%d]: project.ID=%d clientID=%d in_expected_set=%v",
-			i, r.Project.ID, r.Project.ClientID, expectedClientIDs[r.Project.ClientID])
+		if r.Client != nil && r.Client.ID != pClientID {
+			t.Errorf("results[%d]: r.Client.ID=%d != r.Project.Client.ID=%d",
+				i, r.Client.ID, pClientID)
+		}
+		t.Logf("results[%d]: project.ID=%d client_id=%d in_expected_set=%v",
+			i, r.Project.ID, pClientID, expectedClientIDs[pClientID])
 	}
 }
 
@@ -745,16 +760,24 @@ func TestE2E_FindProject_ByText_Strict(t *testing.T) {
 	}
 	t.Logf("FindProject(Text=%q) returned %d results", prefix, len(results))
 
-	// find 層の local filter（containsText は Name/Code/Memo を対象）で絞られているので、
-	// 各 result は prefix を Name/Code/Memo のいずれかに含む。
+	// find 層の local filter（containsText は Name/ManagementNo/InHouseMemo を対象）で絞られているので、
+	// M44: Code/Memo 廃止、ManagementNo/InHouseMemo で代替。
 	for i, r := range results {
 		p := r.Project
+		mgmtNo := ""
+		if p.ManagementNo != nil {
+			mgmtNo = *p.ManagementNo
+		}
+		memo := ""
+		if p.InHouseMemo != nil {
+			memo = *p.InHouseMemo
+		}
 		containsInAny := strings.Contains(p.Name, prefix) ||
-			strings.Contains(p.Code, prefix) ||
-			strings.Contains(p.Memo, prefix)
+			strings.Contains(mgmtNo, prefix) ||
+			strings.Contains(memo, prefix)
 		if !containsInAny {
-			t.Errorf("results[%d]: project(id=%d, name=%q, code=%q, memo=%q) does not contain prefix %q",
-				i, p.ID, p.Name, p.Code, p.Memo, prefix)
+			t.Errorf("results[%d]: project(id=%d, name=%q, management_no=%q, in_house_memo=%q) does not contain prefix %q",
+				i, p.ID, p.Name, mgmtNo, memo, prefix)
 		}
 	}
 }
@@ -769,15 +792,15 @@ func TestE2E_FindProject_ByStatus_Strict(t *testing.T) {
 		t.Skip("no projects available")
 	}
 
-	// 最多 status を discovery する。
+	// M44: Status フィールド廃止。OrderStatusName で discovery する。
 	statusCount := make(map[string]int)
 	for _, p := range pr.Items {
-		if p.Status != "" {
-			statusCount[p.Status]++
+		if p.OrderStatusName != "" {
+			statusCount[p.OrderStatusName]++
 		}
 	}
 	if len(statusCount) == 0 {
-		t.Skip("no project with non-empty status found in first 5 projects")
+		t.Skip("no project with non-empty order_status_name found in first 5 projects")
 	}
 	var targetStatus string
 	var maxCount int
@@ -798,9 +821,11 @@ func TestE2E_FindProject_ByStatus_Strict(t *testing.T) {
 	}
 	t.Logf("FindProject(Status=%q) returned %d results", targetStatus, len(results))
 
+	// M44: OrderStatusName / DeliveryStatusName のいずれかが targetStatus と一致することを確認
 	for i, r := range results {
-		if r.Project.Status != targetStatus {
-			t.Errorf("results[%d]: project.Status=%q want=%q", i, r.Project.Status, targetStatus)
+		if r.Project.OrderStatusName != targetStatus && r.Project.DeliveryStatusName != targetStatus {
+			t.Errorf("results[%d]: project.OrderStatusName=%q / DeliveryStatusName=%q want=%q",
+				i, r.Project.OrderStatusName, r.Project.DeliveryStatusName, targetStatus)
 		}
 	}
 }
@@ -969,8 +994,13 @@ func findProjectWithDocType(t *testing.T, apiClient *boardapi.Client, docType st
 		}
 
 		if docID > 0 {
+			// M44: ClientID 廃止、Client nested の ID で表示
+			clientIDForLog := 0
+			if p.Client != nil {
+				clientIDForLog = p.Client.ID
+			}
 			t.Logf("findProjectWithDocType: found docType=%s projectID=%d documentID=%d clientID=%d",
-				docType, p.ID, docID, p.ClientID)
+				docType, p.ID, docID, clientIDForLog)
 			return p.ID, docID
 		}
 	}
@@ -1024,17 +1054,21 @@ func TestE2E_FindOrder_ByProjectID_Strict(t *testing.T) {
 		t.Errorf("OrderEntity unmapped fields: %v", diff)
 	}
 
-	// Client enrichment
-	if pr.ClientID == 0 {
+	// Client enrichment — M44: ClientID 廃止、Client nested の ID で判定
+	prClientID := 0
+	if pr.Client != nil {
+		prClientID = pr.Client.ID
+	}
+	if prClientID == 0 {
 		if r.Client != nil {
-			t.Errorf("r.Client expected nil (project.ClientID=0), got id=%d", r.Client.ID)
+			t.Errorf("r.Client expected nil (project.Client.ID=0), got id=%d", r.Client.ID)
 		}
-		t.Logf("Client enrichment: project.ClientID=0, r.Client=nil (expected)")
+		t.Logf("Client enrichment: project.Client.ID=0, r.Client=nil (expected)")
 	} else {
 		if r.Client == nil {
-			t.Errorf("r.Client is nil but project.ClientID=%d (enrichment missing)", pr.ClientID)
-		} else if r.Client.ID != pr.ClientID {
-			t.Errorf("r.Client.ID: got=%d want=%d", r.Client.ID, pr.ClientID)
+			t.Errorf("r.Client is nil but project.Client.ID=%d (enrichment missing)", prClientID)
+		} else if r.Client.ID != prClientID {
+			t.Errorf("r.Client.ID: got=%d want=%d", r.Client.ID, prClientID)
 		} else {
 			t.Logf("Client enrichment OK: id=%d", r.Client.ID)
 		}
@@ -1166,17 +1200,21 @@ func TestE2E_FindDelivery_ByProjectID_Strict(t *testing.T) {
 		t.Errorf("DeliveryEntity unmapped fields: %v", diff)
 	}
 
-	// Client enrichment
-	if pr.ClientID == 0 {
+	// Client enrichment — M44: ClientID 廃止、Client nested の ID で判定
+	prClientID := 0
+	if pr.Client != nil {
+		prClientID = pr.Client.ID
+	}
+	if prClientID == 0 {
 		if r.Client != nil {
-			t.Errorf("r.Client expected nil (project.ClientID=0), got id=%d", r.Client.ID)
+			t.Errorf("r.Client expected nil (project.Client.ID=0), got id=%d", r.Client.ID)
 		}
-		t.Logf("Client enrichment: project.ClientID=0, r.Client=nil (expected)")
+		t.Logf("Client enrichment: project.Client.ID=0, r.Client=nil (expected)")
 	} else {
 		if r.Client == nil {
-			t.Errorf("r.Client is nil but project.ClientID=%d (enrichment missing)", pr.ClientID)
-		} else if r.Client.ID != pr.ClientID {
-			t.Errorf("r.Client.ID: got=%d want=%d", r.Client.ID, pr.ClientID)
+			t.Errorf("r.Client is nil but project.Client.ID=%d (enrichment missing)", prClientID)
+		} else if r.Client.ID != prClientID {
+			t.Errorf("r.Client.ID: got=%d want=%d", r.Client.ID, prClientID)
 		} else {
 			t.Logf("Client enrichment OK: id=%d", r.Client.ID)
 		}
@@ -1300,17 +1338,21 @@ func TestE2E_FindReceipt_ByProjectID_Strict(t *testing.T) {
 		t.Errorf("ReceiptEntity unmapped fields: %v", diff)
 	}
 
-	// Client enrichment
-	if pr.ClientID == 0 {
+	// Client enrichment — M44: ClientID 廃止、Client nested の ID で判定
+	prClientID := 0
+	if pr.Client != nil {
+		prClientID = pr.Client.ID
+	}
+	if prClientID == 0 {
 		if r.Client != nil {
-			t.Errorf("r.Client expected nil (project.ClientID=0), got id=%d", r.Client.ID)
+			t.Errorf("r.Client expected nil (project.Client.ID=0), got id=%d", r.Client.ID)
 		}
-		t.Logf("Client enrichment: project.ClientID=0, r.Client=nil (expected)")
+		t.Logf("Client enrichment: project.Client.ID=0, r.Client=nil (expected)")
 	} else {
 		if r.Client == nil {
-			t.Errorf("r.Client is nil but project.ClientID=%d (enrichment missing)", pr.ClientID)
-		} else if r.Client.ID != pr.ClientID {
-			t.Errorf("r.Client.ID: got=%d want=%d", r.Client.ID, pr.ClientID)
+			t.Errorf("r.Client is nil but project.Client.ID=%d (enrichment missing)", prClientID)
+		} else if r.Client.ID != prClientID {
+			t.Errorf("r.Client.ID: got=%d want=%d", r.Client.ID, prClientID)
 		} else {
 			t.Logf("Client enrichment OK: id=%d", r.Client.ID)
 		}
