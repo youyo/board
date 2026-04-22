@@ -20,9 +20,9 @@
 - 補助的に lint/docs/archive を閉じて v0.4.0 リリースへ
 
 ## Current Focus
-- **マイルストーン**: M45 ProjectCostEntity 全面再設計
-- **直近の完了**: M44 ProjectEntity 全面再設計（2026-04-22）
-- **次のアクション**: M45 詳細計画 `plans/board-phase-k-m45-project-cost-entity.md` を生成し実装開始
+- **マイルストーン**: M46 golangci-lint + .editorconfig 導入
+- **直近の完了**: M45 ProjectCostEntity 全面再設計（2026-04-22）
+- **次のアクション**: M46 詳細計画 `plans/board-phase-k-m46-lint-config.md` を生成し実装開始
 
 ## Progress
 
@@ -47,13 +47,15 @@
 - [x] response_group 全 6 バリアントで smoke test PASS（未マップ 0）
 - 📄 詳細: plans/board-phase-k-m44-project-entity.md ✅
 
-### M45: ProjectCostEntity 全面再設計（Breaking）
-- [ ] `internal/boardapi/project_costs.go` を概念モデルから書き直し
-- [ ] `Name` / `CostType` / `Amount` / `Memo` を削除
-- [ ] `Cost` / `Description` / `InvoiceDate` / `PaymentDate` を追加
-- [ ] downstream 7-8 ファイル修正
-- [ ] smoke test PASS
-- 📄 詳細: plans/board-phase-k-m45-project-cost-entity.md（着手時生成）
+### M45: ProjectCostEntity 全面再設計（Breaking）✅ 完了
+- [x] `internal/boardapi/project_costs.go` を概念モデルから書き直し
+- [x] `Name` / `CostType` / `Amount` / `Memo` を削除
+- [x] `Description` / `Cost` / `InvoiceDate *string` / `PaymentDate *string` を追加
+- [x] `ProjectEntity.ProjectCosts` を `json.RawMessage` から `[]ProjectCostEntity` へ変換
+- [x] downstream 4 ファイル修正（client_test.go, project_costs_test.go, e2e_project_costs_test.go, repository/project_costs_test.go）
+- [x] smoke test PASS（List 22 件 / Get 1 件 / Search 22 件、未マップ 0）
+- [x] M44 TestE2E_Projects_GetWithGroup 全 6 variants 引き続き PASS
+- 📄 詳細: plans/board-phase-k-m45-project-cost-entity.md ✅
 
 ### M46: golangci-lint + .editorconfig 導入
 - [ ] `.golangci.yml` 作成（errcheck/govet/staticcheck/ineffassign/unused/gofmt/goimports）
@@ -115,3 +117,4 @@ M45 (ProjectCost, 独立) ──┘
 | 2026-04-22 17:10 | 作成 | Phase K ロードマップ初版。親計画 plans/tender-squishing-dusk.md に基づき 6 M 構成で起票 |
 | 2026-04-22 18:03 | M43 完了 | ClientEntity を 6 フィールドから 33 フィールドへ全面再設計。Code/Memo を削除し CustomNo/Note に置換。Unit test 6 件追加（U1-U6）。downstream 修正 4 ファイル（find_client.go, text_match.go, find_client_test.go, e2e_clients_test.go）。E2E smoke: List 299 件 / Get / Search 全 PASS 未マップ 0。commit: 3b87f78, 5ee83fa, 71d0b4f |
 | 2026-04-22 18:45 | M44 完了 | ProjectEntity を 13 フィールドから 72 フィールドへ全面再設計（最大規模）。Status/Code/Memo/Delivery・Invoice・Receipt 単数ポインタを削除。nested 型 5 件新規追加（UserRef/ContactRef/ClientBranchRef/CompanyBranchRef/HubspotRef）。DocumentSummary を 17 フィールド拡張。Deliveries/Invoices/Receipts を []DocumentSummary 配列化。Unit test 12 件追加（U1-U12）。downstream 修正 9 ファイル（projects.go, find_project.go, text_match.go, find_estimate/order/delivery/receipt/invoice.go, helpers_test.go 等）。E2E smoke: List/Get/Search/GetWithGroup 全 6 variants PASS 未マップ 0。commit: 88139f9, b20c138, 0d1f652, f1c2eee, 2c5e254 |
+| 2026-04-22 19:10 | M45 完了 | ProjectCostEntity を 8 フィールド（概念モデルから全面再設計）。Name/CostType/Amount/Memo の 4 フィールドを削除し Description/Cost/InvoiceDate*/PaymentDate* を追加。ProjectEntity.ProjectCosts を json.RawMessage から []ProjectCostEntity へ変換。Unit test 3 件追加（U1-U3）。downstream 修正 4 ファイル（boardapi/client_test.go, project_costs_test.go, e2e_project_costs_test.go, repository/project_costs_test.go）。E2E smoke: List 22 件 / Get 1 件 / Search 22 件 PASS 未マップ 0。M44 GetWithGroup 全 6 variants 引き続き PASS。commit: 8ce558f, 38f656c |
