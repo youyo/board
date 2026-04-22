@@ -129,10 +129,9 @@ type ProjectEntity struct {
 	Invoices   []DocumentSummary `json:"invoices,omitempty"`
 	Receipts   []DocumentSummary `json:"receipts,omitempty"`
 
-	// ===== M45 スコープ（暫定処理） =====
-	// ProjectCosts は rg=all 時のみ出現。M45 で []ProjectCostEntity 化予定。
-	// json.RawMessage で保持し unmarshal エラーを起こさない。
-	ProjectCosts json.RawMessage `json:"project_costs,omitempty"`
+	// ===== response_group フィールド（rg=all 時のみ出現） =====
+	// ProjectCosts はプロジェクト原価台帳の行（個別支払い記録リスト）。
+	ProjectCosts []ProjectCostEntity `json:"project_costs,omitempty"`
 }
 
 // ProjectSearchParams は SearchProjects のパラメータ。

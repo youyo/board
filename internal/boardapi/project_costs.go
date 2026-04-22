@@ -8,17 +8,21 @@ import (
 	"strconv"
 )
 
-// ProjectCostEntity is a BOARD API project cost entity.
-// Corresponds to one element in the GET /v1/project_costs response.
+// ProjectCostEntity は BOARD API の ProjectCost エンティティ。
+// GET /v1/project_costs および GET /v1/project_costs/{id} の実レスポンスに
+// 完全一致する 8 フィールド定義。
+//
+// 実データ根拠: tmp/e2e-artifacts/project_costs_33291004.json
+// 概念: プロジェクト原価台帳の行（個別支払い記録）
 type ProjectCostEntity struct {
-	ID        int     `json:"id"`
-	ProjectID int     `json:"project_id"`
-	Name      string  `json:"name"`
-	CostType  string  `json:"cost_type"`
-	Amount    float64 `json:"amount"`
-	Memo      string  `json:"memo"`
-	UpdatedAt string  `json:"updated_at"` // ISO 8601
-	CreatedAt string  `json:"created_at"` // ISO 8601
+	ID          int     `json:"id"`
+	ProjectID   int     `json:"project_id"`
+	Description string  `json:"description"`   // 支払い内容の説明
+	Cost        int     `json:"cost"`           // 金額（整数）
+	InvoiceDate *string `json:"invoice_date"`   // 請求日（ISO date）、null 可
+	PaymentDate *string `json:"payment_date"`   // 支払日（ISO date）、null 可
+	UpdatedAt   string  `json:"updated_at"`     // ISO 8601
+	CreatedAt   string  `json:"created_at"`     // ISO 8601
 }
 
 // ProjectCostSearchParams is the parameter for SearchProjectCosts.
