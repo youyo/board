@@ -86,10 +86,7 @@ func (r *ContactRepository) List(ctx context.Context, opts ReadOptions) ([]board
 		return nil, err
 	}
 
-	if opts.Limit > 0 && len(entities) > opts.Limit {
-		entities = entities[:opts.Limit]
-	}
-	return entities, nil
+	return applyLimit(entities, opts.Limit), nil
 }
 
 // GetByID returns the contact with the given ID from the cache.
@@ -151,14 +148,16 @@ func (r *ContactRepository) Search(ctx context.Context, params boardapi.ContactS
 		if err != nil {
 			return nil, err
 		}
-		return filterContactsByNameEmail(entities, params.Name, params.Email), nil
+		return applyLimit(filterContactsByNameEmail(entities, params.Name, params.Email), opts.Limit), nil
 	}
 	// Name/Email-only (or empty) filter: fall back to full list + in-memory.
-	all, err := r.List(ctx, opts)
+	listOpts := opts
+	listOpts.Limit = 0
+	all, err := r.List(ctx, listOpts)
 	if err != nil {
 		return nil, err
 	}
-	return filterContactsByNameEmail(all, params.Name, params.Email), nil
+	return applyLimit(filterContactsByNameEmail(all, params.Name, params.Email), opts.Limit), nil
 }
 
 // filterContactsByNameEmail performs in-memory name and email filtering.

@@ -398,6 +398,34 @@ func TestClientRepository_List_NoLimit(t *testing.T) {
 	}
 }
 
+// T_R_SEARCH_LIMIT: Search - Limit=2, 3 total entries, only 1 matches filter ->
+// bug: List truncates to 2 before filter, so match is lost.
+// fix: List is called with Limit=0, filter runs on all, then applyLimit caps the result.
+func TestClientRepository_Search_LimitAppliedAfterFilter(t *testing.T) {
+	db := newTestDB(t)
+	// sampleClients = [ClientA, ClientB, OtherClientC]
+	// Only "OtherClientC" matches Name="Other", but it is the 3rd entry.
+	// Buggy behaviour: List(Limit=2) -> [ClientA, ClientB], filter -> [], result=0
+	// Fixed behaviour: List(Limit=0) -> all 3, filter -> [OtherClientC], applyLimit -> [OtherClientC], result=1
+	seedClientCache(t, db, sampleClients)
+	markSynced(t, db, "clients")
+
+	srv := newClientAPIServer(t, nil)
+	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
+
+	repo := makeClientRepo(t, db, apiClient, false)
+	got, err := repo.Search(context.Background(), boardapi.ClientSearchParams{Name: "Other"}, repository.ReadOptions{Limit: 2})
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+	if len(got) != 1 {
+		t.Errorf("len(got) = %d, want 1 (Search Limit must apply after filter, not before)", len(got))
+	}
+	if len(got) == 1 && got[0].Name != "OtherClientC" {
+		t.Errorf("got[0].Name = %q, want OtherClientC", got[0].Name)
+	}
+}
+
 // T_R15: List - context canceled -> returns context.Canceled
 func TestClientRepository_List_ContextCanceled(t *testing.T) {
 	db := newTestDB(t)

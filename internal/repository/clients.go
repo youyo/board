@@ -91,10 +91,7 @@ func (r *ClientRepository) List(ctx context.Context, opts ReadOptions) ([]boarda
 		return nil, err
 	}
 
-	if opts.Limit > 0 && len(entities) > opts.Limit {
-		entities = entities[:opts.Limit]
-	}
-	return entities, nil
+	return applyLimit(entities, opts.Limit), nil
 }
 
 // GetByID returns the client with the given ID from the cache.
@@ -149,11 +146,13 @@ func (r *ClientRepository) GetByID(ctx context.Context, id int, opts ReadOptions
 // Search returns clients filtered by the given parameters from the cache.
 // Refresh is controlled by the same logic as List.
 func (r *ClientRepository) Search(ctx context.Context, params boardapi.ClientSearchParams, opts ReadOptions) ([]boardapi.ClientEntity, error) {
-	all, err := r.List(ctx, opts)
+	listOpts := opts
+	listOpts.Limit = 0 // filter 前に切り詰めない
+	all, err := r.List(ctx, listOpts)
 	if err != nil {
 		return nil, err
 	}
-	return filterClients(all, params), nil
+	return applyLimit(filterClients(all, params), opts.Limit), nil
 }
 
 // filterClients performs in-memory filtering.

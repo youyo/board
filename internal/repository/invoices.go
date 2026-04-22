@@ -85,10 +85,7 @@ func (r *InvoiceRepository) List(ctx context.Context, opts ReadOptions) ([]board
 		return nil, err
 	}
 
-	if opts.Limit > 0 && len(entities) > opts.Limit {
-		entities = entities[:opts.Limit]
-	}
-	return entities, nil
+	return applyLimit(entities, opts.Limit), nil
 }
 
 // GetByID returns the invoice with the given ID from the cache.
@@ -139,11 +136,13 @@ func (r *InvoiceRepository) GetByID(ctx context.Context, id int, opts ReadOption
 
 // Search returns invoices filtered by the given parameters from the cache.
 func (r *InvoiceRepository) Search(ctx context.Context, params boardapi.InvoiceSearchParams, opts ReadOptions) ([]boardapi.InvoiceEntity, error) {
-	all, err := r.List(ctx, opts)
+	listOpts := opts
+	listOpts.Limit = 0
+	all, err := r.List(ctx, listOpts)
 	if err != nil {
 		return nil, err
 	}
-	return filterInvoices(all, params), nil
+	return applyLimit(filterInvoices(all, params), opts.Limit), nil
 }
 
 // filterInvoices performs in-memory filtering.

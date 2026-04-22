@@ -86,10 +86,7 @@ func (r *AccountingTypeRepository) List(ctx context.Context, opts ReadOptions) (
 		return nil, err
 	}
 
-	if opts.Limit > 0 && len(entities) > opts.Limit {
-		entities = entities[:opts.Limit]
-	}
-	return entities, nil
+	return applyLimit(entities, opts.Limit), nil
 }
 
 // GetByID returns the accounting type with the given ID from the cache.
@@ -140,11 +137,13 @@ func (r *AccountingTypeRepository) GetByID(ctx context.Context, id int, opts Rea
 
 // Search returns accounting types filtered by the given parameters from the cache.
 func (r *AccountingTypeRepository) Search(ctx context.Context, params boardapi.AccountingTypeSearchParams, opts ReadOptions) ([]boardapi.AccountingTypeEntity, error) {
-	all, err := r.List(ctx, opts)
+	listOpts := opts
+	listOpts.Limit = 0
+	all, err := r.List(ctx, listOpts)
 	if err != nil {
 		return nil, err
 	}
-	return filterAccountingTypes(all, params), nil
+	return applyLimit(filterAccountingTypes(all, params), opts.Limit), nil
 }
 
 // filterAccountingTypes performs in-memory filtering.

@@ -86,10 +86,7 @@ func (r *PurchaseTypeRepository) List(ctx context.Context, opts ReadOptions) ([]
 		return nil, err
 	}
 
-	if opts.Limit > 0 && len(entities) > opts.Limit {
-		entities = entities[:opts.Limit]
-	}
-	return entities, nil
+	return applyLimit(entities, opts.Limit), nil
 }
 
 // GetByID returns the purchase type with the given ID from the cache.
@@ -140,11 +137,13 @@ func (r *PurchaseTypeRepository) GetByID(ctx context.Context, id int, opts ReadO
 
 // Search returns purchase types filtered by the given parameters from the cache.
 func (r *PurchaseTypeRepository) Search(ctx context.Context, params boardapi.PurchaseTypeSearchParams, opts ReadOptions) ([]boardapi.PurchaseTypeEntity, error) {
-	all, err := r.List(ctx, opts)
+	listOpts := opts
+	listOpts.Limit = 0
+	all, err := r.List(ctx, listOpts)
 	if err != nil {
 		return nil, err
 	}
-	return filterPurchaseTypes(all, params), nil
+	return applyLimit(filterPurchaseTypes(all, params), opts.Limit), nil
 }
 
 // filterPurchaseTypes performs in-memory filtering.

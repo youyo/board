@@ -85,10 +85,7 @@ func (r *PurchaseOrderRepository) List(ctx context.Context, opts ReadOptions) ([
 		return nil, err
 	}
 
-	if opts.Limit > 0 && len(entities) > opts.Limit {
-		entities = entities[:opts.Limit]
-	}
-	return entities, nil
+	return applyLimit(entities, opts.Limit), nil
 }
 
 // GetByID returns the purchase order with the given ID from the cache.
@@ -139,11 +136,13 @@ func (r *PurchaseOrderRepository) GetByID(ctx context.Context, id int, opts Read
 
 // Search returns purchase orders filtered by the given parameters from the cache.
 func (r *PurchaseOrderRepository) Search(ctx context.Context, params boardapi.PurchaseOrderSearchParams, opts ReadOptions) ([]boardapi.PurchaseOrderEntity, error) {
-	all, err := r.List(ctx, opts)
+	listOpts := opts
+	listOpts.Limit = 0
+	all, err := r.List(ctx, listOpts)
 	if err != nil {
 		return nil, err
 	}
-	return filterPurchaseOrders(all, params), nil
+	return applyLimit(filterPurchaseOrders(all, params), opts.Limit), nil
 }
 
 // filterPurchaseOrders performs in-memory filtering.

@@ -86,10 +86,7 @@ func (r *ProjectRepository) List(ctx context.Context, opts ReadOptions) ([]board
 		return nil, err
 	}
 
-	if opts.Limit > 0 && len(entities) > opts.Limit {
-		entities = entities[:opts.Limit]
-	}
-	return entities, nil
+	return applyLimit(entities, opts.Limit), nil
 }
 
 // GetByID returns the project with the given ID from the cache.
@@ -149,11 +146,13 @@ func (r *ProjectRepository) Search(ctx context.Context, params boardapi.ProjectS
 	if params.ResponseGroup != "" {
 		return r.api.SearchProjects(ctx, params)
 	}
-	all, err := r.List(ctx, opts)
+	listOpts := opts
+	listOpts.Limit = 0
+	all, err := r.List(ctx, listOpts)
 	if err != nil {
 		return nil, err
 	}
-	return filterProjects(all, params), nil
+	return applyLimit(filterProjects(all, params), opts.Limit), nil
 }
 
 // filterProjects performs in-memory filtering.

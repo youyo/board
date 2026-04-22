@@ -68,7 +68,7 @@ func NewRootCmd(version string) *cobra.Command {
 	pf.BoolVar(&gf.refresh, "refresh", false, "Force incremental refresh")
 	pf.BoolVar(&gf.forceRefresh, "force-refresh", false, "Force full refresh")
 	pf.BoolVar(&gf.pretty, "pretty", false, "Pretty-print JSON output")
-	pf.IntVar(&gf.limit, "limit", 50, "Maximum number of results to return (0 = unlimited)")
+	pf.IntVar(&gf.limit, "limit", 0, "Maximum number of results to return (0 = unlimited)")
 
 	// Register subcommands.
 	rootCmd.AddCommand(NewConfigureCmd())

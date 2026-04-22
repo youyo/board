@@ -86,10 +86,7 @@ func (r *VendorBranchRepository) List(ctx context.Context, opts ReadOptions) ([]
 		return nil, err
 	}
 
-	if opts.Limit > 0 && len(entities) > opts.Limit {
-		entities = entities[:opts.Limit]
-	}
-	return entities, nil
+	return applyLimit(entities, opts.Limit), nil
 }
 
 // GetByID returns the vendor branch with the given ID from the cache.
@@ -140,11 +137,13 @@ func (r *VendorBranchRepository) GetByID(ctx context.Context, id int, opts ReadO
 
 // Search returns vendor branches filtered by the given parameters from the cache.
 func (r *VendorBranchRepository) Search(ctx context.Context, params boardapi.VendorBranchSearchParams, opts ReadOptions) ([]boardapi.VendorBranchEntity, error) {
-	all, err := r.List(ctx, opts)
+	listOpts := opts
+	listOpts.Limit = 0
+	all, err := r.List(ctx, listOpts)
 	if err != nil {
 		return nil, err
 	}
-	return filterVendorBranches(all, params), nil
+	return applyLimit(filterVendorBranches(all, params), opts.Limit), nil
 }
 
 // filterVendorBranches performs in-memory filtering.

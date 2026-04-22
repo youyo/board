@@ -86,10 +86,7 @@ func (r *DocumentSendChannelRepository) List(ctx context.Context, opts ReadOptio
 		return nil, err
 	}
 
-	if opts.Limit > 0 && len(entities) > opts.Limit {
-		entities = entities[:opts.Limit]
-	}
-	return entities, nil
+	return applyLimit(entities, opts.Limit), nil
 }
 
 // GetByID returns the document send channel with the given ID from the cache.
@@ -140,11 +137,13 @@ func (r *DocumentSendChannelRepository) GetByID(ctx context.Context, id int, opt
 
 // Search returns document send channels filtered by the given parameters from the cache.
 func (r *DocumentSendChannelRepository) Search(ctx context.Context, params boardapi.DocumentSendChannelSearchParams, opts ReadOptions) ([]boardapi.DocumentSendChannelEntity, error) {
-	all, err := r.List(ctx, opts)
+	listOpts := opts
+	listOpts.Limit = 0
+	all, err := r.List(ctx, listOpts)
 	if err != nil {
 		return nil, err
 	}
-	return filterDocumentSendChannels(all, params), nil
+	return applyLimit(filterDocumentSendChannels(all, params), opts.Limit), nil
 }
 
 // filterDocumentSendChannels performs in-memory filtering.

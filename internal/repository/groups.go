@@ -86,10 +86,7 @@ func (r *GroupRepository) List(ctx context.Context, opts ReadOptions) ([]boardap
 		return nil, err
 	}
 
-	if opts.Limit > 0 && len(entities) > opts.Limit {
-		entities = entities[:opts.Limit]
-	}
-	return entities, nil
+	return applyLimit(entities, opts.Limit), nil
 }
 
 // GetByID returns the group with the given ID from the cache.
@@ -140,11 +137,13 @@ func (r *GroupRepository) GetByID(ctx context.Context, id int, opts ReadOptions)
 
 // Search returns groups filtered by the given parameters from the cache.
 func (r *GroupRepository) Search(ctx context.Context, params boardapi.GroupSearchParams, opts ReadOptions) ([]boardapi.GroupEntity, error) {
-	all, err := r.List(ctx, opts)
+	listOpts := opts
+	listOpts.Limit = 0
+	all, err := r.List(ctx, listOpts)
 	if err != nil {
 		return nil, err
 	}
-	return filterGroups(all, params), nil
+	return applyLimit(filterGroups(all, params), opts.Limit), nil
 }
 
 // filterGroups performs in-memory filtering.

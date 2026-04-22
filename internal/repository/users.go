@@ -86,10 +86,7 @@ func (r *UserRepository) List(ctx context.Context, opts ReadOptions) ([]boardapi
 		return nil, err
 	}
 
-	if opts.Limit > 0 && len(entities) > opts.Limit {
-		entities = entities[:opts.Limit]
-	}
-	return entities, nil
+	return applyLimit(entities, opts.Limit), nil
 }
 
 // GetByID returns the user with the given ID from the cache.
@@ -140,11 +137,13 @@ func (r *UserRepository) GetByID(ctx context.Context, id int, opts ReadOptions) 
 
 // Search returns users filtered by the given parameters from the cache.
 func (r *UserRepository) Search(ctx context.Context, params boardapi.UserSearchParams, opts ReadOptions) ([]boardapi.UserEntity, error) {
-	all, err := r.List(ctx, opts)
+	listOpts := opts
+	listOpts.Limit = 0
+	all, err := r.List(ctx, listOpts)
 	if err != nil {
 		return nil, err
 	}
-	return filterUsers(all, params), nil
+	return applyLimit(filterUsers(all, params), opts.Limit), nil
 }
 
 // filterUsers performs in-memory filtering.

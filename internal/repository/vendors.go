@@ -86,10 +86,7 @@ func (r *VendorRepository) List(ctx context.Context, opts ReadOptions) ([]boarda
 		return nil, err
 	}
 
-	if opts.Limit > 0 && len(entities) > opts.Limit {
-		entities = entities[:opts.Limit]
-	}
-	return entities, nil
+	return applyLimit(entities, opts.Limit), nil
 }
 
 // GetByID returns the vendor with the given ID from the cache.
@@ -140,11 +137,13 @@ func (r *VendorRepository) GetByID(ctx context.Context, id int, opts ReadOptions
 
 // Search returns vendors filtered by the given parameters from the cache.
 func (r *VendorRepository) Search(ctx context.Context, params boardapi.VendorSearchParams, opts ReadOptions) ([]boardapi.VendorEntity, error) {
-	all, err := r.List(ctx, opts)
+	listOpts := opts
+	listOpts.Limit = 0
+	all, err := r.List(ctx, listOpts)
 	if err != nil {
 		return nil, err
 	}
-	return filterVendors(all, params), nil
+	return applyLimit(filterVendors(all, params), opts.Limit), nil
 }
 
 // filterVendors performs in-memory filtering.

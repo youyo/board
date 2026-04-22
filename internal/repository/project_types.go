@@ -86,10 +86,7 @@ func (r *ProjectTypeRepository) List(ctx context.Context, opts ReadOptions) ([]b
 		return nil, err
 	}
 
-	if opts.Limit > 0 && len(entities) > opts.Limit {
-		entities = entities[:opts.Limit]
-	}
-	return entities, nil
+	return applyLimit(entities, opts.Limit), nil
 }
 
 // GetByID returns the project type with the given ID from the cache.
@@ -140,11 +137,13 @@ func (r *ProjectTypeRepository) GetByID(ctx context.Context, id int, opts ReadOp
 
 // Search returns project types filtered by the given parameters from the cache.
 func (r *ProjectTypeRepository) Search(ctx context.Context, params boardapi.ProjectTypeSearchParams, opts ReadOptions) ([]boardapi.ProjectTypeEntity, error) {
-	all, err := r.List(ctx, opts)
+	listOpts := opts
+	listOpts.Limit = 0
+	all, err := r.List(ctx, listOpts)
 	if err != nil {
 		return nil, err
 	}
-	return filterProjectTypes(all, params), nil
+	return applyLimit(filterProjectTypes(all, params), opts.Limit), nil
 }
 
 // filterProjectTypes performs in-memory filtering.

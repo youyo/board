@@ -86,10 +86,7 @@ func (r *PaymentTermRepository) List(ctx context.Context, opts ReadOptions) ([]b
 		return nil, err
 	}
 
-	if opts.Limit > 0 && len(entities) > opts.Limit {
-		entities = entities[:opts.Limit]
-	}
-	return entities, nil
+	return applyLimit(entities, opts.Limit), nil
 }
 
 // GetByID returns the payment term with the given ID from the cache.
@@ -140,11 +137,13 @@ func (r *PaymentTermRepository) GetByID(ctx context.Context, id int, opts ReadOp
 
 // Search returns payment terms filtered by the given parameters from the cache.
 func (r *PaymentTermRepository) Search(ctx context.Context, params boardapi.PaymentTermSearchParams, opts ReadOptions) ([]boardapi.PaymentTermEntity, error) {
-	all, err := r.List(ctx, opts)
+	listOpts := opts
+	listOpts.Limit = 0
+	all, err := r.List(ctx, listOpts)
 	if err != nil {
 		return nil, err
 	}
-	return filterPaymentTerms(all, params), nil
+	return applyLimit(filterPaymentTerms(all, params), opts.Limit), nil
 }
 
 // filterPaymentTerms performs in-memory filtering.

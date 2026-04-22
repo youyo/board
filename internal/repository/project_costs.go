@@ -85,10 +85,7 @@ func (r *ProjectCostRepository) List(ctx context.Context, opts ReadOptions) ([]b
 		return nil, err
 	}
 
-	if opts.Limit > 0 && len(entities) > opts.Limit {
-		entities = entities[:opts.Limit]
-	}
-	return entities, nil
+	return applyLimit(entities, opts.Limit), nil
 }
 
 // GetByID returns the project cost with the given ID from the cache.
@@ -138,11 +135,13 @@ func (r *ProjectCostRepository) GetByID(ctx context.Context, id int, opts ReadOp
 
 // Search returns project costs filtered by the given parameters from the cache.
 func (r *ProjectCostRepository) Search(ctx context.Context, params boardapi.ProjectCostSearchParams, opts ReadOptions) ([]boardapi.ProjectCostEntity, error) {
-	all, err := r.List(ctx, opts)
+	listOpts := opts
+	listOpts.Limit = 0
+	all, err := r.List(ctx, listOpts)
 	if err != nil {
 		return nil, err
 	}
-	return filterProjectCosts(all, params), nil
+	return applyLimit(filterProjectCosts(all, params), opts.Limit), nil
 }
 
 // filterProjectCosts performs in-memory filtering.

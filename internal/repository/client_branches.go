@@ -86,10 +86,7 @@ func (r *ClientBranchRepository) List(ctx context.Context, opts ReadOptions) ([]
 		return nil, err
 	}
 
-	if opts.Limit > 0 && len(entities) > opts.Limit {
-		entities = entities[:opts.Limit]
-	}
-	return entities, nil
+	return applyLimit(entities, opts.Limit), nil
 }
 
 // GetByID returns the client branch with the given ID from the cache.
@@ -152,16 +149,18 @@ func (r *ClientBranchRepository) Search(ctx context.Context, params boardapi.Cli
 			return nil, err
 		}
 		if params.Name == "" {
-			return entities, nil
+			return applyLimit(entities, opts.Limit), nil
 		}
-		return filterClientBranchesByName(entities, params.Name), nil
+		return applyLimit(filterClientBranchesByName(entities, params.Name), opts.Limit), nil
 	}
 	// Name-only (or empty) filter: fall back to full list + in-memory.
-	all, err := r.List(ctx, opts)
+	listOpts := opts
+	listOpts.Limit = 0
+	all, err := r.List(ctx, listOpts)
 	if err != nil {
 		return nil, err
 	}
-	return filterClientBranchesByName(all, params.Name), nil
+	return applyLimit(filterClientBranchesByName(all, params.Name), opts.Limit), nil
 }
 
 // filterClientBranchesByName performs in-memory name filtering.

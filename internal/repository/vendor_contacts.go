@@ -86,10 +86,7 @@ func (r *VendorContactRepository) List(ctx context.Context, opts ReadOptions) ([
 		return nil, err
 	}
 
-	if opts.Limit > 0 && len(entities) > opts.Limit {
-		entities = entities[:opts.Limit]
-	}
-	return entities, nil
+	return applyLimit(entities, opts.Limit), nil
 }
 
 // GetByID returns the vendor contact with the given ID from the cache.
@@ -140,11 +137,13 @@ func (r *VendorContactRepository) GetByID(ctx context.Context, id int, opts Read
 
 // Search returns vendor contacts filtered by the given parameters from the cache.
 func (r *VendorContactRepository) Search(ctx context.Context, params boardapi.VendorContactSearchParams, opts ReadOptions) ([]boardapi.VendorContactEntity, error) {
-	all, err := r.List(ctx, opts)
+	listOpts := opts
+	listOpts.Limit = 0
+	all, err := r.List(ctx, listOpts)
 	if err != nil {
 		return nil, err
 	}
-	return filterVendorContacts(all, params), nil
+	return applyLimit(filterVendorContacts(all, params), opts.Limit), nil
 }
 
 // filterVendorContacts は in-memory フィルタリングを行う。

@@ -29,8 +29,8 @@ func TestNewRootCmd_LimitDefault(t *testing.T) {
 	if f == nil {
 		t.Fatal("--limit flag not found")
 	}
-	if f.DefValue != "50" {
-		t.Errorf("--limit default = %q, want %q", f.DefValue, "50")
+	if f.DefValue != "0" {
+		t.Errorf("--limit default = %q, want %q", f.DefValue, "0")
 	}
 }
 
