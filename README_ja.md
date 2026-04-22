@@ -12,6 +12,13 @@
 - **`board mcp serve`** — ローカル HTTP MCP サーバー（AI アシスタント連携用）
 - SQLite キャッシュで BOARD API rate limit（3,000 回/日、3 回/秒）に対応
 
+## ドキュメント
+
+- [インストール](docs/installation_ja.md)
+- [クイックスタート](docs/guides/getting-started.md)
+- [MCP サーバー利用ガイド](docs/guides/mcp-server.md)
+- [API コマンドリファレンス](docs/api-reference.md)
+
 ## インストール
 
 ### Homebrew（macOS / Linux）

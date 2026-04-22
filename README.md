@@ -12,6 +12,13 @@ CLI tool and local MCP server for the [BOARD API](https://api.the-board.jp/v1/).
 - **`board mcp serve`** — Local HTTP MCP server (for AI assistants)
 - SQLite cache to respect BOARD API rate limits (3,000/day, 3/sec)
 
+## Documentation
+
+- [Installation](docs/installation.md)
+- [Getting Started](docs/guides/getting-started.md)
+- [MCP Server Guide](docs/guides/mcp-server.md)
+- [API Reference](docs/api-reference.md)
+
 ## Installation
 
 ### Homebrew (macOS / Linux)

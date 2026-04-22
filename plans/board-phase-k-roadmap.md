@@ -8,8 +8,8 @@
 | 制約 | 破壊的変更（SQLite cache invalidate 必要）、Rate Limit 3 req/sec, 3000/day 遵守 |
 | 対象リポジトリ | /Users/youyo/src/github.com/youyo/board |
 | 作成日 | 2026-04-22 |
-| 最終更新 | 2026-04-22 18:45 |
-| ステータス | 進行中（M44 完了） |
+| 最終更新 | 2026-04-22 |
+| ステータス | 進行中（M47 完了） |
 | 親計画 | plans/tender-squishing-dusk.md |
 | 併走計画 | plans/board-compliance-roadmap.md（42 M 完走済） |
 
@@ -20,9 +20,9 @@
 - 補助的に lint/docs/archive を閉じて v0.4.0 リリースへ
 
 ## Current Focus
-- **マイルストーン**: M47 ユーザー向けドキュメント一括整備
-- **直近の完了**: M46 golangci-lint + .editorconfig 導入（2026-04-22）
-- **次のアクション**: M47 詳細計画 `plans/board-phase-k-m47-user-docs.md` を生成し実装開始
+- **マイルストーン**: M48 旧ロードマップ archive 化
+- **直近の完了**: M47 ユーザー向けドキュメント一括整備（2026-04-22）
+- **次のアクション**: M48 詳細計画 `plans/board-phase-k-m48-roadmap-archive.md` を生成し実装開始
 
 ## Progress
 
@@ -65,13 +65,13 @@
 - [x] 既存 warning を一括解消（gofmt: 3件、errcheck: 8件、staticcheck: 4件 → 0件）
 - 📄 詳細: plans/board-phase-k-m46-lint-config.md ✅
 
-### M47: ユーザー向けドキュメント一括整備
-- [ ] `docs/installation.md`（Homebrew / バイナリ / go install）
-- [ ] `docs/guides/getting-started.md`（5 分クイックスタート）
-- [ ] `docs/guides/mcp-server.md`（Claude Desktop / Claude Code 連携）
-- [ ] `docs/api-reference.md`（api/find コマンドリファレンス）
-- [ ] README.md / README_ja.md に docs/ 動線追加
-- 📄 詳細: plans/board-phase-k-m47-user-docs.md（着手時生成）
+### M47: ユーザー向けドキュメント一括整備 ✅ 完了
+- [x] `docs/installation.md`（Homebrew / バイナリ / go install）
+- [x] `docs/guides/getting-started.md`（5 分クイックスタート）
+- [x] `docs/guides/mcp-server.md`（Claude Desktop / Claude Code 連携）
+- [x] `docs/api-reference.md`（api/find コマンドリファレンス）
+- [x] README.md / README_ja.md に docs/ 動線追加
+- 📄 詳細: plans/board-phase-k-m47-user-docs.md ✅
 
 ### M48: 旧ロードマップ archive 化
 - [ ] `plans/archive/` ディレクトリ作成
