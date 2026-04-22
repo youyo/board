@@ -71,10 +71,13 @@ func TestFindClient_ByName(t *testing.T) {
 }
 
 func TestFindClient_ByText(t *testing.T) {
+	memoImportant := "important memo"
+	memoNormal := "normal"
+	customMemo := "memo-code"
 	allClients := []boardapi.ClientEntity{
-		{ID: 1, Name: "Client A", Code: "CA", Memo: "important memo"},
-		{ID: 2, Name: "Client B", Code: "CB", Memo: "normal"},
-		{ID: 3, Name: "Client C", Code: "memo-code", Memo: ""},
+		{ID: 1, Name: "Client A", CustomNo: nil, Note: &memoImportant},
+		{ID: 2, Name: "Client B", CustomNo: nil, Note: &memoNormal},
+		{ID: 3, Name: "Client C", CustomNo: &customMemo, Note: nil},
 	}
 
 	svc := newServiceWith(
@@ -86,7 +89,7 @@ func TestFindClient_ByText(t *testing.T) {
 
 	got, err := svc.FindClient(testCtx, find.FindClientQuery{Text: "memo"})
 	assertNoError(t, err)
-	// Should match Client A (memo field) and Client C (code field)
+	// Should match Client A (Note field) and Client C (CustomNo field)
 	assertClientResultLen(t, got, 2)
 }
 

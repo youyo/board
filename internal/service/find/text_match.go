@@ -13,3 +13,11 @@ func containsText(text string, fields ...string) bool {
 	}
 	return false
 }
+
+// derefString は *string を安全に string に変換する。nil の場合は "" を返す。
+func derefString(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}

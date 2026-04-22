@@ -44,7 +44,7 @@ func (s *Service) FindClient(ctx context.Context, q FindClientQuery) ([]ClientRe
 			return nil, err
 		}
 		for _, c := range all {
-			if containsText(q.Text, c.Name, c.Code, c.Memo) {
+			if containsText(q.Text, c.Name, derefString(c.CustomNo), derefString(c.Note)) {
 				clients = append(clients, c)
 			}
 		}
