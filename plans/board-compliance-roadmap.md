@@ -51,7 +51,8 @@ FindUser/FindGroup は groups 0 件 Pending Re-verification、FindInvoice は ID
 - **マイルストーン**: **ロードマップ全走完了（38 + 4 = 42 マイルストーン）** ✅
 - **直近の完了**: M39/M40 smoke 再実行 完了（全 PASS）／M41/M42 smoke（data 0 件で PASS/SKIP）
 - **以前の完了**: M42 VendorContactEntity ✅ / M41 VendorBranchEntity ✅ / M40 ContactEntity ✅ / M39 ClientBranchEntity ✅
-- **次のアクション**: なし（全 42 M 完了 + M39/M40 実 API 検証完了）。vendor データ投入後に M41/M42 Get + M30 Pending Re-verification を再実行
+- **次のアクション**: 本ロードマップ（compliance）は完走。**残 Entity 3 件（Client/Project/ProjectCost）の全面再設計と仕上げ作業は [Phase K ロードマップ](./board-phase-k-roadmap.md) に移管**（M43-M48、6 M 構成、v0.4.0 向け）
+- **Pending Re-verification**: vendor データ投入後に M41/M42 Get + M30 を再実行
 
 ## Progress
 

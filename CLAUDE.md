@@ -92,5 +92,7 @@ gofmt -s -w .
 ## 計画ファイル
 
 - スペック: `docs/specs/board_cli_mcp_ultra_detailed_design_ja.md`
-- ロードマップ: `plans/board-roadmap.md`
-- マイルストーン詳細: `plans/board-m{NN}-{slug}.md`
+- ロードマップ（機能実装、実装完走済）: `plans/board-roadmap.md`（※M48 で `plans/archive/` へ移設予定）
+- ロードマップ（準拠検証、42 M 完走済）: `plans/board-compliance-roadmap.md`
+- **ロードマップ（Phase K、進行中）**: `plans/board-phase-k-roadmap.md` — Entity 3 件の全面再設計 + 仕上げ（v0.4.0 向け）
+- マイルストーン詳細: `plans/board-m{NN}-{slug}.md` / `plans/board-compliance-m{NN}-{slug}.md` / `plans/board-phase-k-m{NN}-{slug}.md`
