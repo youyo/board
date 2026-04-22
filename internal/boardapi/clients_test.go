@@ -31,11 +31,11 @@ func newClientsMockClient(rt roundTripperFunc) *boardapi.Client {
 }
 
 // U1: ListClientsRaw returns the raw JSON array body byte-for-byte when a
-// single page response is served. All 6 ClientEntity keys must survive the
+// single page response is served. Core ClientEntity keys must survive the
 // round trip so StrictFieldDiff can later detect any unmapped BOARD API keys
 // in E2E.
 func TestListClientsRaw_SinglePage(t *testing.T) {
-	page1 := `[{"id":1,"name":"Client A","code":"C001","memo":"VIP","updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}]`
+	page1 := `[{"id":1,"name":"Client A","name_disp":"A","payment_term_id":100,"payment_term_name":"月末","invoice_system_issuer_type":0,"invoice_system_issuer_type_name":"未設定","invoice_system_number_validated":false,"updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}]`
 	var gotPath string
 	var gotQuery url.Values
 	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
@@ -64,10 +64,10 @@ func TestListClientsRaw_SinglePage(t *testing.T) {
 		t.Fatalf("expected 1 element, got %d", len(arr))
 	}
 	got := arr[0]
-	// All 6 ClientEntity json tags must survive round-tripping so
+	// Core ClientEntity json tags must survive round-tripping so
 	// StrictFieldDiff can detect any unmapped BOARD API keys.
 	wantKeys := []string{
-		"id", "name", "code", "memo", "updated_at", "created_at",
+		"id", "name", "name_disp", "updated_at", "created_at",
 	}
 	for _, k := range wantKeys {
 		if _, ok := got[k]; !ok {
@@ -81,11 +81,11 @@ func TestListClientsRaw_SinglePage(t *testing.T) {
 // 1 item on page 2. Result must be a JSON array of 3 items.
 func TestListClientsRaw_MultiPage(t *testing.T) {
 	page1Items := []string{
-		`{"id":1,"name":"A","code":"C001","memo":"","updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}`,
-		`{"id":2,"name":"B","code":"C002","memo":"","updated_at":"2024-01-02T00:00:00+09:00","created_at":"2023-01-02T00:00:00+09:00"}`,
+		`{"id":1,"name":"A","name_disp":"A","payment_term_id":100,"payment_term_name":"月末","invoice_system_issuer_type":0,"invoice_system_issuer_type_name":"未設定","invoice_system_number_validated":false,"updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}`,
+		`{"id":2,"name":"B","name_disp":"B","payment_term_id":100,"payment_term_name":"月末","invoice_system_issuer_type":0,"invoice_system_issuer_type_name":"未設定","invoice_system_number_validated":false,"updated_at":"2024-01-02T00:00:00+09:00","created_at":"2023-01-02T00:00:00+09:00"}`,
 	}
 	page2Items := []string{
-		`{"id":3,"name":"C","code":"C003","memo":"","updated_at":"2024-01-03T00:00:00+09:00","created_at":"2023-01-03T00:00:00+09:00"}`,
+		`{"id":3,"name":"C","name_disp":"C","payment_term_id":100,"payment_term_name":"月末","invoice_system_issuer_type":0,"invoice_system_issuer_type_name":"未設定","invoice_system_number_validated":false,"updated_at":"2024-01-03T00:00:00+09:00","created_at":"2023-01-03T00:00:00+09:00"}`,
 	}
 	var pageCount int
 	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
@@ -131,7 +131,7 @@ func TestListClientsRaw_MultiPage(t *testing.T) {
 
 // U3: GetClientRaw returns body exactly as served (single object).
 func TestGetClientRaw_Success(t *testing.T) {
-	body := []byte(`{"id":42,"name":"Client X","code":"CX","memo":"","updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}`)
+	body := []byte(`{"id":42,"name":"Client X","name_disp":"X","title":null,"zip":null,"pref":null,"address1":null,"address2":null,"tel":null,"fax":null,"payment_term_id":100,"payment_term_name":"月末","bank_charge_to_client_flg":0,"nda_flg":0,"basic_agreement_flg":0,"document_send_type":1,"document_send_type_name":"メール","note":null,"tags":[],"company_number":null,"accounting_code":null,"to":null,"cc":null,"custom_no":null,"company_bank_id":null,"company_bank_name":null,"invoice_system_number":null,"invoice_system_number_validated":false,"invoice_system_issuer_type":0,"invoice_system_issuer_type_name":"未設定","archive_flg":0,"updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}`)
 	var gotPath string
 	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
 		gotPath = r.URL.Path
@@ -182,7 +182,7 @@ func TestGetClientRaw_NotFound(t *testing.T) {
 // U5: SearchClientsRaw sends both Name and UpdatedAtFrom parameters in the
 // query and returns the body. M08 users uses the same two-parameter surface.
 func TestSearchClientsRaw_QueryParams(t *testing.T) {
-	page1 := `[{"id":7,"name":"matched","code":"","memo":"","updated_at":"2024-02-01T00:00:00+09:00","created_at":"2024-02-01T00:00:00+09:00"}]`
+	page1 := `[{"id":7,"name":"matched","name_disp":"matched","payment_term_id":100,"payment_term_name":"月末","invoice_system_issuer_type":0,"invoice_system_issuer_type_name":"未設定","invoice_system_number_validated":false,"updated_at":"2024-02-01T00:00:00+09:00","created_at":"2024-02-01T00:00:00+09:00"}]`
 	var observedName, observedUpdatedFrom string
 	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
 		observedName = r.URL.Query().Get("name")
@@ -210,5 +210,268 @@ func TestSearchClientsRaw_QueryParams(t *testing.T) {
 	}
 	if len(arr) != 1 {
 		t.Fatalf("expected 1 element, got %d", len(arr))
+	}
+}
+
+// ---- M43 新規 Unit テスト（U1-U6）----
+
+// clientGetDumpJSON は実 API dump と同等の 33 フィールド JSON を返す。
+const clientGetDumpJSON = `{
+	"id":51285623,
+	"name":"株式会社WAND",
+	"name_disp":"WAND",
+	"title":"御中",
+	"zip":"034-0016",
+	"pref":"青森県",
+	"address1":"十和田市東十二番町18-31",
+	"address2":null,
+	"tel":null,
+	"fax":null,
+	"payment_term_id":53928746,
+	"payment_term_name":"商品引換時",
+	"bank_charge_to_client_flg":1,
+	"nda_flg":1,
+	"basic_agreement_flg":1,
+	"document_send_type":1,
+	"document_send_type_name":"メール(DL)",
+	"note":null,
+	"tags":[],
+	"company_number":null,
+	"accounting_code":null,
+	"to":null,
+	"cc":null,
+	"custom_no":null,
+	"company_bank_id":null,
+	"company_bank_name":null,
+	"invoice_system_number":null,
+	"invoice_system_number_validated":false,
+	"invoice_system_issuer_type":0,
+	"invoice_system_issuer_type_name":"未設定",
+	"archive_flg":0,
+	"created_at":"2015-02-02T20:02:08.000+09:00",
+	"updated_at":"2024-12-26T10:14:11.000+09:00"
+}`
+
+// M43 U1: Get レスポンスの全 33 フィールドが ClientEntity に正しく unmarshal される。
+func TestClientEntity_UnmarshalGet_AllFields(t *testing.T) {
+	var got boardapi.ClientEntity
+	if err := json.Unmarshal([]byte(clientGetDumpJSON), &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	// 既存維持フィールド
+	if got.ID != 51285623 {
+		t.Errorf("ID = %d, want 51285623", got.ID)
+	}
+	if got.Name != "株式会社WAND" {
+		t.Errorf("Name = %q, want 株式会社WAND", got.Name)
+	}
+	if got.CreatedAt != "2015-02-02T20:02:08.000+09:00" {
+		t.Errorf("CreatedAt = %q", got.CreatedAt)
+	}
+	if got.UpdatedAt != "2024-12-26T10:14:11.000+09:00" {
+		t.Errorf("UpdatedAt = %q", got.UpdatedAt)
+	}
+
+	// 共通フィールド
+	if got.NameDisp != "WAND" {
+		t.Errorf("NameDisp = %q, want WAND", got.NameDisp)
+	}
+	if got.Title == nil || *got.Title != "御中" {
+		t.Errorf("Title = %v, want 御中", got.Title)
+	}
+	if got.Zip == nil || *got.Zip != "034-0016" {
+		t.Errorf("Zip = %v, want 034-0016", got.Zip)
+	}
+	if got.Pref == nil || *got.Pref != "青森県" {
+		t.Errorf("Pref = %v, want 青森県", got.Pref)
+	}
+	if got.Address1 == nil || *got.Address1 != "十和田市東十二番町18-31" {
+		t.Errorf("Address1 = %v", got.Address1)
+	}
+	if got.Address2 != nil {
+		t.Errorf("Address2 = %v, want nil", got.Address2)
+	}
+	if got.Tel != nil {
+		t.Errorf("Tel = %v, want nil", got.Tel)
+	}
+	if got.Fax != nil {
+		t.Errorf("Fax = %v, want nil", got.Fax)
+	}
+	if got.PaymentTermID != 53928746 {
+		t.Errorf("PaymentTermID = %d, want 53928746", got.PaymentTermID)
+	}
+	if got.PaymentTermName != "商品引換時" {
+		t.Errorf("PaymentTermName = %q, want 商品引換時", got.PaymentTermName)
+	}
+	if got.InvoiceSystemIssuerType != 0 {
+		t.Errorf("InvoiceSystemIssuerType = %d, want 0", got.InvoiceSystemIssuerType)
+	}
+	if got.InvoiceSystemIssuerTypeName != "未設定" {
+		t.Errorf("InvoiceSystemIssuerTypeName = %q, want 未設定", got.InvoiceSystemIssuerTypeName)
+	}
+	if got.InvoiceSystemNumberValidated != false {
+		t.Errorf("InvoiceSystemNumberValidated = %v, want false", got.InvoiceSystemNumberValidated)
+	}
+
+	// Get 限定フィールド
+	if got.BankChargeToClientFlg != 1 {
+		t.Errorf("BankChargeToClientFlg = %d, want 1", got.BankChargeToClientFlg)
+	}
+	if got.NdaFlg != 1 {
+		t.Errorf("NdaFlg = %d, want 1", got.NdaFlg)
+	}
+	if got.BasicAgreementFlg != 1 {
+		t.Errorf("BasicAgreementFlg = %d, want 1", got.BasicAgreementFlg)
+	}
+	if got.DocumentSendType != 1 {
+		t.Errorf("DocumentSendType = %d, want 1", got.DocumentSendType)
+	}
+	if got.DocumentSendTypeName != "メール(DL)" {
+		t.Errorf("DocumentSendTypeName = %q, want メール(DL)", got.DocumentSendTypeName)
+	}
+	if got.Note != nil {
+		t.Errorf("Note = %v, want nil", got.Note)
+	}
+	if got.Tags == nil {
+		t.Errorf("Tags should not be nil (expected empty slice)")
+	}
+	if len(got.Tags) != 0 {
+		t.Errorf("Tags = %v, want empty", got.Tags)
+	}
+	if got.CompanyNumber != nil {
+		t.Errorf("CompanyNumber = %v, want nil", got.CompanyNumber)
+	}
+	if got.AccountingCode != nil {
+		t.Errorf("AccountingCode = %v, want nil", got.AccountingCode)
+	}
+	if got.To != nil {
+		t.Errorf("To = %v, want nil", got.To)
+	}
+	if got.CC != nil {
+		t.Errorf("CC = %v, want nil", got.CC)
+	}
+	if got.CustomNo != nil {
+		t.Errorf("CustomNo = %v, want nil", got.CustomNo)
+	}
+	if got.CompanyBankID != nil {
+		t.Errorf("CompanyBankID = %v, want nil", got.CompanyBankID)
+	}
+	if got.CompanyBankName != nil {
+		t.Errorf("CompanyBankName = %v, want nil", got.CompanyBankName)
+	}
+	if got.InvoiceSystemNumber != nil {
+		t.Errorf("InvoiceSystemNumber = %v, want nil", got.InvoiceSystemNumber)
+	}
+	if got.ArchiveFlg != 0 {
+		t.Errorf("ArchiveFlg = %d, want 0", got.ArchiveFlg)
+	}
+}
+
+// M43 U2: List レスポンス（Get 限定 14 フィールドなし）の unmarshal で
+// 共通フィールドが埋まり、Get 限定フィールドは zero/nil になる。
+func TestClientEntity_UnmarshalList_SparseFields(t *testing.T) {
+	listJSON := `{
+		"id":1,
+		"name":"テスト会社",
+		"name_disp":"テスト",
+		"title":null,
+		"zip":"100-0001",
+		"pref":"東京都",
+		"address1":"千代田区1-1",
+		"address2":null,
+		"tel":null,
+		"fax":null,
+		"payment_term_id":100,
+		"payment_term_name":"月末",
+		"company_number":null,
+		"invoice_system_number":null,
+		"invoice_system_number_validated":false,
+		"invoice_system_issuer_type":0,
+		"invoice_system_issuer_type_name":"未設定",
+		"updated_at":"2024-01-01T00:00:00+09:00",
+		"created_at":"2023-01-01T00:00:00+09:00"
+	}`
+	var got boardapi.ClientEntity
+	if err := json.Unmarshal([]byte(listJSON), &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	// 共通フィールドが埋まる
+	if got.ID != 1 {
+		t.Errorf("ID = %d, want 1", got.ID)
+	}
+	if got.Name != "テスト会社" {
+		t.Errorf("Name = %q", got.Name)
+	}
+	if got.NameDisp != "テスト" {
+		t.Errorf("NameDisp = %q", got.NameDisp)
+	}
+	if got.PaymentTermID != 100 {
+		t.Errorf("PaymentTermID = %d, want 100", got.PaymentTermID)
+	}
+	// Get 限定フィールドは zero/nil
+	if got.AccountingCode != nil {
+		t.Errorf("AccountingCode should be nil for List response")
+	}
+	if got.Note != nil {
+		t.Errorf("Note should be nil for List response")
+	}
+	if got.Tags != nil {
+		t.Errorf("Tags should be nil for List response (omitempty)")
+	}
+	if got.DocumentSendTypeName != "" {
+		t.Errorf("DocumentSendTypeName should be empty for List response")
+	}
+}
+
+// M43 U3: address2=null の JSON で Address2 が nil になる。
+func TestClientEntity_NullableString_NilForMissing(t *testing.T) {
+	j := `{"id":1,"name":"X","name_disp":"X","payment_term_id":1,"payment_term_name":"a","invoice_system_issuer_type":0,"invoice_system_issuer_type_name":"未設定","invoice_system_number_validated":false,"address2":null,"updated_at":"2024-01-01T00:00:00+09:00","created_at":"2024-01-01T00:00:00+09:00"}`
+	var got boardapi.ClientEntity
+	if err := json.Unmarshal([]byte(j), &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if got.Address2 != nil {
+		t.Errorf("Address2 = %v, want nil for null JSON value", got.Address2)
+	}
+}
+
+// M43 U5: ClientSearchParams が name / updated_at_from クエリを正しくエンコードする。
+func TestClientSearchParams_QueryEncoding(t *testing.T) {
+	page1 := `[{"id":7,"name":"matched","name_disp":"matched","payment_term_id":100,"payment_term_name":"月末","invoice_system_issuer_type":0,"invoice_system_issuer_type_name":"未設定","invoice_system_number_validated":false,"updated_at":"2024-02-01T00:00:00+09:00","created_at":"2024-02-01T00:00:00+09:00"}]`
+	var observedQuery url.Values
+	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
+		observedQuery = r.URL.Query()
+		return jsonResp(page1), nil
+	})
+	client := newClientsMockClient(rt)
+
+	_, err := client.SearchClientsRaw(context.Background(), boardapi.ClientSearchParams{
+		Name:          "テスト",
+		UpdatedAtFrom: "2024-01-01T00:00:00+09:00",
+	})
+	if err != nil {
+		t.Fatalf("SearchClientsRaw: %v", err)
+	}
+	if observedQuery.Get("name") != "テスト" {
+		t.Errorf("query name = %q, want テスト", observedQuery.Get("name"))
+	}
+	if observedQuery.Get("updated_at_from") != "2024-01-01T00:00:00+09:00" {
+		t.Errorf("query updated_at_from = %q", observedQuery.Get("updated_at_from"))
+	}
+}
+
+// M43 U6: tags=[] の JSON で Tags が nil ではなく空スライスになる。
+func TestClientEntity_TagsEmptyArray(t *testing.T) {
+	j := `{"id":1,"name":"X","name_disp":"X","payment_term_id":1,"payment_term_name":"a","invoice_system_issuer_type":0,"invoice_system_issuer_type_name":"未設定","invoice_system_number_validated":false,"tags":[],"bank_charge_to_client_flg":0,"nda_flg":0,"basic_agreement_flg":0,"document_send_type":1,"document_send_type_name":"メール","archive_flg":0,"updated_at":"2024-01-01T00:00:00+09:00","created_at":"2024-01-01T00:00:00+09:00"}`
+	var got boardapi.ClientEntity
+	if err := json.Unmarshal([]byte(j), &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if got.Tags == nil {
+		t.Errorf("Tags = nil, want empty slice (tags:[] should decode to []string{})")
+	}
+	if len(got.Tags) != 0 {
+		t.Errorf("Tags = %v, want empty", got.Tags)
 	}
 }
