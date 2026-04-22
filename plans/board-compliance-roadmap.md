@@ -49,9 +49,9 @@ FindUser/FindGroup は groups 0 件 Pending Re-verification、FindInvoice は ID
 
 ## Current Focus
 - **マイルストーン**: **ロードマップ全走完了（38 + 4 = 42 マイルストーン）** ✅
-- **直近の完了**: M42 VendorContactEntity 全面再設計 / VendorID() accessor / DisplayName() 更新 / downstream 修正 / go build/vet/test 全 Green（Phase J 完走）
-- **以前の完了**: M41 VendorBranchEntity ✅ / M40 ContactEntity ✅ / M39 ClientBranchEntity ✅
-- **次のアクション**: なし（全 42 M 完了）。vendor データ投入後に Pending Re-verification を再実行
+- **直近の完了**: M39/M40 smoke 再実行 完了（全 PASS）／M41/M42 smoke（data 0 件で PASS/SKIP）
+- **以前の完了**: M42 VendorContactEntity ✅ / M41 VendorBranchEntity ✅ / M40 ContactEntity ✅ / M39 ClientBranchEntity ✅
+- **次のアクション**: なし（全 42 M 完了 + M39/M40 実 API 検証完了）。vendor データ投入後に M41/M42 Get + M30 Pending Re-verification を再実行
 
 ## Progress
 
@@ -618,6 +618,13 @@ M39-M42 の 4 マイルストーンにより、ClientBranch/Contact/VendorBranch
 | 6 | documentID は projects response_group から発見 | orders/deliveries/receipts の List 相当を API 仕様範囲内で再現 | 2026-04-20 |
 
 ## Changelog
+
+### 2026-04-22（M39/M40 smoke 再実行完了 / Entity 再設計の実 API 準拠を検証）
+- **M39 ClientBranches smoke**: 全 3 テスト（List/Get/Search）PASS。List 10 件、Get `id=195311 client_id=51346407`（nested `client:{id:51346407}` から accessor が正しく取得）、Search 10 件。`ClientRef` 共通型 + `Zip/Pref/Address1/Address2/Tel*/Fax*/ArchiveFlg` 構造が実 API と完全一致を確認。
+- **M40 Contacts smoke**: 全 3 テスト PASS。List 171 件で 271cba3 fill rate が M10 観測値と完全一致（`last_name=171/171`, `first_name=140/171`, `honorific_title=171/171`, `department=27/171`, `note=5/171`, `archive_flg[0=171,non0=0]`）。Get `id=56292528 client_id=51285667`。Entity 再設計で追加した `*string` nullable フィールド 4 件（Title/Department/Email/Note）が正しく動作。
+- **M41/M42 smoke 状態維持**: VendorBranches/VendorContacts とも List 0 / Get SKIP（data-dependent）/ Search 0 で Pending Re-verification 状態継続。実 API の nested キー（"vendor" vs "payee"）は依然未検証、vendor データ投入後に再実行予定。
+- **実消費**: 合計 **11 req**（M39=3 + M40=4 + M41=2 List/Search + M42=2 List/Search、Get 2 件は discovery のみで list 0 なら追加 req なし）、上限 15 req 以下で完了。
+- **副次検証**: 前 commit f284898 の e2e テストビルド修正（VendorID() accessor 等）が実 API 呼び出しでも破綻なく動作することを確認。
 
 ### 2026-04-21（M42: VendorContactEntity 実 API 準拠再設計 / Phase J 完走）
 - **M42 VendorContactEntity 全面再設計**: M40/ContactEntity パターン踏襲。6 幻フィールド（VendorID/VendorBranchID/Name/NameKana/Phone/Memo）を削除し、nested `vendor: *VendorRef`（M41 共通型再利用）+ nullable `Title/*string/Department/*string/Email/*string/Note/*string` に変更。`VendorID()` accessor 追加、`DisplayName()` を LastName+FirstName 専用に更新（Name フィールド廃止）。repository の `filterVendorContacts` を `VendorID()` accessor + `DisplayName()` + `*string` nil ガード対応に修正。downstream 8 ファイルを修正。go build/vet/test 全 Green。実 API smoke はデータ 0 件のため Skip（Pending Re-verification 維持）。
