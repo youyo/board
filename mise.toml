@@ -25,6 +25,10 @@ run = "go test -tags e2e -v -count=1 ./internal/boardapi/ ./internal/service/fin
 description = "Run a single E2E test (rate-limit safe). Usage: mise run test:e2e:single -- -run TestE2E_Foo"
 run = "go test -tags e2e -v -count=1 ./internal/boardapi/ ./internal/service/find/"
 
+[tasks.lint]
+description = "Run golangci-lint"
+run = "golangci-lint run"
+
 [tasks.clean]
 description = "Remove build artifacts"
 run = "rm -f board"
