@@ -20,9 +20,9 @@
 - 補助的に lint/docs/archive を閉じて v0.4.0 リリースへ
 
 ## Current Focus
-- **マイルストーン**: M46 golangci-lint + .editorconfig 導入
-- **直近の完了**: M45 ProjectCostEntity 全面再設計（2026-04-22）
-- **次のアクション**: M46 詳細計画 `plans/board-phase-k-m46-lint-config.md` を生成し実装開始
+- **マイルストーン**: M47 ユーザー向けドキュメント一括整備
+- **直近の完了**: M46 golangci-lint + .editorconfig 導入（2026-04-22）
+- **次のアクション**: M47 詳細計画 `plans/board-phase-k-m47-user-docs.md` を生成し実装開始
 
 ## Progress
 
@@ -57,13 +57,13 @@
 - [x] M44 TestE2E_Projects_GetWithGroup 全 6 variants 引き続き PASS
 - 📄 詳細: plans/board-phase-k-m45-project-cost-entity.md ✅
 
-### M46: golangci-lint + .editorconfig 導入
-- [ ] `.golangci.yml` 作成（errcheck/govet/staticcheck/ineffassign/unused/gofmt/goimports）
-- [ ] `.editorconfig` 作成
-- [ ] `.github/workflows/ci.yml` に lint step 追加
-- [ ] `mise.toml` に `lint` task 追加
-- [ ] 既存 warning を一括解消
-- 📄 詳細: plans/board-phase-k-m46-lint-config.md（着手時生成）
+### M46: golangci-lint + .editorconfig 導入 ✅ 完了
+- [x] `.golangci.yml` 作成（errcheck/govet/staticcheck/ineffassign/unused/gofmt/goimports）
+- [x] `.editorconfig` 作成
+- [x] `.github/workflows/ci.yml` に lint step 追加
+- [x] `mise.toml` に `lint` task 追加
+- [x] 既存 warning を一括解消（gofmt: 3件、errcheck: 8件、staticcheck: 4件 → 0件）
+- 📄 詳細: plans/board-phase-k-m46-lint-config.md ✅
 
 ### M47: ユーザー向けドキュメント一括整備
 - [ ] `docs/installation.md`（Homebrew / バイナリ / go install）
@@ -118,3 +118,4 @@ M45 (ProjectCost, 独立) ──┘
 | 2026-04-22 18:03 | M43 完了 | ClientEntity を 6 フィールドから 33 フィールドへ全面再設計。Code/Memo を削除し CustomNo/Note に置換。Unit test 6 件追加（U1-U6）。downstream 修正 4 ファイル（find_client.go, text_match.go, find_client_test.go, e2e_clients_test.go）。E2E smoke: List 299 件 / Get / Search 全 PASS 未マップ 0。commit: 3b87f78, 5ee83fa, 71d0b4f |
 | 2026-04-22 18:45 | M44 完了 | ProjectEntity を 13 フィールドから 72 フィールドへ全面再設計（最大規模）。Status/Code/Memo/Delivery・Invoice・Receipt 単数ポインタを削除。nested 型 5 件新規追加（UserRef/ContactRef/ClientBranchRef/CompanyBranchRef/HubspotRef）。DocumentSummary を 17 フィールド拡張。Deliveries/Invoices/Receipts を []DocumentSummary 配列化。Unit test 12 件追加（U1-U12）。downstream 修正 9 ファイル（projects.go, find_project.go, text_match.go, find_estimate/order/delivery/receipt/invoice.go, helpers_test.go 等）。E2E smoke: List/Get/Search/GetWithGroup 全 6 variants PASS 未マップ 0。commit: 88139f9, b20c138, 0d1f652, f1c2eee, 2c5e254 |
 | 2026-04-22 19:10 | M45 完了 | ProjectCostEntity を 8 フィールド（概念モデルから全面再設計）。Name/CostType/Amount/Memo の 4 フィールドを削除し Description/Cost/InvoiceDate*/PaymentDate* を追加。ProjectEntity.ProjectCosts を json.RawMessage から []ProjectCostEntity へ変換。Unit test 3 件追加（U1-U3）。downstream 修正 4 ファイル（boardapi/client_test.go, project_costs_test.go, e2e_project_costs_test.go, repository/project_costs_test.go）。E2E smoke: List 22 件 / Get 1 件 / Search 22 件 PASS 未マップ 0。M44 GetWithGroup 全 6 variants 引き続き PASS。commit: 8ce558f, 38f656c |
+| 2026-04-22 19:30 | M46 完了 | golangci-lint v2 + .editorconfig 導入。.golangci.yml（errcheck/govet/staticcheck/ineffassign/unused/gofmt/goimports）を作成。既存コード違反 15 件（gofmt: 3、errcheck: 8、staticcheck: 4）を解消。GitHub Actions CI に golangci-lint-action@v6 ステップ追加。mise run lint タスク追加。go build/vet/test 全 PASS。commit: 6708a80, 25093ee, c106001, 2e16f3a, 3f97de8, 5b58570 |
