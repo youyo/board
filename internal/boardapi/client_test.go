@@ -3679,7 +3679,8 @@ func TestGetProjectWithGroup_QueryParam(t *testing.T) {
 		}
 		gotResponseGroup = r.URL.Query().Get("response_group")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"id":42,"client_id":1,"name":"ProjX","code":"PX","status":"active","start_date":"","end_date":"","memo":"","updated_at":"","created_at":"","invoice":{"id":7,"message":null,"total":"100000","tax":"10000","tax_withholding":"0","lock_flg":0}}`))
+		// M44: invoice は配列形式（invoices）に変更
+		w.Write([]byte(`{"id":42,"name":"ProjX","order_status":1,"order_status_name":"受注","delivery_status":1,"delivery_status_name":"未着手","invoice_dates":[],"tags":[],"updated_at":"","created_at":"","invoices":[{"id":7,"message":null,"total":"100000","tax":"10000","tax_withholding":"0","lock_flg":0}]}`))
 	}))
 	defer ts.Close()
 
@@ -3695,14 +3696,15 @@ func TestGetProjectWithGroup_QueryParam(t *testing.T) {
 	if gotResponseGroup != "invoice" {
 		t.Errorf("response_group param: want %q, got %q", "invoice", gotResponseGroup)
 	}
-	if got.Invoice == nil {
-		t.Fatal("Invoice field is nil, expected DocumentSummary")
+	// M44: Invoice 単数形は廃止、Invoices 配列を使用
+	if len(got.Invoices) == 0 {
+		t.Fatal("Invoices field is empty, expected at least one DocumentSummary")
 	}
-	if got.Invoice.ID != 7 {
-		t.Errorf("Invoice.ID: want 7, got %d", got.Invoice.ID)
+	if got.Invoices[0].ID != 7 {
+		t.Errorf("Invoices[0].ID: want 7, got %d", got.Invoices[0].ID)
 	}
-	if got.Invoice.Total != "100000" {
-		t.Errorf("Invoice.Total: want %q, got %q", "100000", got.Invoice.Total)
+	if got.Invoices[0].Total != "100000" {
+		t.Errorf("Invoices[0].Total: want %q, got %q", "100000", got.Invoices[0].Total)
 	}
 }
 
@@ -3712,7 +3714,8 @@ func TestGetProjectWithGroup_EmptyGroup(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotQuery = r.URL.RawQuery
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"id":5,"client_id":1,"name":"P5","code":"P5","status":"active","start_date":"","end_date":"","memo":"","updated_at":"","created_at":""}`))
+		// M44: 旧フィールドを新スキーマに更新
+		w.Write([]byte(`{"id":5,"name":"P5","order_status":1,"order_status_name":"受注","delivery_status":1,"delivery_status_name":"未着手","invoice_dates":[],"tags":[],"updated_at":"","created_at":""}`))
 	}))
 	defer ts.Close()
 
@@ -3776,7 +3779,8 @@ func TestSearchProjects_NoResponseGroup(t *testing.T) {
 func TestProjectEntity_DocumentSummaryNullMessage(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"id":1,"client_id":1,"name":"P","code":"P","status":"active","start_date":"","end_date":"","memo":"","updated_at":"","created_at":"","estimate":{"id":3,"message":null,"total":"50000","tax":"5000","tax_withholding":"0","lock_flg":1}}`))
+		// M44: 旧フィールド（client_id/code/status/start_date/end_date/memo）を新スキーマに更新
+		w.Write([]byte(`{"id":1,"name":"P","order_status":1,"order_status_name":"受注","delivery_status":1,"delivery_status_name":"未着手","invoice_dates":[],"tags":[],"updated_at":"","created_at":"","estimate":{"id":3,"message":null,"total":"50000","tax":"5000","tax_withholding":"0","lock_flg":1}}`))
 	}))
 	defer ts.Close()
 
