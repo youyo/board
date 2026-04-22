@@ -1641,7 +1641,7 @@ func TestListProjects_UnmarshalError(t *testing.T) {
 func TestListProjectCosts_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"project_id":200,"name":"Labor Cost","cost_type":"labor","amount":100000.0,"memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":2,"project_id":200,"name":"Outsourcing Cost","cost_type":"outsource","amount":50000.0,"memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":3,"project_id":200,"name":"Travel Expense","cost_type":"expense","amount":10000.0,"memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":4,"project_id":200,"name":"Communication Expense","cost_type":"expense","amount":5000.0,"memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":5,"project_id":200,"name":"Equipment Expense","cost_type":"expense","amount":3000.0,"memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
+		w.Write([]byte(`[{"id":1,"project_id":200,"description":"労務費","cost":100000,"invoice_date":"2026-01-01","payment_date":null,"updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":2,"project_id":200,"description":"外注費","cost":50000,"invoice_date":null,"payment_date":null,"updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":3,"project_id":200,"description":"旅費交通費","cost":10000,"invoice_date":null,"payment_date":null,"updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":4,"project_id":200,"description":"通信費","cost":5000,"invoice_date":null,"payment_date":null,"updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"},{"id":5,"project_id":200,"description":"設備費","cost":3000,"invoice_date":null,"payment_date":null,"updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
 	}))
 	defer ts.Close()
 
@@ -1664,7 +1664,7 @@ func TestGetProjectCost_OK(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"id":50,"project_id":200,"name":"Labor Cost","cost_type":"labor","amount":100000.0,"memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
+		w.Write([]byte(`{"id":50,"project_id":200,"description":"労務費","cost":100000,"invoice_date":"2026-01-01","payment_date":null,"updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}`))
 	}))
 	defer ts.Close()
 
@@ -1677,7 +1677,7 @@ func TestGetProjectCost_OK(t *testing.T) {
 	if got == nil {
 		t.Fatal("got nil ProjectCostEntity")
 	}
-	if got.ID != 50 || got.Amount != 100000.0 {
+	if got.ID != 50 || got.Cost != 100000 {
 		t.Errorf("GetProjectCost: got %+v", got)
 	}
 }
@@ -1688,7 +1688,7 @@ func TestSearchProjectCosts_WithProjectID(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotProjectID = r.URL.Query().Get("project_id")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"project_id":200,"name":"Labor Cost","cost_type":"labor","amount":100000.0,"memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
+		w.Write([]byte(`[{"id":1,"project_id":200,"description":"労務費","cost":100000,"invoice_date":null,"payment_date":null,"updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
 	}))
 	defer ts.Close()
 

@@ -51,7 +51,7 @@ import (
 
 // TestE2E_ProjectCosts_List exercises GET /v1/project_costs and verifies that
 // every JSON key returned by the BOARD API is mapped on ProjectCostEntity. It
-// also logs distribution stats for Amount / CostType / Memo so the real-API
+// also logs distribution stats for Cost / InvoiceDate / PaymentDate so the real-API
 // population can be understood without leaking individual values.
 func TestE2E_ProjectCosts_List(t *testing.T) {
 	client := newE2EClient(t)
@@ -74,49 +74,45 @@ func TestE2E_ProjectCosts_List(t *testing.T) {
 		t.Fatalf("unmarshal list: %v", err)
 	}
 
-	// Aggregate stats only. Never log individual names, memos, or amounts.
+	// Aggregate stats only. Never log individual descriptions or cost values.
 	var (
-		amountNonZero int
-		amountSum     float64
-		amountMin     float64
-		amountMax     float64
-		memoFilled    int
-		nameFilled    int
+		costNonZero        int
+		costSum            int
+		costMin            int
+		costMax            int
+		invoiceDateFilled  int
+		paymentDateFilled  int
+		descriptionFilled  int
 	)
-	costTypes := map[string]int{}
 	for i, pc := range items {
-		if pc.Amount != 0 {
-			amountNonZero++
-			if i == 0 || pc.Amount < amountMin {
-				amountMin = pc.Amount
+		if pc.Cost != 0 {
+			costNonZero++
+			if i == 0 || pc.Cost < costMin {
+				costMin = pc.Cost
 			}
-			if pc.Amount > amountMax {
-				amountMax = pc.Amount
+			if pc.Cost > costMax {
+				costMax = pc.Cost
 			}
 		}
-		amountSum += pc.Amount
-		if pc.Memo != "" {
-			memoFilled++
+		costSum += pc.Cost
+		if pc.InvoiceDate != nil {
+			invoiceDateFilled++
 		}
-		if pc.Name != "" {
-			nameFilled++
+		if pc.PaymentDate != nil {
+			paymentDateFilled++
 		}
-		costTypes[pc.CostType]++
+		if pc.Description != "" {
+			descriptionFilled++
+		}
 	}
 	t.Logf("TestE2E_ProjectCosts_List: %d items returned", len(items))
-	t.Logf("distribution: name_filled=%d/%d memo_filled=%d/%d amount_nonzero=%d/%d amount_sum=%.2f amount_min=%.2f amount_max=%.2f",
-		nameFilled, len(items),
-		memoFilled, len(items),
-		amountNonZero, len(items),
-		amountSum, amountMin, amountMax,
+	t.Logf("distribution: description_filled=%d/%d invoice_date_filled=%d/%d payment_date_filled=%d/%d cost_nonzero=%d/%d cost_sum=%d cost_min=%d cost_max=%d",
+		descriptionFilled, len(items),
+		invoiceDateFilled, len(items),
+		paymentDateFilled, len(items),
+		costNonZero, len(items),
+		costSum, costMin, costMax,
 	)
-	// cost_type is expected to be an enum (e.g. labor/material/outsourcing/
-	// other); small cardinality is public info, not PII.
-	if len(costTypes) <= 10 {
-		t.Logf("cost_type distribution (count by value): %v", costTypes)
-	} else {
-		t.Logf("cost_type has %d unique values (large cardinality; omitting detail)", len(costTypes))
-	}
 }
 
 // TestE2E_ProjectCosts_Get discovers a project cost id via List and fetches
@@ -172,15 +168,15 @@ func TestE2E_ProjectCosts_Get(t *testing.T) {
 	}
 
 	// Log only lengths, ids, booleans, and nonzero flags for traceability.
-	// NEVER log the actual name/memo/amount values — project_costs contain
+	// NEVER log the actual description/cost values — project_costs contain
 	// commercially sensitive financial data.
-	t.Logf("TestE2E_ProjectCosts_Get: id=%d project_id=%d name_len=%d cost_type_len=%d amount_nonzero=%v memo_len=%d has_updated_at=%v has_created_at=%v",
+	t.Logf("TestE2E_ProjectCosts_Get: id=%d project_id=%d description_len=%d cost_nonzero=%v has_invoice_date=%v has_payment_date=%v has_updated_at=%v has_created_at=%v",
 		got.ID,
 		got.ProjectID,
-		len(got.Name),
-		len(got.CostType),
-		got.Amount != 0,
-		len(got.Memo),
+		len(got.Description),
+		got.Cost != 0,
+		got.InvoiceDate != nil,
+		got.PaymentDate != nil,
 		got.UpdatedAt != "",
 		got.CreatedAt != "",
 	)

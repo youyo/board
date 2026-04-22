@@ -65,9 +65,9 @@ func newProjectCostAPIServer(t *testing.T, entities []boardapi.ProjectCostEntity
 }
 
 var sampleProjectCosts = []boardapi.ProjectCostEntity{
-	{ID: 1, ProjectID: 10, Name: "Labor Cost", CostType: "labor", Amount: 100000},
-	{ID: 2, ProjectID: 10, Name: "Outsourcing Fee", CostType: "outsource", Amount: 50000},
-	{ID: 3, ProjectID: 20, Name: "Travel Expense", CostType: "transport", Amount: 5000},
+	{ID: 1, ProjectID: 10, Description: "労務費", Cost: 100000},
+	{ID: 2, ProjectID: 10, Description: "外注費", Cost: 50000},
+	{ID: 3, ProjectID: 20, Description: "旅費交通費", Cost: 5000},
 }
 
 // T_R55: List - cache hit -> returns cached data
@@ -248,7 +248,7 @@ func TestProjectCostRepository_GetByID_CacheMiss_APISuccess(t *testing.T) {
 	db := newTestDB(t)
 	markSynced(t, db, "project_costs")
 
-	target := boardapi.ProjectCostEntity{ID: 99, ProjectID: 10, Name: "Test Cost", Amount: 9999}
+	target := boardapi.ProjectCostEntity{ID: 99, ProjectID: 10, Description: "テストコスト", Cost: 9999}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		b, _ := json.Marshal(target)
