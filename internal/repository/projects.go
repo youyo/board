@@ -144,7 +144,11 @@ func (r *ProjectRepository) GetByIDWithGroup(ctx context.Context, id int, respon
 // If params.ResponseGroup is set, the cache is bypassed and the API is called directly.
 func (r *ProjectRepository) Search(ctx context.Context, params boardapi.ProjectSearchParams, opts ReadOptions) ([]boardapi.ProjectEntity, error) {
 	if params.ResponseGroup != "" {
-		return r.api.SearchProjects(ctx, params)
+		result, err := r.api.SearchProjects(ctx, params)
+		if err != nil {
+			return nil, err
+		}
+		return applyLimit(result, opts.Limit), nil
 	}
 	listOpts := opts
 	listOpts.Limit = 0
