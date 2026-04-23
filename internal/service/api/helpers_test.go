@@ -11,25 +11,32 @@ import (
 // --- Stubs: core ---
 
 // stubClientRepo is a stub implementation of ClientRepo.
+// M50 以降: Search / ListPage は削除、List は (readOpts, filter) 二引数化。
+// 非ゼロ filter 時に searchResult を返し、ゼロ filter 時は listResult を返す
+// （repository の cache-bypass / cache-backed 分岐を模倣）。
 type stubClientRepo struct {
-	listResult     []boardapi.ClientEntity
-	getResult      *boardapi.ClientEntity
-	searchResult   []boardapi.ClientEntity
-	listPageResult *boardapi.PageResult[boardapi.ClientEntity]
-	err            error
+	listResult   []boardapi.ClientEntity
+	getResult    *boardapi.ClientEntity
+	searchResult []boardapi.ClientEntity
+	meta         boardapi.ListMeta
+	err          error
 }
 
-func (s *stubClientRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.ClientEntity, error) {
-	return s.listResult, s.err
+func (s *stubClientRepo) List(_ context.Context, _ repository.ReadOptions, filter boardapi.ClientListOptions) (*boardapi.ListResult[boardapi.ClientEntity], error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	items := s.listResult
+	if filter.NameCont != "" || filter.CustomNoEq != "" || len(filter.Tags) != 0 ||
+		filter.NameDispCont != "" || filter.InvoiceSystemNumberEq != "" ||
+		filter.UpdatedAtGteq != "" || filter.UpdatedAtLteq != "" ||
+		filter.IncludeArchiveFlg != nil || filter.ResponseGroup != "" {
+		items = s.searchResult
+	}
+	return &boardapi.ListResult[boardapi.ClientEntity]{Items: items, Meta: s.meta}, nil
 }
 func (s *stubClientRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.ClientEntity, error) {
 	return s.getResult, s.err
-}
-func (s *stubClientRepo) Search(_ context.Context, _ boardapi.ClientSearchParams, _ repository.ReadOptions) ([]boardapi.ClientEntity, error) {
-	return s.searchResult, s.err
-}
-func (s *stubClientRepo) ListPage(_ context.Context, _, _ int) (*boardapi.PageResult[boardapi.ClientEntity], error) {
-	return s.listPageResult, s.err
 }
 
 // stubClientBranchRepo is a stub implementation of ClientBranchRepo.

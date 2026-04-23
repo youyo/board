@@ -68,7 +68,7 @@ func (s *Service) FindEstimate(ctx context.Context, q FindEstimateQuery) ([]Esti
 
 	case q.ClientName != "":
 		// Resolve client name → search projects with estimate group → hydrate.
-		clients, err := s.clients.Search(ctx, boardapi.ClientSearchParams{Name: q.ClientName}, opts)
+		clients, err := s.clients.Search(ctx, boardapi.ClientListOptions{NameCont: q.ClientName}, opts)
 		if err != nil {
 			return nil, err
 		}

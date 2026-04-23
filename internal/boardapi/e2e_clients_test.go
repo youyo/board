@@ -59,7 +59,7 @@ func TestE2E_Clients_List(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
 
-	raw, err := client.ListClientsRaw(ctx)
+	raw, _, err := client.ListClientsRaw(ctx, boardapi.ClientListOptions{})
 	if err != nil {
 		// Roadmap rule: 403/429 must NOT be skipped, they must fail the test.
 		t.Fatalf("ListClientsRaw: %v", err)
@@ -109,7 +109,7 @@ func TestE2E_Clients_Get(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
 
-	listRaw, err := client.ListClientsRaw(ctx)
+	listRaw, _, err := client.ListClientsRaw(ctx, boardapi.ClientListOptions{})
 	if err != nil {
 		t.Fatalf("ListClientsRaw (discovery): %v", err)
 	}
@@ -130,7 +130,7 @@ func TestE2E_Clients_Get(t *testing.T) {
 		t.Fatalf("first client has non-positive ID: %d", id)
 	}
 
-	getRaw, err := client.GetClientRaw(ctx, id)
+	getRaw, _, err := client.GetClientRaw(ctx, id)
 	if err != nil {
 		// Phase E note: M09/M10/M11 confirmed core-business resources return
 		// 200 on Get-by-id. If M12 regresses to 404 it's a new finding worthy
@@ -172,21 +172,23 @@ func TestE2E_Clients_Get(t *testing.T) {
 	)
 }
 
-// TestE2E_Clients_Search exercises Search with a non-matching name and
-// verifies that the (possibly full) JSON array still passes strict field diff.
-// The BOARD API has been observed to ignore the `name` filter across 6
-// consecutive milestones (M03/M04/M06/M08/M09/M10) so Search is expected to
-// return every client regardless of the query value; this test focuses on
-// StrictFieldDiff and artifact collection rather than server-side filtering.
+// TestE2E_Clients_Search exercises ListClients with a non-matching NameCont
+// (Ransack `name_cont`) and verifies that the JSON array still passes strict
+// field diff. M50 re-tests the Ransack-style filter. Expected behaviour:
+// server-side substring match should return 0 records for an unreachable
+// keyword — a change from pre-M50 where BOARD appeared to ignore the raw
+// `name` parameter. If the server returns a non-zero count, this likely
+// indicates the `_cont` matcher is similarly ignored or accepts prefix-only
+// matches; finding is recorded in plans/board-phase-l-m50-clients-pilot.md.
 func TestE2E_Clients_Search(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
 
-	raw, err := client.SearchClientsRaw(ctx, boardapi.ClientSearchParams{
-		Name: "zzz_nonexistent_keyword_for_e2e",
+	raw, _, err := client.ListClientsRaw(ctx, boardapi.ClientListOptions{
+		NameCont: "zzz_nonexistent_keyword_for_e2e",
 	})
 	if err != nil {
-		t.Fatalf("SearchClientsRaw: %v", err)
+		t.Fatalf("ListClientsRaw (search): %v", err)
 	}
 
 	dumpJSON(t, "clients_search", 0, raw)

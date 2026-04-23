@@ -9,7 +9,7 @@ import (
 	"github.com/youyo/board/internal/output"
 )
 
-// NewAPIClientsCmd  returns the board api clients subcommand group.
+// NewAPIClientsCmd returns the board api clients subcommand group.
 func NewAPIClientsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "clients",
@@ -18,42 +18,82 @@ func NewAPIClientsCmd() *cobra.Command {
 	cmd.AddCommand(
 		newAPIClientsListCmd(),
 		newAPIClientsGetCmd(),
-		newAPIClientsSearchCmd(),
 	)
 	return cmd
+}
+
+// clientListFlagsFromCmd reads the Ransack-style filter flags and returns a
+// ClientListOptions. All flags are optional; any flag left at its zero value
+// is omitted from the outgoing request.
+func clientListFlagsFromCmd(cmd *cobra.Command) boardapi.ClientListOptions {
+	nameCont, _ := cmd.Flags().GetString("name-cont")
+	nameDispCont, _ := cmd.Flags().GetString("name-disp-cont")
+	invoiceNumberEq, _ := cmd.Flags().GetString("invoice-system-number-eq")
+	customNoEq, _ := cmd.Flags().GetString("custom-no-eq")
+	tags, _ := cmd.Flags().GetStringSlice("tags")
+	responseGroup, _ := cmd.Flags().GetString("response-group")
+	updatedAtGteq, _ := cmd.Flags().GetString("updated-at-gteq")
+	updatedAtLteq, _ := cmd.Flags().GetString("updated-at-lteq")
+
+	var includeArchive *bool
+	if cmd.Flags().Changed("include-archive-flg") {
+		v, _ := cmd.Flags().GetBool("include-archive-flg")
+		includeArchive = &v
+	}
+
+	return boardapi.ClientListOptions{
+		NameCont:              nameCont,
+		NameDispCont:          nameDispCont,
+		InvoiceSystemNumberEq: invoiceNumberEq,
+		CustomNoEq:            customNoEq,
+		Tags:                  tags,
+		ResponseGroup:         responseGroup,
+		UpdatedAtGteq:         updatedAtGteq,
+		UpdatedAtLteq:         updatedAtLteq,
+		IncludeArchiveFlg:     includeArchive,
+	}
 }
 
 func newAPIClientsListCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
-		Short: "List all clients",
+		Short: "List clients (optionally filtered by Ransack-style query params)",
+		Long: `List clients. Filters are forwarded to the BOARD API as Ransack-style
+query parameters (e.g. --name-cont sends name_cont). A zero-filter request
+uses the local cache; any non-zero filter bypasses the cache and calls the
+API directly so server-side filter semantics take effect.
+
+JSON output includes an _meta object (total_count, page, per_page, rate
+limits, ETag, last_modified) derived from response headers. Use
+--no-show-meta to omit it.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			svc, err := apiServiceFromCmd(cmd)
 			if err != nil {
 				return err
 			}
-			page, _ := cmd.Flags().GetInt("page")
-			perPage, _ := cmd.Flags().GetInt("per-page")
-			if page > 0 {
-				result, err := svc.ListClientsPage(cmd.Context(), page, perPage)
-				if err != nil {
-					return err
-				}
-				totalPages := (result.TotalCount + result.PerPage - 1) / result.PerPage
-				fmt.Fprintf(os.Stderr, "# Total: %d, Page: %d/%d, PerPage: %d\n",
-					result.TotalCount, result.Page, totalPages, result.PerPage)
-				return output.Write(os.Stdout, result.Items, prettyFromCmd(cmd))
-			}
-			opts := readOptionsFromCmd(cmd)
-			result, err := svc.ListClients(cmd.Context(), opts)
+			readOpts := readOptionsFromCmd(cmd)
+			filter := clientListFlagsFromCmd(cmd)
+			result, err := svc.ListClients(cmd.Context(), readOpts, filter)
 			if err != nil {
 				return err
 			}
-			return output.Write(os.Stdout, result, prettyFromCmd(cmd))
+			showMeta, _ := cmd.Flags().GetBool("show-meta")
+			if showMeta {
+				return output.Write(os.Stdout, result, prettyFromCmd(cmd))
+			}
+			return output.Write(os.Stdout, result.Items, prettyFromCmd(cmd))
 		},
 	}
-	cmd.Flags().Int("page", 0, "Page number (1-based, bypasses cache)")
-	cmd.Flags().Int("per-page", 50, "Items per page (max 100, used with --page)")
+	cmd.Flags().String("name-cont", "", "Filter by customer name (Ransack name_cont, partial match)")
+	cmd.Flags().String("name-disp-cont", "", "Filter by display name (Ransack name_disp_cont, partial match)")
+	cmd.Flags().String("invoice-system-number-eq", "", "Filter by invoice system number (exact match)")
+	cmd.Flags().String("custom-no-eq", "", "Filter by custom_no (exact match)")
+	cmd.Flags().StringSlice("tags", nil, "Filter by tags (repeatable, sent as tags[]=A&tags[]=B)")
+	cmd.Flags().String("response-group", "", `Response group: "small" (default) or "large" (includes Get-only fields)`)
+	cmd.Flags().String("updated-at-gteq", "", `updated_at >= (YYYY-MM-DD HH:MM:SS)`)
+	cmd.Flags().String("updated-at-lteq", "", `updated_at <= (YYYY-MM-DD HH:MM:SS)`)
+	cmd.Flags().Bool("include-archive-flg", false, "Include archived customers (send include_archive_flg=1)")
+	cmd.Flags().Bool("show-meta", true, "Include _meta (pagination / rate limit / ETag) in JSON output")
 	return cmd
 }
 
@@ -79,32 +119,5 @@ func newAPIClientsGetCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().IntVar(&id, "id", 0, "Client ID (required)")
-	return cmd
-}
-
-func newAPIClientsSearchCmd() *cobra.Command {
-	var name, updatedAtFrom string
-	cmd := &cobra.Command{
-		Use:   "search",
-		Short: "Search clients by criteria",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			svc, err := apiServiceFromCmd(cmd)
-			if err != nil {
-				return err
-			}
-			opts := readOptionsFromCmd(cmd)
-			params := boardapi.ClientSearchParams{
-				Name:          name,
-				UpdatedAtFrom: updatedAtFrom,
-			}
-			result, err := svc.SearchClients(cmd.Context(), params, opts)
-			if err != nil {
-				return err
-			}
-			return output.Write(os.Stdout, result, prettyFromCmd(cmd))
-		},
-	}
-	cmd.Flags().StringVar(&name, "name", "", "Filter by client name")
-	cmd.Flags().StringVar(&updatedAtFrom, "updated-at-from", "", "Filter by updated_at (ISO 8601, lower bound)")
 	return cmd
 }

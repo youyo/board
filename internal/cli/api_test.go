@@ -38,10 +38,14 @@ func TestNewAPIClientsCmd(t *testing.T) {
 	for _, sub := range cmd.Commands() {
 		subNames[sub.Use] = true
 	}
-	for _, name := range []string{"list", "get", "search"} {
+	// M50: search サブコマンドは削除、list が Ransack フィルタを内蔵する。
+	for _, name := range []string{"list", "get"} {
 		if !subNames[name] {
 			t.Errorf("subcommand %q is not registered", name)
 		}
+	}
+	if subNames["search"] {
+		t.Errorf("subcommand 'search' must be removed (merged into 'list' in M50)")
 	}
 
 	// Verify that the get command has the --id flag.
@@ -58,19 +62,24 @@ func TestNewAPIClientsCmd(t *testing.T) {
 		t.Error("get: --id flag is not defined")
 	}
 
-	// Verify search command flags.
-	var searchCmd *cobra.Command
+	// Verify list command has the new Ransack-style filter flags.
+	var listCmd *cobra.Command
 	for _, sub := range cmd.Commands() {
-		if sub.Use == "search" {
-			searchCmd = sub
+		if sub.Use == "list" {
+			listCmd = sub
 		}
 	}
-	if searchCmd == nil {
-		t.Fatal("search command not found")
+	if listCmd == nil {
+		t.Fatal("list command not found")
 	}
-	for _, flagName := range []string{"name", "updated-at-from"} {
-		if f := searchCmd.Flags().Lookup(flagName); f == nil {
-			t.Errorf("search: --%s flag is not defined", flagName)
+	for _, flagName := range []string{
+		"name-cont", "name-disp-cont", "invoice-system-number-eq",
+		"custom-no-eq", "tags", "response-group",
+		"updated-at-gteq", "updated-at-lteq",
+		"include-archive-flg", "show-meta",
+	} {
+		if f := listCmd.Flags().Lookup(flagName); f == nil {
+			t.Errorf("list: --%s flag is not defined", flagName)
 		}
 	}
 }

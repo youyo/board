@@ -257,6 +257,52 @@ sequenceDiagram
 
 M50 完了後、確立したパターンを **M51（projects）** に適用。最大規模なので早めに着手。`plans/board-phase-l-m51-projects.md` を着手時に生成。
 
+## 実装着手時の最終決定（advisor レビュー 2 回反映、2026-04-23）
+
+### D1: repository.List の二引数化
+`ReadOptions`（cache 制御）と `ClientListOptions`（API filter）は直交するため分離する。
+
+```go
+func (r *ClientRepository) List(ctx context.Context, readOpts ReadOptions, filter boardapi.ClientListOptions) (*boardapi.ListResult[boardapi.ClientEntity], error)
+```
+
+### D2: filter 非ゼロ時は cache バイパス
+- zero filter (`ClientListOptions{}`) → 既存の cache → refresh → API fallback 経路（従来通り）
+- 非ゼロ filter → cache バイパス、`api.ListClients(ctx, filter)` を直接呼ぶ（フィルタ結果でキャッシュを汚染しないため）
+
+### D3: `SearchClients` / `SearchClientsRaw` / `ClientSearchParams` は削除
+- `ListClients(ctx, opts ClientListOptions)` / `ListClientsRaw(ctx, opts ClientListOptions)` に一本化
+- `ListClientsRaw` の戻り値は `([]byte, http.Header, error)`（E2E strict diff + ヘッダー実測用）
+- `ListClientsPage` / `SearchClients` / `SearchClientsRaw` は削除（破壊的変更として v0.5.0 に含める）
+
+### D4: JSON タグを `_meta` に変更
+M49 時点の `Meta` json tag は `"meta"` だが、acceptance criterion (`jq '._meta'`) に合わせて `"_meta"` へ変更。M49 のテストも同時に更新。
+
+### D5: find 層は `.Items` 展開の最小追従
+`find.ClientRepo` interface は `Search` シグネチャを `(ctx, filter boardapi.ClientListOptions, opts repository.ReadOptions) ([]boardapi.ClientEntity, error)` に変更。実装側は `*ListResult` の `.Items` を返す薄いラッパ。find 層に `ListResult` を露出しない（Phase M 本格刷新まで温存）。
+
+### D6: updated_at フォーマット変換
+`refresh.Refresher` は `SyncState.CursorUpdatedAt`（ISO 8601: `2024-12-26T10:14:11.000+09:00`）をそのまま `ListUpdatedSince(ctx, since)` に渡す。
+BOARD API の `_gteq` は `YYYY-MM-DD HH:MM:SS` 形式を期待するため、`clientsFetcher.ListUpdatedSince` 内で ISO 8601 → `YYYY-MM-DD HH:MM:SS` への変換を行う（`isoToSpaceDateTime` ヘルパを repository 内に新設）。E2E で ISO 8601 のまま通る可能性もあるが、安全側で変換。
+
+### D7: CLI 破壊的 flag 改名
+- `--name` → `--name-cont`
+- `--updated-at-from` → `--updated-at-gteq`
+- `--page` / `--per-page` (ページ直指定) → 削除（`ListClientsPage` 削除に伴う）
+
+## 事前チェックリスト（下流ビルド修正箇所）
+
+1. `internal/repository/fetcher.go:131-138` `clientsFetcher.ListUpdatedSince` — `SearchClients` 呼び出しを `ListClients(ctx, ClientListOptions{UpdatedAtGteq: spaceDateTime(since)})` に置換
+2. `internal/service/find/service.go:12-16` `ClientRepo` interface の `Search` signature 変更
+3. `internal/service/find/find_client.go:34`, `find_estimate.go:71`, `find_delivery.go:76`, `find_invoice.go:31` — `ClientSearchParams{Name:...}` → `ClientListOptions{NameCont:...}`
+4. `internal/service/find/helpers_test.go:134` `stubClientRepo.Search` stub signature 更新
+5. `internal/service/find/e2e_test.go:703` `api.SearchClients` → `api.ListClients(ctx, opts)`（E2E ビルドタグ付きなので通常 build には影響しないがタグ付き build で壊れる）
+6. `internal/boardapi/clients_test.go:184-214, 440-462` `name` / `updated_at_from` 依存テストの改名
+7. `internal/cli/api_clients.go:85-110` search cmd を list に統合 + flag 名改名
+8. `internal/service/api/clients.go:21-28` `SearchClients` / `ListClientsPage` メソッド削除
+9. `internal/service/api/service_test.go:665` 関連テスト更新（`ClientSearchParams` 参照があれば）
+10. `internal/repository/clients_test.go` — `Search` テスト全般を `ClientListOptions` ベースに書き換え
+
 ## E2E 実測結果記入欄（M50 実行時に埋める）
 
 ### 確定したヘッダー名

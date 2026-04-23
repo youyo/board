@@ -1176,7 +1176,7 @@ func TestListClients_TwoPages(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	clients, err := c.ListClients(context.Background())
+	clients, err := c.ListClients(context.Background(), boardapi.ClientListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1204,7 +1204,7 @@ func TestListClients_Unauthorized(t *testing.T) {
 		boardapi.WithRetryMax(0),
 		boardapi.WithSleepFn(noSleep),
 	)
-	_, err := c.ListClients(context.Background())
+	_, err := c.ListClients(context.Background(), boardapi.ClientListOptions{})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -1235,11 +1235,11 @@ func TestGetClient_OK(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got == nil {
-		t.Fatal("got nil ClientEntity")
+	if got == nil || got.Item == nil {
+		t.Fatal("got nil ItemResult / Item")
 	}
-	if got.ID != 123 || got.Name != "Test Client" {
-		t.Errorf("GetClient: got %+v", got)
+	if got.Item.ID != 123 || got.Item.Name != "Test Client" {
+		t.Errorf("GetClient: got %+v", got.Item)
 	}
 }
 
@@ -1272,10 +1272,11 @@ func TestGetClient_NotFound(t *testing.T) {
 	}
 }
 
-// T50: SearchClients — with Name parameter
-func TestSearchClients_WithName(t *testing.T) {
-	var gotName string
+// T50 (M50 刷新): ListClients with NameCont sends Ransack `name_cont` query.
+func TestListClients_WithNameCont(t *testing.T) {
+	var gotNameCont, gotName string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotNameCont = r.URL.Query().Get("name_cont")
 		gotName = r.URL.Query().Get("name")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`[{"id":10,"name":"test","code":"","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
@@ -1284,20 +1285,23 @@ func TestSearchClients_WithName(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.SearchClients(context.Background(), boardapi.ClientSearchParams{Name: "test"})
+	result, err := c.ListClients(context.Background(), boardapi.ClientListOptions{NameCont: "test"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(result.Items) != 1 {
 		t.Errorf("want 1 client, got %d", len(result.Items))
 	}
-	if gotName != "test" {
-		t.Errorf("name param: want %q, got %q", "test", gotName)
+	if gotNameCont != "test" {
+		t.Errorf("name_cont param: want %q, got %q", "test", gotNameCont)
+	}
+	if gotName != "" {
+		t.Errorf("legacy `name` param must NOT be sent, got %q", gotName)
 	}
 }
 
-// T51: SearchClients — empty result
-func TestSearchClients_EmptyResult(t *testing.T) {
+// T51 (M50 刷新): ListClients empty filter → request still succeeds with empty result.
+func TestListClients_EmptyResult(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`[]`))
@@ -1306,7 +1310,7 @@ func TestSearchClients_EmptyResult(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.SearchClients(context.Background(), boardapi.ClientSearchParams{})
+	result, err := c.ListClients(context.Background(), boardapi.ClientListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1337,11 +1341,12 @@ func TestGetClient_ContextCancel(t *testing.T) {
 	}
 }
 
-// T66: SearchClients — with UpdatedAtFrom parameter
-func TestSearchClients_WithUpdatedAtFrom(t *testing.T) {
-	var gotUpdatedAtFrom string
+// T66 (M50 刷新): ListClients with UpdatedAtGteq sends `updated_at_gteq`.
+func TestListClients_WithUpdatedAtGteq(t *testing.T) {
+	var gotGteq, gotLegacy string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotUpdatedAtFrom = r.URL.Query().Get("updated_at_from")
+		gotGteq = r.URL.Query().Get("updated_at_gteq")
+		gotLegacy = r.URL.Query().Get("updated_at_from")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`[]`))
 	}))
@@ -1349,12 +1354,15 @@ func TestSearchClients_WithUpdatedAtFrom(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	_, err := c.SearchClients(context.Background(), boardapi.ClientSearchParams{UpdatedAtFrom: "2026-03-01T00:00:00Z"})
+	_, err := c.ListClients(context.Background(), boardapi.ClientListOptions{UpdatedAtGteq: "2026-03-01 00:00:00"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if gotUpdatedAtFrom != "2026-03-01T00:00:00Z" {
-		t.Errorf("updated_at_from param: want %q, got %q", "2026-03-01T00:00:00Z", gotUpdatedAtFrom)
+	if gotGteq != "2026-03-01 00:00:00" {
+		t.Errorf("updated_at_gteq param: want %q, got %q", "2026-03-01 00:00:00", gotGteq)
+	}
+	if gotLegacy != "" {
+		t.Errorf("legacy updated_at_from must NOT be sent, got %q", gotLegacy)
 	}
 }
 
@@ -3549,95 +3557,9 @@ func TestIsNotFound_WrappedError(t *testing.T) {
 
 // ── Step 1: DoWithRetryFull & ListPage ────────────────────────────────────────
 
-// T205: ListClientsPage returns PageResult with items and pagination headers
-func TestListClientsPage_WithHeaders(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Query().Get("page") != "2" {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		w.Header().Set("X-Total-Count", "250")
-		w.Header().Set("X-Page", "2")
-		w.Header().Set("X-Per-Page", "50")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":51,"name":"Client51","code":"C51","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
-	}))
-	defer ts.Close()
-
-	noSleep := func(time.Duration) {}
-	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.ListClientsPage(context.Background(), 2, 50)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if result == nil {
-		t.Fatal("got nil PageResult")
-	}
-	if len(result.Items) != 1 {
-		t.Errorf("want 1 item, got %d", len(result.Items))
-	}
-	if result.TotalCount != 250 {
-		t.Errorf("TotalCount: want 250, got %d", result.TotalCount)
-	}
-	if result.Page != 2 {
-		t.Errorf("Page: want 2, got %d", result.Page)
-	}
-	if result.PerPage != 50 {
-		t.Errorf("PerPage: want 50, got %d", result.PerPage)
-	}
-	if result.Items[0].ID != 51 {
-		t.Errorf("Items[0].ID: want 51, got %d", result.Items[0].ID)
-	}
-}
-
-// T206: ListClientsPage propagates API error
-func TestListClientsPage_Error(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte(`{"message":"unauthorized"}`))
-	}))
-	defer ts.Close()
-
-	noSleep := func(time.Duration) {}
-	c := boardapi.New(ts.URL, "key", "token", 5*time.Second,
-		boardapi.WithRetryMax(0),
-		boardapi.WithSleepFn(noSleep),
-	)
-	result, err := c.ListClientsPage(context.Background(), 1, 20)
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
-	if result != nil {
-		t.Errorf("expected nil result on error, got %+v", result)
-	}
-	var apiErr *boardapi.APIError
-	if !errors.As(err, &apiErr) {
-		t.Fatalf("expected *APIError, got %T", err)
-	}
-	if apiErr.Code != boardapi.APIErrorUnauthorized {
-		t.Errorf("Code: want UNAUTHORIZED, got %q", apiErr.Code)
-	}
-}
-
-// T207: parsePaginationHeaders returns zeros when headers are absent
-func TestListClientsPage_NoHeaders(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"name":"A","code":"","memo":"","updated_at":"","created_at":""}]`))
-	}))
-	defer ts.Close()
-
-	noSleep := func(time.Duration) {}
-	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.ListClientsPage(context.Background(), 1, 100)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if result.TotalCount != 0 || result.Page != 0 || result.PerPage != 0 {
-		t.Errorf("want zero pagination headers, got TotalCount=%d Page=%d PerPage=%d",
-			result.TotalCount, result.Page, result.PerPage)
-	}
-}
+// T205-T207 (旧 ListClientsPage 系) は M50 で ListClientsPage が削除されたため
+// 撤去。pagination 系テストは T208 TestListProjectsPage_OK および
+// pagination_test.go の ListAllWithResult テストでカバー。
 
 // T208: ListProjectsPage works correctly
 func TestListProjectsPage_OK(t *testing.T) {

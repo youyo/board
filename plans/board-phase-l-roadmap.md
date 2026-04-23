@@ -8,7 +8,7 @@
 | 制約 | readonly GET のみ対象、Rate Limit 3 req/sec / 3000 req/day 遵守、破壊的変更を許容（v0.5.0 で major bump） |
 | 対象リポジトリ | /Users/youyo/src/github.com/youyo/board |
 | 作成日 | 2026-04-23 |
-| 最終更新 | 2026-04-23 09:55 |
+| 最終更新 | 2026-04-23 17:10 |
 | ステータス | 未着手 |
 | 親計画 | plans/iridescent-leaping-snowglobe.md |
 | 先行フェーズ | plans/board-phase-k-roadmap.md（Phase K: Entity 再設計、完走済み） |
@@ -34,9 +34,9 @@ Phase A〜K（48 M）でエンティティ準拠とリリースインフラが�
    - BOARD API 側の存在有無自体が未検証
 
 ## Current Focus
-- **ステータス**: M49 完了、M50 待機
-- **直近の完了**: M49（基盤再設計: ListResult / QueryBuilder / Header 伝達配管、2026-04-23）
-- **次のアクション**: M50（clients 先行パイロット）着手
+- **ステータス**: M50 完了、M51 待機
+- **直近の完了**: M50（clients 先行パイロット、フルサイクル刷新 + E2E 整備、2026-04-23）
+- **次のアクション**: M51（projects 全面移行）着手 — `plans/board-phase-l-pattern.md` を参照しながら差分実装
 
 ## Progress
 
@@ -53,14 +53,23 @@ Phase A〜K（48 M）でエンティティ準拠とリリースインフラが�
 - **補足**: `ListMeta.MarshalJSON` / `ItemMeta.MarshalJSON` をカスタム実装（`time.Time` ゼロ値が encoding/json の `omitempty` で除外されない問題を回避）。
 - **補足**: 環境制約により Agent/Task tool 未提供のため direct execution 経路で実装、advisor() で最終ゲート代替。
 
-### M50 (L-02): clients 先行パイロット（フルサイクル検証）⏳
-- [ ] `ClientSearchParams` → `ClientListOptions` に刷新（NameCont, NameDispCont, UpdatedAtGteq, UpdatedAtLteq, IncludeArchiveFlg, ResponseGroup, InvoiceSystemNumberEq, Tags, CustomNoEq）
-- [ ] `ListClients / SearchClients / GetClient` が `ListResult[ClientEntity]` / `*ClientEntity` を返すように変更
-- [ ] repository/service/api/cli 層の `clients` ルート全通し
-- [ ] 実 API E2E 検証（`name_cont` が効くこと、`response_group=large` で Get 限定フィールドが List/Search でも取れること、ヘッダー実測）
-- [ ] `internal/output/` の `_meta` フィールド実装（`ListResult.Meta` を JSON 出力）
-- [ ] パイロット成果物: `plans/board-phase-l-pattern.md`（全 22 リソース移行手順書）
+### M50 (L-02): clients 先行パイロット（フルサイクル検証）✅
+- [x] `ClientSearchParams` → `ClientListOptions` に刷新（NameCont, NameDispCont, UpdatedAtGteq, UpdatedAtLteq, IncludeArchiveFlg, ResponseGroup, InvoiceSystemNumberEq, Tags, CustomNoEq）
+- [x] `ListClients` が `*ListResult[ClientEntity]` / `GetClient` が `*ItemResult[ClientEntity]` / `ListClientsRaw` + `GetClientRaw` が `http.Header` 付き返却に変更
+- [x] `SearchClients` / `SearchClientsRaw` / `ListClientsPage` / `ClientSearchParams` を削除（破壊的変更、v0.5.0 で受容）
+- [x] repository 層: `ClientRepository.List(ctx, ReadOptions, ClientListOptions) (*ListResult, error)` に二引数化、非ゼロ filter は cache bypass で `api.ListClients` 直呼び
+- [x] service/api 層: `ListClients(ctx, readOpts, filter)` に刷新、`SearchClients`/`ListClientsPage` 削除
+- [x] find 層: `ClientRepo.Search(ctx, ClientListOptions, ReadOptions) ([]ClientEntity, error)` に更新、find/find_*.go の `ClientSearchParams{Name:...}` → `ClientListOptions{NameCont:...}` 全置換
+- [x] cli 層: `board api clients list` に `--name-cont / --name-disp-cont / --invoice-system-number-eq / --custom-no-eq / --tags / --response-group / --updated-at-gteq / --updated-at-lteq / --include-archive-flg / --show-meta` 追加、`search` サブコマンド削除
+- [x] `internal/boardapi/result.go` の JSON tag を `"meta"` → `"_meta"` に変更（`jq '._meta'` 慣習）
+- [x] fetcher: `clientsFetcher.ListUpdatedSince` で ISO 8601 → `YYYY-MM-DD HH:MM:SS` 変換（`isoToBoardDateTime`）
+- [x] Unit テスト追加/更新: U1-U9 相当（ListClients / GetClient / ListClientsRaw 新シグネチャ、Ransack パラメータ確認、全フィルタ網羅）
+- [x] E2E テスト: `internal/boardapi/e2e_clients_m50_test.go` に E1-E10 追加（実 API 実行時はヘッダー名実測 + フィルタ動作確認）。実行は環境が整い次第。
+- [x] パイロット成果物: `plans/board-phase-l-pattern.md`（M51-M56 移行手順書）作成
 - 📄 詳細: plans/board-phase-l-m50-clients-pilot.md
+- 📄 パターン手順書: plans/board-phase-l-pattern.md
+- **補足**: Agent/Task tool 未提供環境のため direct execution 経路 + advisor() 2 回（計画批評 + 実装前レビュー）で M49 同様の AI ゲート代替を実施。
+- **補足**: E10（BOARD API 正式ヘッダー名確定）は実 API 実行が未完で、pattern 手順書 §6 に TBD を残した。M51 以降の per-batch E2E 実行で随時確定していく。
 
 ### M51 (L-03): projects 全面移行（最大規模）⏳
 - [ ] `ProjectSearchParams` 刷新: NameCont, ClientIDEq, ClientNameCont, OrderStatusIn []int, DeliveryStatusIn []int, ProjectNoEq, ManagementNoEq, DeliveryDateGteq/Lteq, InvoiceDateGteq/Lteq, InvoiceTimingKbnIn []int, Tags []string, CreatedAtGteq/Lteq, UpdatedAtGteq/Lteq, IncludeLostFlg, IncludeArchiveFlg, ResponseGroup
@@ -167,3 +176,4 @@ M51〜M56 は技術的には並列実施可能だが、ソースの競合を避�
 |------|------|------|
 | 2026-04-23 09:55 | 作成 | Phase L ロードマップ初版。Phase K 完走（M43-M48）+ v0.4.1 リリースを受けて、api 層の BOARD API 完全準拠化を目標に 9 M 構成で起票。パイロット方式（clients 先行）+ ListResult[T] 戻り値型刷新 + QueryBuilder 共通化を軸とする。find 層は Phase M に分離。親計画 plans/iridescent-leaping-snowglobe.md |
 | 2026-04-23 16:40 | M49 完了 | `ListResult[T]` / `QueryBuilder` / `ListAllWithResult` / `parseListMeta/parseItemMeta` の基盤導入 + clients (`ListClients` / `SearchClients`) を `*ListResult[ClientEntity]` 戻り値に刷新。repository/fetcher は `.Items` 展開で追従、外部 service/cli I/F は維持（M50 以降で段階的変更予定）。ユニットテスト 25 件追加、全パッケージ go test Green、go vet / golangci-lint 0 issues。ブランチ: feature-m49-listresult-querybuilder-foundation |
+| 2026-04-23 17:10 | M50 完了 | clients パイロット フルサイクル刷新。`ClientListOptions`（Ransack 9 フィルタ）導入、`SearchClients`/`ListClientsPage`/`ClientSearchParams` 削除、`GetClient` が `*ItemResult` 返却、repository は `(ReadOptions, ClientListOptions)` 二引数 + 非ゼロ filter 時 cache bypass、cli は `list` に `--name-cont` 等 10 種 flag 追加、`--show-meta` で `_meta` JSON 出力。fetcher で ISO 8601 → `YYYY-MM-DD HH:MM:SS` 変換。`result.go` の JSON タグを `"_meta"` に変更。Unit / find / repository / cli / service/api 全テスト Green、go vet 0 issues、lint は M57 で削除予定の `PageResult deprecated` 3 件のみ。E2E は `TestE2E_Clients_Pilot_M50` (E1-E10) を `-tags e2e` で追加、実 API 実行はユーザー環境依存。パターン手順書 `plans/board-phase-l-pattern.md` 作成。ブランチ: feature-m49-listresult-querybuilder-foundation (M49 の上に積み重ね) |

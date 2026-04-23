@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/youyo/board/internal/boardapi"
@@ -49,30 +48,62 @@ func NewClientRepository(
 
 const clientsResource = "clients"
 
-// List returns all clients from the cache.
-// Refresh is performed according to opts.
-func (r *ClientRepository) List(ctx context.Context, opts ReadOptions) ([]boardapi.ClientEntity, error) {
+// clientFilterIsZero reports whether the given filter is empty (all fields
+// are zero values / nil). A zero filter routes through the local cache; a
+// non-zero filter bypasses the cache and calls the API directly because
+// filtered results must not poison the full-entity cache.
+func clientFilterIsZero(f boardapi.ClientListOptions) bool {
+	return f.Page == 0 &&
+		f.PerPage == 0 &&
+		f.UpdatedAtGteq == "" &&
+		f.UpdatedAtLteq == "" &&
+		f.IncludeArchiveFlg == nil &&
+		f.NameCont == "" &&
+		f.NameDispCont == "" &&
+		f.InvoiceSystemNumberEq == "" &&
+		f.CustomNoEq == "" &&
+		len(f.Tags) == 0 &&
+		f.ResponseGroup == ""
+}
+
+// List returns clients.
+//
+// Behavior:
+//   - Zero filter (boardapi.ClientListOptions{}): uses the local cache with
+//     refresh-on-demand (daily auto refresh, explicit Refresh / ForceRefresh).
+//     Returns *ListResult with Meta zero-valued (cache is source of truth).
+//   - Non-zero filter: bypasses the cache and calls api.ListClients directly
+//     so that server-side filter semantics (Ransack _cont / _eq / _gteq / tags[]
+//     / response_group) take effect. Returns *ListResult with Meta populated
+//     from the final page's response headers.
+//
+// Limit from readOpts is applied to the final result in either path.
+func (r *ClientRepository) List(ctx context.Context, readOpts ReadOptions, filter boardapi.ClientListOptions) (*boardapi.ListResult[boardapi.ClientEntity], error) {
+	if !clientFilterIsZero(filter) {
+		// API 直接呼び出し（cache bypass）: フィルタ結果でキャッシュを汚染しない。
+		result, err := r.api.ListClients(ctx, filter)
+		if err != nil {
+			return nil, err
+		}
+		result.Items = applyLimit(result.Items, readOpts.Limit)
+		return result, nil
+	}
+
+	// ゼロフィルタ: 既存の cache → refresh → API fallback 経路
 	fetcher := &clientsFetcher{api: r.api}
 	now := time.Now()
 
-	// Get SyncState
 	state, err := r.syncStore.Get(ctx, r.profile, clientsResource)
 	if err != nil {
 		return nil, err
 	}
-
-	// Determine and execute refresh
-	if err := maybeRefresh(ctx, r.profile, clientsResource, opts, state, r.autoRefresh, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
+	if err := maybeRefresh(ctx, r.profile, clientsResource, readOpts, state, r.autoRefresh, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
 		return nil, err
 	}
-
-	// Fetch from cache
 	entries, err := r.cache.List(ctx, r.profile, clientsResource)
 	if err != nil {
 		return nil, err
 	}
-
-	// Empty cache + no sync state -> implicit ForceRefresh
 	if len(entries) == 0 && state == nil {
 		if err := r.lockManager.WithLock(ctx, r.profile, clientsResource, func() error {
 			_, err := r.refresher.ForceRefresh(ctx, r.profile, fetcher, now, r.tz)
@@ -85,13 +116,24 @@ func (r *ClientRepository) List(ctx context.Context, opts ReadOptions) ([]boarda
 			return nil, err
 		}
 	}
-
 	entities, err := decodeEntries[boardapi.ClientEntity](entries)
 	if err != nil {
 		return nil, err
 	}
+	entities = applyLimit(entities, readOpts.Limit)
+	return &boardapi.ListResult[boardapi.ClientEntity]{Items: entities}, nil
+}
 
-	return applyLimit(entities, opts.Limit), nil
+// ListEntities is a convenience wrapper around List that returns only the
+// items slice. Used by service/find (Phase L: find 層は *ListResult を受け取らず
+// []ClientEntity を維持、Phase M で再検討）and other callers that do not need
+// response metadata.
+func (r *ClientRepository) ListEntities(ctx context.Context, readOpts ReadOptions, filter boardapi.ClientListOptions) ([]boardapi.ClientEntity, error) {
+	result, err := r.List(ctx, readOpts, filter)
+	if err != nil {
+		return nil, err
+	}
+	return result.Items, nil
 }
 
 // GetByID returns the client with the given ID from the cache.
@@ -100,13 +142,11 @@ func (r *ClientRepository) GetByID(ctx context.Context, id int, opts ReadOptions
 	fetcher := &clientsFetcher{api: r.api}
 	now := time.Now()
 
-	// Get SyncState
 	state, err := r.syncStore.Get(ctx, r.profile, clientsResource)
 	if err != nil {
 		return nil, err
 	}
 
-	// Determine and execute refresh
 	if err := maybeRefresh(ctx, r.profile, clientsResource, opts, state, r.autoRefresh, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
 		return nil, err
 	}
@@ -126,13 +166,12 @@ func (r *ClientRepository) GetByID(ctx context.Context, id int, opts ReadOptions
 	}
 
 	// Cache miss -> fetch single entry from API
-	entity, err := r.api.GetClient(ctx, id)
+	result, err := r.api.GetClient(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 
-	// upsert
-	raw, err := json.Marshal(entity)
+	raw, err := json.Marshal(result.Item)
 	if err != nil {
 		return nil, err
 	}
@@ -140,34 +179,14 @@ func (r *ClientRepository) GetByID(ctx context.Context, id int, opts ReadOptions
 		return nil, err
 	}
 
-	return entity, nil
+	return result.Item, nil
 }
 
-// Search returns clients filtered by the given parameters from the cache.
-// Refresh is controlled by the same logic as List.
-func (r *ClientRepository) Search(ctx context.Context, params boardapi.ClientSearchParams, opts ReadOptions) ([]boardapi.ClientEntity, error) {
-	listOpts := opts
-	listOpts.Limit = 0 // filter 前に切り詰めない
-	all, err := r.List(ctx, listOpts)
-	if err != nil {
-		return nil, err
-	}
-	return applyLimit(filterClients(all, params), opts.Limit), nil
-}
-
-// filterClients performs in-memory filtering.
-func filterClients(entities []boardapi.ClientEntity, params boardapi.ClientSearchParams) []boardapi.ClientEntity {
-	var result []boardapi.ClientEntity
-	for _, e := range entities {
-		if params.Name != "" && !strings.Contains(e.Name, params.Name) {
-			continue
-		}
-		result = append(result, e)
-	}
-	return result
-}
-
-// ListPage retrieves a single page of ClientEntity directly from the API (cache bypass).
-func (r *ClientRepository) ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.ClientEntity], error) {
-	return r.api.ListClientsPage(ctx, page, perPage)
+// Search is a thin alias for ListEntities kept for the find layer's
+// per-resource Search idiom. Behaviorally identical to ListEntities.
+//
+// find 層は *ListResult を扱わず []ClientEntity を維持する（Phase L の方針）。
+// Phase M で MCP / find の仕上げを行う際にインターフェースを再検討する。
+func (r *ClientRepository) Search(ctx context.Context, filter boardapi.ClientListOptions, opts ReadOptions) ([]boardapi.ClientEntity, error) {
+	return r.ListEntities(ctx, opts, filter)
 }

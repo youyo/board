@@ -28,7 +28,7 @@ func (s *Service) FindInvoice(ctx context.Context, q FindInvoiceQuery) ([]Invoic
 		invoices = []boardapi.InvoiceEntity{*inv}
 
 	case q.ClientName != "":
-		clients, err := s.clients.Search(ctx, boardapi.ClientSearchParams{Name: q.ClientName}, opts)
+		clients, err := s.clients.Search(ctx, boardapi.ClientListOptions{NameCont: q.ClientName}, opts)
 		if err != nil {
 			return nil, err
 		}

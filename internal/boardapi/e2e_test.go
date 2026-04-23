@@ -22,11 +22,6 @@
 
 package boardapi_test
 
-import (
-	"context"
-	"testing"
-)
-
 // --- Clients ---
 // TestE2E_Clients_List / TestE2E_Clients_GetByID / TestE2E_Clients_Search は
 // M12 で厳格フィールド突合付きの版に一本化したため e2e_clients_test.go へ
@@ -56,27 +51,10 @@ import (
 // 一本化したため e2e_invoices_test.go へ移動（M16 vendors と同パターン）。
 
 // --- Clients (pagination) ---
-
-func TestE2E_Clients_ListPage(t *testing.T) {
-	client := newE2EClient(t)
-	ctx := context.Background()
-
-	pr, err := client.ListClientsPage(ctx, 1, 5)
-	if err != nil {
-		skipIfNotFound(t, err, "ListClientsPage")
-		t.Fatalf("ListClientsPage: %v", err)
-	}
-	if pr.TotalCount <= 0 {
-		t.Errorf("TotalCount expected > 0, got %d", pr.TotalCount)
-	}
-	if pr.Page != 1 {
-		t.Errorf("Page expected 1, got %d", pr.Page)
-	}
-	if len(pr.Items) > 5 {
-		t.Errorf("Items expected <= 5, got %d", len(pr.Items))
-	}
-	t.Logf("ListClientsPage: total=%d page=%d items=%d", pr.TotalCount, pr.Page, len(pr.Items))
-}
+// M50: ListClientsPage は削除。ページネーションは ListClients (ListAllWithResult)
+// 内部で全ページ自動取得 + Meta (TotalCount / Page / PerPage / RateLimit) を
+// *ListResult 経由で surface する。pagination 系の E2E 検証は
+// TestE2E_Clients_Pilot_M50 (e2e_clients_m50_test.go) の E10 に統合済み。
 
 // --- PurchaseOrders (expenditures path) ---
 // TestE2E_PurchaseOrders_List / _Get / _Search は M23 で厳格フィールド突合付きの版に

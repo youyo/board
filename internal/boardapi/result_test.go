@@ -116,8 +116,8 @@ func TestListResult_MarshalJSON_HeadersExcluded(t *testing.T) {
 	if !strings.Contains(s, `"items"`) {
 		t.Errorf("want items key, got %s", s)
 	}
-	if !strings.Contains(s, `"meta"`) {
-		t.Errorf("want meta key, got %s", s)
+	if !strings.Contains(s, `"_meta"`) {
+		t.Errorf("want _meta key, got %s", s)
 	}
 	if strings.Contains(s, "headers") || strings.Contains(s, "X-Internal") || strings.Contains(s, "should not leak") {
 		t.Errorf("Headers must be excluded from JSON, got %s", s)

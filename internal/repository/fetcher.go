@@ -121,7 +121,7 @@ type clientsFetcher struct {
 func (f *clientsFetcher) ResourceName() string { return "clients" }
 
 func (f *clientsFetcher) ListAll(ctx context.Context) ([]json.RawMessage, error) {
-	result, err := f.api.ListClients(ctx)
+	result, err := f.api.ListClients(ctx, boardapi.ClientListOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -129,12 +129,44 @@ func (f *clientsFetcher) ListAll(ctx context.Context) ([]json.RawMessage, error)
 }
 
 func (f *clientsFetcher) ListUpdatedSince(ctx context.Context, since string) ([]json.RawMessage, error) {
-	params := boardapi.ClientSearchParams{UpdatedAtFrom: since}
-	result, err := f.api.SearchClients(ctx, params)
+	// since は cache.SyncState.CursorUpdatedAt 由来の ISO 8601（BOARD API の
+	// エンティティ updated_at）。BOARD API の Ransack `_gteq` は
+	// `YYYY-MM-DD HH:MM:SS` 形式を期待するため、ここで変換する。
+	// 空文字はそのまま渡し（filter 無効化）、全件取得。
+	gteq := isoToBoardDateTime(since)
+	result, err := f.api.ListClients(ctx, boardapi.ClientListOptions{UpdatedAtGteq: gteq})
 	if err != nil {
 		return nil, err
 	}
 	return entitiesToRaw(result.Items)
+}
+
+// isoToBoardDateTime converts an ISO 8601 datetime string (e.g.
+// "2024-12-26T10:14:11.000+09:00") to the BOARD API Ransack `_gteq`
+// compatible form "YYYY-MM-DD HH:MM:SS" in the original timezone.
+// Empty input is returned as-is to signal "no filter".
+//
+// The function accepts common ISO 8601 variants. Unparseable input is
+// returned unchanged as a best-effort fallback; the server may reject it
+// but the alternative (silently dropping the cursor) would cause wholesale
+// refetch — explicit error feedback from the server is preferable.
+func isoToBoardDateTime(s string) string {
+	if s == "" {
+		return ""
+	}
+	layouts := []string{
+		time.RFC3339Nano,
+		time.RFC3339,
+		"2006-01-02T15:04:05.000-07:00",
+		"2006-01-02T15:04:05-07:00",
+		"2006-01-02 15:04:05",
+	}
+	for _, layout := range layouts {
+		if t, err := time.Parse(layout, s); err == nil {
+			return t.Format("2006-01-02 15:04:05")
+		}
+	}
+	return s
 }
 
 // --- client_branches Fetcher ---

@@ -73,7 +73,7 @@ func (s *Service) FindReceipt(ctx context.Context, q FindReceiptQuery) ([]Receip
 
 	case q.ClientName != "":
 		// Resolve client name → search projects with receipt group → hydrate.
-		clients, err := s.clients.Search(ctx, boardapi.ClientSearchParams{Name: q.ClientName}, opts)
+		clients, err := s.clients.Search(ctx, boardapi.ClientListOptions{NameCont: q.ClientName}, opts)
 		if err != nil {
 			return nil, err
 		}

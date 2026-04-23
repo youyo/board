@@ -125,13 +125,20 @@ type stubClientRepo struct {
 	err          error
 }
 
-func (s *stubClientRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.ClientEntity, error) {
-	return s.listResult, s.err
-}
 func (s *stubClientRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.ClientEntity, error) {
 	return s.getResult, s.err
 }
-func (s *stubClientRepo) Search(_ context.Context, _ boardapi.ClientSearchParams, _ repository.ReadOptions) ([]boardapi.ClientEntity, error) {
+
+// Search returns listResult for a zero filter (used by Text search in
+// find_client to fetch all clients before in-memory filtering) and
+// searchResult otherwise. Callers can still set either field independently.
+func (s *stubClientRepo) Search(_ context.Context, filter boardapi.ClientListOptions, _ repository.ReadOptions) ([]boardapi.ClientEntity, error) {
+	if filter.NameCont == "" && len(filter.Tags) == 0 && filter.CustomNoEq == "" &&
+		filter.NameDispCont == "" && filter.InvoiceSystemNumberEq == "" &&
+		filter.UpdatedAtGteq == "" && filter.UpdatedAtLteq == "" &&
+		filter.IncludeArchiveFlg == nil && filter.ResponseGroup == "" {
+		return s.listResult, s.err
+	}
 	return s.searchResult, s.err
 }
 

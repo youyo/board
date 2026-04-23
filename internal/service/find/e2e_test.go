@@ -59,11 +59,11 @@ func TestE2E_FindClient_ByName(t *testing.T) {
 	ctx := context.Background()
 
 	// Get a real client name from the API.
-	clients, err := api.ListClients(ctx)
-	if err != nil || len(clients) == 0 {
+	clients, err := api.ListClients(ctx, boardapi.ClientListOptions{})
+	if err != nil || len(clients.Items) == 0 {
 		t.Skip("no clients available")
 	}
-	targetName := clients[0].Name
+	targetName := clients.Items[0].Name
 
 	results, err := svc.FindClient(ctx, find.FindClientQuery{
 		Name:  targetName,
@@ -106,12 +106,12 @@ func TestE2E_FindClient_ByText(t *testing.T) {
 	svc, api := newE2EFindService(t)
 	ctx := context.Background()
 
-	clients, err := api.ListClients(ctx)
-	if err != nil || len(clients) == 0 {
+	clients, err := api.ListClients(ctx, boardapi.ClientListOptions{})
+	if err != nil || len(clients.Items) == 0 {
 		t.Skip("no clients available")
 	}
 	// Use first 3 chars of the first client name as text query.
-	name := clients[0].Name
+	name := clients.Items[0].Name
 	if len(name) < 3 {
 		t.Skip("client name too short for text search")
 	}
@@ -148,7 +148,7 @@ func TestE2E_FindClient_StrictEnrichment(t *testing.T) {
 	ctx := context.Background()
 
 	// 1. Discover a client with data.
-	page, err := api.ListClientsPage(ctx, 1, 1)
+	page, err := api.ListClients(ctx, boardapi.ClientListOptions{PerPage: 1})
 	if err != nil || len(page.Items) == 0 {
 		t.Skip("no clients available")
 	}
@@ -465,7 +465,7 @@ func TestE2E_FindProject_ByClientName(t *testing.T) {
 	svc, api := newE2EFindService(t)
 	ctx := context.Background()
 
-	cr, err := api.ListClientsPage(ctx, 1, 1)
+	cr, err := api.ListClients(ctx, boardapi.ClientListOptions{PerPage: 1})
 	if err != nil || len(cr.Items) == 0 {
 		t.Skip("no clients available")
 	}
@@ -590,8 +590,11 @@ func TestE2E_FindProject_StrictEnrichment_ByID(t *testing.T) {
 		if err != nil {
 			t.Fatalf("GetClient(ID=%d): %v", targetClientID, err)
 		}
-		if r.Client.ID != independentClient.ID {
-			t.Errorf("client ID mismatch: FindProject=%d independent=%d", r.Client.ID, independentClient.ID)
+		if independentClient == nil || independentClient.Item == nil {
+			t.Fatalf("GetClient(ID=%d): returned nil item", targetClientID)
+		}
+		if r.Client.ID != independentClient.Item.ID {
+			t.Errorf("client ID mismatch: FindProject=%d independent=%d", r.Client.ID, independentClient.Item.ID)
 		}
 		t.Logf("Client enrichment OK: id=%d name=%q", r.Client.ID, r.Client.Name)
 	}
@@ -679,7 +682,7 @@ func TestE2E_FindProject_ByClientName_Strict(t *testing.T) {
 	svc, api := newE2EFindService(t)
 	ctx := context.Background()
 
-	cr, err := api.ListClientsPage(ctx, 1, 1)
+	cr, err := api.ListClients(ctx, boardapi.ClientListOptions{PerPage: 1})
 	if err != nil || len(cr.Items) == 0 {
 		t.Skip("no clients available")
 	}
@@ -699,20 +702,22 @@ func TestE2E_FindProject_ByClientName_Strict(t *testing.T) {
 	t.Logf("FindProject(ClientName=%q) returned %d results", clientName, len(results))
 
 	// 独立 API で一致する client ID 集合を取得する。
-	// Note: BOARD API は name filter を無視するため searchClients は全件返す可能性がある。
-	independentClients, err := api.SearchClients(ctx, boardapi.ClientSearchParams{Name: clientName})
+	// M50: Ransack `name_cont` を使う。以前は `name` パラメータが無視されていた
+	// ため全件返る可能性があった。M50 の E2E で実動作を再評価。
+	independentResult, err := api.ListClients(ctx, boardapi.ClientListOptions{NameCont: clientName})
 	if err != nil {
-		t.Fatalf("SearchClients(Name=%q): %v", clientName, err)
+		t.Fatalf("ListClients(NameCont=%q): %v", clientName, err)
 	}
+	independentClients := independentResult.Items
 	if len(independentClients) == 0 {
-		t.Skipf("SearchClients(Name=%q): returned 0 results; data-dependent skip", clientName)
+		t.Skipf("ListClients(NameCont=%q): returned 0 results; data-dependent skip", clientName)
 	}
 
 	expectedClientIDs := make(map[int]bool, len(independentClients))
 	for _, c := range independentClients {
 		expectedClientIDs[c.ID] = true
 	}
-	t.Logf("Independent SearchClients returned %d clients (BOARD API may ignore name filter)", len(independentClients))
+	t.Logf("Independent ListClients(NameCont) returned %d clients", len(independentClients))
 
 	// 各 result の Client enrichment 整合性確認。
 	// M44: ClientID 廃止、Client nested の ID で判定

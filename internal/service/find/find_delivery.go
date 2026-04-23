@@ -73,7 +73,7 @@ func (s *Service) FindDelivery(ctx context.Context, q FindDeliveryQuery) ([]Deli
 
 	case q.ClientName != "":
 		// Resolve client name → search projects with delivery group → hydrate.
-		clients, err := s.clients.Search(ctx, boardapi.ClientSearchParams{Name: q.ClientName}, opts)
+		clients, err := s.clients.Search(ctx, boardapi.ClientListOptions{NameCont: q.ClientName}, opts)
 		if err != nil {
 			return nil, err
 		}

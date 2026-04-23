@@ -8,11 +8,13 @@ import (
 )
 
 // ClientRepo is the interface for the clients repository.
+//
+// M50 以降: List は (readOpts, filter) 二引数化されて *ListResult を返す。
+// 非ゼロ filter 時は cache バイパスで api.ListClients を直接呼ぶ。
+// Search / ListPage は削除（破壊的変更）。
 type ClientRepo interface {
-	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.ClientEntity, error)
+	List(ctx context.Context, readOpts repository.ReadOptions, filter boardapi.ClientListOptions) (*boardapi.ListResult[boardapi.ClientEntity], error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.ClientEntity, error)
-	Search(ctx context.Context, params boardapi.ClientSearchParams, opts repository.ReadOptions) ([]boardapi.ClientEntity, error)
-	ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.ClientEntity], error)
 }
 
 // ClientBranchRepo is the interface for the client_branches repository.

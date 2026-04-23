@@ -45,7 +45,7 @@ func TestListClientsRaw_SinglePage(t *testing.T) {
 	})
 	client := newClientsMockClient(rt)
 
-	raw, err := client.ListClientsRaw(context.Background())
+	raw, _, err := client.ListClientsRaw(context.Background(), boardapi.ClientListOptions{})
 	if err != nil {
 		t.Fatalf("ListClientsRaw: %v", err)
 	}
@@ -107,7 +107,7 @@ func TestListClientsRaw_MultiPage(t *testing.T) {
 	})
 	client := newClientsMockClient(rt)
 
-	raw, err := client.ListClientsRaw(context.Background(), boardapi.WithPerPage(2))
+	raw, _, err := client.ListClientsRaw(context.Background(), boardapi.ClientListOptions{PerPage: 2})
 	if err != nil {
 		t.Fatalf("ListClientsRaw: %v", err)
 	}
@@ -143,7 +143,7 @@ func TestGetClientRaw_Success(t *testing.T) {
 	})
 	client := newClientsMockClient(rt)
 
-	raw, err := client.GetClientRaw(context.Background(), 42)
+	raw, _, err := client.GetClientRaw(context.Background(), 42)
 	if err != nil {
 		t.Fatalf("GetClientRaw: %v", err)
 	}
@@ -166,7 +166,7 @@ func TestGetClientRaw_NotFound(t *testing.T) {
 	})
 	client := newClientsMockClient(rt)
 
-	_, err := client.GetClientRaw(context.Background(), 99)
+	_, _, err := client.GetClientRaw(context.Background(), 99)
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}
@@ -179,30 +179,40 @@ func TestGetClientRaw_NotFound(t *testing.T) {
 	}
 }
 
-// U5: SearchClientsRaw sends both Name and UpdatedAtFrom parameters in the
-// query and returns the body. M08 users uses the same two-parameter surface.
-func TestSearchClientsRaw_QueryParams(t *testing.T) {
+// U5 (M50 刷新): ListClientsRaw sends Ransack-style `name_cont` and
+// `updated_at_gteq` parameters in the query and returns the aggregated body
+// plus response headers. Legacy `name` / `updated_at_from` must NOT be sent.
+func TestListClientsRaw_RansackQueryParams(t *testing.T) {
 	page1 := `[{"id":7,"name":"matched","name_disp":"matched","payment_term_id":100,"payment_term_name":"月末","invoice_system_issuer_type":0,"invoice_system_issuer_type_name":"未設定","invoice_system_number_validated":false,"updated_at":"2024-02-01T00:00:00+09:00","created_at":"2024-02-01T00:00:00+09:00"}]`
-	var observedName, observedUpdatedFrom string
+	var observedNameCont, observedGteq, observedLegacyName, observedLegacyFrom string
 	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
-		observedName = r.URL.Query().Get("name")
-		observedUpdatedFrom = r.URL.Query().Get("updated_at_from")
+		observedNameCont = r.URL.Query().Get("name_cont")
+		observedGteq = r.URL.Query().Get("updated_at_gteq")
+		observedLegacyName = r.URL.Query().Get("name")
+		observedLegacyFrom = r.URL.Query().Get("updated_at_from")
 		return jsonResp(page1), nil
 	})
 	client := newClientsMockClient(rt)
 
-	raw, err := client.SearchClientsRaw(context.Background(), boardapi.ClientSearchParams{
-		Name:          "matched",
-		UpdatedAtFrom: "2024-01-01T00:00:00+09:00",
+	raw, gotHeaders, err := client.ListClientsRaw(context.Background(), boardapi.ClientListOptions{
+		NameCont:      "matched",
+		UpdatedAtGteq: "2024-01-01 00:00:00",
 	})
 	if err != nil {
-		t.Fatalf("SearchClientsRaw: %v", err)
+		t.Fatalf("ListClientsRaw: %v", err)
 	}
-	if observedName != "matched" {
-		t.Errorf("query name = %q, want matched", observedName)
+	if observedNameCont != "matched" {
+		t.Errorf("query name_cont = %q, want matched", observedNameCont)
 	}
-	if observedUpdatedFrom != "2024-01-01T00:00:00+09:00" {
-		t.Errorf("query updated_at_from = %q, want 2024-01-01T00:00:00+09:00", observedUpdatedFrom)
+	if observedGteq != "2024-01-01 00:00:00" {
+		t.Errorf("query updated_at_gteq = %q, want 2024-01-01 00:00:00", observedGteq)
+	}
+	if observedLegacyName != "" || observedLegacyFrom != "" {
+		t.Errorf("legacy name/updated_at_from must NOT be sent: name=%q updated_at_from=%q",
+			observedLegacyName, observedLegacyFrom)
+	}
+	if gotHeaders == nil {
+		t.Errorf("headers must be non-nil")
 	}
 	var arr []map[string]any
 	if err := json.Unmarshal(raw, &arr); err != nil {
@@ -210,6 +220,53 @@ func TestSearchClientsRaw_QueryParams(t *testing.T) {
 	}
 	if len(arr) != 1 {
 		t.Fatalf("expected 1 element, got %d", len(arr))
+	}
+}
+
+// U5b (M50 新規): tags[] / include_archive_flg / response_group / custom_no_eq /
+// invoice_system_number_eq / name_disp_cont が正しくエンコードされる。
+func TestListClientsRaw_AllFilters(t *testing.T) {
+	var q url.Values
+	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
+		q = r.URL.Query()
+		return jsonResp("[]"), nil
+	})
+	client := newClientsMockClient(rt)
+	trueVal := true
+
+	_, _, err := client.ListClientsRaw(context.Background(), boardapi.ClientListOptions{
+		NameDispCont:          "エス",
+		InvoiceSystemNumberEq: "T1234567890123",
+		CustomNoEq:            "CUST001",
+		Tags:                  []string{"A", "B"},
+		IncludeArchiveFlg:     &trueVal,
+		ResponseGroup:         "large",
+		UpdatedAtLteq:         "2024-12-31 23:59:59",
+	})
+	if err != nil {
+		t.Fatalf("ListClientsRaw: %v", err)
+	}
+	if q.Get("name_disp_cont") != "エス" {
+		t.Errorf("name_disp_cont = %q", q.Get("name_disp_cont"))
+	}
+	if q.Get("invoice_system_number_eq") != "T1234567890123" {
+		t.Errorf("invoice_system_number_eq = %q", q.Get("invoice_system_number_eq"))
+	}
+	if q.Get("custom_no_eq") != "CUST001" {
+		t.Errorf("custom_no_eq = %q", q.Get("custom_no_eq"))
+	}
+	gotTags := q["tags[]"]
+	if len(gotTags) != 2 || gotTags[0] != "A" || gotTags[1] != "B" {
+		t.Errorf("tags[] = %v, want [A B]", gotTags)
+	}
+	if q.Get("include_archive_flg") != "1" {
+		t.Errorf("include_archive_flg = %q, want 1", q.Get("include_archive_flg"))
+	}
+	if q.Get("response_group") != "large" {
+		t.Errorf("response_group = %q, want large", q.Get("response_group"))
+	}
+	if q.Get("updated_at_lteq") != "2024-12-31 23:59:59" {
+		t.Errorf("updated_at_lteq = %q", q.Get("updated_at_lteq"))
 	}
 }
 
@@ -436,8 +493,9 @@ func TestClientEntity_NullableString_NilForMissing(t *testing.T) {
 	}
 }
 
-// M43 U5: ClientSearchParams が name / updated_at_from クエリを正しくエンコードする。
-func TestClientSearchParams_QueryEncoding(t *testing.T) {
+// M43 U5 (M50 刷新): ClientListOptions が日本語 name_cont / updated_at_gteq
+// クエリを URL エンコード含めて正しく送る。
+func TestClientListOptions_QueryEncoding(t *testing.T) {
 	page1 := `[{"id":7,"name":"matched","name_disp":"matched","payment_term_id":100,"payment_term_name":"月末","invoice_system_issuer_type":0,"invoice_system_issuer_type_name":"未設定","invoice_system_number_validated":false,"updated_at":"2024-02-01T00:00:00+09:00","created_at":"2024-02-01T00:00:00+09:00"}]`
 	var observedQuery url.Values
 	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
@@ -446,18 +504,18 @@ func TestClientSearchParams_QueryEncoding(t *testing.T) {
 	})
 	client := newClientsMockClient(rt)
 
-	_, err := client.SearchClientsRaw(context.Background(), boardapi.ClientSearchParams{
-		Name:          "テスト",
-		UpdatedAtFrom: "2024-01-01T00:00:00+09:00",
+	_, _, err := client.ListClientsRaw(context.Background(), boardapi.ClientListOptions{
+		NameCont:      "テスト",
+		UpdatedAtGteq: "2024-01-01 00:00:00",
 	})
 	if err != nil {
-		t.Fatalf("SearchClientsRaw: %v", err)
+		t.Fatalf("ListClientsRaw: %v", err)
 	}
-	if observedQuery.Get("name") != "テスト" {
-		t.Errorf("query name = %q, want テスト", observedQuery.Get("name"))
+	if observedQuery.Get("name_cont") != "テスト" {
+		t.Errorf("query name_cont = %q, want テスト", observedQuery.Get("name_cont"))
 	}
-	if observedQuery.Get("updated_at_from") != "2024-01-01T00:00:00+09:00" {
-		t.Errorf("query updated_at_from = %q", observedQuery.Get("updated_at_from"))
+	if observedQuery.Get("updated_at_gteq") != "2024-01-01 00:00:00" {
+		t.Errorf("query updated_at_gteq = %q", observedQuery.Get("updated_at_gteq"))
 	}
 }
 

@@ -30,16 +30,17 @@ func (s *Service) FindClient(ctx context.Context, q FindClientQuery) ([]ClientRe
 		clients = []boardapi.ClientEntity{*c}
 
 	case q.Name != "":
-		// Name search: delegate to repo
-		result, err := s.clients.Search(ctx, boardapi.ClientSearchParams{Name: q.Name}, opts)
+		// Name search: delegate to repo using Ransack-style _cont filter.
+		result, err := s.clients.Search(ctx, boardapi.ClientListOptions{NameCont: q.Name}, opts)
 		if err != nil {
 			return nil, err
 		}
 		clients = result
 
 	case q.Text != "":
-		// Text search: list all, filter by name/code/memo
-		all, err := s.clients.List(ctx, opts)
+		// Text search: list all (zero filter = cache-backed), then filter by
+		// name / custom_no / note in-process.
+		all, err := s.clients.Search(ctx, boardapi.ClientListOptions{}, opts)
 		if err != nil {
 			return nil, err
 		}

@@ -9,10 +9,14 @@ import (
 
 // ClientRepo is the repository interface for clients used by service/find.
 // Defined independently from service/api (Go interface segregation).
+//
+// M50: Search now receives ClientListOptions (Ransack-style) instead of the
+// legacy ClientSearchParams. "List all entities" is expressed as
+// Search(ctx, boardapi.ClientListOptions{}, opts) — this avoids a redundant
+// List method while keeping the find layer agnostic of *ListResult.
 type ClientRepo interface {
-	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.ClientEntity, error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.ClientEntity, error)
-	Search(ctx context.Context, params boardapi.ClientSearchParams, opts repository.ReadOptions) ([]boardapi.ClientEntity, error)
+	Search(ctx context.Context, filter boardapi.ClientListOptions, opts repository.ReadOptions) ([]boardapi.ClientEntity, error)
 }
 
 // ClientBranchRepo is the repository interface for client branches.

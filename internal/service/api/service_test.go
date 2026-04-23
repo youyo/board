@@ -42,9 +42,12 @@ func assertNotNil[T any](t *testing.T, got *T) {
 func TestListClients(t *testing.T) {
 	stub := &stubClientRepo{listResult: []boardapi.ClientEntity{{ID: 1, Name: "ClientA"}}}
 	svc := newServiceWithClients(stub)
-	got, err := svc.ListClients(testCtx, defaultOpts)
+	got, err := svc.ListClients(testCtx, defaultOpts, boardapi.ClientListOptions{})
 	assertNoError(t, err)
-	assertLen(t, got, 1)
+	if got == nil {
+		t.Fatal("got nil ListResult")
+	}
+	assertLen(t, got.Items, 1)
 }
 
 func TestGetClient(t *testing.T) {
@@ -56,20 +59,22 @@ func TestGetClient(t *testing.T) {
 	assertNotNil(t, got)
 }
 
-func TestSearchClients(t *testing.T) {
-	stub := &stubClientRepo{searchResult: []boardapi.ClientEntity{{ID: 2, Name: "ClientB"}}}
+// M50: 非ゼロ filter 時は searchResult を返す（cache bypass path の stub 挙動）。
+func TestListClients_WithFilter(t *testing.T) {
+	stub := &stubClientRepo{
+		listResult:   []boardapi.ClientEntity{{ID: 1, Name: "ClientA"}},
+		searchResult: []boardapi.ClientEntity{{ID: 2, Name: "ClientB"}},
+	}
 	svc := newServiceWithClients(stub)
-	got, err := svc.SearchClients(testCtx, boardapi.ClientSearchParams{Name: "ClientB"}, defaultOpts)
+	got, err := svc.ListClients(testCtx, defaultOpts, boardapi.ClientListOptions{NameCont: "ClientB"})
 	assertNoError(t, err)
-	assertLen(t, got, 1)
-}
-
-func TestListClientsPage(t *testing.T) {
-	stub := &stubClientRepo{listPageResult: &boardapi.PageResult[boardapi.ClientEntity]{Items: []boardapi.ClientEntity{{ID: 1}}}}
-	svc := newServiceWithClients(stub)
-	got, err := svc.ListClientsPage(testCtx, 1, 30)
-	assertNoError(t, err)
-	assertNotNil(t, got)
+	if got == nil {
+		t.Fatal("got nil ListResult")
+	}
+	assertLen(t, got.Items, 1)
+	if got.Items[0].ID != 2 {
+		t.Errorf("want ID=2 (from searchResult), got %d", got.Items[0].ID)
+	}
 }
 
 // --- ClientBranches tests ---

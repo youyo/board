@@ -31,7 +31,7 @@ func (s *Service) FindProject(ctx context.Context, q FindProjectQuery) ([]Projec
 
 	case q.ClientName != "":
 		// Resolve client name -> client IDs -> search projects
-		clients, err := s.clients.Search(ctx, boardapi.ClientSearchParams{Name: q.ClientName}, opts)
+		clients, err := s.clients.Search(ctx, boardapi.ClientListOptions{NameCont: q.ClientName}, opts)
 		if err != nil {
 			return nil, err
 		}

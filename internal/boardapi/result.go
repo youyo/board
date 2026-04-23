@@ -14,16 +14,20 @@ import (
 //
 // Headers is intentionally omitted from JSON output (`json:"-"`). Callers that
 // want to expose metadata to downstream consumers should rely on Meta.
+//
+// Meta is serialized under the `_meta` JSON key (leading underscore) so that
+// `jq '._meta'` conventions used in the CLI / docs work uniformly across
+// resources (see plans/board-phase-l-m50-clients-pilot.md §D4).
 type ListResult[T any] struct {
 	Items   []T         `json:"items"`
-	Meta    ListMeta    `json:"meta"`
+	Meta    ListMeta    `json:"_meta"`
 	Headers http.Header `json:"-"`
 }
 
 // ItemResult mirrors ListResult for single-item endpoints (Get*).
 type ItemResult[T any] struct {
 	Item    *T          `json:"item"`
-	Meta    ItemMeta    `json:"meta"`
+	Meta    ItemMeta    `json:"_meta"`
 	Headers http.Header `json:"-"`
 }
 
