@@ -76,12 +76,12 @@ func TestPaymentRepository_List_CacheHit(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makePaymentRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{})
+	got, err := repo.List(context.Background(), repository.ReadOptions{}, boardapi.PaymentListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(got) != len(samplePayments) {
-		t.Errorf("len(got) = %d, want %d", len(got), len(samplePayments))
+	if len(got.Items) != len(samplePayments) {
+		t.Errorf("len(got.Items) = %d, want %d", len(got.Items), len(samplePayments))
 	}
 }
 
@@ -93,12 +93,12 @@ func TestPaymentRepository_List_InitialLoad(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makePaymentRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{})
+	got, err := repo.List(context.Background(), repository.ReadOptions{}, boardapi.PaymentListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(got) != len(samplePayments) {
-		t.Errorf("len(got) = %d, want %d", len(got), len(samplePayments))
+	if len(got.Items) != len(samplePayments) {
+		t.Errorf("len(got.Items) = %d, want %d", len(got.Items), len(samplePayments))
 	}
 }
 
@@ -161,17 +161,21 @@ func TestPaymentRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	}
 }
 
-// T_PAY06: Search - VendorID filter -> returns matching items
+// T_PAY06: Search - VendorIDEq filter -> non-zero filter bypasses cache, calls API directly
 func TestPaymentRepository_Search_VendorIDFilter(t *testing.T) {
 	db := newTestDB(t)
-	seedPaymentCache(t, db, samplePayments)
 	markSynced(t, db, "payments")
 
-	srv := newPaymentAPIServer(t, nil)
+	// API returns 2 payments with vendor_id=10
+	filtered := []boardapi.PaymentEntity{
+		{ID: 1, VendorID: 10, PurchaseOrderID: 100, Amount: 10000, Status: "pending", UpdatedAt: "2026-01-01T00:00:00Z"},
+		{ID: 2, VendorID: 10, PurchaseOrderID: 101, Amount: 20000, Status: "paid", UpdatedAt: "2026-01-02T00:00:00Z"},
+	}
+	srv := newPaymentAPIServer(t, filtered)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makePaymentRepo(t, db, apiClient, false)
-	got, err := repo.Search(context.Background(), boardapi.PaymentSearchParams{VendorID: 10}, repository.ReadOptions{})
+	got, err := repo.Search(context.Background(), boardapi.PaymentListOptions{VendorIDEq: 10}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
@@ -180,17 +184,20 @@ func TestPaymentRepository_Search_VendorIDFilter(t *testing.T) {
 	}
 }
 
-// T_PAY07: Search - Status filter -> returns matching items
+// T_PAY07: Search - StatusEq filter -> non-zero filter bypasses cache, calls API directly
 func TestPaymentRepository_Search_StatusFilter(t *testing.T) {
 	db := newTestDB(t)
-	seedPaymentCache(t, db, samplePayments)
 	markSynced(t, db, "payments")
 
-	srv := newPaymentAPIServer(t, nil)
+	// API returns 1 payment with status=pending
+	pending := []boardapi.PaymentEntity{
+		{ID: 1, VendorID: 10, PurchaseOrderID: 100, Amount: 10000, Status: "pending", UpdatedAt: "2026-01-01T00:00:00Z"},
+	}
+	srv := newPaymentAPIServer(t, pending)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makePaymentRepo(t, db, apiClient, false)
-	got, err := repo.Search(context.Background(), boardapi.PaymentSearchParams{Status: "pending"}, repository.ReadOptions{})
+	got, err := repo.Search(context.Background(), boardapi.PaymentListOptions{StatusEq: "pending"}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
@@ -199,7 +206,7 @@ func TestPaymentRepository_Search_StatusFilter(t *testing.T) {
 	}
 }
 
-// T_PAY08: Search - no filter -> returns all items
+// T_PAY08: Search - no filter -> zero filter routes through cache
 func TestPaymentRepository_Search_NoFilter(t *testing.T) {
 	db := newTestDB(t)
 	seedPaymentCache(t, db, samplePayments)
@@ -209,7 +216,7 @@ func TestPaymentRepository_Search_NoFilter(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makePaymentRepo(t, db, apiClient, false)
-	got, err := repo.Search(context.Background(), boardapi.PaymentSearchParams{}, repository.ReadOptions{})
+	got, err := repo.Search(context.Background(), boardapi.PaymentListOptions{}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}

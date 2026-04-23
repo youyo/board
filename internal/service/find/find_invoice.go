@@ -33,7 +33,7 @@ func (s *Service) FindInvoice(ctx context.Context, q FindInvoiceQuery) ([]Invoic
 			return nil, err
 		}
 		for _, c := range clients {
-			is, err := s.invoices.Search(ctx, boardapi.InvoiceSearchParams{ClientID: c.ID}, opts)
+			is, err := s.invoices.Search(ctx, boardapi.InvoiceListOptions{ClientIDEq: c.ID}, opts)
 			if err != nil {
 				return nil, err
 			}
@@ -46,7 +46,7 @@ func (s *Service) FindInvoice(ctx context.Context, q FindInvoiceQuery) ([]Invoic
 			return nil, err
 		}
 		for _, p := range projects {
-			is, err := s.invoices.Search(ctx, boardapi.InvoiceSearchParams{ProjectID: p.ID}, opts)
+			is, err := s.invoices.Search(ctx, boardapi.InvoiceListOptions{ProjectIDEq: p.ID}, opts)
 			if err != nil {
 				return nil, err
 			}
@@ -54,7 +54,7 @@ func (s *Service) FindInvoice(ctx context.Context, q FindInvoiceQuery) ([]Invoic
 		}
 
 	case q.Text != "":
-		all, err := s.invoices.List(ctx, opts)
+		all, err := s.invoices.Search(ctx, boardapi.InvoiceListOptions{}, opts)
 		if err != nil {
 			return nil, err
 		}
@@ -65,7 +65,7 @@ func (s *Service) FindInvoice(ctx context.Context, q FindInvoiceQuery) ([]Invoic
 		}
 
 	case q.Status != "":
-		all, err := s.invoices.List(ctx, opts)
+		all, err := s.invoices.Search(ctx, boardapi.InvoiceListOptions{}, opts)
 		if err != nil {
 			return nil, err
 		}

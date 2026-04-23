@@ -34,7 +34,7 @@ func (s *Service) FindPurchaseOrder(ctx context.Context, q FindPurchaseOrderQuer
 			return nil, err
 		}
 		for _, v := range vendors {
-			pos, err := s.purchaseOrders.Search(ctx, boardapi.PurchaseOrderSearchParams{VendorID: v.ID}, opts)
+			pos, err := s.purchaseOrders.Search(ctx, boardapi.PurchaseOrderListOptions{VendorIDEq: v.ID}, opts)
 			if err != nil {
 				return nil, err
 			}
@@ -47,7 +47,7 @@ func (s *Service) FindPurchaseOrder(ctx context.Context, q FindPurchaseOrderQuer
 			return nil, err
 		}
 		for _, p := range projects {
-			pos, err := s.purchaseOrders.Search(ctx, boardapi.PurchaseOrderSearchParams{ProjectID: p.ID}, opts)
+			pos, err := s.purchaseOrders.Search(ctx, boardapi.PurchaseOrderListOptions{ProjectIDEq: p.ID}, opts)
 			if err != nil {
 				return nil, err
 			}
@@ -55,7 +55,7 @@ func (s *Service) FindPurchaseOrder(ctx context.Context, q FindPurchaseOrderQuer
 		}
 
 	case q.Text != "":
-		all, err := s.purchaseOrders.List(ctx, opts)
+		all, err := s.purchaseOrders.Search(ctx, boardapi.PurchaseOrderListOptions{}, opts)
 		if err != nil {
 			return nil, err
 		}
@@ -66,7 +66,7 @@ func (s *Service) FindPurchaseOrder(ctx context.Context, q FindPurchaseOrderQuer
 		}
 
 	case q.Status != "":
-		all, err := s.purchaseOrders.List(ctx, opts)
+		all, err := s.purchaseOrders.Search(ctx, boardapi.PurchaseOrderListOptions{}, opts)
 		if err != nil {
 			return nil, err
 		}

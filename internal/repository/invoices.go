@@ -48,8 +48,45 @@ func NewInvoiceRepository(
 
 const invoicesResource = "invoices"
 
-// List returns all invoices from the cache.
-func (r *InvoiceRepository) List(ctx context.Context, opts ReadOptions) ([]boardapi.InvoiceEntity, error) {
+// invoiceFilterIsZero reports whether the given filter is empty (all fields
+// are zero values / nil). A zero filter routes through the local cache; a
+// non-zero filter bypasses the cache and calls the API directly because
+// filtered results must not poison the full-entity cache.
+func invoiceFilterIsZero(f boardapi.InvoiceListOptions) bool {
+	return f.Page == 0 &&
+		f.PerPage == 0 &&
+		f.UpdatedAtGteq == "" &&
+		f.UpdatedAtLteq == "" &&
+		f.IncludeArchiveFlg == nil &&
+		f.ClientIDEq == 0 &&
+		f.ProjectIDEq == 0 &&
+		f.StatusEq == "" &&
+		f.ResponseGroup == ""
+}
+
+// List returns invoices.
+//
+// Behavior:
+//   - Zero filter (boardapi.InvoiceListOptions{}): uses the local cache with
+//     refresh-on-demand (daily auto refresh, explicit Refresh / ForceRefresh).
+//     Returns *ListResult with Meta zero-valued (cache is source of truth).
+//   - Non-zero filter: bypasses the cache and calls api.ListInvoices directly
+//     so that server-side filter semantics (Ransack _eq / _gteq) take effect.
+//     Returns *ListResult with Meta populated from the final page's response headers.
+//
+// Limit from readOpts is applied to the final result in either path.
+func (r *InvoiceRepository) List(ctx context.Context, readOpts ReadOptions, filter boardapi.InvoiceListOptions) (*boardapi.ListResult[boardapi.InvoiceEntity], error) {
+	if !invoiceFilterIsZero(filter) {
+		// API 直接呼び出し（cache bypass）: フィルタ結果でキャッシュを汚染しない。
+		result, err := r.api.ListInvoices(ctx, filter)
+		if err != nil {
+			return nil, err
+		}
+		result.Items = applyLimit(result.Items, readOpts.Limit)
+		return result, nil
+	}
+
+	// ゼロフィルタ: 既存の cache → refresh → API fallback 経路
 	fetcher := &invoicesFetcher{api: r.api}
 	now := time.Now()
 
@@ -57,16 +94,13 @@ func (r *InvoiceRepository) List(ctx context.Context, opts ReadOptions) ([]board
 	if err != nil {
 		return nil, err
 	}
-
-	if err := maybeRefresh(ctx, r.profile, invoicesResource, opts, state, r.autoRefresh, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
+	if err := maybeRefresh(ctx, r.profile, invoicesResource, readOpts, state, r.autoRefresh, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
 		return nil, err
 	}
-
 	entries, err := r.cache.List(ctx, r.profile, invoicesResource)
 	if err != nil {
 		return nil, err
 	}
-
 	if len(entries) == 0 && state == nil {
 		if err := r.lockManager.WithLock(ctx, r.profile, invoicesResource, func() error {
 			_, err := r.refresher.ForceRefresh(ctx, r.profile, fetcher, now, r.tz)
@@ -79,13 +113,22 @@ func (r *InvoiceRepository) List(ctx context.Context, opts ReadOptions) ([]board
 			return nil, err
 		}
 	}
-
 	entities, err := decodeEntries[boardapi.InvoiceEntity](entries)
 	if err != nil {
 		return nil, err
 	}
+	entities = applyLimit(entities, readOpts.Limit)
+	return &boardapi.ListResult[boardapi.InvoiceEntity]{Items: entities}, nil
+}
 
-	return applyLimit(entities, opts.Limit), nil
+// ListEntities は List のラッパで []InvoiceEntity を返す。
+// find 層など *ListResult を必要としない呼び出し元が使用する（Phase L の方針）。
+func (r *InvoiceRepository) ListEntities(ctx context.Context, readOpts ReadOptions, filter boardapi.InvoiceListOptions) ([]boardapi.InvoiceEntity, error) {
+	result, err := r.List(ctx, readOpts, filter)
+	if err != nil {
+		return nil, err
+	}
+	return result.Items, nil
 }
 
 // GetByID returns the invoice with the given ID from the cache.
@@ -117,13 +160,13 @@ func (r *InvoiceRepository) GetByID(ctx context.Context, id int, opts ReadOption
 		return &entity, nil
 	}
 
-	// Cache miss → fetch single entity from API
-	entity, err := r.api.GetInvoice(ctx, id)
+	// Cache miss -> fetch single entry from API
+	result, err := r.api.GetInvoice(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 
-	raw, err := json.Marshal(entity)
+	raw, err := json.Marshal(result.Item)
 	if err != nil {
 		return nil, err
 	}
@@ -131,40 +174,13 @@ func (r *InvoiceRepository) GetByID(ctx context.Context, id int, opts ReadOption
 		return nil, err
 	}
 
-	return entity, nil
+	return result.Item, nil
 }
 
-// Search returns invoices filtered by the given parameters from the cache.
-func (r *InvoiceRepository) Search(ctx context.Context, params boardapi.InvoiceSearchParams, opts ReadOptions) ([]boardapi.InvoiceEntity, error) {
-	listOpts := opts
-	listOpts.Limit = 0
-	all, err := r.List(ctx, listOpts)
-	if err != nil {
-		return nil, err
-	}
-	return applyLimit(filterInvoices(all, params), opts.Limit), nil
-}
-
-// filterInvoices performs in-memory filtering.
-// UpdatedAtFrom is used as a delta fetch cursor and is not included in the filter.
-func filterInvoices(entities []boardapi.InvoiceEntity, params boardapi.InvoiceSearchParams) []boardapi.InvoiceEntity {
-	var result []boardapi.InvoiceEntity
-	for _, e := range entities {
-		if params.ClientID != 0 && e.ClientID != params.ClientID {
-			continue
-		}
-		if params.ProjectID != 0 && e.ProjectID != params.ProjectID {
-			continue
-		}
-		if params.Status != "" && e.Status != params.Status {
-			continue
-		}
-		result = append(result, e)
-	}
-	return result
-}
-
-// ListPage retrieves a single page of InvoiceEntity directly from the API (cache bypass).
-func (r *InvoiceRepository) ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.InvoiceEntity], error) {
-	return r.api.ListInvoicesPage(ctx, page, perPage)
+// Search は find 層向けの薄いラッパ。ListEntities に委譲する。
+//
+// find 層は *ListResult を扱わず []InvoiceEntity を維持する（Phase L の方針）。
+// Phase M で MCP / find の仕上げを行う際にインターフェースを再検討する。
+func (r *InvoiceRepository) Search(ctx context.Context, filter boardapi.InvoiceListOptions, opts ReadOptions) ([]boardapi.InvoiceEntity, error) {
+	return r.ListEntities(ctx, opts, filter)
 }

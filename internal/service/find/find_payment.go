@@ -34,7 +34,7 @@ func (s *Service) FindPayment(ctx context.Context, q FindPaymentQuery) ([]Paymen
 			return nil, err
 		}
 		for _, v := range vendors {
-			ps, err := s.payments.Search(ctx, boardapi.PaymentSearchParams{VendorID: v.ID}, opts)
+			ps, err := s.payments.Search(ctx, boardapi.PaymentListOptions{VendorIDEq: v.ID}, opts)
 			if err != nil {
 				return nil, err
 			}
@@ -42,14 +42,14 @@ func (s *Service) FindPayment(ctx context.Context, q FindPaymentQuery) ([]Paymen
 		}
 
 	case q.PurchaseOrderID != 0:
-		ps, err := s.payments.Search(ctx, boardapi.PaymentSearchParams{PurchaseOrderID: q.PurchaseOrderID}, opts)
+		ps, err := s.payments.Search(ctx, boardapi.PaymentListOptions{PurchaseOrderIDEq: q.PurchaseOrderID}, opts)
 		if err != nil {
 			return nil, err
 		}
 		payments = ps
 
 	case q.Text != "":
-		all, err := s.payments.List(ctx, opts)
+		all, err := s.payments.Search(ctx, boardapi.PaymentListOptions{}, opts)
 		if err != nil {
 			return nil, err
 		}
@@ -60,7 +60,7 @@ func (s *Service) FindPayment(ctx context.Context, q FindPaymentQuery) ([]Paymen
 		}
 
 	case q.Status != "":
-		all, err := s.payments.List(ctx, opts)
+		all, err := s.payments.Search(ctx, boardapi.PaymentListOptions{}, opts)
 		if err != nil {
 			return nil, err
 		}

@@ -76,12 +76,12 @@ func TestInvoiceRepository_List_CacheHit(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeInvoiceRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{})
+	got, err := repo.List(context.Background(), repository.ReadOptions{}, boardapi.InvoiceListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(got) != len(sampleInvoices) {
-		t.Errorf("len(got) = %d, want %d", len(got), len(sampleInvoices))
+	if len(got.Items) != len(sampleInvoices) {
+		t.Errorf("len(got.Items) = %d, want %d", len(got.Items), len(sampleInvoices))
 	}
 }
 
@@ -93,12 +93,12 @@ func TestInvoiceRepository_List_InitialLoad(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeInvoiceRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{})
+	got, err := repo.List(context.Background(), repository.ReadOptions{}, boardapi.InvoiceListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(got) != len(sampleInvoices) {
-		t.Errorf("len(got) = %d, want %d", len(got), len(sampleInvoices))
+	if len(got.Items) != len(sampleInvoices) {
+		t.Errorf("len(got.Items) = %d, want %d", len(got.Items), len(sampleInvoices))
 	}
 }
 
@@ -161,17 +161,21 @@ func TestInvoiceRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	}
 }
 
-// T_INV06: Search - ClientID filter -> returns matching items
+// T_INV06: Search - ClientIDEq filter -> non-zero filter bypasses cache, calls API directly
 func TestInvoiceRepository_Search_ClientIDFilter(t *testing.T) {
 	db := newTestDB(t)
-	seedInvoiceCache(t, db, sampleInvoices)
 	markSynced(t, db, "invoices")
 
-	srv := newInvoiceAPIServer(t, nil)
+	// API returns 2 invoices with client_id=10
+	filtered := []boardapi.InvoiceEntity{
+		{ID: 1, ClientID: 10, ProjectID: 100, Title: "InvoiceA", Status: "draft", UpdatedAt: "2026-01-01T00:00:00Z"},
+		{ID: 2, ClientID: 10, ProjectID: 101, Title: "InvoiceB", Status: "sent", UpdatedAt: "2026-01-02T00:00:00Z"},
+	}
+	srv := newInvoiceAPIServer(t, filtered)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeInvoiceRepo(t, db, apiClient, false)
-	got, err := repo.Search(context.Background(), boardapi.InvoiceSearchParams{ClientID: 10}, repository.ReadOptions{})
+	got, err := repo.Search(context.Background(), boardapi.InvoiceListOptions{ClientIDEq: 10}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
@@ -180,17 +184,20 @@ func TestInvoiceRepository_Search_ClientIDFilter(t *testing.T) {
 	}
 }
 
-// T_INV07: Search - Status filter -> returns matching items
+// T_INV07: Search - StatusEq filter -> non-zero filter bypasses cache, calls API directly
 func TestInvoiceRepository_Search_StatusFilter(t *testing.T) {
 	db := newTestDB(t)
-	seedInvoiceCache(t, db, sampleInvoices)
 	markSynced(t, db, "invoices")
 
-	srv := newInvoiceAPIServer(t, nil)
+	// API returns 1 invoice with status=paid
+	paid := []boardapi.InvoiceEntity{
+		{ID: 3, ClientID: 20, ProjectID: 102, Title: "InvoiceC", Status: "paid", UpdatedAt: "2026-01-03T00:00:00Z"},
+	}
+	srv := newInvoiceAPIServer(t, paid)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeInvoiceRepo(t, db, apiClient, false)
-	got, err := repo.Search(context.Background(), boardapi.InvoiceSearchParams{Status: "paid"}, repository.ReadOptions{})
+	got, err := repo.Search(context.Background(), boardapi.InvoiceListOptions{StatusEq: "paid"}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
@@ -199,7 +206,7 @@ func TestInvoiceRepository_Search_StatusFilter(t *testing.T) {
 	}
 }
 
-// T_INV08: Search - no filter -> returns all items
+// T_INV08: Search - no filter -> zero filter routes through cache
 func TestInvoiceRepository_Search_NoFilter(t *testing.T) {
 	db := newTestDB(t)
 	seedInvoiceCache(t, db, sampleInvoices)
@@ -209,7 +216,7 @@ func TestInvoiceRepository_Search_NoFilter(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeInvoiceRepo(t, db, apiClient, false)
-	got, err := repo.Search(context.Background(), boardapi.InvoiceSearchParams{}, repository.ReadOptions{})
+	got, err := repo.Search(context.Background(), boardapi.InvoiceListOptions{}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}

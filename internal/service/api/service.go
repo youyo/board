@@ -64,11 +64,13 @@ type EstimateRepo interface {
 }
 
 // InvoiceRepo is the interface for the invoices repository.
+//
+// M54 以降: List は (readOpts, filter) 二引数化されて *ListResult を返す。
+// 非ゼロ filter 時は cache バイパスで api.ListInvoices を直接呼ぶ。
+// Search / ListPage は削除（破壊的変更）。
 type InvoiceRepo interface {
-	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.InvoiceEntity, error)
+	List(ctx context.Context, readOpts repository.ReadOptions, filter boardapi.InvoiceListOptions) (*boardapi.ListResult[boardapi.InvoiceEntity], error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.InvoiceEntity, error)
-	Search(ctx context.Context, params boardapi.InvoiceSearchParams, opts repository.ReadOptions) ([]boardapi.InvoiceEntity, error)
-	ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.InvoiceEntity], error)
 }
 
 // OrderRepo is the interface for the orders repository.
@@ -111,19 +113,23 @@ type VendorContactRepo interface {
 }
 
 // PurchaseOrderRepo is the interface for the purchase_orders repository.
+//
+// M54 以降: List は (readOpts, filter) 二引数化されて *ListResult を返す。
+// 非ゼロ filter 時は cache バイパスで api.ListPurchaseOrders を直接呼ぶ。
+// Search / ListPage は削除（破壊的変更）。
 type PurchaseOrderRepo interface {
-	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.PurchaseOrderEntity, error)
+	List(ctx context.Context, readOpts repository.ReadOptions, filter boardapi.PurchaseOrderListOptions) (*boardapi.ListResult[boardapi.PurchaseOrderEntity], error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.PurchaseOrderEntity, error)
-	Search(ctx context.Context, params boardapi.PurchaseOrderSearchParams, opts repository.ReadOptions) ([]boardapi.PurchaseOrderEntity, error)
-	ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.PurchaseOrderEntity], error)
 }
 
 // PaymentRepo is the interface for the payments repository.
+//
+// M54 以降: List は (readOpts, filter) 二引数化されて *ListResult を返す。
+// 非ゼロ filter 時は cache バイパスで api.ListPayments を直接呼ぶ。
+// Search / ListPage は削除（破壊的変更）。
 type PaymentRepo interface {
-	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.PaymentEntity, error)
+	List(ctx context.Context, readOpts repository.ReadOptions, filter boardapi.PaymentListOptions) (*boardapi.ListResult[boardapi.PaymentEntity], error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.PaymentEntity, error)
-	Search(ctx context.Context, params boardapi.PaymentSearchParams, opts repository.ReadOptions) ([]boardapi.PaymentEntity, error)
-	ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.PaymentEntity], error)
 }
 
 // UserRepo is the interface for the users repository.

@@ -76,12 +76,12 @@ func TestPurchaseOrderRepository_List_CacheHit(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makePurchaseOrderRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{})
+	got, err := repo.List(context.Background(), repository.ReadOptions{}, boardapi.PurchaseOrderListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(got) != len(samplePurchaseOrders) {
-		t.Errorf("len(got) = %d, want %d", len(got), len(samplePurchaseOrders))
+	if len(got.Items) != len(samplePurchaseOrders) {
+		t.Errorf("len(got.Items) = %d, want %d", len(got.Items), len(samplePurchaseOrders))
 	}
 }
 
@@ -93,12 +93,12 @@ func TestPurchaseOrderRepository_List_InitialLoad(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makePurchaseOrderRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{})
+	got, err := repo.List(context.Background(), repository.ReadOptions{}, boardapi.PurchaseOrderListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(got) != len(samplePurchaseOrders) {
-		t.Errorf("len(got) = %d, want %d", len(got), len(samplePurchaseOrders))
+	if len(got.Items) != len(samplePurchaseOrders) {
+		t.Errorf("len(got.Items) = %d, want %d", len(got.Items), len(samplePurchaseOrders))
 	}
 }
 
@@ -161,17 +161,21 @@ func TestPurchaseOrderRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	}
 }
 
-// T_PO06: Search - VendorID filter -> returns matching items
+// T_PO06: Search - VendorIDEq filter -> non-zero filter bypasses cache, calls API directly
 func TestPurchaseOrderRepository_Search_VendorIDFilter(t *testing.T) {
 	db := newTestDB(t)
-	seedPurchaseOrderCache(t, db, samplePurchaseOrders)
 	markSynced(t, db, "purchase_orders")
 
-	srv := newPurchaseOrderAPIServer(t, nil)
+	// API returns 2 purchase orders with vendor_id=10
+	filtered := []boardapi.PurchaseOrderEntity{
+		{ID: 1, VendorID: 10, ProjectID: 100, Title: "PurchaseOrderA", Status: "draft", UpdatedAt: "2026-01-01T00:00:00Z"},
+		{ID: 2, VendorID: 10, ProjectID: 101, Title: "PurchaseOrderB", Status: "ordered", UpdatedAt: "2026-01-02T00:00:00Z"},
+	}
+	srv := newPurchaseOrderAPIServer(t, filtered)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makePurchaseOrderRepo(t, db, apiClient, false)
-	got, err := repo.Search(context.Background(), boardapi.PurchaseOrderSearchParams{VendorID: 10}, repository.ReadOptions{})
+	got, err := repo.Search(context.Background(), boardapi.PurchaseOrderListOptions{VendorIDEq: 10}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
@@ -180,17 +184,20 @@ func TestPurchaseOrderRepository_Search_VendorIDFilter(t *testing.T) {
 	}
 }
 
-// T_PO07: Search - Status filter -> returns matching items
+// T_PO07: Search - StatusEq filter -> non-zero filter bypasses cache, calls API directly
 func TestPurchaseOrderRepository_Search_StatusFilter(t *testing.T) {
 	db := newTestDB(t)
-	seedPurchaseOrderCache(t, db, samplePurchaseOrders)
 	markSynced(t, db, "purchase_orders")
 
-	srv := newPurchaseOrderAPIServer(t, nil)
+	// API returns 1 purchase order with status=draft
+	drafted := []boardapi.PurchaseOrderEntity{
+		{ID: 1, VendorID: 10, ProjectID: 100, Title: "PurchaseOrderA", Status: "draft", UpdatedAt: "2026-01-01T00:00:00Z"},
+	}
+	srv := newPurchaseOrderAPIServer(t, drafted)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makePurchaseOrderRepo(t, db, apiClient, false)
-	got, err := repo.Search(context.Background(), boardapi.PurchaseOrderSearchParams{Status: "draft"}, repository.ReadOptions{})
+	got, err := repo.Search(context.Background(), boardapi.PurchaseOrderListOptions{StatusEq: "draft"}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
@@ -199,7 +206,7 @@ func TestPurchaseOrderRepository_Search_StatusFilter(t *testing.T) {
 	}
 }
 
-// T_PO08: Search - no filter -> returns all items
+// T_PO08: Search - no filter -> zero filter routes through cache
 func TestPurchaseOrderRepository_Search_NoFilter(t *testing.T) {
 	db := newTestDB(t)
 	seedPurchaseOrderCache(t, db, samplePurchaseOrders)
@@ -209,7 +216,7 @@ func TestPurchaseOrderRepository_Search_NoFilter(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makePurchaseOrderRepo(t, db, apiClient, false)
-	got, err := repo.Search(context.Background(), boardapi.PurchaseOrderSearchParams{}, repository.ReadOptions{})
+	got, err := repo.Search(context.Background(), boardapi.PurchaseOrderListOptions{}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}

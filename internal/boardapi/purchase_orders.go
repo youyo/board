@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 )
 
-// PurchaseOrderEntity is a BOARD API purchase order entity.
-// Corresponds to one element in the GET /v1/purchase_orders response.
+// PurchaseOrderEntity は BOARD API の発注書エンティティ。
+// GET /v1/expenditures および GET /v1/expenditures/{id} のレスポンスに対応する。
+// 注意: 実 API パスは /v1/expenditures（Go 名: purchase_orders）。
 type PurchaseOrderEntity struct {
 	ID           int     `json:"id"`
 	VendorID     int     `json:"vendor_id"`
@@ -24,7 +24,36 @@ type PurchaseOrderEntity struct {
 	CreatedAt    string  `json:"created_at"` // ISO 8601
 }
 
-// PurchaseOrderSearchParams is the parameter for SearchPurchaseOrders.
+// PurchaseOrderListOptions は GET /v1/expenditures のクエリパラメータ（Ransack スタイル）。
+// ゼロ値は API に送信されないため、PurchaseOrderListOptions{} は無フィルタのリスト取得となる。
+//
+// 注意: M54 時点では expenditures の Ransack _eq / _gteq 形式が実 API で有効かは未検証。
+// E2E テスト（TestE2E_PurchaseOrders_M54）で確認予定。
+// 旧コードでは `vendor_id` を素のクエリパラメータとして使用していた。
+//
+// Introduced in M54 as the Phase L purchase_orders migration target.
+// Replaces the pre-M54 PurchaseOrderSearchParams struct.
+type PurchaseOrderListOptions struct {
+	// 共通ページネーション（通常は ListAllWithResult が page を上書きする）。
+	Page    int
+	PerPage int
+
+	// 全 List 共通
+	UpdatedAtGteq     string // "YYYY-MM-DD HH:MM:SS"
+	UpdatedAtLteq     string
+	IncludeArchiveFlg *bool // nil=送らない, true=1, false=0
+
+	// purchase_orders 専用
+	VendorIDEq    int    // 取引先 ID 完全一致
+	ProjectIDEq   int    // プロジェクト ID 完全一致
+	StatusEq      string // ステータス完全一致
+	ResponseGroup string // "small" / "large"
+}
+
+// PurchaseOrderSearchParams は SearchPurchaseOrders の後方互換のために残す。
+//
+// Deprecated: M54 以降は PurchaseOrderListOptions を使用すること。
+// M57 で一括削除予定。
 type PurchaseOrderSearchParams struct {
 	VendorID      int
 	ProjectID     int
@@ -32,42 +61,63 @@ type PurchaseOrderSearchParams struct {
 	UpdatedAtFrom string
 }
 
-// ListPurchaseOrders retrieves all purchase orders.
-// Pagination is automatically handled by ListAll.
-func (c *Client) ListPurchaseOrders(ctx context.Context) ([]PurchaseOrderEntity, error) {
-	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+// buildPurchaseOrdersQuery は PurchaseOrderListOptions を Ransack スタイルのクエリ文字列に変換する。
+func buildPurchaseOrdersQuery(opts PurchaseOrderListOptions, page, perPage int) string {
+	return NewQueryBuilder().
+		Page(page, perPage).
+		IntEq("vendor_id", opts.VendorIDEq).
+		IntEq("project_id", opts.ProjectIDEq).
+		StrEq("status", opts.StatusEq).
+		DateGteq("updated_at", opts.UpdatedAtGteq).
+		DateLteq("updated_at", opts.UpdatedAtLteq).
+		Flg01("include_archive_flg", opts.IncludeArchiveFlg).
+		ResponseGroup(opts.ResponseGroup).
+		Encode()
+}
+
+// ListPurchaseOrders は PurchaseOrderListOptions でフィルタした発注書一覧を返す。
+// ページネーションは ListAllWithResult が内部で処理する。
+//
+// 注意: 実 API パスは /v1/expenditures（Go 名: purchase_orders）。
+//
+// Pass PurchaseOrderListOptions{} for an unfiltered list of all purchase orders.
+func (c *Client) ListPurchaseOrders(ctx context.Context, opts PurchaseOrderListOptions) (*ListResult[PurchaseOrderEntity], error) {
+	perPage := opts.PerPage
+	makeReq := func(ctx context.Context, page, pp int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/expenditures", nil)
 		if err != nil {
 			return nil, err
 		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		req.URL.RawQuery = q.Encode()
+		req.URL.RawQuery = buildPurchaseOrdersQuery(opts, page, pp)
 		return req, nil
 	}
-	items, err := c.ListAll(ctx, makeReq)
+	var listOpts []ListAllOption
+	if perPage > 0 {
+		listOpts = append(listOpts, WithPerPage(perPage))
+	}
+	raw, err := c.ListAllWithResult(ctx, makeReq, listOpts...)
 	if err != nil {
 		return nil, err
 	}
-	result := make([]PurchaseOrderEntity, 0, len(items))
-	for _, raw := range items {
+	items := make([]PurchaseOrderEntity, 0, len(raw.Items))
+	for _, b := range raw.Items {
 		var x PurchaseOrderEntity
-		if err := json.Unmarshal(raw, &x); err != nil {
+		if err := json.Unmarshal(b, &x); err != nil {
 			return nil, &APIError{Code: APIErrorUnknown, Message: "ListPurchaseOrders: unmarshal: " + err.Error()}
 		}
-		result = append(result, x)
+		items = append(items, x)
 	}
-	return result, nil
+	return &ListResult[PurchaseOrderEntity]{Items: items, Meta: raw.Meta, Headers: raw.Headers}, nil
 }
 
-// GetPurchaseOrder retrieves the purchase order with the specified ID.
-func (c *Client) GetPurchaseOrder(ctx context.Context, id int) (*PurchaseOrderEntity, error) {
+// GetPurchaseOrder は指定 ID の発注書を返す。
+// 注意: 実 API パスは /v1/expenditures/{id}。
+func (c *Client) GetPurchaseOrder(ctx context.Context, id int) (*ItemResult[PurchaseOrderEntity], error) {
 	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/expenditures/%d", id), nil)
 	if err != nil {
 		return nil, err
 	}
-	body, err := c.DoWithRetry(req)
+	body, headers, err := c.DoWithRetryFull(req)
 	if err != nil {
 		return nil, err
 	}
@@ -75,152 +125,48 @@ func (c *Client) GetPurchaseOrder(ctx context.Context, id int) (*PurchaseOrderEn
 	if err := json.Unmarshal(body, &x); err != nil {
 		return nil, &APIError{Code: APIErrorUnknown, Message: "GetPurchaseOrder: unmarshal: " + err.Error()}
 	}
-	return &x, nil
+	return &ItemResult[PurchaseOrderEntity]{
+		Item:    &x,
+		Meta:    parseItemMeta(headers),
+		Headers: headers,
+	}, nil
 }
 
-// SearchPurchaseOrders searches purchase orders with the given conditions.
-// Pagination is automatically handled by ListAll.
-func (c *Client) SearchPurchaseOrders(ctx context.Context, params PurchaseOrderSearchParams) ([]PurchaseOrderEntity, error) {
-	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+// ListPurchaseOrdersRaw は発注書一覧を生 JSON バイト列と最終ページのヘッダーで返す。
+// E2E strict field diff 専用。通常の呼び出し元は ListPurchaseOrders を使うこと。
+// 注意: 実 API パスは /v1/expenditures。
+func (c *Client) ListPurchaseOrdersRaw(ctx context.Context, opts PurchaseOrderListOptions) ([]byte, http.Header, error) {
+	perPage := opts.PerPage
+	makeReq := func(ctx context.Context, page, pp int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/expenditures", nil)
 		if err != nil {
 			return nil, err
 		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		if params.VendorID != 0 {
-			q.Set("vendor_id", strconv.Itoa(params.VendorID))
-		}
-		if params.ProjectID != 0 {
-			q.Set("project_id", strconv.Itoa(params.ProjectID))
-		}
-		if params.Status != "" {
-			q.Set("status", params.Status)
-		}
-		if params.UpdatedAtFrom != "" {
-			q.Set("updated_at_from", params.UpdatedAtFrom)
-		}
-		req.URL.RawQuery = q.Encode()
+		req.URL.RawQuery = buildPurchaseOrdersQuery(opts, page, pp)
 		return req, nil
 	}
-	items, err := c.ListAll(ctx, makeReq)
+	var listOpts []ListAllOption
+	if perPage > 0 {
+		listOpts = append(listOpts, WithPerPage(perPage))
+	}
+	raw, err := c.ListAllWithResult(ctx, makeReq, listOpts...)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	result := make([]PurchaseOrderEntity, 0, len(items))
-	for _, raw := range items {
-		var x PurchaseOrderEntity
-		if err := json.Unmarshal(raw, &x); err != nil {
-			return nil, &APIError{Code: APIErrorUnknown, Message: "SearchPurchaseOrders: unmarshal: " + err.Error()}
-		}
-		result = append(result, x)
+	out, err := json.Marshal(raw.Items)
+	if err != nil {
+		return nil, nil, &APIError{Code: APIErrorUnknown, Message: "ListPurchaseOrdersRaw: marshal aggregate: " + err.Error()}
 	}
-	return result, nil
+	return out, raw.Headers, nil
 }
 
-// ListPurchaseOrdersRaw retrieves all purchase orders and returns the raw HTTP
-// response bodies merged across pages as a single JSON array. Each element
-// preserves the exact byte content returned by the BOARD API.
-//
-// Note: the real BOARD API path is /v1/expenditures (Go name: purchase_orders).
-//
-// Intended for E2E strict field diff; regular callers should use
-// ListPurchaseOrders.
-func (c *Client) ListPurchaseOrdersRaw(ctx context.Context, opts ...ListAllOption) ([]byte, error) {
-	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
-		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/expenditures", nil)
-		if err != nil {
-			return nil, err
-		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		req.URL.RawQuery = q.Encode()
-		return req, nil
-	}
-	items, err := c.ListAll(ctx, makeReq, opts...)
-	if err != nil {
-		return nil, err
-	}
-	out, err := json.Marshal(items)
-	if err != nil {
-		return nil, &APIError{Code: APIErrorUnknown, Message: "ListPurchaseOrdersRaw: marshal aggregate: " + err.Error()}
-	}
-	return out, nil
-}
-
-// GetPurchaseOrderRaw retrieves a single purchase order and returns the raw HTTP
-// response body byte-for-byte.
-//
-// Note: the real BOARD API path is /v1/expenditures/{id} (Go name: purchase_orders).
-//
-// Intended for E2E strict field diff; regular callers should use
-// GetPurchaseOrder.
-func (c *Client) GetPurchaseOrderRaw(ctx context.Context, id int) ([]byte, error) {
+// GetPurchaseOrderRaw は指定 ID の発注書を生 JSON バイト列とヘッダーで返す。
+// E2E strict field diff 専用。通常の呼び出し元は GetPurchaseOrder を使うこと。
+// 注意: 実 API パスは /v1/expenditures/{id}。
+func (c *Client) GetPurchaseOrderRaw(ctx context.Context, id int) ([]byte, http.Header, error) {
 	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/expenditures/%d", id), nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return c.DoWithRetry(req)
-}
-
-// SearchPurchaseOrdersRaw retrieves purchase orders matching the given search parameters and
-// returns the raw HTTP response bodies merged across pages as a single JSON
-// array. Same byte-preserving guarantee as ListPurchaseOrdersRaw.
-//
-// PurchaseOrderSearchParams exposes 4 filters (VendorID, ProjectID, Status, UpdatedAtFrom).
-// Note: the real BOARD API path is /v1/expenditures.
-//
-// Intended for E2E strict field diff; regular callers should use
-// SearchPurchaseOrders.
-func (c *Client) SearchPurchaseOrdersRaw(ctx context.Context, params PurchaseOrderSearchParams, opts ...ListAllOption) ([]byte, error) {
-	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
-		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/expenditures", nil)
-		if err != nil {
-			return nil, err
-		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		if params.VendorID != 0 {
-			q.Set("vendor_id", strconv.Itoa(params.VendorID))
-		}
-		if params.ProjectID != 0 {
-			q.Set("project_id", strconv.Itoa(params.ProjectID))
-		}
-		if params.Status != "" {
-			q.Set("status", params.Status)
-		}
-		if params.UpdatedAtFrom != "" {
-			q.Set("updated_at_from", params.UpdatedAtFrom)
-		}
-		req.URL.RawQuery = q.Encode()
-		return req, nil
-	}
-	items, err := c.ListAll(ctx, makeReq, opts...)
-	if err != nil {
-		return nil, err
-	}
-	out, err := json.Marshal(items)
-	if err != nil {
-		return nil, &APIError{Code: APIErrorUnknown, Message: "SearchPurchaseOrdersRaw: marshal aggregate: " + err.Error()}
-	}
-	return out, nil
-}
-
-// ListPurchaseOrdersPage retrieves a single page of PurchaseOrderEntity.
-func (c *Client) ListPurchaseOrdersPage(ctx context.Context, page, perPage int) (*PageResult[PurchaseOrderEntity], error) {
-	makeReq := func(ctx context.Context, p, pp int) (*http.Request, error) {
-		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/expenditures", nil)
-		if err != nil {
-			return nil, err
-		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(p))
-		q.Set("per_page", strconv.Itoa(pp))
-		req.URL.RawQuery = q.Encode()
-		return req, nil
-	}
-	return ListPage[PurchaseOrderEntity](c, ctx, makeReq, page, perPage)
+	return c.DoWithRetryFull(req)
 }

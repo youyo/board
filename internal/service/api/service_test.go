@@ -176,11 +176,11 @@ func TestGetEstimate(t *testing.T) {
 // --- Invoices tests ---
 
 func TestListInvoices(t *testing.T) {
-	stub := &stubInvoiceRepo{listResult: []boardapi.InvoiceEntity{{ID: 1, ProjectID: 10}}}
+	stub := &stubInvoiceRepo{listResult: &boardapi.ListResult[boardapi.InvoiceEntity]{Items: []boardapi.InvoiceEntity{{ID: 1, ProjectID: 10}}}}
 	svc := newServiceWithInvoices(stub)
-	got, err := svc.ListInvoices(testCtx, defaultOpts)
+	got, err := svc.ListInvoices(testCtx, defaultOpts, boardapi.InvoiceListOptions{})
 	assertNoError(t, err)
-	assertLen(t, got, 1)
+	assertLen(t, got.Items, 1)
 }
 
 func TestGetInvoice(t *testing.T) {
@@ -192,20 +192,12 @@ func TestGetInvoice(t *testing.T) {
 	assertNotNil(t, got)
 }
 
-func TestSearchInvoices(t *testing.T) {
-	stub := &stubInvoiceRepo{searchResult: []boardapi.InvoiceEntity{{ID: 2, ProjectID: 10}}}
+func TestListInvoicesWithFilter(t *testing.T) {
+	stub := &stubInvoiceRepo{listResult: &boardapi.ListResult[boardapi.InvoiceEntity]{Items: []boardapi.InvoiceEntity{{ID: 2, ProjectID: 10}}}}
 	svc := newServiceWithInvoices(stub)
-	got, err := svc.SearchInvoices(testCtx, boardapi.InvoiceSearchParams{ProjectID: 10}, defaultOpts)
+	got, err := svc.ListInvoices(testCtx, defaultOpts, boardapi.InvoiceListOptions{ProjectIDEq: 10})
 	assertNoError(t, err)
-	assertLen(t, got, 1)
-}
-
-func TestListInvoicesPage(t *testing.T) {
-	stub := &stubInvoiceRepo{listPageResult: &boardapi.PageResult[boardapi.InvoiceEntity]{Items: []boardapi.InvoiceEntity{{ID: 1}}}}
-	svc := newServiceWithInvoices(stub)
-	got, err := svc.ListInvoicesPage(testCtx, 1, 30)
-	assertNoError(t, err)
-	assertNotNil(t, got)
+	assertLen(t, got.Items, 1)
 }
 
 // --- Orders tests ---
@@ -325,11 +317,11 @@ func TestSearchVendorContacts(t *testing.T) {
 // --- PurchaseOrders tests ---
 
 func TestListPurchaseOrders(t *testing.T) {
-	stub := &stubPurchaseOrderRepo{listResult: []boardapi.PurchaseOrderEntity{{ID: 1, ProjectID: 10}}}
+	stub := &stubPurchaseOrderRepo{listResult: &boardapi.ListResult[boardapi.PurchaseOrderEntity]{Items: []boardapi.PurchaseOrderEntity{{ID: 1, ProjectID: 10}}}}
 	svc := newServiceWithPurchaseOrders(stub)
-	got, err := svc.ListPurchaseOrders(testCtx, defaultOpts)
+	got, err := svc.ListPurchaseOrders(testCtx, defaultOpts, boardapi.PurchaseOrderListOptions{})
 	assertNoError(t, err)
-	assertLen(t, got, 1)
+	assertLen(t, got.Items, 1)
 }
 
 func TestGetPurchaseOrder(t *testing.T) {
@@ -341,22 +333,22 @@ func TestGetPurchaseOrder(t *testing.T) {
 	assertNotNil(t, got)
 }
 
-func TestSearchPurchaseOrders(t *testing.T) {
-	stub := &stubPurchaseOrderRepo{searchResult: []boardapi.PurchaseOrderEntity{{ID: 2, ProjectID: 10}}}
+func TestListPurchaseOrdersWithFilter(t *testing.T) {
+	stub := &stubPurchaseOrderRepo{listResult: &boardapi.ListResult[boardapi.PurchaseOrderEntity]{Items: []boardapi.PurchaseOrderEntity{{ID: 2, ProjectID: 10}}}}
 	svc := newServiceWithPurchaseOrders(stub)
-	got, err := svc.SearchPurchaseOrders(testCtx, boardapi.PurchaseOrderSearchParams{ProjectID: 10}, defaultOpts)
+	got, err := svc.ListPurchaseOrders(testCtx, defaultOpts, boardapi.PurchaseOrderListOptions{ProjectIDEq: 10})
 	assertNoError(t, err)
-	assertLen(t, got, 1)
+	assertLen(t, got.Items, 1)
 }
 
 // --- Payments tests ---
 
 func TestListPayments(t *testing.T) {
-	stub := &stubPaymentRepo{listResult: []boardapi.PaymentEntity{{ID: 1, VendorID: 5}}}
+	stub := &stubPaymentRepo{listResult: &boardapi.ListResult[boardapi.PaymentEntity]{Items: []boardapi.PaymentEntity{{ID: 1, VendorID: 5}}}}
 	svc := newServiceWithPayments(stub)
-	got, err := svc.ListPayments(testCtx, defaultOpts)
+	got, err := svc.ListPayments(testCtx, defaultOpts, boardapi.PaymentListOptions{})
 	assertNoError(t, err)
-	assertLen(t, got, 1)
+	assertLen(t, got.Items, 1)
 }
 
 func TestGetPayment(t *testing.T) {
@@ -368,12 +360,12 @@ func TestGetPayment(t *testing.T) {
 	assertNotNil(t, got)
 }
 
-func TestSearchPayments(t *testing.T) {
-	stub := &stubPaymentRepo{searchResult: []boardapi.PaymentEntity{{ID: 2, VendorID: 5}}}
+func TestListPaymentsWithFilter(t *testing.T) {
+	stub := &stubPaymentRepo{listResult: &boardapi.ListResult[boardapi.PaymentEntity]{Items: []boardapi.PaymentEntity{{ID: 2, VendorID: 5}}}}
 	svc := newServiceWithPayments(stub)
-	got, err := svc.SearchPayments(testCtx, boardapi.PaymentSearchParams{VendorID: 5}, defaultOpts)
+	got, err := svc.ListPayments(testCtx, defaultOpts, boardapi.PaymentListOptions{VendorIDEq: 5})
 	assertNoError(t, err)
-	assertLen(t, got, 1)
+	assertLen(t, got.Items, 1)
 }
 
 // --- Users tests ---

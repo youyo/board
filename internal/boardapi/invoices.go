@@ -5,11 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 )
 
-// InvoiceEntity is a BOARD API invoice entity.
-// Corresponds to one element in the GET /v1/invoices response.
+// InvoiceEntity は BOARD API の請求書エンティティ。
+// GET /v1/invoices および GET /v1/invoices/{id} のレスポンスに対応する。
 type InvoiceEntity struct {
 	ID          int     `json:"id"`
 	ClientID    int     `json:"client_id"`
@@ -24,7 +23,35 @@ type InvoiceEntity struct {
 	CreatedAt   string  `json:"created_at"` // ISO 8601
 }
 
-// InvoiceSearchParams is the parameter for SearchInvoices.
+// InvoiceListOptions は GET /v1/invoices のクエリパラメータ（Ransack スタイル）。
+// ゼロ値は API に送信されないため、InvoiceListOptions{} は無フィルタのリスト取得となる。
+//
+// 注意: M54 時点では invoices の Ransack _eq / _gteq 形式が実 API で有効かは未検証。
+// E2E テスト（TestE2E_Invoices_M54）で確認予定。
+//
+// Introduced in M54 as the Phase L invoices migration target.
+// Replaces the pre-M54 InvoiceSearchParams struct.
+type InvoiceListOptions struct {
+	// 共通ページネーション（通常は ListAllWithResult が page を上書きする）。
+	Page    int
+	PerPage int
+
+	// 全 List 共通
+	UpdatedAtGteq     string // "YYYY-MM-DD HH:MM:SS"
+	UpdatedAtLteq     string
+	IncludeArchiveFlg *bool // nil=送らない, true=1, false=0
+
+	// invoices 専用
+	ClientIDEq    int    // 顧客 ID 完全一致
+	ProjectIDEq   int    // プロジェクト ID 完全一致
+	StatusEq      string // ステータス完全一致
+	ResponseGroup string // "small" / "large"
+}
+
+// InvoiceSearchParams は SearchInvoices の後方互換のために残す。
+//
+// Deprecated: M54 以降は InvoiceListOptions を使用すること。
+// M57 で一括削除予定。
 type InvoiceSearchParams struct {
 	ClientID      int
 	ProjectID     int
@@ -32,42 +59,60 @@ type InvoiceSearchParams struct {
 	UpdatedAtFrom string
 }
 
-// ListInvoices retrieves all invoices.
-// Pagination is automatically handled by ListAll.
-func (c *Client) ListInvoices(ctx context.Context) ([]InvoiceEntity, error) {
-	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+// buildInvoicesQuery は InvoiceListOptions を Ransack スタイルのクエリ文字列に変換する。
+func buildInvoicesQuery(opts InvoiceListOptions, page, perPage int) string {
+	return NewQueryBuilder().
+		Page(page, perPage).
+		IntEq("client_id", opts.ClientIDEq).
+		IntEq("project_id", opts.ProjectIDEq).
+		StrEq("status", opts.StatusEq).
+		DateGteq("updated_at", opts.UpdatedAtGteq).
+		DateLteq("updated_at", opts.UpdatedAtLteq).
+		Flg01("include_archive_flg", opts.IncludeArchiveFlg).
+		ResponseGroup(opts.ResponseGroup).
+		Encode()
+}
+
+// ListInvoices は InvoiceListOptions でフィルタした請求書一覧を返す。
+// ページネーションは ListAllWithResult が内部で処理する。
+//
+// Pass InvoiceListOptions{} for an unfiltered list of all invoices.
+func (c *Client) ListInvoices(ctx context.Context, opts InvoiceListOptions) (*ListResult[InvoiceEntity], error) {
+	perPage := opts.PerPage
+	makeReq := func(ctx context.Context, page, pp int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/invoices", nil)
 		if err != nil {
 			return nil, err
 		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		req.URL.RawQuery = q.Encode()
+		req.URL.RawQuery = buildInvoicesQuery(opts, page, pp)
 		return req, nil
 	}
-	items, err := c.ListAll(ctx, makeReq)
+	var listOpts []ListAllOption
+	if perPage > 0 {
+		listOpts = append(listOpts, WithPerPage(perPage))
+	}
+	raw, err := c.ListAllWithResult(ctx, makeReq, listOpts...)
 	if err != nil {
 		return nil, err
 	}
-	result := make([]InvoiceEntity, 0, len(items))
-	for _, raw := range items {
+	items := make([]InvoiceEntity, 0, len(raw.Items))
+	for _, b := range raw.Items {
 		var x InvoiceEntity
-		if err := json.Unmarshal(raw, &x); err != nil {
+		if err := json.Unmarshal(b, &x); err != nil {
 			return nil, &APIError{Code: APIErrorUnknown, Message: "ListInvoices: unmarshal: " + err.Error()}
 		}
-		result = append(result, x)
+		items = append(items, x)
 	}
-	return result, nil
+	return &ListResult[InvoiceEntity]{Items: items, Meta: raw.Meta, Headers: raw.Headers}, nil
 }
 
-// GetInvoice retrieves the invoice with the specified ID.
-func (c *Client) GetInvoice(ctx context.Context, id int) (*InvoiceEntity, error) {
+// GetInvoice は指定 ID の請求書を返す。
+func (c *Client) GetInvoice(ctx context.Context, id int) (*ItemResult[InvoiceEntity], error) {
 	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/invoices/%d", id), nil)
 	if err != nil {
 		return nil, err
 	}
-	body, err := c.DoWithRetry(req)
+	body, headers, err := c.DoWithRetryFull(req)
 	if err != nil {
 		return nil, err
 	}
@@ -75,151 +120,46 @@ func (c *Client) GetInvoice(ctx context.Context, id int) (*InvoiceEntity, error)
 	if err := json.Unmarshal(body, &x); err != nil {
 		return nil, &APIError{Code: APIErrorUnknown, Message: "GetInvoice: unmarshal: " + err.Error()}
 	}
-	return &x, nil
+	return &ItemResult[InvoiceEntity]{
+		Item:    &x,
+		Meta:    parseItemMeta(headers),
+		Headers: headers,
+	}, nil
 }
 
-// SearchInvoices searches invoices with the given conditions.
-// Pagination is automatically handled by ListAll.
-func (c *Client) SearchInvoices(ctx context.Context, params InvoiceSearchParams) ([]InvoiceEntity, error) {
-	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+// ListInvoicesRaw は請求書一覧を生 JSON バイト列と最終ページのヘッダーで返す。
+// E2E strict field diff 専用。通常の呼び出し元は ListInvoices を使うこと。
+func (c *Client) ListInvoicesRaw(ctx context.Context, opts InvoiceListOptions) ([]byte, http.Header, error) {
+	perPage := opts.PerPage
+	makeReq := func(ctx context.Context, page, pp int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/invoices", nil)
 		if err != nil {
 			return nil, err
 		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		if params.ClientID != 0 {
-			q.Set("client_id", strconv.Itoa(params.ClientID))
-		}
-		if params.ProjectID != 0 {
-			q.Set("project_id", strconv.Itoa(params.ProjectID))
-		}
-		if params.Status != "" {
-			q.Set("status", params.Status)
-		}
-		if params.UpdatedAtFrom != "" {
-			q.Set("updated_at_from", params.UpdatedAtFrom)
-		}
-		req.URL.RawQuery = q.Encode()
+		req.URL.RawQuery = buildInvoicesQuery(opts, page, pp)
 		return req, nil
 	}
-	items, err := c.ListAll(ctx, makeReq)
+	var listOpts []ListAllOption
+	if perPage > 0 {
+		listOpts = append(listOpts, WithPerPage(perPage))
+	}
+	raw, err := c.ListAllWithResult(ctx, makeReq, listOpts...)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	result := make([]InvoiceEntity, 0, len(items))
-	for _, raw := range items {
-		var x InvoiceEntity
-		if err := json.Unmarshal(raw, &x); err != nil {
-			return nil, &APIError{Code: APIErrorUnknown, Message: "SearchInvoices: unmarshal: " + err.Error()}
-		}
-		result = append(result, x)
+	out, err := json.Marshal(raw.Items)
+	if err != nil {
+		return nil, nil, &APIError{Code: APIErrorUnknown, Message: "ListInvoicesRaw: marshal aggregate: " + err.Error()}
 	}
-	return result, nil
+	return out, raw.Headers, nil
 }
 
-// ListInvoicesRaw retrieves all invoices and returns the raw HTTP
-// response bodies merged across pages as a single JSON array. Each element
-// preserves the exact byte content returned by the BOARD API.
-//
-// Note: the real BOARD API path is /v1/invoices.
-//
-// Intended for E2E strict field diff; regular callers should use
-// ListInvoices.
-func (c *Client) ListInvoicesRaw(ctx context.Context, opts ...ListAllOption) ([]byte, error) {
-	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
-		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/invoices", nil)
-		if err != nil {
-			return nil, err
-		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		req.URL.RawQuery = q.Encode()
-		return req, nil
-	}
-	items, err := c.ListAll(ctx, makeReq, opts...)
-	if err != nil {
-		return nil, err
-	}
-	out, err := json.Marshal(items)
-	if err != nil {
-		return nil, &APIError{Code: APIErrorUnknown, Message: "ListInvoicesRaw: marshal aggregate: " + err.Error()}
-	}
-	return out, nil
-}
-
-// GetInvoiceRaw retrieves a single invoice and returns the raw HTTP
-// response body byte-for-byte.
-//
-// Note: the real BOARD API path is /v1/invoices/{id}.
-//
-// Intended for E2E strict field diff; regular callers should use
-// GetInvoice.
-func (c *Client) GetInvoiceRaw(ctx context.Context, id int) ([]byte, error) {
+// GetInvoiceRaw は指定 ID の請求書を生 JSON バイト列とヘッダーで返す。
+// E2E strict field diff 専用。通常の呼び出し元は GetInvoice を使うこと。
+func (c *Client) GetInvoiceRaw(ctx context.Context, id int) ([]byte, http.Header, error) {
 	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/invoices/%d", id), nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return c.DoWithRetry(req)
-}
-
-// SearchInvoicesRaw retrieves invoices matching the given search parameters and
-// returns the raw HTTP response bodies merged across pages as a single JSON
-// array. Same byte-preserving guarantee as ListInvoicesRaw.
-//
-// InvoiceSearchParams exposes 4 filters (ClientID, ProjectID, Status, UpdatedAtFrom).
-//
-// Intended for E2E strict field diff; regular callers should use
-// SearchInvoices.
-func (c *Client) SearchInvoicesRaw(ctx context.Context, params InvoiceSearchParams, opts ...ListAllOption) ([]byte, error) {
-	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
-		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/invoices", nil)
-		if err != nil {
-			return nil, err
-		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		if params.ClientID != 0 {
-			q.Set("client_id", strconv.Itoa(params.ClientID))
-		}
-		if params.ProjectID != 0 {
-			q.Set("project_id", strconv.Itoa(params.ProjectID))
-		}
-		if params.Status != "" {
-			q.Set("status", params.Status)
-		}
-		if params.UpdatedAtFrom != "" {
-			q.Set("updated_at_from", params.UpdatedAtFrom)
-		}
-		req.URL.RawQuery = q.Encode()
-		return req, nil
-	}
-	items, err := c.ListAll(ctx, makeReq, opts...)
-	if err != nil {
-		return nil, err
-	}
-	out, err := json.Marshal(items)
-	if err != nil {
-		return nil, &APIError{Code: APIErrorUnknown, Message: "SearchInvoicesRaw: marshal aggregate: " + err.Error()}
-	}
-	return out, nil
-}
-
-// ListInvoicesPage retrieves a single page of invoices.
-func (c *Client) ListInvoicesPage(ctx context.Context, page, perPage int) (*PageResult[InvoiceEntity], error) {
-	makeReq := func(ctx context.Context, p, pp int) (*http.Request, error) {
-		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/invoices", nil)
-		if err != nil {
-			return nil, err
-		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(p))
-		q.Set("per_page", strconv.Itoa(pp))
-		req.URL.RawQuery = q.Encode()
-		return req, nil
-	}
-	return ListPage[InvoiceEntity](c, ctx, makeReq, page, perPage)
+	return c.DoWithRetryFull(req)
 }

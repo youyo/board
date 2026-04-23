@@ -234,14 +234,26 @@ type stubInvoiceRepo struct {
 	err          error
 }
 
-func (s *stubInvoiceRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.InvoiceEntity, error) {
-	return s.listResult, s.err
-}
 func (s *stubInvoiceRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.InvoiceEntity, error) {
 	return s.getResult, s.err
 }
-func (s *stubInvoiceRepo) Search(_ context.Context, _ boardapi.InvoiceSearchParams, _ repository.ReadOptions) ([]boardapi.InvoiceEntity, error) {
+
+// Search returns listResult for a zero filter (used by "list all" semantics)
+// and searchResult otherwise.
+func (s *stubInvoiceRepo) Search(_ context.Context, filter boardapi.InvoiceListOptions, _ repository.ReadOptions) ([]boardapi.InvoiceEntity, error) {
+	if invoiceListOptionsIsZero(filter) {
+		return s.listResult, s.err
+	}
 	return s.searchResult, s.err
+}
+
+// invoiceListOptionsIsZero reports whether filter is the zero value.
+func invoiceListOptionsIsZero(f boardapi.InvoiceListOptions) bool {
+	return f.Page == 0 && f.PerPage == 0 &&
+		f.UpdatedAtGteq == "" && f.UpdatedAtLteq == "" &&
+		f.IncludeArchiveFlg == nil &&
+		f.ClientIDEq == 0 && f.ProjectIDEq == 0 &&
+		f.StatusEq == "" && f.ResponseGroup == ""
 }
 
 type stubOrderRepo struct {
@@ -329,14 +341,26 @@ type stubPurchaseOrderRepo struct {
 	err          error
 }
 
-func (s *stubPurchaseOrderRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.PurchaseOrderEntity, error) {
-	return s.listResult, s.err
-}
 func (s *stubPurchaseOrderRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.PurchaseOrderEntity, error) {
 	return s.getResult, s.err
 }
-func (s *stubPurchaseOrderRepo) Search(_ context.Context, _ boardapi.PurchaseOrderSearchParams, _ repository.ReadOptions) ([]boardapi.PurchaseOrderEntity, error) {
+
+// Search returns listResult for a zero filter (used by "list all" semantics)
+// and searchResult otherwise.
+func (s *stubPurchaseOrderRepo) Search(_ context.Context, filter boardapi.PurchaseOrderListOptions, _ repository.ReadOptions) ([]boardapi.PurchaseOrderEntity, error) {
+	if purchaseOrderListOptionsIsZero(filter) {
+		return s.listResult, s.err
+	}
 	return s.searchResult, s.err
+}
+
+// purchaseOrderListOptionsIsZero reports whether filter is the zero value.
+func purchaseOrderListOptionsIsZero(f boardapi.PurchaseOrderListOptions) bool {
+	return f.Page == 0 && f.PerPage == 0 &&
+		f.UpdatedAtGteq == "" && f.UpdatedAtLteq == "" &&
+		f.IncludeArchiveFlg == nil &&
+		f.VendorIDEq == 0 && f.ProjectIDEq == 0 &&
+		f.StatusEq == "" && f.ResponseGroup == ""
 }
 
 type stubPaymentRepo struct {
@@ -346,14 +370,26 @@ type stubPaymentRepo struct {
 	err          error
 }
 
-func (s *stubPaymentRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.PaymentEntity, error) {
-	return s.listResult, s.err
-}
 func (s *stubPaymentRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.PaymentEntity, error) {
 	return s.getResult, s.err
 }
-func (s *stubPaymentRepo) Search(_ context.Context, _ boardapi.PaymentSearchParams, _ repository.ReadOptions) ([]boardapi.PaymentEntity, error) {
+
+// Search returns listResult for a zero filter (used by "list all" semantics)
+// and searchResult otherwise.
+func (s *stubPaymentRepo) Search(_ context.Context, filter boardapi.PaymentListOptions, _ repository.ReadOptions) ([]boardapi.PaymentEntity, error) {
+	if paymentListOptionsIsZero(filter) {
+		return s.listResult, s.err
+	}
 	return s.searchResult, s.err
+}
+
+// paymentListOptionsIsZero reports whether filter is the zero value.
+func paymentListOptionsIsZero(f boardapi.PaymentListOptions) bool {
+	return f.Page == 0 && f.PerPage == 0 &&
+		f.UpdatedAtGteq == "" && f.UpdatedAtLteq == "" &&
+		f.IncludeArchiveFlg == nil &&
+		f.VendorIDEq == 0 && f.PurchaseOrderIDEq == 0 &&
+		f.StatusEq == "" && f.ResponseGroup == ""
 }
 
 type stubUserRepo struct {

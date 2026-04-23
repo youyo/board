@@ -129,24 +129,19 @@ func (s *stubEstimateRepo) GetByDocumentID(_ context.Context, _ int, _ repositor
 }
 
 type stubInvoiceRepo struct {
-	listResult     []boardapi.InvoiceEntity
-	getResult      *boardapi.InvoiceEntity
-	searchResult   []boardapi.InvoiceEntity
-	listPageResult *boardapi.PageResult[boardapi.InvoiceEntity]
-	err            error
+	listResult   *boardapi.ListResult[boardapi.InvoiceEntity]
+	getResult    *boardapi.InvoiceEntity
+	err          error
 }
 
-func (s *stubInvoiceRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.InvoiceEntity, error) {
+func (s *stubInvoiceRepo) List(_ context.Context, _ repository.ReadOptions, _ boardapi.InvoiceListOptions) (*boardapi.ListResult[boardapi.InvoiceEntity], error) {
+	if s.listResult == nil {
+		return &boardapi.ListResult[boardapi.InvoiceEntity]{}, s.err
+	}
 	return s.listResult, s.err
 }
 func (s *stubInvoiceRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.InvoiceEntity, error) {
 	return s.getResult, s.err
-}
-func (s *stubInvoiceRepo) Search(_ context.Context, _ boardapi.InvoiceSearchParams, _ repository.ReadOptions) ([]boardapi.InvoiceEntity, error) {
-	return s.searchResult, s.err
-}
-func (s *stubInvoiceRepo) ListPage(_ context.Context, _, _ int) (*boardapi.PageResult[boardapi.InvoiceEntity], error) {
-	return s.listPageResult, s.err
 }
 
 type stubOrderRepo struct {
@@ -239,43 +234,35 @@ func (s *stubVendorContactRepo) ListPage(_ context.Context, _, _ int) (*boardapi
 }
 
 type stubPurchaseOrderRepo struct {
-	listResult   []boardapi.PurchaseOrderEntity
-	getResult    *boardapi.PurchaseOrderEntity
-	searchResult []boardapi.PurchaseOrderEntity
-	err          error
+	listResult *boardapi.ListResult[boardapi.PurchaseOrderEntity]
+	getResult  *boardapi.PurchaseOrderEntity
+	err        error
 }
 
-func (s *stubPurchaseOrderRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.PurchaseOrderEntity, error) {
+func (s *stubPurchaseOrderRepo) List(_ context.Context, _ repository.ReadOptions, _ boardapi.PurchaseOrderListOptions) (*boardapi.ListResult[boardapi.PurchaseOrderEntity], error) {
+	if s.listResult == nil {
+		return &boardapi.ListResult[boardapi.PurchaseOrderEntity]{}, s.err
+	}
 	return s.listResult, s.err
 }
 func (s *stubPurchaseOrderRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.PurchaseOrderEntity, error) {
 	return s.getResult, s.err
 }
-func (s *stubPurchaseOrderRepo) Search(_ context.Context, _ boardapi.PurchaseOrderSearchParams, _ repository.ReadOptions) ([]boardapi.PurchaseOrderEntity, error) {
-	return s.searchResult, s.err
-}
-func (s *stubPurchaseOrderRepo) ListPage(_ context.Context, _, _ int) (*boardapi.PageResult[boardapi.PurchaseOrderEntity], error) {
-	return nil, s.err
-}
 
 type stubPaymentRepo struct {
-	listResult   []boardapi.PaymentEntity
-	getResult    *boardapi.PaymentEntity
-	searchResult []boardapi.PaymentEntity
-	err          error
+	listResult *boardapi.ListResult[boardapi.PaymentEntity]
+	getResult  *boardapi.PaymentEntity
+	err        error
 }
 
-func (s *stubPaymentRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.PaymentEntity, error) {
+func (s *stubPaymentRepo) List(_ context.Context, _ repository.ReadOptions, _ boardapi.PaymentListOptions) (*boardapi.ListResult[boardapi.PaymentEntity], error) {
+	if s.listResult == nil {
+		return &boardapi.ListResult[boardapi.PaymentEntity]{}, s.err
+	}
 	return s.listResult, s.err
 }
 func (s *stubPaymentRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.PaymentEntity, error) {
 	return s.getResult, s.err
-}
-func (s *stubPaymentRepo) Search(_ context.Context, _ boardapi.PaymentSearchParams, _ repository.ReadOptions) ([]boardapi.PaymentEntity, error) {
-	return s.searchResult, s.err
-}
-func (s *stubPaymentRepo) ListPage(_ context.Context, _, _ int) (*boardapi.PageResult[boardapi.PaymentEntity], error) {
-	return nil, s.err
 }
 
 // --- Stubs: master ---

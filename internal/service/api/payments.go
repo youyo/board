@@ -7,22 +7,15 @@ import (
 	"github.com/youyo/board/internal/repository"
 )
 
-// ListPayments returns all payments.
-func (s *Service) ListPayments(ctx context.Context, opts repository.ReadOptions) ([]boardapi.PaymentEntity, error) {
-	return s.payments.List(ctx, opts)
+// ListPayments は PaymentListOptions でフィルタした支払一覧を返す。
+//
+// M54 以降: filter を第2引数として受け取り、*ListResult を返す。
+// 旧 SearchPayments / ListPaymentsPage は削除。
+func (s *Service) ListPayments(ctx context.Context, readOpts repository.ReadOptions, filter boardapi.PaymentListOptions) (*boardapi.ListResult[boardapi.PaymentEntity], error) {
+	return s.payments.List(ctx, readOpts, filter)
 }
 
-// GetPayment returns a payment by ID.
+// GetPayment は指定 ID の支払を返す。
 func (s *Service) GetPayment(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.PaymentEntity, error) {
 	return s.payments.GetByID(ctx, id, opts)
-}
-
-// SearchPayments returns payments filtered by the given parameters.
-func (s *Service) SearchPayments(ctx context.Context, params boardapi.PaymentSearchParams, opts repository.ReadOptions) ([]boardapi.PaymentEntity, error) {
-	return s.payments.Search(ctx, params, opts)
-}
-
-// ListPaymentsPage returns a single page of payments.
-func (s *Service) ListPaymentsPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.PaymentEntity], error) {
-	return s.payments.ListPage(ctx, page, perPage)
 }

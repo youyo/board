@@ -1742,15 +1742,15 @@ func TestListInvoices_OK(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.ListInvoices(context.Background())
+	result, err := c.ListInvoices(context.Background(), boardapi.InvoiceListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result) != 2 {
-		t.Errorf("want 2 invoices, got %d", len(result))
+	if len(result.Items) != 2 {
+		t.Errorf("want 2 invoices, got %d", len(result.Items))
 	}
-	if result[0].ID != 1 || result[0].InvoiceDate != "2026-01-31" || result[0].DueDate != "2026-02-28" {
-		t.Errorf("invoice[0]: got %+v", result[0])
+	if result.Items[0].ID != 1 || result.Items[0].InvoiceDate != "2026-01-31" || result.Items[0].DueDate != "2026-02-28" {
+		t.Errorf("invoice[0]: got %+v", result.Items[0])
 	}
 }
 
@@ -1772,20 +1772,20 @@ func TestGetInvoice_OK(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got == nil {
-		t.Fatal("got nil InvoiceEntity")
+	if got == nil || got.Item == nil {
+		t.Fatal("got nil ItemResult or Item")
 	}
-	if got.ID != 55 || got.TotalAmount != 1000000.0 || got.Status != "paid" {
-		t.Errorf("GetInvoice: got %+v", got)
+	if got.Item.ID != 55 || got.Item.TotalAmount != 1000000.0 || got.Item.Status != "paid" {
+		t.Errorf("GetInvoice: got %+v", got.Item)
 	}
 }
 
-// T72: SearchInvoices — with ProjectID + UpdatedAtFrom parameters
-func TestSearchInvoices_WithProjectIDAndUpdatedAtFrom(t *testing.T) {
-	var gotProjectID, gotUpdatedAtFrom string
+// T72: ListInvoices — with ProjectIDEq + UpdatedAtGteq parameters (M54: Ransack-style)
+func TestListInvoices_WithProjectIDAndUpdatedAt(t *testing.T) {
+	var gotProjectID, gotUpdatedAt string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotProjectID = r.URL.Query().Get("project_id")
-		gotUpdatedAtFrom = r.URL.Query().Get("updated_at_from")
+		gotProjectID = r.URL.Query().Get("project_id_eq")
+		gotUpdatedAt = r.URL.Query().Get("updated_at_gteq")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`[{"id":1,"client_id":10,"project_id":100,"title":"Invoice 1","total_amount":500000.0,"status":"draft","invoice_date":"2026-01-31","due_date":"2026-02-28","memo":"","updated_at":"2026-01-31T00:00:00Z","created_at":"2026-01-31T00:00:00Z"}]`))
 	}))
@@ -1793,18 +1793,18 @@ func TestSearchInvoices_WithProjectIDAndUpdatedAtFrom(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.SearchInvoices(context.Background(), boardapi.InvoiceSearchParams{ProjectID: 100, UpdatedAtFrom: "2026-01-01"})
+	result, err := c.ListInvoices(context.Background(), boardapi.InvoiceListOptions{ProjectIDEq: 100, UpdatedAtGteq: "2026-01-01 00:00:00"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result) != 1 {
-		t.Errorf("want 1 result, got %d", len(result))
+	if len(result.Items) != 1 {
+		t.Errorf("want 1 result, got %d", len(result.Items))
 	}
 	if gotProjectID != "100" {
-		t.Errorf("project_id param: want %q, got %q", "100", gotProjectID)
+		t.Errorf("project_id_eq param: want %q, got %q", "100", gotProjectID)
 	}
-	if gotUpdatedAtFrom != "2026-01-01" {
-		t.Errorf("updated_at_from param: want %q, got %q", "2026-01-01", gotUpdatedAtFrom)
+	if gotUpdatedAt != "2026-01-01 00:00:00" {
+		t.Errorf("updated_at_gteq param: want %q, got %q", "2026-01-01 00:00:00", gotUpdatedAt)
 	}
 }
 
@@ -2371,15 +2371,15 @@ func TestListPurchaseOrders_OK(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.ListPurchaseOrders(context.Background())
+	result, err := c.ListPurchaseOrders(context.Background(), boardapi.PurchaseOrderListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result) != 3 {
-		t.Errorf("want 3 purchase orders, got %d", len(result))
+	if len(result.Items) != 3 {
+		t.Errorf("want 3 purchase orders, got %d", len(result.Items))
 	}
-	if result[0].ID != 1 || result[0].TotalAmount != 500000.0 {
-		t.Errorf("purchaseOrder[0]: got %+v", result[0])
+	if result.Items[0].ID != 1 || result.Items[0].TotalAmount != 500000.0 {
+		t.Errorf("purchaseOrder[0]: got %+v", result.Items[0])
 	}
 }
 
@@ -2392,7 +2392,7 @@ func TestListPurchaseOrders_Unauthorized(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	_, err := c.ListPurchaseOrders(context.Background())
+	_, err := c.ListPurchaseOrders(context.Background(), boardapi.PurchaseOrderListOptions{})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -2423,11 +2423,11 @@ func TestGetPurchaseOrder_OK(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got == nil {
-		t.Fatal("got nil PurchaseOrderEntity")
+	if got == nil || got.Item == nil {
+		t.Fatal("got nil ItemResult or Item")
 	}
-	if got.ID != 1 || got.OrderDate != "2026-01-01" || got.DeliveryDate != "2026-02-01" {
-		t.Errorf("GetPurchaseOrder: got %+v", got)
+	if got.Item.ID != 1 || got.Item.OrderDate != "2026-01-01" || got.Item.DeliveryDate != "2026-02-01" {
+		t.Errorf("GetPurchaseOrder: got %+v", got.Item)
 	}
 }
 
@@ -2453,12 +2453,12 @@ func TestGetPurchaseOrder_NotFound(t *testing.T) {
 	}
 }
 
-// T134: SearchPurchaseOrders — with VendorID + Status parameters
-func TestSearchPurchaseOrders_WithVendorIDAndStatus(t *testing.T) {
+// T134: ListPurchaseOrders — with VendorIDEq + StatusEq parameters (M54: Ransack-style)
+func TestListPurchaseOrders_WithVendorIDAndStatus(t *testing.T) {
 	var gotVendorID, gotStatus string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotVendorID = r.URL.Query().Get("vendor_id")
-		gotStatus = r.URL.Query().Get("status")
+		gotVendorID = r.URL.Query().Get("vendor_id_eq")
+		gotStatus = r.URL.Query().Get("status_eq")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`[{"id":1,"vendor_id":1,"project_id":100,"title":"Order 1","total_amount":500000.0,"status":"approved","order_date":"2026-01-01","delivery_date":"2026-02-01","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
 	}))
@@ -2466,27 +2466,27 @@ func TestSearchPurchaseOrders_WithVendorIDAndStatus(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.SearchPurchaseOrders(context.Background(), boardapi.PurchaseOrderSearchParams{VendorID: 1, Status: "approved"})
+	result, err := c.ListPurchaseOrders(context.Background(), boardapi.PurchaseOrderListOptions{VendorIDEq: 1, StatusEq: "approved"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result) != 1 {
-		t.Errorf("want 1 result, got %d", len(result))
+	if len(result.Items) != 1 {
+		t.Errorf("want 1 result, got %d", len(result.Items))
 	}
 	if gotVendorID != "1" {
-		t.Errorf("vendor_id param: want %q, got %q", "1", gotVendorID)
+		t.Errorf("vendor_id_eq param: want %q, got %q", "1", gotVendorID)
 	}
 	if gotStatus != "approved" {
-		t.Errorf("status param: want %q, got %q", "approved", gotStatus)
+		t.Errorf("status_eq param: want %q, got %q", "approved", gotStatus)
 	}
 }
 
-// T135: SearchPurchaseOrders — with ProjectID + UpdatedAtFrom parameters
-func TestSearchPurchaseOrders_WithProjectIDAndUpdatedAtFrom(t *testing.T) {
-	var gotProjectID, gotUpdatedAtFrom string
+// T135: ListPurchaseOrders — with ProjectIDEq + UpdatedAtGteq parameters (M54: Ransack-style)
+func TestListPurchaseOrders_WithProjectIDAndUpdatedAt(t *testing.T) {
+	var gotProjectID, gotUpdatedAt string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotProjectID = r.URL.Query().Get("project_id")
-		gotUpdatedAtFrom = r.URL.Query().Get("updated_at_from")
+		gotProjectID = r.URL.Query().Get("project_id_eq")
+		gotUpdatedAt = r.URL.Query().Get("updated_at_gteq")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`[]`))
 	}))
@@ -2494,15 +2494,15 @@ func TestSearchPurchaseOrders_WithProjectIDAndUpdatedAtFrom(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	_, err := c.SearchPurchaseOrders(context.Background(), boardapi.PurchaseOrderSearchParams{ProjectID: 10, UpdatedAtFrom: "2024-06-01T00:00:00Z"})
+	_, err := c.ListPurchaseOrders(context.Background(), boardapi.PurchaseOrderListOptions{ProjectIDEq: 10, UpdatedAtGteq: "2024-06-01 00:00:00"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if gotProjectID != "10" {
-		t.Errorf("project_id param: want %q, got %q", "10", gotProjectID)
+		t.Errorf("project_id_eq param: want %q, got %q", "10", gotProjectID)
 	}
-	if gotUpdatedAtFrom != "2024-06-01T00:00:00Z" {
-		t.Errorf("updated_at_from param: want %q, got %q", "2024-06-01T00:00:00Z", gotUpdatedAtFrom)
+	if gotUpdatedAt != "2024-06-01 00:00:00" {
+		t.Errorf("updated_at_gteq param: want %q, got %q", "2024-06-01 00:00:00", gotUpdatedAt)
 	}
 }
 
@@ -2520,15 +2520,15 @@ func TestListPayments_OK(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.ListPayments(context.Background())
+	result, err := c.ListPayments(context.Background(), boardapi.PaymentListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result) != 2 {
-		t.Errorf("want 2 payments, got %d", len(result))
+	if len(result.Items) != 2 {
+		t.Errorf("want 2 payments, got %d", len(result.Items))
 	}
-	if result[0].ID != 1 || result[0].Amount != 500000.0 {
-		t.Errorf("payment[0]: got %+v", result[0])
+	if result.Items[0].ID != 1 || result.Items[0].Amount != 500000.0 {
+		t.Errorf("payment[0]: got %+v", result.Items[0])
 	}
 }
 
@@ -2541,7 +2541,7 @@ func TestListPayments_Unauthorized(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	_, err := c.ListPayments(context.Background())
+	_, err := c.ListPayments(context.Background(), boardapi.PaymentListOptions{})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -2572,11 +2572,11 @@ func TestGetPayment_OK(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got == nil {
-		t.Fatal("got nil PaymentEntity")
+	if got == nil || got.Item == nil {
+		t.Fatal("got nil ItemResult or Item")
 	}
-	if got.ID != 1 || got.PaymentDate != "2026-01-31" || got.Status != "paid" {
-		t.Errorf("GetPayment: got %+v", got)
+	if got.Item.ID != 1 || got.Item.PaymentDate != "2026-01-31" || got.Item.Status != "paid" {
+		t.Errorf("GetPayment: got %+v", got.Item)
 	}
 }
 
@@ -2602,12 +2602,12 @@ func TestGetPayment_NotFound(t *testing.T) {
 	}
 }
 
-// T140: SearchPayments — with VendorID + Status parameters
-func TestSearchPayments_WithVendorIDAndStatus(t *testing.T) {
+// T140: ListPayments — with VendorIDEq + StatusEq parameters (M54: Ransack-style)
+func TestListPayments_WithVendorIDAndStatus(t *testing.T) {
 	var gotVendorID, gotStatus string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotVendorID = r.URL.Query().Get("vendor_id")
-		gotStatus = r.URL.Query().Get("status")
+		gotVendorID = r.URL.Query().Get("vendor_id_eq")
+		gotStatus = r.URL.Query().Get("status_eq")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`[{"id":1,"vendor_id":2,"purchase_order_id":10,"amount":500000.0,"status":"paid","payment_date":"2026-01-31","memo":"","updated_at":"2026-01-31T00:00:00Z","created_at":"2026-01-31T00:00:00Z"}]`))
 	}))
@@ -2615,26 +2615,26 @@ func TestSearchPayments_WithVendorIDAndStatus(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.SearchPayments(context.Background(), boardapi.PaymentSearchParams{VendorID: 2, Status: "paid"})
+	result, err := c.ListPayments(context.Background(), boardapi.PaymentListOptions{VendorIDEq: 2, StatusEq: "paid"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result) != 1 {
-		t.Errorf("want 1 result, got %d", len(result))
+	if len(result.Items) != 1 {
+		t.Errorf("want 1 result, got %d", len(result.Items))
 	}
 	if gotVendorID != "2" {
-		t.Errorf("vendor_id param: want %q, got %q", "2", gotVendorID)
+		t.Errorf("vendor_id_eq param: want %q, got %q", "2", gotVendorID)
 	}
 	if gotStatus != "paid" {
-		t.Errorf("status param: want %q, got %q", "paid", gotStatus)
+		t.Errorf("status_eq param: want %q, got %q", "paid", gotStatus)
 	}
 }
 
-// T141: SearchPayments — with PurchaseOrderID parameter
-func TestSearchPayments_WithPurchaseOrderID(t *testing.T) {
+// T141: ListPayments — with PurchaseOrderIDEq parameter (M54: Ransack-style)
+func TestListPayments_WithPurchaseOrderID(t *testing.T) {
 	var gotPurchaseOrderID string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotPurchaseOrderID = r.URL.Query().Get("purchase_order_id")
+		gotPurchaseOrderID = r.URL.Query().Get("purchase_order_id_eq")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`[]`))
 	}))
@@ -2642,12 +2642,12 @@ func TestSearchPayments_WithPurchaseOrderID(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	_, err := c.SearchPayments(context.Background(), boardapi.PaymentSearchParams{PurchaseOrderID: 7})
+	_, err := c.ListPayments(context.Background(), boardapi.PaymentListOptions{PurchaseOrderIDEq: 7})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if gotPurchaseOrderID != "7" {
-		t.Errorf("purchase_order_id param: want %q, got %q", "7", gotPurchaseOrderID)
+		t.Errorf("purchase_order_id_eq param: want %q, got %q", "7", gotPurchaseOrderID)
 	}
 }
 
@@ -2720,12 +2720,12 @@ func TestListPurchaseOrders_TwoPages(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.ListPurchaseOrders(context.Background())
+	result, err := c.ListPurchaseOrders(context.Background(), boardapi.PurchaseOrderListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result) != 130 {
-		t.Errorf("want 130 purchase orders, got %d", len(result))
+	if len(result.Items) != 130 {
+		t.Errorf("want 130 purchase orders, got %d", len(result.Items))
 	}
 }
 
@@ -2852,7 +2852,7 @@ func TestListPurchaseOrders_UnmarshalError(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	_, err := c.ListPurchaseOrders(context.Background())
+	_, err := c.ListPurchaseOrders(context.Background(), boardapi.PurchaseOrderListOptions{})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -2875,7 +2875,7 @@ func TestListPayments_UnmarshalError(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	_, err := c.ListPayments(context.Background())
+	_, err := c.ListPayments(context.Background(), boardapi.PaymentListOptions{})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -2926,8 +2926,8 @@ func TestSearchVendorBranches_ZeroParams(t *testing.T) {
 	}
 }
 
-// T154: SearchPurchaseOrders — all parameters zero value
-func TestSearchPurchaseOrders_ZeroParams(t *testing.T) {
+// T154: ListPurchaseOrders — all parameters zero value (M54: Ransack-style)
+func TestListPurchaseOrders_ZeroParams(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`[]`))
@@ -2936,17 +2936,17 @@ func TestSearchPurchaseOrders_ZeroParams(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.SearchPurchaseOrders(context.Background(), boardapi.PurchaseOrderSearchParams{})
+	result, err := c.ListPurchaseOrders(context.Background(), boardapi.PurchaseOrderListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result) != 0 {
-		t.Errorf("want 0 results, got %d", len(result))
+	if len(result.Items) != 0 {
+		t.Errorf("want 0 results, got %d", len(result.Items))
 	}
 }
 
-// T155: SearchPayments — all parameters zero value
-func TestSearchPayments_ZeroParams(t *testing.T) {
+// T155: ListPayments — all parameters zero value (M54: Ransack-style)
+func TestListPayments_ZeroParams(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`[]`))
@@ -2955,12 +2955,12 @@ func TestSearchPayments_ZeroParams(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.SearchPayments(context.Background(), boardapi.PaymentSearchParams{})
+	result, err := c.ListPayments(context.Background(), boardapi.PaymentListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result) != 0 {
-		t.Errorf("want 0 results, got %d", len(result))
+	if len(result.Items) != 0 {
+		t.Errorf("want 0 results, got %d", len(result.Items))
 	}
 }
 

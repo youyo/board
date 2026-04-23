@@ -56,11 +56,14 @@ type EstimateRepo interface {
 	GetByDocumentID(ctx context.Context, documentID int, opts repository.ReadOptions) (*boardapi.EstimateEntity, error)
 }
 
-// InvoiceRepo is the repository interface for invoices.
+// InvoiceRepo is the repository interface for invoices used by service/find.
+//
+// M54: Search now receives InvoiceListOptions (Ransack-style) instead of the
+// legacy InvoiceSearchParams. "List all entities" is expressed as
+// Search(ctx, boardapi.InvoiceListOptions{}, opts).
 type InvoiceRepo interface {
-	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.InvoiceEntity, error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.InvoiceEntity, error)
-	Search(ctx context.Context, params boardapi.InvoiceSearchParams, opts repository.ReadOptions) ([]boardapi.InvoiceEntity, error)
+	Search(ctx context.Context, filter boardapi.InvoiceListOptions, opts repository.ReadOptions) ([]boardapi.InvoiceEntity, error)
 }
 
 // OrderRepo is the repository interface for orders used by service/find.
@@ -76,6 +79,26 @@ type DeliveryRepo interface {
 // ReceiptRepo is the repository interface for receipts used by service/find.
 type ReceiptRepo interface {
 	GetByDocumentID(ctx context.Context, documentID int, opts repository.ReadOptions) (*boardapi.ReceiptEntity, error)
+}
+
+// PurchaseOrderRepo is the repository interface for purchase orders used by service/find.
+//
+// M54: Search now receives PurchaseOrderListOptions (Ransack-style) instead of the
+// legacy PurchaseOrderSearchParams. "List all entities" is expressed as
+// Search(ctx, boardapi.PurchaseOrderListOptions{}, opts).
+type PurchaseOrderRepo interface {
+	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.PurchaseOrderEntity, error)
+	Search(ctx context.Context, filter boardapi.PurchaseOrderListOptions, opts repository.ReadOptions) ([]boardapi.PurchaseOrderEntity, error)
+}
+
+// PaymentRepo is the repository interface for payments used by service/find.
+//
+// M54: Search now receives PaymentListOptions (Ransack-style) instead of the
+// legacy PaymentSearchParams. "List all entities" is expressed as
+// Search(ctx, boardapi.PaymentListOptions{}, opts).
+type PaymentRepo interface {
+	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.PaymentEntity, error)
+	Search(ctx context.Context, filter boardapi.PaymentListOptions, opts repository.ReadOptions) ([]boardapi.PaymentEntity, error)
 }
 
 // VendorRepo is the repository interface for vendors used by service/find.
@@ -97,20 +120,6 @@ type VendorContactRepo interface {
 	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.VendorContactEntity, error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.VendorContactEntity, error)
 	Search(ctx context.Context, params boardapi.VendorContactSearchParams, opts repository.ReadOptions) ([]boardapi.VendorContactEntity, error)
-}
-
-// PurchaseOrderRepo is the repository interface for purchase orders.
-type PurchaseOrderRepo interface {
-	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.PurchaseOrderEntity, error)
-	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.PurchaseOrderEntity, error)
-	Search(ctx context.Context, params boardapi.PurchaseOrderSearchParams, opts repository.ReadOptions) ([]boardapi.PurchaseOrderEntity, error)
-}
-
-// PaymentRepo is the repository interface for payments.
-type PaymentRepo interface {
-	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.PaymentEntity, error)
-	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.PaymentEntity, error)
-	Search(ctx context.Context, params boardapi.PaymentSearchParams, opts repository.ReadOptions) ([]boardapi.PaymentEntity, error)
 }
 
 // UserRepo is the repository interface for users.

@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 )
 
-// PaymentEntity is a BOARD API payment entity.
-// Corresponds to one element in the GET /v1/payments response.
+// PaymentEntity は BOARD API の支払エンティティ。
+// GET /v1/expenditure_payments および GET /v1/expenditure_payments/{id} のレスポンスに対応する。
+// 注意: 実 API パスは /v1/expenditure_payments（Go 名: payments）。
 type PaymentEntity struct {
 	ID              int     `json:"id"`
 	VendorID        int     `json:"vendor_id"`
@@ -22,7 +22,35 @@ type PaymentEntity struct {
 	CreatedAt       string  `json:"created_at"` // ISO 8601
 }
 
-// PaymentSearchParams is the parameter for SearchPayments.
+// PaymentListOptions は GET /v1/expenditure_payments のクエリパラメータ（Ransack スタイル）。
+// ゼロ値は API に送信されないため、PaymentListOptions{} は無フィルタのリスト取得となる。
+//
+// 注意: M54 時点では expenditure_payments の Ransack _eq / _gteq 形式が実 API で有効かは未検証。
+// E2E テスト（TestE2E_Payments_M54）で確認予定。
+//
+// Introduced in M54 as the Phase L payments migration target.
+// Replaces the pre-M54 PaymentSearchParams struct.
+type PaymentListOptions struct {
+	// 共通ページネーション（通常は ListAllWithResult が page を上書きする）。
+	Page    int
+	PerPage int
+
+	// 全 List 共通
+	UpdatedAtGteq     string // "YYYY-MM-DD HH:MM:SS"
+	UpdatedAtLteq     string
+	IncludeArchiveFlg *bool // nil=送らない, true=1, false=0
+
+	// payments 専用
+	VendorIDEq        int    // 取引先 ID 完全一致
+	PurchaseOrderIDEq int    // 発注書 ID 完全一致
+	StatusEq          string // ステータス完全一致
+	ResponseGroup     string // "small" / "large"
+}
+
+// PaymentSearchParams は SearchPayments の後方互換のために残す。
+//
+// Deprecated: M54 以降は PaymentListOptions を使用すること。
+// M57 で一括削除予定。
 type PaymentSearchParams struct {
 	VendorID        int
 	PurchaseOrderID int
@@ -30,42 +58,63 @@ type PaymentSearchParams struct {
 	UpdatedAtFrom   string
 }
 
-// ListPayments retrieves all payments.
-// Pagination is automatically handled by ListAll.
-func (c *Client) ListPayments(ctx context.Context) ([]PaymentEntity, error) {
-	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+// buildPaymentsQuery は PaymentListOptions を Ransack スタイルのクエリ文字列に変換する。
+func buildPaymentsQuery(opts PaymentListOptions, page, perPage int) string {
+	return NewQueryBuilder().
+		Page(page, perPage).
+		IntEq("vendor_id", opts.VendorIDEq).
+		IntEq("purchase_order_id", opts.PurchaseOrderIDEq).
+		StrEq("status", opts.StatusEq).
+		DateGteq("updated_at", opts.UpdatedAtGteq).
+		DateLteq("updated_at", opts.UpdatedAtLteq).
+		Flg01("include_archive_flg", opts.IncludeArchiveFlg).
+		ResponseGroup(opts.ResponseGroup).
+		Encode()
+}
+
+// ListPayments は PaymentListOptions でフィルタした支払一覧を返す。
+// ページネーションは ListAllWithResult が内部で処理する。
+//
+// 注意: 実 API パスは /v1/expenditure_payments（Go 名: payments）。
+//
+// Pass PaymentListOptions{} for an unfiltered list of all payments.
+func (c *Client) ListPayments(ctx context.Context, opts PaymentListOptions) (*ListResult[PaymentEntity], error) {
+	perPage := opts.PerPage
+	makeReq := func(ctx context.Context, page, pp int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/expenditure_payments", nil)
 		if err != nil {
 			return nil, err
 		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		req.URL.RawQuery = q.Encode()
+		req.URL.RawQuery = buildPaymentsQuery(opts, page, pp)
 		return req, nil
 	}
-	items, err := c.ListAll(ctx, makeReq)
+	var listOpts []ListAllOption
+	if perPage > 0 {
+		listOpts = append(listOpts, WithPerPage(perPage))
+	}
+	raw, err := c.ListAllWithResult(ctx, makeReq, listOpts...)
 	if err != nil {
 		return nil, err
 	}
-	result := make([]PaymentEntity, 0, len(items))
-	for _, raw := range items {
+	items := make([]PaymentEntity, 0, len(raw.Items))
+	for _, b := range raw.Items {
 		var x PaymentEntity
-		if err := json.Unmarshal(raw, &x); err != nil {
+		if err := json.Unmarshal(b, &x); err != nil {
 			return nil, &APIError{Code: APIErrorUnknown, Message: "ListPayments: unmarshal: " + err.Error()}
 		}
-		result = append(result, x)
+		items = append(items, x)
 	}
-	return result, nil
+	return &ListResult[PaymentEntity]{Items: items, Meta: raw.Meta, Headers: raw.Headers}, nil
 }
 
-// GetPayment retrieves the payment with the specified ID.
-func (c *Client) GetPayment(ctx context.Context, id int) (*PaymentEntity, error) {
+// GetPayment は指定 ID の支払を返す。
+// 注意: 実 API パスは /v1/expenditure_payments/{id}。
+func (c *Client) GetPayment(ctx context.Context, id int) (*ItemResult[PaymentEntity], error) {
 	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/expenditure_payments/%d", id), nil)
 	if err != nil {
 		return nil, err
 	}
-	body, err := c.DoWithRetry(req)
+	body, headers, err := c.DoWithRetryFull(req)
 	if err != nil {
 		return nil, err
 	}
@@ -73,152 +122,48 @@ func (c *Client) GetPayment(ctx context.Context, id int) (*PaymentEntity, error)
 	if err := json.Unmarshal(body, &x); err != nil {
 		return nil, &APIError{Code: APIErrorUnknown, Message: "GetPayment: unmarshal: " + err.Error()}
 	}
-	return &x, nil
+	return &ItemResult[PaymentEntity]{
+		Item:    &x,
+		Meta:    parseItemMeta(headers),
+		Headers: headers,
+	}, nil
 }
 
-// SearchPayments searches payments with the given conditions.
-// Pagination is automatically handled by ListAll.
-func (c *Client) SearchPayments(ctx context.Context, params PaymentSearchParams) ([]PaymentEntity, error) {
-	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+// ListPaymentsRaw は支払一覧を生 JSON バイト列と最終ページのヘッダーで返す。
+// E2E strict field diff 専用。通常の呼び出し元は ListPayments を使うこと。
+// 注意: 実 API パスは /v1/expenditure_payments。
+func (c *Client) ListPaymentsRaw(ctx context.Context, opts PaymentListOptions) ([]byte, http.Header, error) {
+	perPage := opts.PerPage
+	makeReq := func(ctx context.Context, page, pp int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/expenditure_payments", nil)
 		if err != nil {
 			return nil, err
 		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		if params.VendorID != 0 {
-			q.Set("vendor_id", strconv.Itoa(params.VendorID))
-		}
-		if params.PurchaseOrderID != 0 {
-			q.Set("purchase_order_id", strconv.Itoa(params.PurchaseOrderID))
-		}
-		if params.Status != "" {
-			q.Set("status", params.Status)
-		}
-		if params.UpdatedAtFrom != "" {
-			q.Set("updated_at_from", params.UpdatedAtFrom)
-		}
-		req.URL.RawQuery = q.Encode()
+		req.URL.RawQuery = buildPaymentsQuery(opts, page, pp)
 		return req, nil
 	}
-	items, err := c.ListAll(ctx, makeReq)
+	var listOpts []ListAllOption
+	if perPage > 0 {
+		listOpts = append(listOpts, WithPerPage(perPage))
+	}
+	raw, err := c.ListAllWithResult(ctx, makeReq, listOpts...)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	result := make([]PaymentEntity, 0, len(items))
-	for _, raw := range items {
-		var x PaymentEntity
-		if err := json.Unmarshal(raw, &x); err != nil {
-			return nil, &APIError{Code: APIErrorUnknown, Message: "SearchPayments: unmarshal: " + err.Error()}
-		}
-		result = append(result, x)
+	out, err := json.Marshal(raw.Items)
+	if err != nil {
+		return nil, nil, &APIError{Code: APIErrorUnknown, Message: "ListPaymentsRaw: marshal aggregate: " + err.Error()}
 	}
-	return result, nil
+	return out, raw.Headers, nil
 }
 
-// ListPaymentsRaw retrieves all payments and returns the raw HTTP
-// response bodies merged across pages as a single JSON array. Each element
-// preserves the exact byte content returned by the BOARD API.
-//
-// Note: the real BOARD API path is /v1/expenditure_payments (Go name: payments).
-//
-// Intended for E2E strict field diff; regular callers should use
-// ListPayments.
-func (c *Client) ListPaymentsRaw(ctx context.Context, opts ...ListAllOption) ([]byte, error) {
-	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
-		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/expenditure_payments", nil)
-		if err != nil {
-			return nil, err
-		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		req.URL.RawQuery = q.Encode()
-		return req, nil
-	}
-	items, err := c.ListAll(ctx, makeReq, opts...)
-	if err != nil {
-		return nil, err
-	}
-	out, err := json.Marshal(items)
-	if err != nil {
-		return nil, &APIError{Code: APIErrorUnknown, Message: "ListPaymentsRaw: marshal aggregate: " + err.Error()}
-	}
-	return out, nil
-}
-
-// GetPaymentRaw retrieves a single payment and returns the raw HTTP
-// response body byte-for-byte.
-//
-// Note: the real BOARD API path is /v1/expenditure_payments/{id} (Go name: payments).
-//
-// Intended for E2E strict field diff; regular callers should use
-// GetPayment.
-func (c *Client) GetPaymentRaw(ctx context.Context, id int) ([]byte, error) {
+// GetPaymentRaw は指定 ID の支払を生 JSON バイト列とヘッダーで返す。
+// E2E strict field diff 専用。通常の呼び出し元は GetPayment を使うこと。
+// 注意: 実 API パスは /v1/expenditure_payments/{id}。
+func (c *Client) GetPaymentRaw(ctx context.Context, id int) ([]byte, http.Header, error) {
 	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/expenditure_payments/%d", id), nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return c.DoWithRetry(req)
-}
-
-// SearchPaymentsRaw retrieves payments matching the given search parameters and
-// returns the raw HTTP response bodies merged across pages as a single JSON
-// array. Same byte-preserving guarantee as ListPaymentsRaw.
-//
-// PaymentSearchParams exposes 4 filters (VendorID, PurchaseOrderID, Status, UpdatedAtFrom).
-// Note: the real BOARD API path is /v1/expenditure_payments.
-//
-// Intended for E2E strict field diff; regular callers should use
-// SearchPayments.
-func (c *Client) SearchPaymentsRaw(ctx context.Context, params PaymentSearchParams, opts ...ListAllOption) ([]byte, error) {
-	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
-		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/expenditure_payments", nil)
-		if err != nil {
-			return nil, err
-		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		if params.VendorID != 0 {
-			q.Set("vendor_id", strconv.Itoa(params.VendorID))
-		}
-		if params.PurchaseOrderID != 0 {
-			q.Set("purchase_order_id", strconv.Itoa(params.PurchaseOrderID))
-		}
-		if params.Status != "" {
-			q.Set("status", params.Status)
-		}
-		if params.UpdatedAtFrom != "" {
-			q.Set("updated_at_from", params.UpdatedAtFrom)
-		}
-		req.URL.RawQuery = q.Encode()
-		return req, nil
-	}
-	items, err := c.ListAll(ctx, makeReq, opts...)
-	if err != nil {
-		return nil, err
-	}
-	out, err := json.Marshal(items)
-	if err != nil {
-		return nil, &APIError{Code: APIErrorUnknown, Message: "SearchPaymentsRaw: marshal aggregate: " + err.Error()}
-	}
-	return out, nil
-}
-
-// ListPaymentsPage retrieves a single page of PaymentEntity.
-func (c *Client) ListPaymentsPage(ctx context.Context, page, perPage int) (*PageResult[PaymentEntity], error) {
-	makeReq := func(ctx context.Context, p, pp int) (*http.Request, error) {
-		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/expenditure_payments", nil)
-		if err != nil {
-			return nil, err
-		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(p))
-		q.Set("per_page", strconv.Itoa(pp))
-		req.URL.RawQuery = q.Encode()
-		return req, nil
-	}
-	return ListPage[PaymentEntity](c, ctx, makeReq, page, perPage)
+	return c.DoWithRetryFull(req)
 }
