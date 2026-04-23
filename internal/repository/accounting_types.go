@@ -160,6 +160,9 @@ func filterAccountingTypes(entities []boardapi.AccountingTypeEntity, params boar
 }
 
 // ListPage retrieves a single page of AccountingTypeEntity directly from the API (cache bypass).
+// TODO(M57): PageResult は M57 で ListResult[T] に移行予定。
+//
+//nolint:staticcheck
 func (r *AccountingTypeRepository) ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.AccountingTypeEntity], error) {
 	return r.api.ListAccountingTypesPage(ctx, page, perPage)
 }

@@ -396,7 +396,7 @@ func TestSearchUsers(t *testing.T) {
 }
 
 func TestListUsersPage(t *testing.T) {
-	stub := &stubUserRepo{listPageResult: &boardapi.PageResult[boardapi.UserEntity]{Items: []boardapi.UserEntity{{ID: 1}}}}
+	stub := &stubUserRepo{listPageResult: &boardapi.PageResult[boardapi.UserEntity]{Items: []boardapi.UserEntity{{ID: 1}}}} //nolint:staticcheck
 	svc := newServiceWithUsers(stub)
 	got, err := svc.ListUsersPage(testCtx, 1, 30)
 	assertNoError(t, err)
@@ -431,7 +431,7 @@ func TestSearchGroups(t *testing.T) {
 }
 
 func TestListGroupsPage(t *testing.T) {
-	stub := &stubGroupRepo{listPageResult: &boardapi.PageResult[boardapi.GroupEntity]{Items: []boardapi.GroupEntity{{ID: 1}}}}
+	stub := &stubGroupRepo{listPageResult: &boardapi.PageResult[boardapi.GroupEntity]{Items: []boardapi.GroupEntity{{ID: 1}}}} //nolint:staticcheck
 	svc := newServiceWithGroups(stub)
 	got, err := svc.ListGroupsPage(testCtx, 1, 30)
 	assertNoError(t, err)
@@ -466,7 +466,7 @@ func TestSearchPaymentTerms(t *testing.T) {
 }
 
 func TestListPaymentTermsPage(t *testing.T) {
-	stub := &stubPaymentTermRepo{listPageResult: &boardapi.PageResult[boardapi.PaymentTermEntity]{Items: []boardapi.PaymentTermEntity{{ID: 1}}}}
+	stub := &stubPaymentTermRepo{listPageResult: &boardapi.PageResult[boardapi.PaymentTermEntity]{Items: []boardapi.PaymentTermEntity{{ID: 1}}}} //nolint:staticcheck
 	svc := newServiceWithPaymentTerms(stub)
 	got, err := svc.ListPaymentTermsPage(testCtx, 1, 30)
 	assertNoError(t, err)
@@ -555,7 +555,7 @@ func TestSearchAccountingTypes(t *testing.T) {
 }
 
 func TestListAccountingTypesPage(t *testing.T) {
-	stub := &stubAccountingTypeRepo{listPageResult: &boardapi.PageResult[boardapi.AccountingTypeEntity]{Items: []boardapi.AccountingTypeEntity{{ID: 1}}}}
+	stub := &stubAccountingTypeRepo{listPageResult: &boardapi.PageResult[boardapi.AccountingTypeEntity]{Items: []boardapi.AccountingTypeEntity{{ID: 1}}}} //nolint:staticcheck
 	svc := newServiceWithAccountingTypes(stub)
 	got, err := svc.ListAccountingTypesPage(testCtx, 1, 30)
 	assertNoError(t, err)
@@ -590,7 +590,7 @@ func TestSearchDocumentSendChannels(t *testing.T) {
 }
 
 func TestListDocumentSendChannelsPage(t *testing.T) {
-	stub := &stubDocumentSendChannelRepo{listPageResult: &boardapi.PageResult[boardapi.DocumentSendChannelEntity]{Items: []boardapi.DocumentSendChannelEntity{{ID: 1}}}}
+	stub := &stubDocumentSendChannelRepo{listPageResult: &boardapi.PageResult[boardapi.DocumentSendChannelEntity]{Items: []boardapi.DocumentSendChannelEntity{{ID: 1}}}} //nolint:staticcheck
 	svc := newServiceWithDocumentSendChannels(stub)
 	got, err := svc.ListDocumentSendChannelsPage(testCtx, 1, 30)
 	assertNoError(t, err)

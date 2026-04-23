@@ -23,6 +23,9 @@ func (s *Service) SearchPaymentTerms(ctx context.Context, params boardapi.Paymen
 }
 
 // ListPaymentTermsPage returns a single page of payment terms.
+// TODO(M57): PageResult は M57 で ListResult[T] に移行予定。
+//
+//nolint:staticcheck
 func (s *Service) ListPaymentTermsPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.PaymentTermEntity], error) {
 	return s.paymentTerms.ListPage(ctx, page, perPage)
 }

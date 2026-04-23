@@ -143,7 +143,6 @@ func (s *stubClientRepo) Search(_ context.Context, filter boardapi.ClientListOpt
 }
 
 type stubClientBranchRepo struct {
-	listResult   []boardapi.ClientBranchEntity
 	getResult    *boardapi.ClientBranchEntity
 	searchResult []boardapi.ClientBranchEntity
 	err          error
@@ -157,7 +156,6 @@ func (s *stubClientBranchRepo) Search(_ context.Context, _ boardapi.ClientBranch
 }
 
 type stubContactRepo struct {
-	listResult   []boardapi.ContactEntity
 	getResult    *boardapi.ContactEntity
 	searchResult []boardapi.ContactEntity
 	err          error
@@ -315,7 +313,6 @@ func vendorListOptionsIsZero(f boardapi.VendorListOptions) bool {
 }
 
 type stubVendorBranchRepo struct {
-	listResult   []boardapi.VendorBranchEntity
 	getResult    *boardapi.VendorBranchEntity
 	searchResult []boardapi.VendorBranchEntity
 	err          error
@@ -329,7 +326,6 @@ func (s *stubVendorBranchRepo) Search(_ context.Context, _ boardapi.VendorBranch
 }
 
 type stubVendorContactRepo struct {
-	listResult   []boardapi.VendorContactEntity
 	getResult    *boardapi.VendorContactEntity
 	searchResult []boardapi.VendorContactEntity
 	err          error

@@ -160,6 +160,9 @@ func filterGroups(entities []boardapi.GroupEntity, params boardapi.GroupSearchPa
 }
 
 // ListPage retrieves a single page of GroupEntity directly from the API (cache bypass).
+// TODO(M57): PageResult は M57 で ListResult[T] に移行予定。
+//
+//nolint:staticcheck
 func (r *GroupRepository) ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.GroupEntity], error) {
 	return r.api.ListGroupsPage(ctx, page, perPage)
 }

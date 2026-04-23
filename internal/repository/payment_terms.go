@@ -160,6 +160,9 @@ func filterPaymentTerms(entities []boardapi.PaymentTermEntity, params boardapi.P
 }
 
 // ListPage retrieves a single page of PaymentTermEntity directly from the API (cache bypass).
+// TODO(M57): PageResult は M57 で ListResult[T] に移行予定。
+//
+//nolint:staticcheck
 func (r *PaymentTermRepository) ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.PaymentTermEntity], error) {
 	return r.api.ListPaymentTermsPage(ctx, page, perPage)
 }

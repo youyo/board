@@ -9,7 +9,6 @@ import (
 	"github.com/youyo/board/internal/boardapi"
 )
 
-
 // newVendorBranchesM55MockClient は M55 のテスト専用モッククライアントを返す。
 func newVendorBranchesM55MockClient(rt roundTripperFunc) *boardapi.Client {
 	hc := &http.Client{Transport: rt, Timeout: 5 * time.Second}

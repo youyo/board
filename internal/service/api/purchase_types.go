@@ -23,6 +23,9 @@ func (s *Service) SearchPurchaseTypes(ctx context.Context, params boardapi.Purch
 }
 
 // ListPurchaseTypesPage returns a single page of purchase types.
+// TODO(M57): PageResult は M57 で ListResult[T] に移行予定。
+//
+//nolint:staticcheck
 func (s *Service) ListPurchaseTypesPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.PurchaseTypeEntity], error) {
 	return s.purchaseTypes.ListPage(ctx, page, perPage)
 }

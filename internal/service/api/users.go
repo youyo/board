@@ -23,6 +23,9 @@ func (s *Service) SearchUsers(ctx context.Context, params boardapi.UserSearchPar
 }
 
 // ListUsersPage returns a single page of users.
+// TODO(M57): PageResult は M57 で ListResult[T] に移行予定。
+//
+//nolint:staticcheck
 func (s *Service) ListUsersPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.UserEntity], error) {
 	return s.users.ListPage(ctx, page, perPage)
 }

@@ -23,6 +23,9 @@ func (s *Service) SearchAccountingTypes(ctx context.Context, params boardapi.Acc
 }
 
 // ListAccountingTypesPage returns a single page of accounting types.
+// TODO(M57): PageResult は M57 で ListResult[T] に移行予定。
+//
+//nolint:staticcheck
 func (s *Service) ListAccountingTypesPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.AccountingTypeEntity], error) {
 	return s.accountingTypes.ListPage(ctx, page, perPage)
 }

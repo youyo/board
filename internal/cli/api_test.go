@@ -228,52 +228,6 @@ func TestNewAPIProjectCostsCmd(t *testing.T) {
 	}
 }
 
-func testDocumentCmd(t *testing.T, cmd *cobra.Command, use string, searchFlags []string) {
-	t.Helper()
-	if cmd.Use != use {
-		t.Errorf("Use = %q, want %q", cmd.Use, use)
-	}
-	subNames := make(map[string]bool)
-	for _, sub := range cmd.Commands() {
-		subNames[sub.Use] = true
-	}
-	for _, name := range []string{"list", "get", "search"} {
-		if !subNames[name] {
-			t.Errorf("subcommand %q is not registered", name)
-		}
-	}
-
-	// Verify get --id flag.
-	var getCmd *cobra.Command
-	for _, sub := range cmd.Commands() {
-		if sub.Use == "get" {
-			getCmd = sub
-		}
-	}
-	if getCmd == nil {
-		t.Fatal("get command not found")
-	}
-	if f := getCmd.Flags().Lookup("id"); f == nil {
-		t.Error("get: --id flag is not defined")
-	}
-
-	// Verify search flags.
-	var searchCmd *cobra.Command
-	for _, sub := range cmd.Commands() {
-		if sub.Use == "search" {
-			searchCmd = sub
-		}
-	}
-	if searchCmd == nil {
-		t.Fatal("search command not found")
-	}
-	for _, flagName := range searchFlags {
-		if f := searchCmd.Flags().Lookup(flagName); f == nil {
-			t.Errorf("search: --%s flag is not defined", flagName)
-		}
-	}
-}
-
 func testDocumentGetOnlyCmd(t *testing.T, cmd *cobra.Command, use string) {
 	t.Helper()
 	if cmd.Use != use {

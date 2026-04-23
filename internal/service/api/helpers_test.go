@@ -129,9 +129,9 @@ func (s *stubEstimateRepo) GetByDocumentID(_ context.Context, _ int, _ repositor
 }
 
 type stubInvoiceRepo struct {
-	listResult   *boardapi.ListResult[boardapi.InvoiceEntity]
-	getResult    *boardapi.InvoiceEntity
-	err          error
+	listResult *boardapi.ListResult[boardapi.InvoiceEntity]
+	getResult  *boardapi.InvoiceEntity
+	err        error
 }
 
 func (s *stubInvoiceRepo) List(_ context.Context, _ repository.ReadOptions, _ boardapi.InvoiceListOptions) (*boardapi.ListResult[boardapi.InvoiceEntity], error) {
@@ -259,7 +259,7 @@ type stubUserRepo struct {
 	listResult     []boardapi.UserEntity
 	getResult      *boardapi.UserEntity
 	searchResult   []boardapi.UserEntity
-	listPageResult *boardapi.PageResult[boardapi.UserEntity]
+	listPageResult *boardapi.PageResult[boardapi.UserEntity] //nolint:staticcheck
 	err            error
 }
 
@@ -272,6 +272,8 @@ func (s *stubUserRepo) GetByID(_ context.Context, _ int, _ repository.ReadOption
 func (s *stubUserRepo) Search(_ context.Context, _ boardapi.UserSearchParams, _ repository.ReadOptions) ([]boardapi.UserEntity, error) {
 	return s.searchResult, s.err
 }
+
+//nolint:staticcheck
 func (s *stubUserRepo) ListPage(_ context.Context, _, _ int) (*boardapi.PageResult[boardapi.UserEntity], error) {
 	return s.listPageResult, s.err
 }
@@ -280,7 +282,7 @@ type stubGroupRepo struct {
 	listResult     []boardapi.GroupEntity
 	getResult      *boardapi.GroupEntity
 	searchResult   []boardapi.GroupEntity
-	listPageResult *boardapi.PageResult[boardapi.GroupEntity]
+	listPageResult *boardapi.PageResult[boardapi.GroupEntity] //nolint:staticcheck
 	err            error
 }
 
@@ -293,6 +295,8 @@ func (s *stubGroupRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptio
 func (s *stubGroupRepo) Search(_ context.Context, _ boardapi.GroupSearchParams, _ repository.ReadOptions) ([]boardapi.GroupEntity, error) {
 	return s.searchResult, s.err
 }
+
+//nolint:staticcheck
 func (s *stubGroupRepo) ListPage(_ context.Context, _, _ int) (*boardapi.PageResult[boardapi.GroupEntity], error) {
 	return s.listPageResult, s.err
 }
@@ -301,7 +305,7 @@ type stubPaymentTermRepo struct {
 	listResult     []boardapi.PaymentTermEntity
 	getResult      *boardapi.PaymentTermEntity
 	searchResult   []boardapi.PaymentTermEntity
-	listPageResult *boardapi.PageResult[boardapi.PaymentTermEntity]
+	listPageResult *boardapi.PageResult[boardapi.PaymentTermEntity] //nolint:staticcheck
 	err            error
 }
 
@@ -314,6 +318,8 @@ func (s *stubPaymentTermRepo) GetByID(_ context.Context, _ int, _ repository.Rea
 func (s *stubPaymentTermRepo) Search(_ context.Context, _ boardapi.PaymentTermSearchParams, _ repository.ReadOptions) ([]boardapi.PaymentTermEntity, error) {
 	return s.searchResult, s.err
 }
+
+//nolint:staticcheck
 func (s *stubPaymentTermRepo) ListPage(_ context.Context, _, _ int) (*boardapi.PageResult[boardapi.PaymentTermEntity], error) {
 	return s.listPageResult, s.err
 }
@@ -334,6 +340,8 @@ func (s *stubProjectTypeRepo) GetByID(_ context.Context, _ int, _ repository.Rea
 func (s *stubProjectTypeRepo) Search(_ context.Context, _ boardapi.ProjectTypeSearchParams, _ repository.ReadOptions) ([]boardapi.ProjectTypeEntity, error) {
 	return s.searchResult, s.err
 }
+
+//nolint:staticcheck
 func (s *stubProjectTypeRepo) ListPage(_ context.Context, _, _ int) (*boardapi.PageResult[boardapi.ProjectTypeEntity], error) {
 	return nil, s.err
 }
@@ -354,6 +362,8 @@ func (s *stubPurchaseTypeRepo) GetByID(_ context.Context, _ int, _ repository.Re
 func (s *stubPurchaseTypeRepo) Search(_ context.Context, _ boardapi.PurchaseTypeSearchParams, _ repository.ReadOptions) ([]boardapi.PurchaseTypeEntity, error) {
 	return s.searchResult, s.err
 }
+
+//nolint:staticcheck
 func (s *stubPurchaseTypeRepo) ListPage(_ context.Context, _, _ int) (*boardapi.PageResult[boardapi.PurchaseTypeEntity], error) {
 	return nil, s.err
 }
@@ -362,7 +372,7 @@ type stubAccountingTypeRepo struct {
 	listResult     []boardapi.AccountingTypeEntity
 	getResult      *boardapi.AccountingTypeEntity
 	searchResult   []boardapi.AccountingTypeEntity
-	listPageResult *boardapi.PageResult[boardapi.AccountingTypeEntity]
+	listPageResult *boardapi.PageResult[boardapi.AccountingTypeEntity] //nolint:staticcheck
 	err            error
 }
 
@@ -375,6 +385,8 @@ func (s *stubAccountingTypeRepo) GetByID(_ context.Context, _ int, _ repository.
 func (s *stubAccountingTypeRepo) Search(_ context.Context, _ boardapi.AccountingTypeSearchParams, _ repository.ReadOptions) ([]boardapi.AccountingTypeEntity, error) {
 	return s.searchResult, s.err
 }
+
+//nolint:staticcheck
 func (s *stubAccountingTypeRepo) ListPage(_ context.Context, _, _ int) (*boardapi.PageResult[boardapi.AccountingTypeEntity], error) {
 	return s.listPageResult, s.err
 }
@@ -383,7 +395,7 @@ type stubDocumentSendChannelRepo struct {
 	listResult     []boardapi.DocumentSendChannelEntity
 	getResult      *boardapi.DocumentSendChannelEntity
 	searchResult   []boardapi.DocumentSendChannelEntity
-	listPageResult *boardapi.PageResult[boardapi.DocumentSendChannelEntity]
+	listPageResult *boardapi.PageResult[boardapi.DocumentSendChannelEntity] //nolint:staticcheck
 	err            error
 }
 
@@ -396,6 +408,8 @@ func (s *stubDocumentSendChannelRepo) GetByID(_ context.Context, _ int, _ reposi
 func (s *stubDocumentSendChannelRepo) Search(_ context.Context, _ boardapi.DocumentSendChannelSearchParams, _ repository.ReadOptions) ([]boardapi.DocumentSendChannelEntity, error) {
 	return s.searchResult, s.err
 }
+
+//nolint:staticcheck
 func (s *stubDocumentSendChannelRepo) ListPage(_ context.Context, _, _ int) (*boardapi.PageResult[boardapi.DocumentSendChannelEntity], error) {
 	return s.listPageResult, s.err
 }

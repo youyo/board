@@ -23,6 +23,9 @@ func (s *Service) SearchDocumentSendChannels(ctx context.Context, params boardap
 }
 
 // ListDocumentSendChannelsPage returns a single page of document send channels.
+// TODO(M57): PageResult は M57 で ListResult[T] に移行予定。
+//
+//nolint:staticcheck
 func (s *Service) ListDocumentSendChannelsPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.DocumentSendChannelEntity], error) {
 	return s.documentSendChannels.ListPage(ctx, page, perPage)
 }

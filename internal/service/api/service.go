@@ -143,7 +143,7 @@ type UserRepo interface {
 	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.UserEntity, error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.UserEntity, error)
 	Search(ctx context.Context, params boardapi.UserSearchParams, opts repository.ReadOptions) ([]boardapi.UserEntity, error)
-	ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.UserEntity], error)
+	ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.UserEntity], error) //nolint:staticcheck
 }
 
 // GroupRepo is the interface for the groups repository.
@@ -151,7 +151,7 @@ type GroupRepo interface {
 	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.GroupEntity, error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.GroupEntity, error)
 	Search(ctx context.Context, params boardapi.GroupSearchParams, opts repository.ReadOptions) ([]boardapi.GroupEntity, error)
-	ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.GroupEntity], error)
+	ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.GroupEntity], error) //nolint:staticcheck
 }
 
 // PaymentTermRepo is the interface for the payment_terms repository.
@@ -159,7 +159,7 @@ type PaymentTermRepo interface {
 	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.PaymentTermEntity, error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.PaymentTermEntity, error)
 	Search(ctx context.Context, params boardapi.PaymentTermSearchParams, opts repository.ReadOptions) ([]boardapi.PaymentTermEntity, error)
-	ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.PaymentTermEntity], error)
+	ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.PaymentTermEntity], error) //nolint:staticcheck
 }
 
 // ProjectTypeRepo is the interface for the project_types repository.
@@ -167,7 +167,7 @@ type ProjectTypeRepo interface {
 	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.ProjectTypeEntity, error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.ProjectTypeEntity, error)
 	Search(ctx context.Context, params boardapi.ProjectTypeSearchParams, opts repository.ReadOptions) ([]boardapi.ProjectTypeEntity, error)
-	ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.ProjectTypeEntity], error)
+	ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.ProjectTypeEntity], error) //nolint:staticcheck
 }
 
 // PurchaseTypeRepo is the interface for the purchase_types repository.
@@ -175,7 +175,7 @@ type PurchaseTypeRepo interface {
 	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.PurchaseTypeEntity, error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.PurchaseTypeEntity, error)
 	Search(ctx context.Context, params boardapi.PurchaseTypeSearchParams, opts repository.ReadOptions) ([]boardapi.PurchaseTypeEntity, error)
-	ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.PurchaseTypeEntity], error)
+	ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.PurchaseTypeEntity], error) //nolint:staticcheck
 }
 
 // AccountingTypeRepo is the interface for the accounting_types repository.
@@ -183,7 +183,7 @@ type AccountingTypeRepo interface {
 	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.AccountingTypeEntity, error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.AccountingTypeEntity, error)
 	Search(ctx context.Context, params boardapi.AccountingTypeSearchParams, opts repository.ReadOptions) ([]boardapi.AccountingTypeEntity, error)
-	ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.AccountingTypeEntity], error)
+	ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.AccountingTypeEntity], error) //nolint:staticcheck
 }
 
 // DocumentSendChannelRepo is the interface for the document_send_channels repository.
@@ -191,7 +191,7 @@ type DocumentSendChannelRepo interface {
 	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.DocumentSendChannelEntity, error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.DocumentSendChannelEntity, error)
 	Search(ctx context.Context, params boardapi.DocumentSendChannelSearchParams, opts repository.ReadOptions) ([]boardapi.DocumentSendChannelEntity, error)
-	ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.DocumentSendChannelEntity], error)
+	ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.DocumentSendChannelEntity], error) //nolint:staticcheck
 }
 
 // Service is the main service for the service/api layer.
