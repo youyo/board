@@ -10,6 +10,10 @@ import (
 // DeliveryEntity is a BOARD API delivery entity.
 // Retrieved via GET /v1/documents/deliveries/{documentID}.
 // フィールドは実 API レスポンス（tmp/e2e-artifacts/deliveries_*.json）に準拠。
+//
+// 注意: BOARD API に納品書の List エンドポイントは存在しない（OpenAPI 実測）。
+// 納品書は projects の response_group=delivery 経由の埋め込み取得が正道。
+// 個別取得は GET /v1/documents/deliveries/{id} のみ。
 type DeliveryEntity struct {
 	ID                      int                    `json:"id"`
 	Message                 *string                `json:"message"`
@@ -28,12 +32,15 @@ type DeliveryEntity struct {
 }
 
 // GetDelivery retrieves the delivery with the specified document ID.
-func (c *Client) GetDelivery(ctx context.Context, documentID int) (*DeliveryEntity, error) {
+// Returns an *ItemResult carrying the entity together with response metadata
+// (ETag, rate limits, Last-Modified). Introduced in M53 as part of Phase L
+// Get* → *ItemResult[XEntity] unification.
+func (c *Client) GetDelivery(ctx context.Context, documentID int) (*ItemResult[DeliveryEntity], error) {
 	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/documents/deliveries/%d", documentID), nil)
 	if err != nil {
 		return nil, err
 	}
-	body, err := c.DoWithRetry(req)
+	body, headers, err := c.DoWithRetryFull(req)
 	if err != nil {
 		return nil, err
 	}
@@ -41,17 +48,22 @@ func (c *Client) GetDelivery(ctx context.Context, documentID int) (*DeliveryEnti
 	if err := json.Unmarshal(body, &x); err != nil {
 		return nil, &APIError{Code: APIErrorUnknown, Message: "GetDelivery: unmarshal: " + err.Error()}
 	}
-	return &x, nil
+	return &ItemResult[DeliveryEntity]{
+		Item:    &x,
+		Meta:    parseItemMeta(headers),
+		Headers: headers,
+	}, nil
 }
 
 // GetDeliveryRaw retrieves a single delivery and returns the raw HTTP
-// response body byte-for-byte.
+// response body byte-for-byte along with response headers.
 //
 // Intended for E2E strict field diff; regular callers should use GetDelivery.
-func (c *Client) GetDeliveryRaw(ctx context.Context, documentID int) ([]byte, error) {
+// The returned http.Header enables parseItemMeta in E2E tests (M53).
+func (c *Client) GetDeliveryRaw(ctx context.Context, documentID int) ([]byte, http.Header, error) {
 	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/documents/deliveries/%d", documentID), nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return c.DoWithRetry(req)
+	return c.DoWithRetryFull(req)
 }

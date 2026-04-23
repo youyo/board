@@ -51,10 +51,11 @@ func (r *ReceiptRepository) GetByDocumentID(ctx context.Context, documentID int,
 	}
 
 	// Cache miss (or ForceRefresh) → fetch from API
-	entity, err := r.api.GetReceipt(ctx, documentID)
+	result, err := r.api.GetReceipt(ctx, documentID)
 	if err != nil {
 		return nil, err
 	}
+	entity := result.Item
 
 	raw, err := json.Marshal(entity)
 	if err != nil {

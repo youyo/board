@@ -51,10 +51,11 @@ func (r *OrderRepository) GetByDocumentID(ctx context.Context, documentID int, o
 	}
 
 	// Cache miss (or ForceRefresh) → fetch from API
-	entity, err := r.api.GetOrder(ctx, documentID)
+	result, err := r.api.GetOrder(ctx, documentID)
 	if err != nil {
 		return nil, err
 	}
+	entity := result.Item
 
 	raw, err := json.Marshal(entity)
 	if err != nil {

@@ -57,7 +57,7 @@ func TestE2E_Deliveries_Get(t *testing.T) {
 	requirePositiveID(t, docID, "findAnyDocumentID.documentID")
 
 	// Step 2: GetDeliveryRaw で生レスポンスを取得
-	getRaw, err := client.GetDeliveryRaw(ctx, docID)
+	getRaw, _, err := client.GetDeliveryRaw(ctx, docID)
 	if err != nil {
 		// Roadmap rule: 403/429 must NOT be skipped, they must fail the test.
 		t.Fatalf("GetDeliveryRaw(%d): %v", docID, err)

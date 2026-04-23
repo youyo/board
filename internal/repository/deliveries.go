@@ -51,10 +51,11 @@ func (r *DeliveryRepository) GetByDocumentID(ctx context.Context, documentID int
 	}
 
 	// Cache miss (or ForceRefresh) → fetch from API
-	entity, err := r.api.GetDelivery(ctx, documentID)
+	result, err := r.api.GetDelivery(ctx, documentID)
 	if err != nil {
 		return nil, err
 	}
+	entity := result.Item
 
 	raw, err := json.Marshal(entity)
 	if err != nil {

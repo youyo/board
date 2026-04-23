@@ -34,9 +34,9 @@ Phase A〜K（48 M）でエンティティ準拠とリリースインフラが�
    - BOARD API 側の存在有無自体が未検証
 
 ## Current Focus
-- **ステータス**: M51 完了、M52 待機
-- **直近の完了**: M51（projects 全面移行、20+ Ransack フィルタ + ListResult 刷新、2026-04-24）
-- **次のアクション**: M52（client_branches / contacts / project_costs）着手
+- **ステータス**: M53 完了、M54 待機
+- **直近の完了**: M53（ドキュメント系 4 件 estimates/orders/deliveries/receipts、2026-04-24）
+- **次のアクション**: M54（invoices / purchase_orders / payments）着手
 
 ## Progress
 
@@ -81,16 +81,24 @@ Phase A〜K（48 M）でエンティティ準拠とリリースインフラが�
 - [x] `go test -count=1 ./...` / `go vet ./...` 全 Green
 - 📄 commit: 38404a9（23 ファイル変更、968 挿入 / 541 削除）
 
-### M52 (L-04): client_branches / contacts / project_costs ⏳
-- [ ] 各 SearchParams 刷新（client_id_eq, name_cont, email_cont 等）
-- [ ] ドキュメント記載パラメータに限定（推測追加はしない）
-- 📄 詳細: 着手時に plans/board-phase-l-m52-client-side.md として生成
+### M52 (L-04): client_branches / contacts / project_costs ✅
+- [x] `ClientBranchListOptions` / `ContactListOptions` / `ProjectCostListOptions` 新設（client_id_eq, name_cont, email_cont, project_id_eq 等）
+- [x] `ListX(ctx, XListOptions) (*ListResult[XEntity], error)` に刷新、旧 SearchX / ListXPage 削除
+- [x] repository / service / cli 層の追従
+- [x] SA1019 PageResult 警告を client_branches / contacts で解消
+- [x] e2e_helpers_test.go / find/e2e_test.go の旧 API 参照を修正（go vet -tags e2e クリーン）
+- [x] `go test -count=1 ./...` / `go vet ./...` 全 Green
 
-### M53 (L-05): ドキュメント系 4 件 List/Search 調査 + 実装 ⏳
-- [ ] estimates/orders/deliveries/receipts の List/Search 存在確認（実 API 探索）
-- [ ] 存在すれば実装、なければ「単一取得のみサポート」を明記
-- [ ] projects の response_group 経由で埋め込み取得する運用との関係整理
-- 📄 詳細: 着手時に plans/board-phase-l-m53-documents.md として生成
+### M53 (L-05): ドキュメント系 4 件 List/Search 調査 + 実装 ✅
+- [x] estimates/orders/deliveries/receipts の List/Search 存在確認（OpenAPI 実測）
+  - **調査結果: List API 非存在**。`/documents/{resource}/{id}` の GET のみ（OpenAPI `/doc/board_openapi.json` 実測）
+  - 正道は projects の `response_group=estimate/order/delivery/receipt` 経由の埋め込み取得
+- [x] Pattern B（単一取得のみ）で実装: `GetX → *ItemResult[XEntity]`, `GetXRaw → ([]byte, http.Header, error)`
+- [x] repository 層: `.Item` 展開で追従
+- [x] service/api 層: `*ItemResult[XEntity]` 返却に刷新
+- [x] cli 層: `--show-meta` フラグ追加（デフォルト true）
+- [x] `go test -count=1 ./...` / `go vet ./...` / `go vet -tags e2e ./...` 全 Green
+- 📄 詳細: plans/board-phase-l-m53-documents.md
 
 ### M54 (L-06): 取引系 3 件（invoices, purchase_orders, payments）⏳
 - [ ] invoices: client_id_eq, project_id_eq, status_in[] 系

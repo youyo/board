@@ -1711,20 +1711,20 @@ func TestGetEstimate_OK(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got == nil {
-		t.Fatal("got nil EstimateEntity")
+	if got == nil || got.Item == nil {
+		t.Fatal("got nil ItemResult or Item")
 	}
-	if got.ID != 42 {
-		t.Errorf("GetEstimate ID: got %d, want 42", got.ID)
+	if got.Item.ID != 42 {
+		t.Errorf("GetEstimate ID: got %d, want 42", got.Item.ID)
 	}
-	if got.Total != "750000.0" {
-		t.Errorf("GetEstimate Total: got %q, want %q", got.Total, "750000.0")
+	if got.Item.Total != "750000.0" {
+		t.Errorf("GetEstimate Total: got %q, want %q", got.Item.Total, "750000.0")
 	}
-	if got.ValidPeriod != "御見積後１ヶ月" {
-		t.Errorf("GetEstimate ValidPeriod: got %q, want %q", got.ValidPeriod, "御見積後１ヶ月")
+	if got.Item.ValidPeriod != "御見積後１ヶ月" {
+		t.Errorf("GetEstimate ValidPeriod: got %q, want %q", got.Item.ValidPeriod, "御見積後１ヶ月")
 	}
-	if len(got.Details) != 1 {
-		t.Errorf("GetEstimate Details len: got %d, want 1", len(got.Details))
+	if len(got.Item.Details) != 1 {
+		t.Errorf("GetEstimate Details len: got %d, want 1", len(got.Item.Details))
 	}
 }
 
@@ -1830,17 +1830,17 @@ func TestGetOrder_OK(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got == nil {
-		t.Fatal("got nil OrderEntity")
+	if got == nil || got.Item == nil {
+		t.Fatal("got nil ItemResult or Item")
 	}
-	if got.ID != 77 {
-		t.Errorf("GetOrder ID: got %d, want 77", got.ID)
+	if got.Item.ID != 77 {
+		t.Errorf("GetOrder ID: got %d, want 77", got.Item.ID)
 	}
-	if got.Total != "800000.0" {
-		t.Errorf("GetOrder Total: got %q, want %q", got.Total, "800000.0")
+	if got.Item.Total != "800000.0" {
+		t.Errorf("GetOrder Total: got %q, want %q", got.Item.Total, "800000.0")
 	}
-	if len(got.Details) != 1 {
-		t.Errorf("GetOrder Details len: got %d, want 1", len(got.Details))
+	if len(got.Item.Details) != 1 {
+		t.Errorf("GetOrder Details len: got %d, want 1", len(got.Item.Details))
 	}
 }
 
@@ -1866,20 +1866,20 @@ func TestGetDelivery_OK(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got == nil {
-		t.Fatal("got nil DeliveryEntity")
+	if got == nil || got.Item == nil {
+		t.Fatal("got nil ItemResult or Item")
 	}
-	if got.ID != 88 {
-		t.Errorf("GetDelivery ID: got %d, want 88", got.ID)
+	if got.Item.ID != 88 {
+		t.Errorf("GetDelivery ID: got %d, want 88", got.Item.ID)
 	}
-	if got.DeliveryDate != "2026-02-15" {
-		t.Errorf("GetDelivery DeliveryDate: got %q, want %q", got.DeliveryDate, "2026-02-15")
+	if got.Item.DeliveryDate != "2026-02-15" {
+		t.Errorf("GetDelivery DeliveryDate: got %q, want %q", got.Item.DeliveryDate, "2026-02-15")
 	}
-	if got.Total != "600000.0" {
-		t.Errorf("GetDelivery Total: got %q, want %q", got.Total, "600000.0")
+	if got.Item.Total != "600000.0" {
+		t.Errorf("GetDelivery Total: got %q, want %q", got.Item.Total, "600000.0")
 	}
-	if len(got.Details) != 1 {
-		t.Errorf("GetDelivery Details len: got %d, want 1", len(got.Details))
+	if len(got.Item.Details) != 1 {
+		t.Errorf("GetDelivery Details len: got %d, want 1", len(got.Item.Details))
 	}
 }
 
@@ -1905,20 +1905,20 @@ func TestGetReceipt_OK(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got == nil {
-		t.Fatal("got nil ReceiptEntity")
+	if got == nil || got.Item == nil {
+		t.Fatal("got nil ItemResult or Item")
 	}
-	if got.ID != 99 {
-		t.Errorf("GetReceipt ID: got %d, want 99", got.ID)
+	if got.Item.ID != 99 {
+		t.Errorf("GetReceipt ID: got %d, want 99", got.Item.ID)
 	}
-	if got.ReceiptDate != "2026-03-31" {
-		t.Errorf("GetReceipt ReceiptDate: got %q, want %q", got.ReceiptDate, "2026-03-31")
+	if got.Item.ReceiptDate != "2026-03-31" {
+		t.Errorf("GetReceipt ReceiptDate: got %q, want %q", got.Item.ReceiptDate, "2026-03-31")
 	}
-	if got.Total != "900000.0" {
-		t.Errorf("GetReceipt Total: got %q, want %q", got.Total, "900000.0")
+	if got.Item.Total != "900000.0" {
+		t.Errorf("GetReceipt Total: got %q, want %q", got.Item.Total, "900000.0")
 	}
-	if len(got.Details) != 1 {
-		t.Errorf("GetReceipt Details len: got %d, want 1", len(got.Details))
+	if len(got.Item.Details) != 1 {
+		t.Errorf("GetReceipt Details len: got %d, want 1", len(got.Item.Details))
 	}
 }
 

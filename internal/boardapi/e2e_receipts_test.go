@@ -57,7 +57,7 @@ func TestE2E_Receipts_Get(t *testing.T) {
 	requirePositiveID(t, docID, "findAnyDocumentID.documentID")
 
 	// Step 2: GetReceiptRaw で生レスポンスを取得
-	getRaw, err := client.GetReceiptRaw(ctx, docID)
+	getRaw, _, err := client.GetReceiptRaw(ctx, docID)
 	if err != nil {
 		// Roadmap rule: 403/429 must NOT be skipped, they must fail the test.
 		t.Fatalf("GetReceiptRaw(%d): %v", docID, err)

@@ -1061,7 +1061,7 @@ func TestE2E_FindOrder_ByProjectID_Strict(t *testing.T) {
 	}
 
 	// 独立 raw fetch で厳格フィールド突合
-	raw, err := apiClient.GetOrderRaw(ctx, expectedDocID)
+	raw, _, err := apiClient.GetOrderRaw(ctx, expectedDocID)
 	if err != nil {
 		t.Fatalf("GetOrderRaw(%d): %v", expectedDocID, err)
 	}
@@ -1211,7 +1211,7 @@ func TestE2E_FindDelivery_ByProjectID_Strict(t *testing.T) {
 	}
 
 	// 独立 raw fetch で厳格フィールド突合
-	raw, err := apiClient.GetDeliveryRaw(ctx, expectedDocID)
+	raw, _, err := apiClient.GetDeliveryRaw(ctx, expectedDocID)
 	if err != nil {
 		t.Fatalf("GetDeliveryRaw(%d): %v", expectedDocID, err)
 	}
@@ -1353,7 +1353,7 @@ func TestE2E_FindReceipt_ByProjectID_Strict(t *testing.T) {
 	}
 
 	// 独立 raw fetch で厳格フィールド突合
-	raw, err := apiClient.GetReceiptRaw(ctx, expectedDocID)
+	raw, _, err := apiClient.GetReceiptRaw(ctx, expectedDocID)
 	if err != nil {
 		t.Fatalf("GetReceiptRaw(%d): %v", expectedDocID, err)
 	}

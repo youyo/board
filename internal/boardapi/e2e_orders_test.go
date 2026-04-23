@@ -57,7 +57,7 @@ func TestE2E_Orders_Get(t *testing.T) {
 	requirePositiveID(t, docID, "findAnyDocumentID.documentID")
 
 	// Step 2: GetOrderRaw で生レスポンスを取得
-	getRaw, err := client.GetOrderRaw(ctx, docID)
+	getRaw, _, err := client.GetOrderRaw(ctx, docID)
 	if err != nil {
 		// Roadmap rule: 403/429 must NOT be skipped, they must fail the test.
 		t.Fatalf("GetOrderRaw(%d): %v", docID, err)

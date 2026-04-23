@@ -25,6 +25,10 @@ func newAPIReceiptsGetCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "get",
 		Short: "Get a receipt by document ID",
+		Long: `Get a receipt by document ID.
+
+JSON output includes an _meta object (rate limit, ETag, last_modified)
+derived from response headers. Use --no-show-meta to omit it.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if documentID == 0 {
 				return fmt.Errorf("--document-id is required")
@@ -38,9 +42,14 @@ func newAPIReceiptsGetCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return output.Write(os.Stdout, result, prettyFromCmd(cmd))
+			showMeta, _ := cmd.Flags().GetBool("show-meta")
+			if showMeta {
+				return output.Write(os.Stdout, result, prettyFromCmd(cmd))
+			}
+			return output.Write(os.Stdout, result.Item, prettyFromCmd(cmd))
 		},
 	}
 	cmd.Flags().IntVar(&documentID, "document-id", 0, "Receipt document ID (required)")
+	cmd.Flags().Bool("show-meta", true, "Include _meta (rate limit / ETag) in JSON output")
 	return cmd
 }
