@@ -81,12 +81,12 @@ func TestProjectRepository_List_CacheHit(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeProjectRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{})
+	got, err := repo.List(context.Background(), repository.ReadOptions{}, boardapi.ProjectListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(got) != len(sampleProjects) {
-		t.Errorf("len(got) = %d, want %d", len(got), len(sampleProjects))
+	if len(got.Items) != len(sampleProjects) {
+		t.Errorf("len(got.Items) = %d, want %d", len(got.Items), len(sampleProjects))
 	}
 }
 
@@ -98,12 +98,12 @@ func TestProjectRepository_List_InitialLoad(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeProjectRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{})
+	got, err := repo.List(context.Background(), repository.ReadOptions{}, boardapi.ProjectListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(got) != len(sampleProjects) {
-		t.Errorf("len(got) = %d, want %d", len(got), len(sampleProjects))
+	if len(got.Items) != len(sampleProjects) {
+		t.Errorf("len(got.Items) = %d, want %d", len(got.Items), len(sampleProjects))
 	}
 }
 
@@ -123,11 +123,11 @@ func TestProjectRepository_List_AutoRefresh(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeProjectRepo(t, db, apiClient, true)
-	got, err := repo.List(context.Background(), repository.ReadOptions{})
+	got, err := repo.List(context.Background(), repository.ReadOptions{}, boardapi.ProjectListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(got) == 0 {
+	if len(got.Items) == 0 {
 		t.Error("expected non-empty result after auto refresh")
 	}
 }
@@ -140,12 +140,12 @@ func TestProjectRepository_List_ForceRefresh(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeProjectRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{ForceRefresh: true})
+	got, err := repo.List(context.Background(), repository.ReadOptions{ForceRefresh: true}, boardapi.ProjectListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(got) != len(sampleProjects) {
-		t.Errorf("len(got) = %d, want %d", len(got), len(sampleProjects))
+	if len(got.Items) != len(sampleProjects) {
+		t.Errorf("len(got.Items) = %d, want %d", len(got.Items), len(sampleProjects))
 	}
 }
 
@@ -159,11 +159,11 @@ func TestProjectRepository_List_DeltaRefresh(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeProjectRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{Refresh: true})
+	got, err := repo.List(context.Background(), repository.ReadOptions{Refresh: true}, boardapi.ProjectListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(got) == 0 {
+	if len(got.Items) == 0 {
 		t.Error("expected non-empty result after delta refresh")
 	}
 }
@@ -178,12 +178,12 @@ func TestProjectRepository_List_Limit(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeProjectRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{Limit: 2})
+	got, err := repo.List(context.Background(), repository.ReadOptions{Limit: 2}, boardapi.ProjectListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(got) != 2 {
-		t.Errorf("len(got) = %d, want 2", len(got))
+	if len(got.Items) != 2 {
+		t.Errorf("len(got.Items) = %d, want 2", len(got.Items))
 	}
 }
 
@@ -197,51 +197,73 @@ func TestProjectRepository_List_DeltaRefreshAPIError_StaleCache(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeProjectRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{Refresh: true})
+	got, err := repo.List(context.Background(), repository.ReadOptions{Refresh: true}, boardapi.ProjectListOptions{})
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
-	if len(got) == 0 {
+	if len(got.Items) == 0 {
 		t.Error("expected stale cache data")
 	}
 }
 
-// T_R49: Search - Status filter ("active")
-func TestProjectRepository_Search_StatusFilter(t *testing.T) {
+// T_R49: Search with NameCont filter -> bypasses cache and calls API directly
+func TestProjectRepository_Search_NameContFilter(t *testing.T) {
 	db := newTestDB(t)
 	seedProjectCache(t, db, sampleProjects)
 	markSynced(t, db, "projects")
 
-	srv := newProjectAPIServer(t, nil)
+	// API server returns only matching results
+	filtered := []boardapi.ProjectEntity{sampleProjects[0]}
+	var observedNameCont string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		observedNameCont = r.URL.Query().Get("name_cont")
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(jsonArrayOf(filtered))
+	}))
+	t.Cleanup(srv.Close)
+
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeProjectRepo(t, db, apiClient, false)
-	got, err := repo.Search(context.Background(), boardapi.ProjectSearchParams{Status: "active"}, repository.ReadOptions{})
+	got, err := repo.Search(context.Background(), boardapi.ProjectListOptions{NameCont: "ProjectA"}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
-	if len(got) != 2 {
-		t.Errorf("len(got) = %d, want 2", len(got))
+	if observedNameCont != "ProjectA" {
+		t.Errorf("name_cont sent to API = %q, want ProjectA", observedNameCont)
+	}
+	if len(got) != 1 {
+		t.Errorf("len(got) = %d, want 1", len(got))
 	}
 }
 
-// T_R50: Search - UpdatedAtFrom filter -> not applied client-side (filtered by API)
-func TestProjectRepository_Search_UpdatedAtFrom(t *testing.T) {
+// T_R50: Search with zero filter -> uses cache (no API call for cache bypass)
+func TestProjectRepository_Search_ZeroFilter(t *testing.T) {
 	db := newTestDB(t)
 	seedProjectCache(t, db, sampleProjects)
 	markSynced(t, db, "projects")
 
-	srv := newProjectAPIServer(t, nil)
+	apiCallCount := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		apiCallCount++
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(jsonArrayOf(sampleProjects))
+	}))
+	t.Cleanup(srv.Close)
+
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeProjectRepo(t, db, apiClient, false)
-	// UpdatedAtFrom is not a client-side filter, so all items are returned
-	got, err := repo.Search(context.Background(), boardapi.ProjectSearchParams{UpdatedAtFrom: "2026-01-02T00:00:00Z"}, repository.ReadOptions{})
+	got, err := repo.Search(context.Background(), boardapi.ProjectListOptions{}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
+	// ゼロフィルタはキャッシュを使うため API コールなし
+	if apiCallCount != 0 {
+		t.Errorf("expected 0 API calls for zero filter, got %d", apiCallCount)
+	}
 	if len(got) != len(sampleProjects) {
-		t.Errorf("len(got) = %d, want %d (UpdatedAtFrom is not a client-side filter)", len(got), len(sampleProjects))
+		t.Errorf("len(got) = %d, want %d", len(got), len(sampleProjects))
 	}
 }
 
@@ -305,19 +327,31 @@ func TestProjectRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	}
 }
 
-// T_R54: Search - Name filter + ClientID filter
-func TestProjectRepository_Search_MultiFilter(t *testing.T) {
+// T_R54: Search - ClientIDEq filter -> bypasses cache and calls API directly
+func TestProjectRepository_Search_ClientIDEqFilter(t *testing.T) {
 	db := newTestDB(t)
 	seedProjectCache(t, db, sampleProjects)
 	markSynced(t, db, "projects")
 
-	srv := newProjectAPIServer(t, nil)
+	// API server returns filtered results
+	filtered := []boardapi.ProjectEntity{sampleProjects[0], sampleProjects[1]}
+	var observedClientIDEq string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		observedClientIDEq = r.URL.Query().Get("client_id_eq")
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(jsonArrayOf(filtered))
+	}))
+	t.Cleanup(srv.Close)
+
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeProjectRepo(t, db, apiClient, false)
-	got, err := repo.Search(context.Background(), boardapi.ProjectSearchParams{ClientID: 10, Name: "Project"}, repository.ReadOptions{})
+	got, err := repo.Search(context.Background(), boardapi.ProjectListOptions{ClientIDEq: 10}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
+	}
+	if observedClientIDEq != "10" {
+		t.Errorf("client_id_eq sent to API = %q, want 10", observedClientIDEq)
 	}
 	if len(got) != 2 {
 		t.Errorf("len(got) = %d, want 2", len(got))

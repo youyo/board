@@ -34,11 +34,13 @@ type ContactRepo interface {
 }
 
 // ProjectRepo is the interface for the projects repository.
+//
+// M51 以降: List は (readOpts, filter) 二引数化されて *ListResult を返す。
+// 非ゼロ filter 時は cache バイパスで api.ListProjects を直接呼ぶ。
+// Search / ListPage は削除（破壊的変更）。
 type ProjectRepo interface {
-	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.ProjectEntity, error)
+	List(ctx context.Context, readOpts repository.ReadOptions, filter boardapi.ProjectListOptions) (*boardapi.ListResult[boardapi.ProjectEntity], error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.ProjectEntity, error)
-	Search(ctx context.Context, params boardapi.ProjectSearchParams, opts repository.ReadOptions) ([]boardapi.ProjectEntity, error)
-	ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.ProjectEntity], error)
 	GetByIDWithGroup(ctx context.Context, id int, responseGroup string) (*boardapi.ProjectEntity, error)
 }
 

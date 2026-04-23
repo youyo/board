@@ -184,14 +184,31 @@ type stubProjectRepo struct {
 	err                error
 }
 
-func (s *stubProjectRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.ProjectEntity, error) {
-	return s.listResult, s.err
-}
 func (s *stubProjectRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.ProjectEntity, error) {
 	return s.getResult, s.err
 }
-func (s *stubProjectRepo) Search(_ context.Context, _ boardapi.ProjectSearchParams, _ repository.ReadOptions) ([]boardapi.ProjectEntity, error) {
+func (s *stubProjectRepo) Search(_ context.Context, filter boardapi.ProjectListOptions, _ repository.ReadOptions) ([]boardapi.ProjectEntity, error) {
+	// ゼロフィルタ → listResult を返す（全件取得の代替）、非ゼロ → searchResult
+	if projectListOptionsIsZero(filter) {
+		return s.listResult, s.err
+	}
 	return s.searchResult, s.err
+}
+
+// projectListOptionsIsZero reports whether filter is the zero value.
+// Cannot use == because ProjectListOptions contains slice fields.
+func projectListOptionsIsZero(f boardapi.ProjectListOptions) bool {
+	return f.Page == 0 && f.PerPage == 0 &&
+		f.UpdatedAtGteq == "" && f.UpdatedAtLteq == "" &&
+		f.CreatedAtGteq == "" && f.CreatedAtLteq == "" &&
+		f.IncludeArchiveFlg == nil && f.IncludeLostFlg == nil &&
+		f.NameCont == "" && f.ClientIDEq == 0 && f.ClientNameCont == "" &&
+		len(f.OrderStatusIn) == 0 && len(f.DeliveryStatusIn) == 0 &&
+		f.ProjectNoEq == "" && f.ManagementNoEq == "" &&
+		f.DeliveryDateGteq == "" && f.DeliveryDateLteq == "" &&
+		f.InvoiceDateGteq == "" && f.InvoiceDateLteq == "" &&
+		len(f.InvoiceTimingKbnIn) == 0 && len(f.Tags) == 0 &&
+		f.ResponseGroup == ""
 }
 func (s *stubProjectRepo) GetByIDWithGroup(_ context.Context, id int, _ string) (*boardapi.ProjectEntity, error) {
 	if s.getWithGroupResult != nil {

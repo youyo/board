@@ -1548,12 +1548,12 @@ func TestListProjects_TwoPages(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.ListProjects(context.Background())
+	result, err := c.ListProjects(context.Background(), boardapi.ProjectListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result) != 150 {
-		t.Errorf("want 150 projects, got %d", len(result))
+	if len(result.Items) != 150 {
+		t.Errorf("want 150 projects, got %d", len(result.Items))
 	}
 }
 
@@ -1575,39 +1575,11 @@ func TestGetProject_OK(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got == nil {
+	if got == nil || got.Item == nil {
 		t.Fatal("got nil ProjectEntity")
 	}
-	if got.ID != 200 || got.Name != "Development Project" {
-		t.Errorf("GetProject: got %+v", got)
-	}
-}
-
-// T60: SearchProjects — with Status + UpdatedAtFrom parameters
-func TestSearchProjects_WithStatusAndUpdatedAtFrom(t *testing.T) {
-	var gotStatus, gotUpdatedAtFrom string
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotStatus = r.URL.Query().Get("status")
-		gotUpdatedAtFrom = r.URL.Query().Get("updated_at_from")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[]`))
-	}))
-	defer ts.Close()
-
-	noSleep := func(time.Duration) {}
-	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	_, err := c.SearchProjects(context.Background(), boardapi.ProjectSearchParams{
-		Status:        "active",
-		UpdatedAtFrom: "2026-01-01T00:00:00Z",
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if gotStatus != "active" {
-		t.Errorf("status param: want %q, got %q", "active", gotStatus)
-	}
-	if gotUpdatedAtFrom != "2026-01-01T00:00:00Z" {
-		t.Errorf("updated_at_from param: want %q, got %q", "2026-01-01T00:00:00Z", gotUpdatedAtFrom)
+	if got.Item.ID != 200 || got.Item.Name != "Development Project" {
+		t.Errorf("GetProject: got %+v", got.Item)
 	}
 }
 
@@ -1622,7 +1594,7 @@ func TestListProjects_UnmarshalError(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	_, err := c.ListProjects(context.Background())
+	_, err := c.ListProjects(context.Background(), boardapi.ProjectListOptions{})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -3558,33 +3530,10 @@ func TestIsNotFound_WrappedError(t *testing.T) {
 // ── Step 1: DoWithRetryFull & ListPage ────────────────────────────────────────
 
 // T205-T207 (旧 ListClientsPage 系) は M50 で ListClientsPage が削除されたため
-// 撤去。pagination 系テストは T208 TestListProjectsPage_OK および
-// pagination_test.go の ListAllWithResult テストでカバー。
+// 撤去。pagination 系テストは pagination_test.go の ListAllWithResult テストでカバー。
 
-// T208: ListProjectsPage works correctly
-func TestListProjectsPage_OK(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("X-Total-Count", "1")
-		w.Header().Set("X-Page", "1")
-		w.Header().Set("X-Per-Page", "100")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"client_id":10,"name":"Project1","code":"P001","status":"active","start_date":"","end_date":"","memo":"","updated_at":"","created_at":""}]`))
-	}))
-	defer ts.Close()
-
-	noSleep := func(time.Duration) {}
-	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.ListProjectsPage(context.Background(), 1, 100)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(result.Items) != 1 || result.Items[0].ID != 1 {
-		t.Errorf("unexpected items: %+v", result.Items)
-	}
-	if result.TotalCount != 1 {
-		t.Errorf("TotalCount: want 1, got %d", result.TotalCount)
-	}
-}
+// T208: ListProjectsPage は M51 で削除（ListProjects に統合）。
+// pagination テストは pagination_test.go でカバー。
 
 // ── Step 2: GetProjectWithGroup + DocumentSummary ────────────────────────────
 
@@ -3609,21 +3558,21 @@ func TestGetProjectWithGroup_QueryParam(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got == nil {
+	if got == nil || got.Item == nil {
 		t.Fatal("got nil ProjectEntity")
 	}
 	if gotResponseGroup != "invoice" {
 		t.Errorf("response_group param: want %q, got %q", "invoice", gotResponseGroup)
 	}
 	// M44: Invoice 単数形は廃止、Invoices 配列を使用
-	if len(got.Invoices) == 0 {
+	if len(got.Item.Invoices) == 0 {
 		t.Fatal("Invoices field is empty, expected at least one DocumentSummary")
 	}
-	if got.Invoices[0].ID != 7 {
-		t.Errorf("Invoices[0].ID: want 7, got %d", got.Invoices[0].ID)
+	if got.Item.Invoices[0].ID != 7 {
+		t.Errorf("Invoices[0].ID: want 7, got %d", got.Item.Invoices[0].ID)
 	}
-	if got.Invoices[0].Total != "100000" {
-		t.Errorf("Invoices[0].Total: want %q, got %q", "100000", got.Invoices[0].Total)
+	if got.Item.Invoices[0].Total != "100000" {
+		t.Errorf("Invoices[0].Total: want %q, got %q", "100000", got.Item.Invoices[0].Total)
 	}
 }
 
@@ -3644,53 +3593,14 @@ func TestGetProjectWithGroup_EmptyGroup(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got.ID != 5 {
-		t.Errorf("ID: want 5, got %d", got.ID)
+	if got == nil || got.Item == nil {
+		t.Fatal("got nil ItemResult")
+	}
+	if got.Item.ID != 5 {
+		t.Errorf("ID: want 5, got %d", got.Item.ID)
 	}
 	if gotQuery != "" {
 		t.Errorf("expected no query string for empty responseGroup, got %q", gotQuery)
-	}
-}
-
-// T211: SearchProjects passes response_group param
-func TestSearchProjects_WithResponseGroup(t *testing.T) {
-	var gotResponseGroup string
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotResponseGroup = r.URL.Query().Get("response_group")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[]`))
-	}))
-	defer ts.Close()
-
-	noSleep := func(time.Duration) {}
-	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	_, err := c.SearchProjects(context.Background(), boardapi.ProjectSearchParams{ResponseGroup: "all"})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if gotResponseGroup != "all" {
-		t.Errorf("response_group param: want %q, got %q", "all", gotResponseGroup)
-	}
-}
-
-// T212: SearchProjects omits response_group when empty
-func TestSearchProjects_NoResponseGroup(t *testing.T) {
-	var gotResponseGroup string
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotResponseGroup = r.URL.Query().Get("response_group")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[]`))
-	}))
-	defer ts.Close()
-
-	noSleep := func(time.Duration) {}
-	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	_, err := c.SearchProjects(context.Background(), boardapi.ProjectSearchParams{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if gotResponseGroup != "" {
-		t.Errorf("expected no response_group param, got %q", gotResponseGroup)
 	}
 }
 
@@ -3709,14 +3619,17 @@ func TestProjectEntity_DocumentSummaryNullMessage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got.Estimate == nil {
+	if got == nil || got.Item == nil {
+		t.Fatal("got nil ItemResult")
+	}
+	if got.Item.Estimate == nil {
 		t.Fatal("Estimate is nil")
 	}
-	if got.Estimate.Message != nil {
-		t.Errorf("Message: want nil, got %v", got.Estimate.Message)
+	if got.Item.Estimate.Message != nil {
+		t.Errorf("Message: want nil, got %v", got.Item.Estimate.Message)
 	}
-	if got.Estimate.LockFlg != 1 {
-		t.Errorf("LockFlg: want 1, got %d", got.Estimate.LockFlg)
+	if got.Item.Estimate.LockFlg != 1 {
+		t.Errorf("LockFlg: want 1, got %d", got.Item.Estimate.LockFlg)
 	}
 }
 

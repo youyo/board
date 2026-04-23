@@ -78,7 +78,7 @@ func (s *Service) FindReceipt(ctx context.Context, q FindReceiptQuery) ([]Receip
 			return nil, err
 		}
 		for _, c := range clients {
-			projects, err := s.projects.Search(ctx, boardapi.ProjectSearchParams{ClientID: c.ID, ResponseGroup: "receipt"}, opts)
+			projects, err := s.projects.Search(ctx, boardapi.ProjectListOptions{ClientIDEq: c.ID, ResponseGroup: "receipt"}, opts)
 			if err != nil {
 				return nil, err
 			}
@@ -104,7 +104,7 @@ func (s *Service) FindReceipt(ctx context.Context, q FindReceiptQuery) ([]Receip
 
 	case q.ProjectName != "":
 		// Search projects by name with receipt group → hydrate.
-		projects, err := s.projects.Search(ctx, boardapi.ProjectSearchParams{Name: q.ProjectName, ResponseGroup: "receipt"}, opts)
+		projects, err := s.projects.Search(ctx, boardapi.ProjectListOptions{NameCont: q.ProjectName, ResponseGroup: "receipt"}, opts)
 		if err != nil {
 			return nil, err
 		}

@@ -87,23 +87,18 @@ func (s *stubContactRepo) ListPage(_ context.Context, _, _ int) (*boardapi.PageR
 type stubProjectRepo struct {
 	listResult         []boardapi.ProjectEntity
 	getResult          *boardapi.ProjectEntity
-	searchResult       []boardapi.ProjectEntity
-	listPageResult     *boardapi.PageResult[boardapi.ProjectEntity]
 	getWithGroupResult *boardapi.ProjectEntity
 	err                error
 }
 
-func (s *stubProjectRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.ProjectEntity, error) {
-	return s.listResult, s.err
+func (s *stubProjectRepo) List(_ context.Context, _ repository.ReadOptions, _ boardapi.ProjectListOptions) (*boardapi.ListResult[boardapi.ProjectEntity], error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	return &boardapi.ListResult[boardapi.ProjectEntity]{Items: s.listResult}, nil
 }
 func (s *stubProjectRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.ProjectEntity, error) {
 	return s.getResult, s.err
-}
-func (s *stubProjectRepo) Search(_ context.Context, _ boardapi.ProjectSearchParams, _ repository.ReadOptions) ([]boardapi.ProjectEntity, error) {
-	return s.searchResult, s.err
-}
-func (s *stubProjectRepo) ListPage(_ context.Context, _, _ int) (*boardapi.PageResult[boardapi.ProjectEntity], error) {
-	return s.listPageResult, s.err
 }
 func (s *stubProjectRepo) GetByIDWithGroup(_ context.Context, _ int, _ string) (*boardapi.ProjectEntity, error) {
 	return s.getWithGroupResult, s.err

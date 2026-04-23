@@ -477,55 +477,6 @@ func TestProjectEntity_NullableNested_NilForNull(t *testing.T) {
 	}
 }
 
-// U10: TestProjectSearchParams_QueryEncoding
-// ProjectSearchParams の全 5 パラメータが正しくクエリエンコードされることを確認。
-func TestProjectSearchParams_QueryEncoding(t *testing.T) {
-	page1 := `[{"id":7,"name":"matched","order_status":1,"order_status_name":"受注","delivery_status":1,"delivery_status_name":"未着手","invoice_dates":[],"tags":[],"updated_at":"2024-02-01T00:00:00+09:00","created_at":"2024-02-01T00:00:00+09:00"}]`
-	var observedClientID, observedName, observedStatus, observedUpdatedFrom, observedResponseGroup string
-	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
-		observedClientID = r.URL.Query().Get("client_id")
-		observedName = r.URL.Query().Get("name")
-		observedStatus = r.URL.Query().Get("status")
-		observedUpdatedFrom = r.URL.Query().Get("updated_at_from")
-		observedResponseGroup = r.URL.Query().Get("response_group")
-		return jsonResp(page1), nil
-	})
-	client := newProjectsMockClient(rt)
-
-	raw, err := client.SearchProjectsRaw(context.Background(), boardapi.ProjectSearchParams{
-		ClientID:      100,
-		Name:          "matched",
-		Status:        "active",
-		UpdatedAtFrom: "2024-01-01T00:00:00+09:00",
-		ResponseGroup: "estimate",
-	})
-	if err != nil {
-		t.Fatalf("SearchProjectsRaw: %v", err)
-	}
-	if observedClientID != "100" {
-		t.Errorf("query client_id = %q, want 100", observedClientID)
-	}
-	if observedName != "matched" {
-		t.Errorf("query name = %q, want matched", observedName)
-	}
-	if observedStatus != "active" {
-		t.Errorf("query status = %q, want active", observedStatus)
-	}
-	if observedUpdatedFrom != "2024-01-01T00:00:00+09:00" {
-		t.Errorf("query updated_at_from = %q, want 2024-01-01T00:00:00+09:00", observedUpdatedFrom)
-	}
-	if observedResponseGroup != "estimate" {
-		t.Errorf("query response_group = %q, want estimate", observedResponseGroup)
-	}
-	var arr []map[string]any
-	if err := json.Unmarshal(raw, &arr); err != nil {
-		t.Fatalf("returned raw is not a valid JSON array: %v", err)
-	}
-	if len(arr) != 1 {
-		t.Fatalf("expected 1 element, got %d", len(arr))
-	}
-}
-
 // U11: TestDocumentDetail_NullableNumeric
 // DocumentDetailEntity の nullable string フィールドが null の場合に正しく nil となることを確認。
 func TestDocumentDetail_NullableNumeric(t *testing.T) {

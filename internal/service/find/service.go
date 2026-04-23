@@ -33,11 +33,15 @@ type ContactRepo interface {
 	Search(ctx context.Context, params boardapi.ContactSearchParams, opts repository.ReadOptions) ([]boardapi.ContactEntity, error)
 }
 
-// ProjectRepo is the repository interface for projects.
+// ProjectRepo is the repository interface for projects used by service/find.
+//
+// M51: Search now receives ProjectListOptions (Ransack-style) instead of the
+// legacy ProjectSearchParams. "List all entities" is expressed as
+// Search(ctx, boardapi.ProjectListOptions{}, opts) — this avoids a redundant
+// List method while keeping the find layer agnostic of *ListResult.
 type ProjectRepo interface {
-	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.ProjectEntity, error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.ProjectEntity, error)
-	Search(ctx context.Context, params boardapi.ProjectSearchParams, opts repository.ReadOptions) ([]boardapi.ProjectEntity, error)
+	Search(ctx context.Context, filter boardapi.ProjectListOptions, opts repository.ReadOptions) ([]boardapi.ProjectEntity, error)
 	GetByIDWithGroup(ctx context.Context, id int, responseGroup string) (*boardapi.ProjectEntity, error)
 }
 

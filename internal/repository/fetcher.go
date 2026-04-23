@@ -231,20 +231,23 @@ type projectsFetcher struct {
 func (f *projectsFetcher) ResourceName() string { return "projects" }
 
 func (f *projectsFetcher) ListAll(ctx context.Context) ([]json.RawMessage, error) {
-	entities, err := f.api.ListProjects(ctx)
+	result, err := f.api.ListProjects(ctx, boardapi.ProjectListOptions{})
 	if err != nil {
 		return nil, err
 	}
-	return entitiesToRaw(entities)
+	return entitiesToRaw(result.Items)
 }
 
 func (f *projectsFetcher) ListUpdatedSince(ctx context.Context, since string) ([]json.RawMessage, error) {
-	params := boardapi.ProjectSearchParams{UpdatedAtFrom: since}
-	entities, err := f.api.SearchProjects(ctx, params)
+	// since は cache.SyncState.CursorUpdatedAt 由来の ISO 8601（BOARD API の
+	// エンティティ updated_at）。BOARD API の Ransack `_gteq` は
+	// `YYYY-MM-DD HH:MM:SS` 形式を期待するため、ここで変換する。
+	gteq := isoToBoardDateTime(since)
+	result, err := f.api.ListProjects(ctx, boardapi.ProjectListOptions{UpdatedAtGteq: gteq})
 	if err != nil {
 		return nil, err
 	}
-	return entitiesToRaw(entities)
+	return entitiesToRaw(result.Items)
 }
 
 // --- project_costs Fetcher ---

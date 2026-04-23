@@ -73,7 +73,7 @@ func (s *Service) FindEstimate(ctx context.Context, q FindEstimateQuery) ([]Esti
 			return nil, err
 		}
 		for _, c := range clients {
-			projects, err := s.projects.Search(ctx, boardapi.ProjectSearchParams{ClientID: c.ID, ResponseGroup: "estimate"}, opts)
+			projects, err := s.projects.Search(ctx, boardapi.ProjectListOptions{ClientIDEq: c.ID, ResponseGroup: "estimate"}, opts)
 			if err != nil {
 				return nil, err
 			}
@@ -99,7 +99,7 @@ func (s *Service) FindEstimate(ctx context.Context, q FindEstimateQuery) ([]Esti
 
 	case q.ProjectName != "":
 		// Search projects by name with estimate group → hydrate.
-		projects, err := s.projects.Search(ctx, boardapi.ProjectSearchParams{Name: q.ProjectName, ResponseGroup: "estimate"}, opts)
+		projects, err := s.projects.Search(ctx, boardapi.ProjectListOptions{NameCont: q.ProjectName, ResponseGroup: "estimate"}, opts)
 		if err != nil {
 			return nil, err
 		}

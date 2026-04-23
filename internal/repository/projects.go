@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/youyo/board/internal/boardapi"
@@ -49,8 +48,59 @@ func NewProjectRepository(
 
 const projectsResource = "projects"
 
-// List returns all projects from the cache.
-func (r *ProjectRepository) List(ctx context.Context, opts ReadOptions) ([]boardapi.ProjectEntity, error) {
+// projectFilterIsZero reports whether the given filter is empty (all fields
+// are zero values / nil). A zero filter routes through the local cache; a
+// non-zero filter bypasses the cache and calls the API directly because
+// filtered results must not poison the full-entity cache.
+func projectFilterIsZero(f boardapi.ProjectListOptions) bool {
+	return f.Page == 0 &&
+		f.PerPage == 0 &&
+		f.UpdatedAtGteq == "" &&
+		f.UpdatedAtLteq == "" &&
+		f.CreatedAtGteq == "" &&
+		f.CreatedAtLteq == "" &&
+		f.IncludeArchiveFlg == nil &&
+		f.IncludeLostFlg == nil &&
+		f.NameCont == "" &&
+		f.ClientIDEq == 0 &&
+		f.ClientNameCont == "" &&
+		len(f.OrderStatusIn) == 0 &&
+		len(f.DeliveryStatusIn) == 0 &&
+		f.ProjectNoEq == "" &&
+		f.ManagementNoEq == "" &&
+		f.DeliveryDateGteq == "" &&
+		f.DeliveryDateLteq == "" &&
+		f.InvoiceDateGteq == "" &&
+		f.InvoiceDateLteq == "" &&
+		len(f.InvoiceTimingKbnIn) == 0 &&
+		len(f.Tags) == 0 &&
+		f.ResponseGroup == ""
+}
+
+// List returns projects.
+//
+// Behavior:
+//   - Zero filter (boardapi.ProjectListOptions{}): uses the local cache with
+//     refresh-on-demand (daily auto refresh, explicit Refresh / ForceRefresh).
+//     Returns *ListResult with Meta zero-valued (cache is source of truth).
+//   - Non-zero filter: bypasses the cache and calls api.ListProjects directly
+//     so that server-side filter semantics (Ransack _cont / _eq / _in[] /
+//     response_group) take effect. Returns *ListResult with Meta populated
+//     from the final page's response headers.
+//
+// Limit from readOpts is applied to the final result in either path.
+func (r *ProjectRepository) List(ctx context.Context, readOpts ReadOptions, filter boardapi.ProjectListOptions) (*boardapi.ListResult[boardapi.ProjectEntity], error) {
+	if !projectFilterIsZero(filter) {
+		// API 直接呼び出し（cache bypass）: フィルタ結果でキャッシュを汚染しない。
+		result, err := r.api.ListProjects(ctx, filter)
+		if err != nil {
+			return nil, err
+		}
+		result.Items = applyLimit(result.Items, readOpts.Limit)
+		return result, nil
+	}
+
+	// ゼロフィルタ: 既存の cache → refresh → API fallback 経路
 	fetcher := &projectsFetcher{api: r.api}
 	now := time.Now()
 
@@ -58,16 +108,13 @@ func (r *ProjectRepository) List(ctx context.Context, opts ReadOptions) ([]board
 	if err != nil {
 		return nil, err
 	}
-
-	if err := maybeRefresh(ctx, r.profile, projectsResource, opts, state, r.autoRefresh, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
+	if err := maybeRefresh(ctx, r.profile, projectsResource, readOpts, state, r.autoRefresh, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
 		return nil, err
 	}
-
 	entries, err := r.cache.List(ctx, r.profile, projectsResource)
 	if err != nil {
 		return nil, err
 	}
-
 	if len(entries) == 0 && state == nil {
 		if err := r.lockManager.WithLock(ctx, r.profile, projectsResource, func() error {
 			_, err := r.refresher.ForceRefresh(ctx, r.profile, fetcher, now, r.tz)
@@ -80,16 +127,28 @@ func (r *ProjectRepository) List(ctx context.Context, opts ReadOptions) ([]board
 			return nil, err
 		}
 	}
-
 	entities, err := decodeEntries[boardapi.ProjectEntity](entries)
 	if err != nil {
 		return nil, err
 	}
+	entities = applyLimit(entities, readOpts.Limit)
+	return &boardapi.ListResult[boardapi.ProjectEntity]{Items: entities}, nil
+}
 
-	return applyLimit(entities, opts.Limit), nil
+// ListEntities is a convenience wrapper around List that returns only the
+// items slice. Used by service/find (Phase L: find 層は *ListResult を受け取らず
+// []ProjectEntity を維持、Phase M で再検討）and other callers that do not need
+// response metadata.
+func (r *ProjectRepository) ListEntities(ctx context.Context, readOpts ReadOptions, filter boardapi.ProjectListOptions) ([]boardapi.ProjectEntity, error) {
+	result, err := r.List(ctx, readOpts, filter)
+	if err != nil {
+		return nil, err
+	}
+	return result.Items, nil
 }
 
 // GetByID returns the project with the given ID from the cache.
+// On cache miss, it fetches from the API and upserts the result.
 func (r *ProjectRepository) GetByID(ctx context.Context, id int, opts ReadOptions) (*boardapi.ProjectEntity, error) {
 	fetcher := &projectsFetcher{api: r.api}
 	now := time.Now()
@@ -118,12 +177,12 @@ func (r *ProjectRepository) GetByID(ctx context.Context, id int, opts ReadOption
 	}
 
 	// Cache miss -> fetch single entry from API
-	entity, err := r.api.GetProject(ctx, id)
+	result, err := r.api.GetProject(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 
-	raw, err := json.Marshal(entity)
+	raw, err := json.Marshal(result.Item)
 	if err != nil {
 		return nil, err
 	}
@@ -131,62 +190,24 @@ func (r *ProjectRepository) GetByID(ctx context.Context, id int, opts ReadOption
 		return nil, err
 	}
 
-	return entity, nil
+	return result.Item, nil
 }
 
 // GetByIDWithGroup fetches a project directly from the API with a response_group parameter.
 // Cache is bypassed because response_group data should not be cached.
 func (r *ProjectRepository) GetByIDWithGroup(ctx context.Context, id int, responseGroup string) (*boardapi.ProjectEntity, error) {
-	return r.api.GetProjectWithGroup(ctx, id, responseGroup)
-}
-
-// Search returns projects filtered by the given parameters from the cache.
-// If params.ResponseGroup is set, the cache is bypassed and the API is called directly.
-func (r *ProjectRepository) Search(ctx context.Context, params boardapi.ProjectSearchParams, opts ReadOptions) ([]boardapi.ProjectEntity, error) {
-	if params.ResponseGroup != "" {
-		result, err := r.api.SearchProjects(ctx, params)
-		if err != nil {
-			return nil, err
-		}
-		return applyLimit(result, opts.Limit), nil
-	}
-	listOpts := opts
-	listOpts.Limit = 0
-	all, err := r.List(ctx, listOpts)
+	result, err := r.api.GetProjectWithGroup(ctx, id, responseGroup)
 	if err != nil {
 		return nil, err
 	}
-	return applyLimit(filterProjects(all, params), opts.Limit), nil
+	return result.Item, nil
 }
 
-// filterProjects performs in-memory filtering.
-// UpdatedAtFrom is used as a delta fetch cursor and is not included in the filter.
-// NOTE: Status フィルタは BOARD API の order_status_name / delivery_status_name
-// の完全一致でフィルタリングする。実 API でも status パラメータは無視されるため
-// in-memory での name ベースフィルタで代替する。
-func filterProjects(entities []boardapi.ProjectEntity, params boardapi.ProjectSearchParams) []boardapi.ProjectEntity {
-	var result []boardapi.ProjectEntity
-	for _, e := range entities {
-		// M44: ClientID は nested Client.ID に統合
-		if params.ClientID != 0 {
-			if e.Client == nil || e.Client.ID != params.ClientID {
-				continue
-			}
-		}
-		if params.Name != "" && !strings.Contains(e.Name, params.Name) {
-			continue
-		}
-		// M44: Status は order_status_name / delivery_status_name で代替
-		// BOARD API 実測で status パラメータは無視されるため name ベースで in-memory フィルタ
-		if params.Status != "" && e.OrderStatusName != params.Status && e.DeliveryStatusName != params.Status {
-			continue
-		}
-		result = append(result, e)
-	}
-	return result
-}
-
-// ListPage retrieves a single page of ProjectEntity directly from the API (cache bypass).
-func (r *ProjectRepository) ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.ProjectEntity], error) {
-	return r.api.ListProjectsPage(ctx, page, perPage)
+// Search is a thin alias for ListEntities kept for the find layer's
+// per-resource Search idiom. The filter is expressed as ProjectListOptions.
+//
+// find 層は *ListResult を扱わず []ProjectEntity を維持する（Phase L の方針）。
+// Phase M で MCP / find の仕上げを行う際にインターフェースを再検討する。
+func (r *ProjectRepository) Search(ctx context.Context, filter boardapi.ProjectListOptions, opts ReadOptions) ([]boardapi.ProjectEntity, error) {
+	return r.ListEntities(ctx, opts, filter)
 }

@@ -42,7 +42,7 @@ func (s *Service) FindPurchaseOrder(ctx context.Context, q FindPurchaseOrderQuer
 		}
 
 	case q.ProjectName != "":
-		projects, err := s.projects.Search(ctx, boardapi.ProjectSearchParams{Name: q.ProjectName}, opts)
+		projects, err := s.projects.Search(ctx, boardapi.ProjectListOptions{NameCont: q.ProjectName}, opts)
 		if err != nil {
 			return nil, err
 		}

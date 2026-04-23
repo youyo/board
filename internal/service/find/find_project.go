@@ -36,7 +36,7 @@ func (s *Service) FindProject(ctx context.Context, q FindProjectQuery) ([]Projec
 			return nil, err
 		}
 		for _, c := range clients {
-			ps, err := s.projects.Search(ctx, boardapi.ProjectSearchParams{ClientID: c.ID}, opts)
+			ps, err := s.projects.Search(ctx, boardapi.ProjectListOptions{ClientIDEq: c.ID}, opts)
 			if err != nil {
 				return nil, err
 			}
@@ -45,7 +45,7 @@ func (s *Service) FindProject(ctx context.Context, q FindProjectQuery) ([]Projec
 
 	case q.Name != "":
 		// Name search: delegate to repo
-		result, err := s.projects.Search(ctx, boardapi.ProjectSearchParams{Name: q.Name}, opts)
+		result, err := s.projects.Search(ctx, boardapi.ProjectListOptions{NameCont: q.Name}, opts)
 		if err != nil {
 			return nil, err
 		}
@@ -54,7 +54,7 @@ func (s *Service) FindProject(ctx context.Context, q FindProjectQuery) ([]Projec
 	case q.Text != "":
 		// Text search: list all, filter by name / management_no / in_house_memo
 		// M44: Code/Memo は廃止。ManagementNo/InHouseMemo で代替。
-		all, err := s.projects.List(ctx, opts)
+		all, err := s.projects.Search(ctx, boardapi.ProjectListOptions{}, opts)
 		if err != nil {
 			return nil, err
 		}
@@ -67,7 +67,7 @@ func (s *Service) FindProject(ctx context.Context, q FindProjectQuery) ([]Projec
 	case q.Status != "":
 		// Status-only search: list all, filter by order_status_name / delivery_status_name
 		// M44: Status フィールド廃止。OrderStatusName/DeliveryStatusName で代替。
-		all, err := s.projects.List(ctx, opts)
+		all, err := s.projects.Search(ctx, boardapi.ProjectListOptions{}, opts)
 		if err != nil {
 			return nil, err
 		}

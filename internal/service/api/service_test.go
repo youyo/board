@@ -152,9 +152,9 @@ func TestListContactsPage(t *testing.T) {
 func TestListProjects(t *testing.T) {
 	stub := &stubProjectRepo{listResult: []boardapi.ProjectEntity{{ID: 1, Name: "ProjectA"}}}
 	svc := newServiceWithProjects(stub)
-	got, err := svc.ListProjects(testCtx, defaultOpts)
+	got, err := svc.ListProjects(testCtx, defaultOpts, boardapi.ProjectListOptions{})
 	assertNoError(t, err)
-	assertLen(t, got, 1)
+	assertLen(t, got.Items, 1)
 }
 
 func TestGetProject(t *testing.T) {
@@ -162,22 +162,6 @@ func TestGetProject(t *testing.T) {
 	stub := &stubProjectRepo{getResult: entity}
 	svc := newServiceWithProjects(stub)
 	got, err := svc.GetProject(testCtx, 1, defaultOpts)
-	assertNoError(t, err)
-	assertNotNil(t, got)
-}
-
-func TestSearchProjects(t *testing.T) {
-	stub := &stubProjectRepo{searchResult: []boardapi.ProjectEntity{{ID: 2, Name: "ProjectB"}}}
-	svc := newServiceWithProjects(stub)
-	got, err := svc.SearchProjects(testCtx, boardapi.ProjectSearchParams{Name: "ProjectB"}, defaultOpts)
-	assertNoError(t, err)
-	assertLen(t, got, 1)
-}
-
-func TestListProjectsPage(t *testing.T) {
-	stub := &stubProjectRepo{listPageResult: &boardapi.PageResult[boardapi.ProjectEntity]{Items: []boardapi.ProjectEntity{{ID: 1}}}}
-	svc := newServiceWithProjects(stub)
-	got, err := svc.ListProjectsPage(testCtx, 1, 30)
 	assertNoError(t, err)
 	assertNotNil(t, got)
 }

@@ -134,54 +134,119 @@ type ProjectEntity struct {
 	ProjectCosts []ProjectCostEntity `json:"project_costs,omitempty"`
 }
 
-// ProjectSearchParams は SearchProjects のパラメータ。
-// NOTE: BOARD API の name フィルタおよび status フィルタは実測で無視されることが
-// コンプライアンスロードマップの 9 件連続観測で確認されている。
-// 保持するが期待どおりのフィルタリングが実施されない可能性がある。
-type ProjectSearchParams struct {
-	ClientID      int
-	Name          string
-	Status        string
-	UpdatedAtFrom string
-	ResponseGroup string
+// ProjectListOptions は BOARD API GET /v1/projects のクエリパラメータ（Ransack スタイル）。
+// ゼロ値フィールドは API リクエストに送信されない。
+// ゼロ値 ProjectListOptions{} はフィルタなし（全件取得）。
+//
+// M51 で ProjectSearchParams に代わり導入。Phase L clients パイロット（M50）で
+// 確立されたパターンを projects に適用したもの。
+type ProjectListOptions struct {
+	// 共通ページネーション（通常は ListAllWithResult が page を上書きする）
+	Page    int
+	PerPage int
+
+	// 全 List 共通
+	UpdatedAtGteq     string // "YYYY-MM-DD HH:MM:SS"
+	UpdatedAtLteq     string
+	CreatedAtGteq     string // "YYYY-MM-DD HH:MM:SS"
+	CreatedAtLteq     string
+	IncludeArchiveFlg *bool // nil=送らない, true=1, false=0
+	IncludeLostFlg    *bool // nil=送らない, true=1, false=0（失注案件含む）
+
+	// projects 専用（Ransack 準拠）
+	NameCont         string // プロジェクト名部分一致
+	ClientIDEq       int    // 顧客 ID 完全一致
+	ClientNameCont   string // 顧客名部分一致
+	OrderStatusIn    []int  // 注文ステータス複数指定
+	DeliveryStatusIn []int  // 納品ステータス複数指定
+	ProjectNoEq      string // プロジェクト番号完全一致
+	ManagementNoEq   string // 管理番号完全一致
+
+	// 日付フィルタ（YYYY-MM-DD）
+	DeliveryDateGteq string // 納期 >= (YYYY-MM-DD)
+	DeliveryDateLteq string // 納期 <= (YYYY-MM-DD)
+	InvoiceDateGteq  string // 請求日 >= (YYYY-MM-DD)
+	InvoiceDateLteq  string // 請求日 <= (YYYY-MM-DD)
+
+	// 請求タイミング
+	InvoiceTimingKbnIn []int // 請求タイミング区分複数指定
+
+	// タグ・レスポンスグループ
+	Tags          []string // タグ
+	ResponseGroup string   // "small" / "large" / "estimate" / "order" / etc.
 }
 
-// ListProjects retrieves all projects.
-// Pagination is automatically handled by ListAll.
-func (c *Client) ListProjects(ctx context.Context) ([]ProjectEntity, error) {
-	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+// buildProjectsQuery builds the Ransack-style query string for
+// GET /v1/projects based on the given options and page.
+func buildProjectsQuery(opts ProjectListOptions, page, perPage int) string {
+	return NewQueryBuilder().
+		Page(page, perPage).
+		StrCont("name", opts.NameCont).
+		IntEq("client_id", opts.ClientIDEq).
+		StrCont("client_name", opts.ClientNameCont).
+		IntIn("order_status", opts.OrderStatusIn).
+		IntIn("delivery_status", opts.DeliveryStatusIn).
+		StrEq("project_no", opts.ProjectNoEq).
+		StrEq("management_no", opts.ManagementNoEq).
+		DateGteq("delivery_date", opts.DeliveryDateGteq).
+		DateLteq("delivery_date", opts.DeliveryDateLteq).
+		DateGteq("invoice_date", opts.InvoiceDateGteq).
+		DateLteq("invoice_date", opts.InvoiceDateLteq).
+		IntIn("invoice_timing_kbn", opts.InvoiceTimingKbnIn).
+		DateGteq("updated_at", opts.UpdatedAtGteq).
+		DateLteq("updated_at", opts.UpdatedAtLteq).
+		DateGteq("created_at", opts.CreatedAtGteq).
+		DateLteq("created_at", opts.CreatedAtLteq).
+		Flg01("include_archive_flg", opts.IncludeArchiveFlg).
+		Flg01("include_lost_flg", opts.IncludeLostFlg).
+		Tags(opts.Tags).
+		ResponseGroup(opts.ResponseGroup).
+		Encode()
+}
+
+// ListProjects retrieves projects filtered by the given options.
+// Pagination is handled internally by ListAllWithResult; metadata (total
+// count, page, rate limits, ETag) is surfaced via the returned *ListResult.
+//
+// Pass ProjectListOptions{} for an unfiltered list of all projects.
+func (c *Client) ListProjects(ctx context.Context, opts ProjectListOptions) (*ListResult[ProjectEntity], error) {
+	perPage := opts.PerPage
+	makeReq := func(ctx context.Context, page, pp int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/projects", nil)
 		if err != nil {
 			return nil, err
 		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		req.URL.RawQuery = q.Encode()
+		req.URL.RawQuery = buildProjectsQuery(opts, page, pp)
 		return req, nil
 	}
-	items, err := c.ListAll(ctx, makeReq)
+	var listOpts []ListAllOption
+	if perPage > 0 {
+		listOpts = append(listOpts, WithPerPage(perPage))
+	}
+	raw, err := c.ListAllWithResult(ctx, makeReq, listOpts...)
 	if err != nil {
 		return nil, err
 	}
-	result := make([]ProjectEntity, 0, len(items))
-	for _, raw := range items {
+	items := make([]ProjectEntity, 0, len(raw.Items))
+	for _, b := range raw.Items {
 		var x ProjectEntity
-		if err := json.Unmarshal(raw, &x); err != nil {
+		if err := json.Unmarshal(b, &x); err != nil {
 			return nil, &APIError{Code: APIErrorUnknown, Message: "ListProjects: unmarshal: " + err.Error()}
 		}
-		result = append(result, x)
+		items = append(items, x)
 	}
-	return result, nil
+	return &ListResult[ProjectEntity]{Items: items, Meta: raw.Meta, Headers: raw.Headers}, nil
 }
 
-// GetProject retrieves the project with the specified ID.
-func (c *Client) GetProject(ctx context.Context, id int) (*ProjectEntity, error) {
+// GetProject retrieves the project with the specified ID and returns an
+// ItemResult carrying the entity together with response metadata (ETag,
+// rate limits, Last-Modified).
+func (c *Client) GetProject(ctx context.Context, id int) (*ItemResult[ProjectEntity], error) {
 	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/projects/%d", id), nil)
 	if err != nil {
 		return nil, err
 	}
-	body, err := c.DoWithRetry(req)
+	body, headers, err := c.DoWithRetryFull(req)
 	if err != nil {
 		return nil, err
 	}
@@ -189,22 +254,26 @@ func (c *Client) GetProject(ctx context.Context, id int) (*ProjectEntity, error)
 	if err := json.Unmarshal(body, &x); err != nil {
 		return nil, &APIError{Code: APIErrorUnknown, Message: "GetProject: unmarshal: " + err.Error()}
 	}
-	return &x, nil
+	return &ItemResult[ProjectEntity]{
+		Item:    &x,
+		Meta:    parseItemMeta(headers),
+		Headers: headers,
+	}, nil
 }
 
-// GetProjectWithGroup retrieves the project with the specified ID and response_group.
+// GetProjectWithGroup retrieves the project with the specified ID and response_group,
+// and returns an ItemResult with metadata.
 // responseGroup can be "estimate", "order", "delivery", "invoice", "receipt", or "all".
 // If responseGroup is empty, behaves like GetProject.
-func (c *Client) GetProjectWithGroup(ctx context.Context, id int, responseGroup string) (*ProjectEntity, error) {
-	path := fmt.Sprintf("/v1/projects/%d", id)
-	if responseGroup != "" {
-		path += "?response_group=" + responseGroup
-	}
-	req, err := c.NewRequest(ctx, http.MethodGet, path, nil)
+func (c *Client) GetProjectWithGroup(ctx context.Context, id int, responseGroup string) (*ItemResult[ProjectEntity], error) {
+	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/projects/%d", id), nil)
 	if err != nil {
 		return nil, err
 	}
-	body, err := c.DoWithRetry(req)
+	if responseGroup != "" {
+		req.URL.RawQuery = NewQueryBuilder().ResponseGroup(responseGroup).Encode()
+	}
+	body, headers, err := c.DoWithRetryFull(req)
 	if err != nil {
 		return nil, err
 	}
@@ -212,67 +281,11 @@ func (c *Client) GetProjectWithGroup(ctx context.Context, id int, responseGroup 
 	if err := json.Unmarshal(body, &x); err != nil {
 		return nil, &APIError{Code: APIErrorUnknown, Message: "GetProjectWithGroup: unmarshal: " + err.Error()}
 	}
-	return &x, nil
-}
-
-// SearchProjects searches projects with the given conditions.
-// Pagination is automatically handled by ListAll.
-func (c *Client) SearchProjects(ctx context.Context, params ProjectSearchParams) ([]ProjectEntity, error) {
-	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
-		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/projects", nil)
-		if err != nil {
-			return nil, err
-		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		if params.ClientID != 0 {
-			q.Set("client_id", strconv.Itoa(params.ClientID))
-		}
-		if params.Name != "" {
-			q.Set("name", params.Name)
-		}
-		if params.Status != "" {
-			q.Set("status", params.Status)
-		}
-		if params.UpdatedAtFrom != "" {
-			q.Set("updated_at_from", params.UpdatedAtFrom)
-		}
-		if params.ResponseGroup != "" {
-			q.Set("response_group", params.ResponseGroup)
-		}
-		req.URL.RawQuery = q.Encode()
-		return req, nil
-	}
-	items, err := c.ListAll(ctx, makeReq)
-	if err != nil {
-		return nil, err
-	}
-	result := make([]ProjectEntity, 0, len(items))
-	for _, raw := range items {
-		var x ProjectEntity
-		if err := json.Unmarshal(raw, &x); err != nil {
-			return nil, &APIError{Code: APIErrorUnknown, Message: "SearchProjects: unmarshal: " + err.Error()}
-		}
-		result = append(result, x)
-	}
-	return result, nil
-}
-
-// ListProjectsPage retrieves a single page of projects.
-func (c *Client) ListProjectsPage(ctx context.Context, page, perPage int) (*PageResult[ProjectEntity], error) {
-	makeReq := func(ctx context.Context, p, pp int) (*http.Request, error) {
-		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/projects", nil)
-		if err != nil {
-			return nil, err
-		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(p))
-		q.Set("per_page", strconv.Itoa(pp))
-		req.URL.RawQuery = q.Encode()
-		return req, nil
-	}
-	return ListPage[ProjectEntity](c, ctx, makeReq, page, perPage)
+	return &ItemResult[ProjectEntity]{
+		Item:    &x,
+		Meta:    parseItemMeta(headers),
+		Headers: headers,
+	}, nil
 }
 
 // ListProjectsRaw retrieves all projects and returns the raw HTTP response
@@ -324,12 +337,6 @@ func (c *Client) GetProjectRaw(ctx context.Context, id int) ([]byte, error) {
 // or "all". If responseGroup is empty, behaves like GetProjectRaw (no
 // response_group query is appended).
 //
-// The query is concatenated directly to the path via "?response_group=<value>"
-// to mirror GetProjectWithGroup's existing implementation; BOARD API has been
-// validated to parse this form. Raw variant is exposed for E2E strict field
-// diff on DocumentSummary sub-entities (estimate/order/delivery/invoice/
-// receipt) which appear only when response_group is specified.
-//
 // Intended for E2E strict field diff; regular callers should use
 // GetProjectWithGroup.
 func (c *Client) GetProjectWithGroupRaw(ctx context.Context, id int, responseGroup string) ([]byte, error) {
@@ -342,54 +349,4 @@ func (c *Client) GetProjectWithGroupRaw(ctx context.Context, id int, responseGro
 		return nil, err
 	}
 	return c.DoWithRetry(req)
-}
-
-// SearchProjectsRaw retrieves projects matching the given search parameters
-// and returns the raw HTTP response bodies merged across pages as a single
-// JSON array. Same byte-preserving guarantee as ListProjectsRaw.
-//
-// ProjectSearchParams exposes 5 filters (ClientID, Name, Status, UpdatedAtFrom,
-// ResponseGroup) — the richest surface across M02-M12. Note that the BOARD
-// API has been observed to ignore the `name` filter across 7 consecutive
-// milestones (M03/M04/M06/M08/M09/M10/M12), so the Name value in Search only
-// exercises request encoding, not server-side filtering.
-//
-// Intended for E2E strict field diff; regular callers should use
-// SearchProjects.
-func (c *Client) SearchProjectsRaw(ctx context.Context, params ProjectSearchParams, opts ...ListAllOption) ([]byte, error) {
-	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
-		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/projects", nil)
-		if err != nil {
-			return nil, err
-		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		if params.ClientID != 0 {
-			q.Set("client_id", strconv.Itoa(params.ClientID))
-		}
-		if params.Name != "" {
-			q.Set("name", params.Name)
-		}
-		if params.Status != "" {
-			q.Set("status", params.Status)
-		}
-		if params.UpdatedAtFrom != "" {
-			q.Set("updated_at_from", params.UpdatedAtFrom)
-		}
-		if params.ResponseGroup != "" {
-			q.Set("response_group", params.ResponseGroup)
-		}
-		req.URL.RawQuery = q.Encode()
-		return req, nil
-	}
-	items, err := c.ListAll(ctx, makeReq, opts...)
-	if err != nil {
-		return nil, err
-	}
-	out, err := json.Marshal(items)
-	if err != nil {
-		return nil, &APIError{Code: APIErrorUnknown, Message: "SearchProjectsRaw: marshal aggregate: " + err.Error()}
-	}
-	return out, nil
 }

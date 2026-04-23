@@ -78,7 +78,7 @@ func (s *Service) FindDelivery(ctx context.Context, q FindDeliveryQuery) ([]Deli
 			return nil, err
 		}
 		for _, c := range clients {
-			projects, err := s.projects.Search(ctx, boardapi.ProjectSearchParams{ClientID: c.ID, ResponseGroup: "delivery"}, opts)
+			projects, err := s.projects.Search(ctx, boardapi.ProjectListOptions{ClientIDEq: c.ID, ResponseGroup: "delivery"}, opts)
 			if err != nil {
 				return nil, err
 			}
@@ -104,7 +104,7 @@ func (s *Service) FindDelivery(ctx context.Context, q FindDeliveryQuery) ([]Deli
 
 	case q.ProjectName != "":
 		// Search projects by name with delivery group → hydrate.
-		projects, err := s.projects.Search(ctx, boardapi.ProjectSearchParams{Name: q.ProjectName, ResponseGroup: "delivery"}, opts)
+		projects, err := s.projects.Search(ctx, boardapi.ProjectListOptions{NameCont: q.ProjectName, ResponseGroup: "delivery"}, opts)
 		if err != nil {
 			return nil, err
 		}

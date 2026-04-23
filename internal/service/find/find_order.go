@@ -73,7 +73,7 @@ func (s *Service) FindOrder(ctx context.Context, q FindOrderQuery) ([]OrderResul
 			return nil, err
 		}
 		for _, c := range clients {
-			projects, err := s.projects.Search(ctx, boardapi.ProjectSearchParams{ClientID: c.ID, ResponseGroup: "order"}, opts)
+			projects, err := s.projects.Search(ctx, boardapi.ProjectListOptions{ClientIDEq: c.ID, ResponseGroup: "order"}, opts)
 			if err != nil {
 				return nil, err
 			}
@@ -99,7 +99,7 @@ func (s *Service) FindOrder(ctx context.Context, q FindOrderQuery) ([]OrderResul
 
 	case q.ProjectName != "":
 		// Search projects by name with order group → hydrate.
-		projects, err := s.projects.Search(ctx, boardapi.ProjectSearchParams{Name: q.ProjectName, ResponseGroup: "order"}, opts)
+		projects, err := s.projects.Search(ctx, boardapi.ProjectListOptions{NameCont: q.ProjectName, ResponseGroup: "order"}, opts)
 		if err != nil {
 			return nil, err
 		}
