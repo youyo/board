@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 )
 
 // ClientBranchEntity は BOARD API の顧客支社エンティティ。
@@ -35,48 +34,79 @@ func (e ClientBranchEntity) ClientID() int {
 	return e.Client.ID
 }
 
-// ClientBranchSearchParams is the parameter for SearchClientBranches.
-type ClientBranchSearchParams struct {
-	ClientID int
-	Name     string
+// ClientBranchListOptions は GET /v1/client_branches のクエリパラメータ（Ransack スタイル）。
+// ゼロ値は API に送信しない。ClientBranchListOptions{} はフィルタなしの全件取得を意味する。
+//
+// M52 で導入。旧 ClientBranchSearchParams を置き換える破壊的変更。
+type ClientBranchListOptions struct {
+	// 共通ページネーション（通常は ListAllWithResult が page を上書きする）
+	Page    int
+	PerPage int
+
+	// 全 List 共通
+	UpdatedAtGteq     string // "YYYY-MM-DD HH:MM:SS"
+	UpdatedAtLteq     string
+	IncludeArchiveFlg *bool // nil=送らない, true=1, false=0
+
+	// client_branches 専用（Ransack 準拠）
+	ClientIDEq int    // 顧客 ID 完全一致
+	NameCont   string // 支社名部分一致（Ransack _cont）
 }
 
-// ListClientBranches retrieves all customer branches.
-// Pagination is automatically handled by ListAll.
-func (c *Client) ListClientBranches(ctx context.Context) ([]ClientBranchEntity, error) {
-	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+// buildClientBranchesQuery は GET /v1/client_branches の Ransack スタイルクエリ文字列を組み立てる。
+func buildClientBranchesQuery(opts ClientBranchListOptions, page, perPage int) string {
+	return NewQueryBuilder().
+		Page(page, perPage).
+		IntEq("client_id", opts.ClientIDEq).
+		StrCont("name", opts.NameCont).
+		DateGteq("updated_at", opts.UpdatedAtGteq).
+		DateLteq("updated_at", opts.UpdatedAtLteq).
+		Flg01("include_archive_flg", opts.IncludeArchiveFlg).
+		Encode()
+}
+
+// ListClientBranches は与えられたオプションでフィルタした顧客支社を取得する。
+// ページネーションは ListAllWithResult が内部で処理する。メタデータ（件数・レート制限・ETag）は
+// 返り値の *ListResult 経由で参照できる。
+//
+// フィルタなしの全件取得は ClientBranchListOptions{} を渡す。
+func (c *Client) ListClientBranches(ctx context.Context, opts ClientBranchListOptions) (*ListResult[ClientBranchEntity], error) {
+	perPage := opts.PerPage
+	makeReq := func(ctx context.Context, page, pp int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/client_branches", nil)
 		if err != nil {
 			return nil, err
 		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		req.URL.RawQuery = q.Encode()
+		req.URL.RawQuery = buildClientBranchesQuery(opts, page, pp)
 		return req, nil
 	}
-	items, err := c.ListAll(ctx, makeReq)
+	var listOpts []ListAllOption
+	if perPage > 0 {
+		listOpts = append(listOpts, WithPerPage(perPage))
+	}
+	raw, err := c.ListAllWithResult(ctx, makeReq, listOpts...)
 	if err != nil {
 		return nil, err
 	}
-	result := make([]ClientBranchEntity, 0, len(items))
-	for _, raw := range items {
+	items := make([]ClientBranchEntity, 0, len(raw.Items))
+	for _, b := range raw.Items {
 		var x ClientBranchEntity
-		if err := json.Unmarshal(raw, &x); err != nil {
+		if err := json.Unmarshal(b, &x); err != nil {
 			return nil, &APIError{Code: APIErrorUnknown, Message: "ListClientBranches: unmarshal: " + err.Error()}
 		}
-		result = append(result, x)
+		items = append(items, x)
 	}
-	return result, nil
+	return &ListResult[ClientBranchEntity]{Items: items, Meta: raw.Meta, Headers: raw.Headers}, nil
 }
 
-// GetClientBranch retrieves the customer branch with the specified ID.
-func (c *Client) GetClientBranch(ctx context.Context, id int) (*ClientBranchEntity, error) {
+// GetClientBranch は指定 ID の顧客支社を取得する。
+// レスポンスメタデータ（ETag・レート制限・Last-Modified）は *ItemResult 経由で参照できる。
+func (c *Client) GetClientBranch(ctx context.Context, id int) (*ItemResult[ClientBranchEntity], error) {
 	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/client_branches/%d", id), nil)
 	if err != nil {
 		return nil, err
 	}
-	body, err := c.DoWithRetry(req)
+	body, headers, err := c.DoWithRetryFull(req)
 	if err != nil {
 		return nil, err
 	}
@@ -84,136 +114,47 @@ func (c *Client) GetClientBranch(ctx context.Context, id int) (*ClientBranchEnti
 	if err := json.Unmarshal(body, &x); err != nil {
 		return nil, &APIError{Code: APIErrorUnknown, Message: "GetClientBranch: unmarshal: " + err.Error()}
 	}
-	return &x, nil
+	return &ItemResult[ClientBranchEntity]{
+		Item:    &x,
+		Meta:    parseItemMeta(headers),
+		Headers: headers,
+	}, nil
 }
 
-// SearchClientBranches searches customer branches with the given conditions.
-// Pagination is automatically handled by ListAll.
-func (c *Client) SearchClientBranches(ctx context.Context, params ClientBranchSearchParams) ([]ClientBranchEntity, error) {
-	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+// ListClientBranchesRaw は与えられたオプションでフィルタした顧客支社の生 JSON 配列と
+// 最終ページのレスポンスヘッダーを返す。バイト列は BOARD API が返したものをそのまま保持するため、
+// E2E の strict field diff に使用できる。通常の呼び出しには ListClientBranches を使うこと。
+func (c *Client) ListClientBranchesRaw(ctx context.Context, opts ClientBranchListOptions) ([]byte, http.Header, error) {
+	perPage := opts.PerPage
+	makeReq := func(ctx context.Context, page, pp int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/client_branches", nil)
 		if err != nil {
 			return nil, err
 		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		if params.ClientID != 0 {
-			q.Set("client_id", strconv.Itoa(params.ClientID))
-		}
-		if params.Name != "" {
-			q.Set("name", params.Name)
-		}
-		req.URL.RawQuery = q.Encode()
+		req.URL.RawQuery = buildClientBranchesQuery(opts, page, pp)
 		return req, nil
 	}
-	items, err := c.ListAll(ctx, makeReq)
+	var listOpts []ListAllOption
+	if perPage > 0 {
+		listOpts = append(listOpts, WithPerPage(perPage))
+	}
+	raw, err := c.ListAllWithResult(ctx, makeReq, listOpts...)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	result := make([]ClientBranchEntity, 0, len(items))
-	for _, raw := range items {
-		var x ClientBranchEntity
-		if err := json.Unmarshal(raw, &x); err != nil {
-			return nil, &APIError{Code: APIErrorUnknown, Message: "SearchClientBranches: unmarshal: " + err.Error()}
-		}
-		result = append(result, x)
+	out, err := json.Marshal(raw.Items)
+	if err != nil {
+		return nil, nil, &APIError{Code: APIErrorUnknown, Message: "ListClientBranchesRaw: marshal aggregate: " + err.Error()}
 	}
-	return result, nil
+	return out, raw.Headers, nil
 }
 
-// ListClientBranchesPage retrieves a single page of customer branches.
-func (c *Client) ListClientBranchesPage(ctx context.Context, page, perPage int) (*PageResult[ClientBranchEntity], error) {
-	makeReq := func(ctx context.Context, p, pp int) (*http.Request, error) {
-		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/client_branches", nil)
-		if err != nil {
-			return nil, err
-		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(p))
-		q.Set("per_page", strconv.Itoa(pp))
-		req.URL.RawQuery = q.Encode()
-		return req, nil
-	}
-	return ListPage[ClientBranchEntity](c, ctx, makeReq, page, perPage)
-}
-
-// ListClientBranchesRaw retrieves all customer branches and returns the raw
-// HTTP response bodies merged across pages as a single JSON array. Unlike
-// ListClientBranches, the returned bytes are byte-preserving: each element
-// JSON is exactly what the BOARD API emitted, enabling strict field diff in
-// E2E tests to detect keys that are not mapped to ClientBranchEntity.
-//
-// Intended for E2E strict field diff; regular callers should use
-// ListClientBranches.
-func (c *Client) ListClientBranchesRaw(ctx context.Context, opts ...ListAllOption) ([]byte, error) {
-	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
-		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/client_branches", nil)
-		if err != nil {
-			return nil, err
-		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		req.URL.RawQuery = q.Encode()
-		return req, nil
-	}
-	items, err := c.ListAll(ctx, makeReq, opts...)
-	if err != nil {
-		return nil, err
-	}
-	out, err := json.Marshal(items)
-	if err != nil {
-		return nil, &APIError{Code: APIErrorUnknown, Message: "ListClientBranchesRaw: marshal aggregate: " + err.Error()}
-	}
-	return out, nil
-}
-
-// GetClientBranchRaw retrieves a single customer branch and returns the raw
-// HTTP response body byte-for-byte.
-//
-// Intended for E2E strict field diff; regular callers should use
-// GetClientBranch.
-func (c *Client) GetClientBranchRaw(ctx context.Context, id int) ([]byte, error) {
+// GetClientBranchRaw は指定 ID の顧客支社の生 HTTP レスポンスボディとヘッダーを返す。
+// E2E の strict field diff に使用できる。通常の呼び出しには GetClientBranch を使うこと。
+func (c *Client) GetClientBranchRaw(ctx context.Context, id int) ([]byte, http.Header, error) {
 	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/client_branches/%d", id), nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return c.DoWithRetry(req)
-}
-
-// SearchClientBranchesRaw retrieves customer branches matching the given
-// search parameters and returns the raw HTTP response bodies merged across
-// pages as a single JSON array. Same byte-preserving guarantee as
-// ListClientBranchesRaw.
-//
-// Intended for E2E strict field diff; regular callers should use
-// SearchClientBranches.
-func (c *Client) SearchClientBranchesRaw(ctx context.Context, params ClientBranchSearchParams, opts ...ListAllOption) ([]byte, error) {
-	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
-		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/client_branches", nil)
-		if err != nil {
-			return nil, err
-		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		if params.ClientID != 0 {
-			q.Set("client_id", strconv.Itoa(params.ClientID))
-		}
-		if params.Name != "" {
-			q.Set("name", params.Name)
-		}
-		req.URL.RawQuery = q.Encode()
-		return req, nil
-	}
-	items, err := c.ListAll(ctx, makeReq, opts...)
-	if err != nil {
-		return nil, err
-	}
-	out, err := json.Marshal(items)
-	if err != nil {
-		return nil, &APIError{Code: APIErrorUnknown, Message: "SearchClientBranchesRaw: marshal aggregate: " + err.Error()}
-	}
-	return out, nil
+	return c.DoWithRetryFull(req)
 }

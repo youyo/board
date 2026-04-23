@@ -61,7 +61,7 @@ func TestE2E_Contacts_List(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
 
-	raw, err := client.ListContactsRaw(ctx)
+	raw, _, err := client.ListContactsRaw(ctx, boardapi.ContactListOptions{})
 	if err != nil {
 		// Roadmap rule: 403/429 must NOT be skipped, they must fail the test.
 		t.Fatalf("ListContactsRaw: %v", err)
@@ -126,7 +126,7 @@ func TestE2E_Contacts_Get(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
 
-	listRaw, err := client.ListContactsRaw(ctx)
+	listRaw, _, err := client.ListContactsRaw(ctx, boardapi.ContactListOptions{})
 	if err != nil {
 		t.Fatalf("ListContactsRaw (discovery): %v", err)
 	}
@@ -148,7 +148,7 @@ func TestE2E_Contacts_Get(t *testing.T) {
 		t.Fatalf("first contact has non-positive ID: %d", id)
 	}
 
-	getRaw, err := client.GetContactRaw(ctx, id)
+	getRaw, _, err := client.GetContactRaw(ctx, id)
 	if err != nil {
 		// Phase D note: M09 confirmed core-business resources return 200 on
 		// Get-by-id (unlike master-tables which 404 consistently). If M10
@@ -210,11 +210,11 @@ func TestE2E_Contacts_Search(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
 
-	raw, err := client.SearchContactsRaw(ctx, boardapi.ContactSearchParams{
-		Name: "zzz_nonexistent_keyword_for_e2e",
+	raw, _, err := client.ListContactsRaw(ctx, boardapi.ContactListOptions{
+		NameCont: "zzz_nonexistent_keyword_for_e2e",
 	})
 	if err != nil {
-		t.Fatalf("SearchContactsRaw: %v", err)
+		t.Fatalf("ListContactsRaw: %v", err)
 	}
 
 	dumpJSON(t, "contacts_search", 0, raw)

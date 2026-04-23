@@ -1371,6 +1371,7 @@ func TestListClients_WithUpdatedAtGteq(t *testing.T) {
 // ============================================================
 
 // T52: ListClientBranches — happy path（M39 新スキーマ: client nested + zip/pref/address1/address2/tel/archive_flg）
+// M52: シグネチャを ListClientBranches(ctx, ClientBranchListOptions) *ListResult に更新。
 func TestListClientBranches_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -1380,19 +1381,20 @@ func TestListClientBranches_OK(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.ListClientBranches(context.Background())
+	result, err := c.ListClientBranches(context.Background(), boardapi.ClientBranchListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result) != 1 {
-		t.Errorf("want 1 client branch, got %d", len(result))
+	if len(result.Items) != 1 {
+		t.Errorf("want 1 client branch, got %d", len(result.Items))
 	}
-	if result[0].ID != 1 || result[0].ClientID() != 10 || result[0].Name != "Tokyo Branch" {
-		t.Errorf("result[0]: got %+v", result[0])
+	if result.Items[0].ID != 1 || result.Items[0].ClientID() != 10 || result.Items[0].Name != "Tokyo Branch" {
+		t.Errorf("result.Items[0]: got %+v", result.Items[0])
 	}
 }
 
 // T53: GetClientBranch — happy path（M39 新スキーマ）
+// M52: シグネチャを GetClientBranch(ctx, id) *ItemResult に更新。
 func TestGetClientBranch_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/client_branches/1" {
@@ -1406,23 +1408,23 @@ func TestGetClientBranch_OK(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	got, err := c.GetClientBranch(context.Background(), 1)
+	result, err := c.GetClientBranch(context.Background(), 1)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got == nil {
-		t.Fatal("got nil ClientBranchEntity")
+	if result == nil || result.Item == nil {
+		t.Fatal("got nil ItemResult or nil Item")
 	}
-	if got.ID != 1 || got.Name != "Osaka Branch" {
-		t.Errorf("GetClientBranch: got %+v", got)
+	if result.Item.ID != 1 || result.Item.Name != "Osaka Branch" {
+		t.Errorf("GetClientBranch: got %+v", result.Item)
 	}
 }
 
-// T54: SearchClientBranches — with ClientID parameter（M39 新スキーマ）
-func TestSearchClientBranches_WithClientID(t *testing.T) {
+// T54: ListClientBranches — with ClientIDEq parameter（M52: SearchClientBranches → ListClientBranches + ClientBranchListOptions）
+func TestListClientBranches_WithClientIDEq(t *testing.T) {
 	var gotClientID string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotClientID = r.URL.Query().Get("client_id")
+		gotClientID = r.URL.Query().Get("client_id_eq")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`[{"id":2,"client":{"id":10,"name":"株式会社名古屋","name_disp":"名古屋","custom_no":""},"name":"Nagoya Branch","zip":"","pref":"","address1":"","address2":"","tel":null,"fax":null,"archive_flg":0,"updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
 	}))
@@ -1430,15 +1432,15 @@ func TestSearchClientBranches_WithClientID(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.SearchClientBranches(context.Background(), boardapi.ClientBranchSearchParams{ClientID: 10})
+	result, err := c.ListClientBranches(context.Background(), boardapi.ClientBranchListOptions{ClientIDEq: 10})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result) != 1 {
-		t.Errorf("want 1 result, got %d", len(result))
+	if len(result.Items) != 1 {
+		t.Errorf("want 1 result, got %d", len(result.Items))
 	}
 	if gotClientID != "10" {
-		t.Errorf("client_id param: want %q, got %q", "10", gotClientID)
+		t.Errorf("client_id_eq param: want %q, got %q", "10", gotClientID)
 	}
 }
 
@@ -1447,6 +1449,7 @@ func TestSearchClientBranches_WithClientID(t *testing.T) {
 // ============================================================
 
 // T55: ListContacts — happy path (3 items)
+// M52: シグネチャを ListContacts(ctx, ContactListOptions) *ListResult に更新。
 func TestListContacts_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -1456,16 +1459,17 @@ func TestListContacts_OK(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.ListContacts(context.Background())
+	result, err := c.ListContacts(context.Background(), boardapi.ContactListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result) != 3 {
-		t.Errorf("want 3 contacts, got %d", len(result))
+	if len(result.Items) != 3 {
+		t.Errorf("want 3 contacts, got %d", len(result.Items))
 	}
 }
 
 // T56: GetContact — happy path
+// M52: シグネチャを GetContact(ctx, id) *ItemResult に更新。
 func TestGetContact_OK(t *testing.T) {
 	email := "test@example.com"
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1480,23 +1484,23 @@ func TestGetContact_OK(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	got, err := c.GetContact(context.Background(), 5)
+	result, err := c.GetContact(context.Background(), 5)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got == nil {
-		t.Fatal("got nil ContactEntity")
+	if result == nil || result.Item == nil {
+		t.Fatal("got nil ItemResult or nil Item")
 	}
-	if got.ID != 5 || got.Email == nil || *got.Email != email {
-		t.Errorf("GetContact: got %+v", got)
+	if result.Item.ID != 5 || result.Item.Email == nil || *result.Item.Email != email {
+		t.Errorf("GetContact: got %+v", result.Item)
 	}
 }
 
-// T57: SearchContacts — with Email parameter
-func TestSearchContacts_WithEmail(t *testing.T) {
+// T57: ListContacts — with EmailCont parameter（M52: SearchContacts → ListContacts + ContactListOptions）
+func TestListContacts_WithEmailCont(t *testing.T) {
 	var gotEmail string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotEmail = r.URL.Query().Get("email")
+		gotEmail = r.URL.Query().Get("email_cont")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`[{"id":5,"client":{"id":10,"name":"Client A","name_disp":"Client A","custom_no":""},"last_name":"Yamada","first_name":"Ichiro","honorific_title":"様","title":null,"department":null,"email":"test@example.com","note":null,"archive_flg":0,"updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
 	}))
@@ -1504,15 +1508,15 @@ func TestSearchContacts_WithEmail(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.SearchContacts(context.Background(), boardapi.ContactSearchParams{Email: "test@example.com"})
+	result, err := c.ListContacts(context.Background(), boardapi.ContactListOptions{EmailCont: "test@example.com"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result) != 1 {
-		t.Errorf("want 1 result, got %d", len(result))
+	if len(result.Items) != 1 {
+		t.Errorf("want 1 result, got %d", len(result.Items))
 	}
 	if gotEmail != "test@example.com" {
-		t.Errorf("email param: want %q, got %q", "test@example.com", gotEmail)
+		t.Errorf("email_cont param: want %q, got %q", "test@example.com", gotEmail)
 	}
 }
 
@@ -1615,6 +1619,7 @@ func TestListProjects_UnmarshalError(t *testing.T) {
 // ============================================================
 
 // T61: ListProjectCosts — happy path (5 items)
+// M52: シグネチャを ListProjectCosts(ctx, ProjectCostListOptions) *ListResult に更新。
 func TestListProjectCosts_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -1624,16 +1629,17 @@ func TestListProjectCosts_OK(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.ListProjectCosts(context.Background())
+	result, err := c.ListProjectCosts(context.Background(), boardapi.ProjectCostListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result) != 5 {
-		t.Errorf("want 5 project costs, got %d", len(result))
+	if len(result.Items) != 5 {
+		t.Errorf("want 5 project costs, got %d", len(result.Items))
 	}
 }
 
 // T62: GetProjectCost — happy path
+// M52: シグネチャを GetProjectCost(ctx, id) *ItemResult に更新。
 func TestGetProjectCost_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/project_costs/50" {
@@ -1647,23 +1653,23 @@ func TestGetProjectCost_OK(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	got, err := c.GetProjectCost(context.Background(), 50)
+	result, err := c.GetProjectCost(context.Background(), 50)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got == nil {
-		t.Fatal("got nil ProjectCostEntity")
+	if result == nil || result.Item == nil {
+		t.Fatal("got nil ItemResult or nil Item")
 	}
-	if got.ID != 50 || got.Cost != 100000 {
-		t.Errorf("GetProjectCost: got %+v", got)
+	if result.Item.ID != 50 || result.Item.Cost != 100000 {
+		t.Errorf("GetProjectCost: got %+v", result.Item)
 	}
 }
 
-// T63: SearchProjectCosts — with ProjectID parameter
-func TestSearchProjectCosts_WithProjectID(t *testing.T) {
+// T63: ListProjectCosts — with ProjectIDEq parameter（M52: SearchProjectCosts → ListProjectCosts + ProjectCostListOptions）
+func TestListProjectCosts_WithProjectIDEq(t *testing.T) {
 	var gotProjectID string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotProjectID = r.URL.Query().Get("project_id")
+		gotProjectID = r.URL.Query().Get("project_id_eq")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`[{"id":1,"project_id":200,"description":"労務費","cost":100000,"invoice_date":null,"payment_date":null,"updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
 	}))
@@ -1671,15 +1677,15 @@ func TestSearchProjectCosts_WithProjectID(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.SearchProjectCosts(context.Background(), boardapi.ProjectCostSearchParams{ProjectID: 200})
+	result, err := c.ListProjectCosts(context.Background(), boardapi.ProjectCostListOptions{ProjectIDEq: 200})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result) != 1 {
-		t.Errorf("want 1 result, got %d", len(result))
+	if len(result.Items) != 1 {
+		t.Errorf("want 1 result, got %d", len(result.Items))
 	}
 	if gotProjectID != "200" {
-		t.Errorf("project_id param: want %q, got %q", "200", gotProjectID)
+		t.Errorf("project_id_eq param: want %q, got %q", "200", gotProjectID)
 	}
 }
 
@@ -3633,25 +3639,23 @@ func TestProjectEntity_DocumentSummaryNullMessage(t *testing.T) {
 	}
 }
 
-// T214: ListClientBranchesPage returns valid PageResult
-func TestListClientBranchesPage_OK(t *testing.T) {
+// T214: ListClientBranches with PerPage option — M52 で ListClientBranchesPage を廃止し
+// ListClientBranches(ctx, ClientBranchListOptions{PerPage: N}) に統合。
+func TestListClientBranches_WithPerPage(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Total-Count", "5")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"client_id":10,"name":"Branch1","postal_code":"","address":"","phone":"","fax":"","memo":"","updated_at":"","created_at":""}]`))
+		w.Write([]byte(`[{"id":1,"client":{"id":10,"name":"Branch1","name_disp":"B1","custom_no":""},"name":"Branch1","zip":"","pref":"","address1":"","address2":"","tel":null,"fax":null,"archive_flg":0,"updated_at":"","created_at":""}]`))
 	}))
 	defer ts.Close()
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.ListClientBranchesPage(context.Background(), 1, 20)
+	result, err := c.ListClientBranches(context.Background(), boardapi.ClientBranchListOptions{PerPage: 20})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(result.Items) != 1 || result.Items[0].ID != 1 {
 		t.Errorf("unexpected items: %+v", result.Items)
-	}
-	if result.TotalCount != 5 {
-		t.Errorf("TotalCount: want 5, got %d", result.TotalCount)
 	}
 }

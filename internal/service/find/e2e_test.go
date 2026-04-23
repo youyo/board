@@ -173,14 +173,15 @@ func TestE2E_FindClient_StrictEnrichment(t *testing.T) {
 	}
 
 	// 4. Independent raw fetch for Branches; compare count + ID set.
-	branchesRaw, err := api.SearchClientBranchesRaw(ctx, boardapi.ClientBranchSearchParams{ClientID: targetID})
+	branchesRaw, _, err := api.ListClientBranchesRaw(ctx, boardapi.ClientBranchListOptions{ClientIDEq: targetID})
 	if err != nil {
-		t.Fatalf("SearchClientBranchesRaw(ClientID=%d): %v", targetID, err)
+		t.Fatalf("ListClientBranchesRaw(ClientIDEq=%d): %v", targetID, err)
 	}
-	var independentBranches []boardapi.ClientBranchEntity
-	if err := json.Unmarshal(branchesRaw, &independentBranches); err != nil {
+	var branchesListResult boardapi.ListResult[boardapi.ClientBranchEntity]
+	if err := json.Unmarshal(branchesRaw, &branchesListResult); err != nil {
 		t.Fatalf("unmarshal branches: %v", err)
 	}
+	independentBranches := branchesListResult.Items
 	if len(r.Branches) != len(independentBranches) {
 		t.Errorf("Branches count mismatch: FindClient=%d independent=%d", len(r.Branches), len(independentBranches))
 	}
@@ -198,14 +199,15 @@ func TestE2E_FindClient_StrictEnrichment(t *testing.T) {
 	}
 
 	// 5. Independent raw fetch for Contacts; compare count + ID set.
-	contactsRaw, err := api.SearchContactsRaw(ctx, boardapi.ContactSearchParams{ClientID: targetID})
+	contactsRaw, _, err := api.ListContactsRaw(ctx, boardapi.ContactListOptions{ClientIDEq: targetID})
 	if err != nil {
-		t.Fatalf("SearchContactsRaw(ClientID=%d): %v", targetID, err)
+		t.Fatalf("ListContactsRaw(ClientIDEq=%d): %v", targetID, err)
 	}
-	var independentContacts []boardapi.ContactEntity
-	if err := json.Unmarshal(contactsRaw, &independentContacts); err != nil {
+	var contactsListResult boardapi.ListResult[boardapi.ContactEntity]
+	if err := json.Unmarshal(contactsRaw, &contactsListResult); err != nil {
 		t.Fatalf("unmarshal contacts: %v", err)
 	}
+	independentContacts := contactsListResult.Items
 	if len(r.Contacts) != len(independentContacts) {
 		t.Errorf("Contacts count mismatch: FindClient=%d independent=%d", len(r.Contacts), len(independentContacts))
 	}
@@ -441,7 +443,7 @@ func TestE2E_FindProject_ByID(t *testing.T) {
 	svc, api := newE2EFindService(t)
 	ctx := context.Background()
 
-	pr, err := api.ListProjectsPage(ctx, 1, 1)
+	pr, err := api.ListProjects(ctx, boardapi.ProjectListOptions{Page: 1, PerPage: 1})
 	if err != nil || len(pr.Items) == 0 {
 		t.Skip("no projects available")
 	}
@@ -488,7 +490,7 @@ func TestE2E_FindEstimate_ByProjectID(t *testing.T) {
 	svc, api := newE2EFindService(t)
 	ctx := context.Background()
 
-	pr, err := api.ListProjectsPage(ctx, 1, 1)
+	pr, err := api.ListProjects(ctx, boardapi.ProjectListOptions{Page: 1, PerPage: 1})
 	if err != nil || len(pr.Items) == 0 {
 		t.Skip("no projects available")
 	}
@@ -509,7 +511,7 @@ func TestE2E_FindProject_WithEstimate(t *testing.T) {
 	svc, api := newE2EFindService(t)
 	ctx := context.Background()
 
-	pr, err := api.ListProjectsPage(ctx, 1, 1)
+	pr, err := api.ListProjects(ctx, boardapi.ProjectListOptions{Page: 1, PerPage: 1})
 	if err != nil || len(pr.Items) == 0 {
 		t.Skip("no projects available")
 	}
@@ -541,7 +543,7 @@ func TestE2E_FindProject_StrictEnrichment_ByID(t *testing.T) {
 	ctx := context.Background()
 
 	// 5 件取得して最初の非ゼロ ClientID を持つプロジェクトを選ぶ。
-	pr, err := api.ListProjectsPage(ctx, 1, 5)
+	pr, err := api.ListProjects(ctx, boardapi.ProjectListOptions{Page: 1, PerPage: 5})
 	if err != nil || len(pr.Items) == 0 {
 		t.Skip("no projects available")
 	}
@@ -600,10 +602,14 @@ func TestE2E_FindProject_StrictEnrichment_ByID(t *testing.T) {
 	}
 
 	// Estimate enrichment: GetProjectWithGroup で response_group=estimate を叩いて突合。
-	pw, err := api.GetProjectWithGroup(ctx, targetProject.ID, "estimate")
+	pwResult, err := api.GetProjectWithGroup(ctx, targetProject.ID, "estimate")
 	if err != nil {
 		t.Fatalf("GetProjectWithGroup(ID=%d, estimate): %v", targetProject.ID, err)
 	}
+	if pwResult == nil || pwResult.Item == nil {
+		t.Fatalf("GetProjectWithGroup(ID=%d, estimate): returned nil item", targetProject.ID)
+	}
+	pw := pwResult.Item
 	if pw.Estimate != nil {
 		if r.Estimate == nil {
 			t.Errorf("r.Estimate is nil but project has estimate id=%d", pw.Estimate.ID)
@@ -634,7 +640,7 @@ func TestE2E_FindProject_ByName_Strict(t *testing.T) {
 	svc, api := newE2EFindService(t)
 	ctx := context.Background()
 
-	pr, err := api.ListProjectsPage(ctx, 1, 1)
+	pr, err := api.ListProjects(ctx, boardapi.ProjectListOptions{Page: 1, PerPage: 1})
 	if err != nil || len(pr.Items) == 0 {
 		t.Skip("no projects available")
 	}
@@ -744,7 +750,7 @@ func TestE2E_FindProject_ByText_Strict(t *testing.T) {
 	svc, api := newE2EFindService(t)
 	ctx := context.Background()
 
-	pr, err := api.ListProjectsPage(ctx, 1, 1)
+	pr, err := api.ListProjects(ctx, boardapi.ProjectListOptions{Page: 1, PerPage: 1})
 	if err != nil || len(pr.Items) == 0 {
 		t.Skip("no projects available")
 	}
@@ -792,7 +798,7 @@ func TestE2E_FindProject_ByStatus_Strict(t *testing.T) {
 	svc, api := newE2EFindService(t)
 	ctx := context.Background()
 
-	pr, err := api.ListProjectsPage(ctx, 1, 5)
+	pr, err := api.ListProjects(ctx, boardapi.ProjectListOptions{Page: 1, PerPage: 5})
 	if err != nil || len(pr.Items) == 0 {
 		t.Skip("no projects available")
 	}
@@ -949,7 +955,7 @@ func findProjectWithDocType(t *testing.T, apiClient *boardapi.Client, docType st
 	ctx := context.Background()
 
 	// topN 件を 1 ページで取得（全ページ走査を避ける）
-	page, err := apiClient.ListProjectsPage(ctx, 1, topN)
+	page, err := apiClient.ListProjects(ctx, boardapi.ProjectListOptions{Page: 1, PerPage: topN})
 	if err != nil || len(page.Items) == 0 {
 		t.Logf("findProjectWithDocType: ListProjectsPage failed or empty: %v", err)
 		return 0, 0
@@ -1028,10 +1034,14 @@ func TestE2E_FindOrder_ByProjectID_Strict(t *testing.T) {
 	}
 
 	// pre-fetch: projectID の ClientID を取得（enrichment 検証用）
-	pr, err := apiClient.GetProjectWithGroup(ctx, projectID, "order")
+	prResult, err := apiClient.GetProjectWithGroup(ctx, projectID, "order")
 	if err != nil {
 		t.Fatalf("GetProjectWithGroup(%d, order): %v", projectID, err)
 	}
+	if prResult == nil || prResult.Item == nil {
+		t.Fatalf("GetProjectWithGroup(%d, order): returned nil item", projectID)
+	}
+	pr := prResult.Item
 
 	results, err := svc.FindOrder(ctx, find.FindOrderQuery{
 		ProjectID: projectID,
@@ -1169,10 +1179,14 @@ func TestE2E_FindDelivery_ByProjectID_Strict(t *testing.T) {
 	}
 
 	// pre-fetch: projectID の ClientID を取得（enrichment 検証用）
-	pr, err := apiClient.GetProjectWithGroup(ctx, projectID, "delivery")
+	prResult, err := apiClient.GetProjectWithGroup(ctx, projectID, "delivery")
 	if err != nil {
 		t.Fatalf("GetProjectWithGroup(%d, delivery): %v", projectID, err)
 	}
+	if prResult == nil || prResult.Item == nil {
+		t.Fatalf("GetProjectWithGroup(%d, delivery): returned nil item", projectID)
+	}
+	pr := prResult.Item
 
 	results, err := svc.FindDelivery(ctx, find.FindDeliveryQuery{
 		ProjectID: projectID,
@@ -1307,10 +1321,14 @@ func TestE2E_FindReceipt_ByProjectID_Strict(t *testing.T) {
 	}
 
 	// pre-fetch: projectID の ClientID を取得（enrichment 検証用）
-	pr, err := apiClient.GetProjectWithGroup(ctx, projectID, "receipt")
+	prResult, err := apiClient.GetProjectWithGroup(ctx, projectID, "receipt")
 	if err != nil {
 		t.Fatalf("GetProjectWithGroup(%d, receipt): %v", projectID, err)
 	}
+	if prResult == nil || prResult.Item == nil {
+		t.Fatalf("GetProjectWithGroup(%d, receipt): returned nil item", projectID)
+	}
+	pr := prResult.Item
 
 	results, err := svc.FindReceipt(ctx, find.FindReceiptQuery{
 		ProjectID: projectID,

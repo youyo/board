@@ -9,7 +9,7 @@ import (
 	"github.com/youyo/board/internal/output"
 )
 
-// NewAPIContactsCmd  returns the board api contacts subcommand group.
+// NewAPIContactsCmd returns the board api contacts subcommand group.
 func NewAPIContactsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "contacts",
@@ -18,42 +18,73 @@ func NewAPIContactsCmd() *cobra.Command {
 	cmd.AddCommand(
 		newAPIContactsListCmd(),
 		newAPIContactsGetCmd(),
-		newAPIContactsSearchCmd(),
 	)
 	return cmd
+}
+
+// contactListFlagsFromCmd reads the Ransack-style filter flags and returns a
+// ContactListOptions. All flags are optional; any flag left at its zero value
+// is omitted from the outgoing request.
+func contactListFlagsFromCmd(cmd *cobra.Command) boardapi.ContactListOptions {
+	clientIDEq, _ := cmd.Flags().GetInt("client-id")
+	nameCont, _ := cmd.Flags().GetString("name-cont")
+	emailCont, _ := cmd.Flags().GetString("email-cont")
+	updatedAtGteq, _ := cmd.Flags().GetString("updated-at-gteq")
+	updatedAtLteq, _ := cmd.Flags().GetString("updated-at-lteq")
+
+	var includeArchive *bool
+	if cmd.Flags().Changed("include-archive-flg") {
+		v, _ := cmd.Flags().GetBool("include-archive-flg")
+		includeArchive = &v
+	}
+
+	return boardapi.ContactListOptions{
+		ClientIDEq:        clientIDEq,
+		NameCont:          nameCont,
+		EmailCont:         emailCont,
+		UpdatedAtGteq:     updatedAtGteq,
+		UpdatedAtLteq:     updatedAtLteq,
+		IncludeArchiveFlg: includeArchive,
+	}
 }
 
 func newAPIContactsListCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
-		Short: "List all contacts",
+		Short: "List contacts (optionally filtered by Ransack-style query params)",
+		Long: `List contacts. Filters are forwarded to the BOARD API as Ransack-style
+query parameters (e.g. --name-cont sends name_cont). A zero-filter request
+uses the local cache; any non-zero filter bypasses the cache and calls the
+API directly so server-side filter semantics take effect.
+
+JSON output includes an _meta object (total_count, page, per_page, rate
+limits, ETag, last_modified) derived from response headers. Use
+--no-show-meta to omit it.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			svc, err := apiServiceFromCmd(cmd)
 			if err != nil {
 				return err
 			}
-			page, _ := cmd.Flags().GetInt("page")
-			perPage, _ := cmd.Flags().GetInt("per-page")
-			if page > 0 {
-				result, err := svc.ListContactsPage(cmd.Context(), page, perPage)
-				if err != nil {
-					return err
-				}
-				totalPages := (result.TotalCount + result.PerPage - 1) / result.PerPage
-				fmt.Fprintf(os.Stderr, "# Total: %d, Page: %d/%d, PerPage: %d\n",
-					result.TotalCount, result.Page, totalPages, result.PerPage)
-				return output.Write(os.Stdout, result.Items, prettyFromCmd(cmd))
-			}
-			opts := readOptionsFromCmd(cmd)
-			result, err := svc.ListContacts(cmd.Context(), opts)
+			readOpts := readOptionsFromCmd(cmd)
+			filter := contactListFlagsFromCmd(cmd)
+			result, err := svc.ListContacts(cmd.Context(), readOpts, filter)
 			if err != nil {
 				return err
 			}
-			return output.Write(os.Stdout, result, prettyFromCmd(cmd))
+			showMeta, _ := cmd.Flags().GetBool("show-meta")
+			if showMeta {
+				return output.Write(os.Stdout, result, prettyFromCmd(cmd))
+			}
+			return output.Write(os.Stdout, result.Items, prettyFromCmd(cmd))
 		},
 	}
-	cmd.Flags().Int("page", 0, "Page number (1-based, bypasses cache)")
-	cmd.Flags().Int("per-page", 50, "Items per page (max 100, used with --page)")
+	cmd.Flags().Int("client-id", 0, "Filter by client ID (Ransack client_id_eq, exact match)")
+	cmd.Flags().String("name-cont", "", "Filter by contact name (Ransack name_cont, partial match)")
+	cmd.Flags().String("email-cont", "", "Filter by email address (Ransack email_cont, partial match)")
+	cmd.Flags().String("updated-at-gteq", "", `updated_at >= (YYYY-MM-DD HH:MM:SS)`)
+	cmd.Flags().String("updated-at-lteq", "", `updated_at <= (YYYY-MM-DD HH:MM:SS)`)
+	cmd.Flags().Bool("include-archive-flg", false, "Include archived contacts (send include_archive_flg=1)")
+	cmd.Flags().Bool("show-meta", true, "Include _meta (pagination / rate limit / ETag) in JSON output")
 	return cmd
 }
 
@@ -79,35 +110,5 @@ func newAPIContactsGetCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().IntVar(&id, "id", 0, "Contact ID (required)")
-	return cmd
-}
-
-func newAPIContactsSearchCmd() *cobra.Command {
-	var clientID int
-	var name, email string
-	cmd := &cobra.Command{
-		Use:   "search",
-		Short: "Search contacts by criteria",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			svc, err := apiServiceFromCmd(cmd)
-			if err != nil {
-				return err
-			}
-			opts := readOptionsFromCmd(cmd)
-			params := boardapi.ContactSearchParams{
-				ClientID: clientID,
-				Name:     name,
-				Email:    email,
-			}
-			result, err := svc.SearchContacts(cmd.Context(), params, opts)
-			if err != nil {
-				return err
-			}
-			return output.Write(os.Stdout, result, prettyFromCmd(cmd))
-		},
-	}
-	cmd.Flags().IntVar(&clientID, "client-id", 0, "Filter by client ID")
-	cmd.Flags().StringVar(&name, "name", "", "Filter by contact name")
-	cmd.Flags().StringVar(&email, "email", "", "Filter by email address")
 	return cmd
 }

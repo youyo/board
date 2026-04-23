@@ -48,8 +48,42 @@ func NewProjectCostRepository(
 
 const projectCostsResource = "project_costs"
 
-// List returns all project costs from the cache.
-func (r *ProjectCostRepository) List(ctx context.Context, opts ReadOptions) ([]boardapi.ProjectCostEntity, error) {
+// projectCostFilterIsZero reports whether the given filter is empty (all fields
+// are zero values / nil). A zero filter routes through the local cache; a
+// non-zero filter bypasses the cache and calls the API directly because
+// filtered results must not poison the full-entity cache.
+func projectCostFilterIsZero(f boardapi.ProjectCostListOptions) bool {
+	return f.Page == 0 &&
+		f.PerPage == 0 &&
+		f.UpdatedAtGteq == "" &&
+		f.UpdatedAtLteq == "" &&
+		f.IncludeArchiveFlg == nil &&
+		f.ProjectIDEq == 0
+}
+
+// List returns project costs.
+//
+// Behavior:
+//   - Zero filter (boardapi.ProjectCostListOptions{}): uses the local cache with
+//     refresh-on-demand (daily auto refresh, explicit Refresh / ForceRefresh).
+//     Returns *ListResult with Meta zero-valued (cache is source of truth).
+//   - Non-zero filter: bypasses the cache and calls api.ListProjectCosts directly
+//     so that server-side filter semantics (Ransack) take effect.
+//     Returns *ListResult with Meta populated from the final page's response headers.
+//
+// Limit from readOpts is applied to the final result in either path.
+func (r *ProjectCostRepository) List(ctx context.Context, readOpts ReadOptions, filter boardapi.ProjectCostListOptions) (*boardapi.ListResult[boardapi.ProjectCostEntity], error) {
+	if !projectCostFilterIsZero(filter) {
+		// API 直接呼び出し（cache bypass）: フィルタ結果でキャッシュを汚染しない。
+		result, err := r.api.ListProjectCosts(ctx, filter)
+		if err != nil {
+			return nil, err
+		}
+		result.Items = applyLimit(result.Items, readOpts.Limit)
+		return result, nil
+	}
+
+	// ゼロフィルタ: 既存の cache → refresh → API fallback 経路
 	fetcher := &projectCostsFetcher{api: r.api}
 	now := time.Now()
 
@@ -57,16 +91,13 @@ func (r *ProjectCostRepository) List(ctx context.Context, opts ReadOptions) ([]b
 	if err != nil {
 		return nil, err
 	}
-
-	if err := maybeRefresh(ctx, r.profile, projectCostsResource, opts, state, r.autoRefresh, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
+	if err := maybeRefresh(ctx, r.profile, projectCostsResource, readOpts, state, r.autoRefresh, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
 		return nil, err
 	}
-
 	entries, err := r.cache.List(ctx, r.profile, projectCostsResource)
 	if err != nil {
 		return nil, err
 	}
-
 	if len(entries) == 0 && state == nil {
 		if err := r.lockManager.WithLock(ctx, r.profile, projectCostsResource, func() error {
 			_, err := r.refresher.ForceRefresh(ctx, r.profile, fetcher, now, r.tz)
@@ -79,16 +110,26 @@ func (r *ProjectCostRepository) List(ctx context.Context, opts ReadOptions) ([]b
 			return nil, err
 		}
 	}
-
 	entities, err := decodeEntries[boardapi.ProjectCostEntity](entries)
 	if err != nil {
 		return nil, err
 	}
+	entities = applyLimit(entities, readOpts.Limit)
+	return &boardapi.ListResult[boardapi.ProjectCostEntity]{Items: entities}, nil
+}
 
-	return applyLimit(entities, opts.Limit), nil
+// ListEntities は List の items のみを返す薄いラッパ。
+// find 層（Phase L では *ListResult を扱わない）向け。
+func (r *ProjectCostRepository) ListEntities(ctx context.Context, readOpts ReadOptions, filter boardapi.ProjectCostListOptions) ([]boardapi.ProjectCostEntity, error) {
+	result, err := r.List(ctx, readOpts, filter)
+	if err != nil {
+		return nil, err
+	}
+	return result.Items, nil
 }
 
 // GetByID returns the project cost with the given ID from the cache.
+// On cache miss, it fetches from the API and upserts the result.
 func (r *ProjectCostRepository) GetByID(ctx context.Context, id int, opts ReadOptions) (*boardapi.ProjectCostEntity, error) {
 	fetcher := &projectCostsFetcher{api: r.api}
 	now := time.Now()
@@ -117,12 +158,12 @@ func (r *ProjectCostRepository) GetByID(ctx context.Context, id int, opts ReadOp
 	}
 
 	// Cache miss -> fetch single entry from API
-	entity, err := r.api.GetProjectCost(ctx, id)
+	result, err := r.api.GetProjectCost(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 
-	raw, err := json.Marshal(entity)
+	raw, err := json.Marshal(result.Item)
 	if err != nil {
 		return nil, err
 	}
@@ -130,33 +171,12 @@ func (r *ProjectCostRepository) GetByID(ctx context.Context, id int, opts ReadOp
 		return nil, err
 	}
 
-	return entity, nil
+	return result.Item, nil
 }
 
-// Search returns project costs filtered by the given parameters from the cache.
-func (r *ProjectCostRepository) Search(ctx context.Context, params boardapi.ProjectCostSearchParams, opts ReadOptions) ([]boardapi.ProjectCostEntity, error) {
-	listOpts := opts
-	listOpts.Limit = 0
-	all, err := r.List(ctx, listOpts)
-	if err != nil {
-		return nil, err
-	}
-	return applyLimit(filterProjectCosts(all, params), opts.Limit), nil
-}
-
-// filterProjectCosts performs in-memory filtering.
-func filterProjectCosts(entities []boardapi.ProjectCostEntity, params boardapi.ProjectCostSearchParams) []boardapi.ProjectCostEntity {
-	var result []boardapi.ProjectCostEntity
-	for _, e := range entities {
-		if params.ProjectID != 0 && e.ProjectID != params.ProjectID {
-			continue
-		}
-		result = append(result, e)
-	}
-	return result
-}
-
-// ListPage retrieves a single page of ProjectCostEntity directly from the API (cache bypass).
-func (r *ProjectCostRepository) ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.ProjectCostEntity], error) {
-	return r.api.ListProjectCostsPage(ctx, page, perPage)
+// Search は find 層向けの薄いラッパ。ListEntities と機能的に同等。
+//
+// find 層は *ListResult を扱わず []ProjectCostEntity を維持する（Phase L の方針）。
+func (r *ProjectCostRepository) Search(ctx context.Context, filter boardapi.ProjectCostListOptions, opts ReadOptions) ([]boardapi.ProjectCostEntity, error) {
+	return r.ListEntities(ctx, opts, filter)
 }

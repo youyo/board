@@ -64,6 +64,35 @@ func newProjectCostAPIServer(t *testing.T, entities []boardapi.ProjectCostEntity
 	return srv
 }
 
+// newProjectCostAPIServerWithFilter returns an httptest.Server that simulates Ransack filtering
+// for the project_id_eq query parameter.
+func newProjectCostAPIServerWithFilter(t *testing.T, entities []boardapi.ProjectCostEntity) *httptest.Server {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		projectIDEqStr := r.URL.Query().Get("project_id_eq")
+		if projectIDEqStr == "" {
+			w.Write(jsonArrayOf(entities))
+			return
+		}
+		projectIDEq := 0
+		for _, c := range projectIDEqStr {
+			if c >= '0' && c <= '9' {
+				projectIDEq = projectIDEq*10 + int(c-'0')
+			}
+		}
+		var filtered []boardapi.ProjectCostEntity
+		for _, e := range entities {
+			if e.ProjectID == projectIDEq {
+				filtered = append(filtered, e)
+			}
+		}
+		w.Write(jsonArrayOf(filtered))
+	}))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
 var sampleProjectCosts = []boardapi.ProjectCostEntity{
 	{ID: 1, ProjectID: 10, Description: "労務費", Cost: 100000},
 	{ID: 2, ProjectID: 10, Description: "外注費", Cost: 50000},
@@ -80,12 +109,12 @@ func TestProjectCostRepository_List_CacheHit(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeProjectCostRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{})
+	got, err := repo.List(context.Background(), repository.ReadOptions{}, boardapi.ProjectCostListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(got) != len(sampleProjectCosts) {
-		t.Errorf("len(got) = %d, want %d", len(got), len(sampleProjectCosts))
+	if len(got.Items) != len(sampleProjectCosts) {
+		t.Errorf("len(got.Items) = %d, want %d", len(got.Items), len(sampleProjectCosts))
 	}
 }
 
@@ -97,12 +126,12 @@ func TestProjectCostRepository_List_InitialLoad(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeProjectCostRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{})
+	got, err := repo.List(context.Background(), repository.ReadOptions{}, boardapi.ProjectCostListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(got) != len(sampleProjectCosts) {
-		t.Errorf("len(got) = %d, want %d", len(got), len(sampleProjectCosts))
+	if len(got.Items) != len(sampleProjectCosts) {
+		t.Errorf("len(got.Items) = %d, want %d", len(got.Items), len(sampleProjectCosts))
 	}
 }
 
@@ -122,11 +151,11 @@ func TestProjectCostRepository_List_AutoRefresh(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeProjectCostRepo(t, db, apiClient, true)
-	got, err := repo.List(context.Background(), repository.ReadOptions{})
+	got, err := repo.List(context.Background(), repository.ReadOptions{}, boardapi.ProjectCostListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(got) == 0 {
+	if len(got.Items) == 0 {
 		t.Error("expected non-empty result after auto refresh")
 	}
 }
@@ -139,12 +168,12 @@ func TestProjectCostRepository_List_ForceRefresh(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeProjectCostRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{ForceRefresh: true})
+	got, err := repo.List(context.Background(), repository.ReadOptions{ForceRefresh: true}, boardapi.ProjectCostListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(got) != len(sampleProjectCosts) {
-		t.Errorf("len(got) = %d, want %d", len(got), len(sampleProjectCosts))
+	if len(got.Items) != len(sampleProjectCosts) {
+		t.Errorf("len(got.Items) = %d, want %d", len(got.Items), len(sampleProjectCosts))
 	}
 }
 
@@ -158,11 +187,11 @@ func TestProjectCostRepository_List_DeltaRefresh(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeProjectCostRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{Refresh: true})
+	got, err := repo.List(context.Background(), repository.ReadOptions{Refresh: true}, boardapi.ProjectCostListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(got) == 0 {
+	if len(got.Items) == 0 {
 		t.Error("expected non-empty result after delta refresh")
 	}
 }
@@ -177,12 +206,12 @@ func TestProjectCostRepository_List_Limit(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeProjectCostRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{Limit: 2})
+	got, err := repo.List(context.Background(), repository.ReadOptions{Limit: 2}, boardapi.ProjectCostListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(got) != 2 {
-		t.Errorf("len(got) = %d, want 2", len(got))
+	if len(got.Items) != 2 {
+		t.Errorf("len(got.Items) = %d, want 2", len(got.Items))
 	}
 }
 
@@ -196,26 +225,25 @@ func TestProjectCostRepository_List_DeltaRefreshAPIError_StaleCache(t *testing.T
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeProjectCostRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{Refresh: true})
+	got, err := repo.List(context.Background(), repository.ReadOptions{Refresh: true}, boardapi.ProjectCostListOptions{})
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
-	if len(got) == 0 {
+	if len(got.Items) == 0 {
 		t.Error("expected stale cache data")
 	}
 }
 
-// T_R62: Search - ProjectID filter -> returns items matching ProjectID
-func TestProjectCostRepository_Search_ProjectIDFilter(t *testing.T) {
+// T_R62: Search - ProjectIDEq filter -> calls API with project_id_eq query param, returns matching items
+func TestProjectCostRepository_Search_ProjectIDEqFilter(t *testing.T) {
 	db := newTestDB(t)
-	seedProjectCostCache(t, db, sampleProjectCosts)
-	markSynced(t, db, "project_costs")
-
-	srv := newProjectCostAPIServer(t, nil)
+	// ProjectIDEq is a non-zero filter: bypasses cache and calls API directly.
+	// Use a server that simulates Ransack project_id_eq filtering.
+	srv := newProjectCostAPIServerWithFilter(t, sampleProjectCosts)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeProjectCostRepo(t, db, apiClient, false)
-	got, err := repo.Search(context.Background(), boardapi.ProjectCostSearchParams{ProjectID: 10}, repository.ReadOptions{})
+	got, err := repo.Search(context.Background(), boardapi.ProjectCostListOptions{ProjectIDEq: 10}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
@@ -293,7 +321,7 @@ func TestProjectCostRepository_Search_NoFilter(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeProjectCostRepo(t, db, apiClient, false)
-	got, err := repo.Search(context.Background(), boardapi.ProjectCostSearchParams{}, repository.ReadOptions{})
+	got, err := repo.Search(context.Background(), boardapi.ProjectCostListOptions{}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
@@ -312,11 +340,11 @@ func TestProjectCostRepository_List_NoLimit(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeProjectCostRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{Limit: 0})
+	got, err := repo.List(context.Background(), repository.ReadOptions{Limit: 0}, boardapi.ProjectCostListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(got) != len(sampleProjectCosts) {
-		t.Errorf("len(got) = %d, want %d", len(got), len(sampleProjectCosts))
+	if len(got.Items) != len(sampleProjectCosts) {
+		t.Errorf("len(got.Items) = %d, want %d", len(got.Items), len(sampleProjectCosts))
 	}
 }

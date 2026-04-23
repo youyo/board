@@ -35,6 +35,7 @@ func newContactsMockClient(rt roundTripperFunc) *boardapi.Client {
 // must not change) because StrictFieldDiff relies on the original response
 // shape. All 12 ContactEntity keys are expected to survive the round trip
 // (M40 re-design: nested client, nullable fields, phantom fields removed).
+// M52: ListContactsRaw シグネチャを ContactListOptions に更新。
 func TestListContactsRaw_SinglePage(t *testing.T) {
 	page1 := `[{"id":1,"client":{"id":10,"name":"Client A","name_disp":"Client A","custom_no":""},"last_name":"Yamada","first_name":"Taro","honorific_title":"様","title":null,"department":null,"email":"taro@example.com","note":null,"archive_flg":0,"updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}]`
 	var gotPath string
@@ -46,7 +47,7 @@ func TestListContactsRaw_SinglePage(t *testing.T) {
 	})
 	client := newContactsMockClient(rt)
 
-	raw, err := client.ListContactsRaw(context.Background())
+	raw, _, err := client.ListContactsRaw(context.Background(), boardapi.ContactListOptions{})
 	if err != nil {
 		t.Fatalf("ListContactsRaw: %v", err)
 	}
@@ -84,6 +85,7 @@ func TestListContactsRaw_SinglePage(t *testing.T) {
 // U2: ListContactsRaw concatenates multiple pages into a single valid JSON
 // array. per_page=2 forces pagination; server returns 2 items on page 1 and
 // 1 item on page 2. Result must be a JSON array of 3 items.
+// M52: ListContactsRaw シグネチャを ContactListOptions に更新。
 func TestListContactsRaw_MultiPage(t *testing.T) {
 	page1Items := []string{
 		`{"id":1,"client":{"id":10,"name":"A Corp","name_disp":"A Corp","custom_no":""},"last_name":"A","first_name":"","honorific_title":"","title":null,"department":null,"email":null,"note":null,"archive_flg":0,"updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}`,
@@ -112,7 +114,7 @@ func TestListContactsRaw_MultiPage(t *testing.T) {
 	})
 	client := newContactsMockClient(rt)
 
-	raw, err := client.ListContactsRaw(context.Background(), boardapi.WithPerPage(2))
+	raw, _, err := client.ListContactsRaw(context.Background(), boardapi.ContactListOptions{PerPage: 2})
 	if err != nil {
 		t.Fatalf("ListContactsRaw: %v", err)
 	}
@@ -135,6 +137,7 @@ func TestListContactsRaw_MultiPage(t *testing.T) {
 }
 
 // U3: GetContactRaw returns body exactly as served (single object).
+// M52: GetContactRaw がヘッダーも返すシグネチャに更新。
 func TestGetContactRaw_Success(t *testing.T) {
 	body := []byte(`{"id":42,"client":{"id":10,"name":"Client A","name_disp":"Client A","custom_no":""},"last_name":"Sato","first_name":"Hanako","honorific_title":"様","title":null,"department":null,"email":"hanako@example.com","note":null,"archive_flg":0,"updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}`)
 	var gotPath string
@@ -148,7 +151,7 @@ func TestGetContactRaw_Success(t *testing.T) {
 	})
 	client := newContactsMockClient(rt)
 
-	raw, err := client.GetContactRaw(context.Background(), 42)
+	raw, _, err := client.GetContactRaw(context.Background(), 42)
 	if err != nil {
 		t.Fatalf("GetContactRaw: %v", err)
 	}
@@ -161,6 +164,7 @@ func TestGetContactRaw_Success(t *testing.T) {
 }
 
 // U4: GetContactRaw on 404 returns *APIError{Code: APIErrorNotFound}.
+// M52: GetContactRaw がヘッダーも返すシグネチャに更新。
 func TestGetContactRaw_NotFound(t *testing.T) {
 	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
 		return &http.Response{
@@ -171,7 +175,7 @@ func TestGetContactRaw_NotFound(t *testing.T) {
 	})
 	client := newContactsMockClient(rt)
 
-	_, err := client.GetContactRaw(context.Background(), 99)
+	_, _, err := client.GetContactRaw(context.Background(), 99)
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}
@@ -184,37 +188,36 @@ func TestGetContactRaw_NotFound(t *testing.T) {
 	}
 }
 
-// U5: SearchContactsRaw sends client_id / name / email in the query and returns
-// body. Unlike users (name/email/updated_at_from) or client_branches
-// (client_id/name), contacts exposes 3 filters: client_id as a hierarchical
-// filter plus name and email as keyword filters.
-func TestSearchContactsRaw_QueryParams(t *testing.T) {
+// U5: ListContactsRaw sends client_id_eq / name_cont / email_cont in the query and returns
+// body. M52: 旧 SearchContactsRaw + ContactSearchParams を
+// ListContactsRaw + ContactListOptions に置き換え。
+func TestListContactsRaw_QueryParams(t *testing.T) {
 	page1 := `[{"id":7,"client":{"id":123,"name":"Corp","name_disp":"Corp","custom_no":""},"last_name":"keyword","first_name":"","honorific_title":"","title":null,"department":null,"email":"x@y.z","note":null,"archive_flg":0,"updated_at":"2024-02-01T00:00:00+09:00","created_at":"2024-02-01T00:00:00+09:00"}]`
 	var observedClientID, observedName, observedEmail string
 	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
-		observedClientID = r.URL.Query().Get("client_id")
-		observedName = r.URL.Query().Get("name")
-		observedEmail = r.URL.Query().Get("email")
+		observedClientID = r.URL.Query().Get("client_id_eq")
+		observedName = r.URL.Query().Get("name_cont")
+		observedEmail = r.URL.Query().Get("email_cont")
 		return jsonResp(page1), nil
 	})
 	client := newContactsMockClient(rt)
 
-	raw, err := client.SearchContactsRaw(context.Background(), boardapi.ContactSearchParams{
-		ClientID: 123,
-		Name:     "keyword",
-		Email:    "x@y.z",
+	raw, _, err := client.ListContactsRaw(context.Background(), boardapi.ContactListOptions{
+		ClientIDEq: 123,
+		NameCont:   "keyword",
+		EmailCont:  "x@y.z",
 	})
 	if err != nil {
-		t.Fatalf("SearchContactsRaw: %v", err)
+		t.Fatalf("ListContactsRaw: %v", err)
 	}
 	if observedClientID != "123" {
-		t.Errorf("query client_id = %q, want 123", observedClientID)
+		t.Errorf("query client_id_eq = %q, want 123", observedClientID)
 	}
 	if observedName != "keyword" {
-		t.Errorf("query name = %q, want keyword", observedName)
+		t.Errorf("query name_cont = %q, want keyword", observedName)
 	}
 	if observedEmail != "x@y.z" {
-		t.Errorf("query email = %q, want x@y.z", observedEmail)
+		t.Errorf("query email_cont = %q, want x@y.z", observedEmail)
 	}
 	var arr []map[string]any
 	if err := json.Unmarshal(raw, &arr); err != nil {

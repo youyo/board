@@ -149,13 +149,10 @@ type stubClientBranchRepo struct {
 	err          error
 }
 
-func (s *stubClientBranchRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.ClientBranchEntity, error) {
-	return s.listResult, s.err
-}
 func (s *stubClientBranchRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.ClientBranchEntity, error) {
 	return s.getResult, s.err
 }
-func (s *stubClientBranchRepo) Search(_ context.Context, _ boardapi.ClientBranchSearchParams, _ repository.ReadOptions) ([]boardapi.ClientBranchEntity, error) {
+func (s *stubClientBranchRepo) Search(_ context.Context, _ boardapi.ClientBranchListOptions, _ repository.ReadOptions) ([]boardapi.ClientBranchEntity, error) {
 	return s.searchResult, s.err
 }
 
@@ -166,13 +163,10 @@ type stubContactRepo struct {
 	err          error
 }
 
-func (s *stubContactRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.ContactEntity, error) {
-	return s.listResult, s.err
-}
 func (s *stubContactRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.ContactEntity, error) {
 	return s.getResult, s.err
 }
-func (s *stubContactRepo) Search(_ context.Context, _ boardapi.ContactSearchParams, _ repository.ReadOptions) ([]boardapi.ContactEntity, error) {
+func (s *stubContactRepo) Search(_ context.Context, _ boardapi.ContactListOptions, _ repository.ReadOptions) ([]boardapi.ContactEntity, error) {
 	return s.searchResult, s.err
 }
 

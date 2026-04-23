@@ -20,17 +20,23 @@ type ClientRepo interface {
 }
 
 // ClientBranchRepo is the repository interface for client branches.
+//
+// M52: Search now receives ClientBranchListOptions (Ransack-style) instead of the
+// legacy ClientBranchSearchParams. "List all entities" is expressed as
+// Search(ctx, boardapi.ClientBranchListOptions{}, opts).
 type ClientBranchRepo interface {
-	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.ClientBranchEntity, error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.ClientBranchEntity, error)
-	Search(ctx context.Context, params boardapi.ClientBranchSearchParams, opts repository.ReadOptions) ([]boardapi.ClientBranchEntity, error)
+	Search(ctx context.Context, filter boardapi.ClientBranchListOptions, opts repository.ReadOptions) ([]boardapi.ClientBranchEntity, error)
 }
 
 // ContactRepo is the repository interface for contacts.
+//
+// M52: Search now receives ContactListOptions (Ransack-style) instead of the
+// legacy ContactSearchParams. "List all entities" is expressed as
+// Search(ctx, boardapi.ContactListOptions{}, opts).
 type ContactRepo interface {
-	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.ContactEntity, error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.ContactEntity, error)
-	Search(ctx context.Context, params boardapi.ContactSearchParams, opts repository.ReadOptions) ([]boardapi.ContactEntity, error)
+	Search(ctx context.Context, filter boardapi.ContactListOptions, opts repository.ReadOptions) ([]boardapi.ContactEntity, error)
 }
 
 // ProjectRepo is the repository interface for projects used by service/find.

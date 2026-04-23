@@ -54,6 +54,8 @@ func seedClientBranchCache(t *testing.T, db *cache.DB, entities []boardapi.Clien
 }
 
 // newClientBranchAPIServer returns an httptest.Server that serves entities for /v1/client_branches.
+// If entities is nil the handler returns an empty array.
+// The handler also wraps the response in the ListResult JSON format: {"items":[...]}.
 func newClientBranchAPIServer(t *testing.T, entities []boardapi.ClientBranchEntity) *httptest.Server {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -62,6 +64,43 @@ func newClientBranchAPIServer(t *testing.T, entities []boardapi.ClientBranchEnti
 	}))
 	t.Cleanup(srv.Close)
 	return srv
+}
+
+// newClientBranchAPIServerWithFilter returns an httptest.Server that filters branches by
+// the name_cont query parameter, simulating server-side Ransack filtering.
+func newClientBranchAPIServerWithFilter(t *testing.T, entities []boardapi.ClientBranchEntity) *httptest.Server {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		nameCont := r.URL.Query().Get("name_cont")
+		if nameCont == "" {
+			w.Write(jsonArrayOf(entities))
+			return
+		}
+		var filtered []boardapi.ClientBranchEntity
+		for _, e := range entities {
+			if containsStr(e.Name, nameCont) {
+				filtered = append(filtered, e)
+			}
+		}
+		w.Write(jsonArrayOf(filtered))
+	}))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+// containsStr reports whether s contains substr (case-sensitive).
+func containsStr(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(substr) == 0 || findSubstr(s, substr))
+}
+
+func findSubstr(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }
 
 // M39: sampleClientBranches を実 API 準拠の新スキーマに更新。
@@ -82,12 +121,12 @@ func TestClientBranchRepository_List_CacheHit(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeClientBranchRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{})
+	got, err := repo.List(context.Background(), repository.ReadOptions{}, boardapi.ClientBranchListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(got) != len(sampleClientBranches) {
-		t.Errorf("len(got) = %d, want %d", len(got), len(sampleClientBranches))
+	if len(got.Items) != len(sampleClientBranches) {
+		t.Errorf("len(got.Items) = %d, want %d", len(got.Items), len(sampleClientBranches))
 	}
 }
 
@@ -99,12 +138,12 @@ func TestClientBranchRepository_List_InitialLoad(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeClientBranchRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{})
+	got, err := repo.List(context.Background(), repository.ReadOptions{}, boardapi.ClientBranchListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(got) != len(sampleClientBranches) {
-		t.Errorf("len(got) = %d, want %d", len(got), len(sampleClientBranches))
+	if len(got.Items) != len(sampleClientBranches) {
+		t.Errorf("len(got.Items) = %d, want %d", len(got.Items), len(sampleClientBranches))
 	}
 }
 
@@ -124,11 +163,11 @@ func TestClientBranchRepository_List_AutoRefresh(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeClientBranchRepo(t, db, apiClient, true)
-	got, err := repo.List(context.Background(), repository.ReadOptions{})
+	got, err := repo.List(context.Background(), repository.ReadOptions{}, boardapi.ClientBranchListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(got) == 0 {
+	if len(got.Items) == 0 {
 		t.Error("expected non-empty result after auto refresh")
 	}
 }
@@ -141,12 +180,12 @@ func TestClientBranchRepository_List_ForceRefresh(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeClientBranchRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{ForceRefresh: true})
+	got, err := repo.List(context.Background(), repository.ReadOptions{ForceRefresh: true}, boardapi.ClientBranchListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(got) != len(sampleClientBranches) {
-		t.Errorf("len(got) = %d, want %d", len(got), len(sampleClientBranches))
+	if len(got.Items) != len(sampleClientBranches) {
+		t.Errorf("len(got.Items) = %d, want %d", len(got.Items), len(sampleClientBranches))
 	}
 }
 
@@ -160,11 +199,11 @@ func TestClientBranchRepository_List_DeltaRefresh(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeClientBranchRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{Refresh: true})
+	got, err := repo.List(context.Background(), repository.ReadOptions{Refresh: true}, boardapi.ClientBranchListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(got) == 0 {
+	if len(got.Items) == 0 {
 		t.Error("expected non-empty result after delta refresh")
 	}
 }
@@ -179,12 +218,12 @@ func TestClientBranchRepository_List_Limit(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeClientBranchRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{Limit: 2})
+	got, err := repo.List(context.Background(), repository.ReadOptions{Limit: 2}, boardapi.ClientBranchListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(got) != 2 {
-		t.Errorf("len(got) = %d, want 2", len(got))
+	if len(got.Items) != 2 {
+		t.Errorf("len(got.Items) = %d, want 2", len(got.Items))
 	}
 }
 
@@ -198,11 +237,11 @@ func TestClientBranchRepository_List_DeltaRefreshAPIError_StaleCache(t *testing.
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeClientBranchRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{Refresh: true})
+	got, err := repo.List(context.Background(), repository.ReadOptions{Refresh: true}, boardapi.ClientBranchListOptions{})
 	if err != nil {
 		t.Fatalf("expected no error on delta refresh failure, got: %v", err)
 	}
-	if len(got) == 0 {
+	if len(got.Items) == 0 {
 		t.Error("expected stale cache data")
 	}
 }
@@ -224,7 +263,7 @@ func TestClientBranchRepository_Search_ClientIDFilter(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeClientBranchRepo(t, db, apiClient, false)
-	got, err := repo.Search(context.Background(), boardapi.ClientBranchSearchParams{ClientID: 10}, repository.ReadOptions{})
+	got, err := repo.Search(context.Background(), boardapi.ClientBranchListOptions{ClientIDEq: 10}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
@@ -233,17 +272,16 @@ func TestClientBranchRepository_Search_ClientIDFilter(t *testing.T) {
 	}
 }
 
-// T_R24: Search - Name filter -> returns matching items
-func TestClientBranchRepository_Search_NameFilter(t *testing.T) {
+// T_R24: Search - NameCont filter -> calls API with name_cont query param, returns matching items
+func TestClientBranchRepository_Search_NameContFilter(t *testing.T) {
 	db := newTestDB(t)
-	seedClientBranchCache(t, db, sampleClientBranches)
-	markSynced(t, db, "client_branches")
-
-	srv := newClientBranchAPIServer(t, nil)
+	// NameCont is a non-zero filter: bypasses cache and calls API directly.
+	// Use a server that simulates Ransack name_cont filtering.
+	srv := newClientBranchAPIServerWithFilter(t, sampleClientBranches)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeClientBranchRepo(t, db, apiClient, false)
-	got, err := repo.Search(context.Background(), boardapi.ClientBranchSearchParams{Name: "Tokyo"}, repository.ReadOptions{})
+	got, err := repo.Search(context.Background(), boardapi.ClientBranchListOptions{NameCont: "Tokyo"}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
@@ -321,11 +359,11 @@ func TestClientBranchRepository_List_NoLimit(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeClientBranchRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{Limit: 0})
+	got, err := repo.List(context.Background(), repository.ReadOptions{Limit: 0}, boardapi.ClientBranchListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(got) != len(sampleClientBranches) {
-		t.Errorf("len(got) = %d, want %d", len(got), len(sampleClientBranches))
+	if len(got.Items) != len(sampleClientBranches) {
+		t.Errorf("len(got.Items) = %d, want %d", len(got.Items), len(sampleClientBranches))
 	}
 }

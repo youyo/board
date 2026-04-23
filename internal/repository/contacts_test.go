@@ -64,6 +64,44 @@ func newContactAPIServer(t *testing.T, entities []boardapi.ContactEntity) *httpt
 	return srv
 }
 
+// newContactAPIServerWithFilter returns an httptest.Server that simulates Ransack filtering
+// for name_cont and email_cont query parameters.
+func newContactAPIServerWithFilter(t *testing.T, entities []boardapi.ContactEntity) *httptest.Server {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		nameCont := r.URL.Query().Get("name_cont")
+		emailCont := r.URL.Query().Get("email_cont")
+		filtered := entities
+		if nameCont != "" {
+			var tmp []boardapi.ContactEntity
+			for _, e := range filtered {
+				if contactContainsName(e, nameCont) {
+					tmp = append(tmp, e)
+				}
+			}
+			filtered = tmp
+		}
+		if emailCont != "" {
+			var tmp []boardapi.ContactEntity
+			for _, e := range filtered {
+				if e.Email != nil && findSubstr(*e.Email, emailCont) {
+					tmp = append(tmp, e)
+				}
+			}
+			filtered = tmp
+		}
+		w.Write(jsonArrayOf(filtered))
+	}))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+// contactContainsName reports whether the contact's full name contains the given substring.
+func contactContainsName(e boardapi.ContactEntity, s string) bool {
+	return findSubstr(e.LastName+e.FirstName, s) || findSubstr(e.LastName+" "+e.FirstName, s)
+}
+
 func strPtr(s string) *string { return &s }
 
 var sampleContacts = []boardapi.ContactEntity{
@@ -82,12 +120,12 @@ func TestContactRepository_List_CacheHit(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeContactRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{})
+	got, err := repo.List(context.Background(), repository.ReadOptions{}, boardapi.ContactListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(got) != len(sampleContacts) {
-		t.Errorf("len(got) = %d, want %d", len(got), len(sampleContacts))
+	if len(got.Items) != len(sampleContacts) {
+		t.Errorf("len(got.Items) = %d, want %d", len(got.Items), len(sampleContacts))
 	}
 }
 
@@ -99,12 +137,12 @@ func TestContactRepository_List_InitialLoad(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeContactRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{})
+	got, err := repo.List(context.Background(), repository.ReadOptions{}, boardapi.ContactListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(got) != len(sampleContacts) {
-		t.Errorf("len(got) = %d, want %d", len(got), len(sampleContacts))
+	if len(got.Items) != len(sampleContacts) {
+		t.Errorf("len(got.Items) = %d, want %d", len(got.Items), len(sampleContacts))
 	}
 }
 
@@ -124,11 +162,11 @@ func TestContactRepository_List_AutoRefresh(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeContactRepo(t, db, apiClient, true)
-	got, err := repo.List(context.Background(), repository.ReadOptions{})
+	got, err := repo.List(context.Background(), repository.ReadOptions{}, boardapi.ContactListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(got) == 0 {
+	if len(got.Items) == 0 {
 		t.Error("expected non-empty result after auto refresh")
 	}
 }
@@ -141,12 +179,12 @@ func TestContactRepository_List_ForceRefresh(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeContactRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{ForceRefresh: true})
+	got, err := repo.List(context.Background(), repository.ReadOptions{ForceRefresh: true}, boardapi.ContactListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(got) != len(sampleContacts) {
-		t.Errorf("len(got) = %d, want %d", len(got), len(sampleContacts))
+	if len(got.Items) != len(sampleContacts) {
+		t.Errorf("len(got.Items) = %d, want %d", len(got.Items), len(sampleContacts))
 	}
 }
 
@@ -160,11 +198,11 @@ func TestContactRepository_List_DeltaRefresh(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeContactRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{Refresh: true})
+	got, err := repo.List(context.Background(), repository.ReadOptions{Refresh: true}, boardapi.ContactListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(got) == 0 {
+	if len(got.Items) == 0 {
 		t.Error("expected non-empty result after delta refresh")
 	}
 }
@@ -179,12 +217,12 @@ func TestContactRepository_List_Limit(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeContactRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{Limit: 2})
+	got, err := repo.List(context.Background(), repository.ReadOptions{Limit: 2}, boardapi.ContactListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(got) != 2 {
-		t.Errorf("len(got) = %d, want 2", len(got))
+	if len(got.Items) != 2 {
+		t.Errorf("len(got.Items) = %d, want 2", len(got.Items))
 	}
 }
 
@@ -198,26 +236,25 @@ func TestContactRepository_List_DeltaRefreshAPIError_StaleCache(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeContactRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{Refresh: true})
+	got, err := repo.List(context.Background(), repository.ReadOptions{Refresh: true}, boardapi.ContactListOptions{})
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
-	if len(got) == 0 {
+	if len(got.Items) == 0 {
 		t.Error("expected stale cache data")
 	}
 }
 
-// T_R36: Search - Email filter -> returns matching items
-func TestContactRepository_Search_EmailFilter(t *testing.T) {
+// T_R36: Search - EmailCont filter -> calls API with email_cont query param, returns matching items
+func TestContactRepository_Search_EmailContFilter(t *testing.T) {
 	db := newTestDB(t)
-	seedContactCache(t, db, sampleContacts)
-	markSynced(t, db, "contacts")
-
-	srv := newContactAPIServer(t, nil)
+	// EmailCont is a non-zero filter: bypasses cache and calls API directly.
+	// Use a server that simulates Ransack email_cont filtering.
+	srv := newContactAPIServerWithFilter(t, sampleContacts)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeContactRepo(t, db, apiClient, false)
-	got, err := repo.Search(context.Background(), boardapi.ContactSearchParams{Email: "example.com"}, repository.ReadOptions{})
+	got, err := repo.Search(context.Background(), boardapi.ContactListOptions{EmailCont: "example.com"}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
@@ -243,7 +280,7 @@ func TestContactRepository_Search_ClientIDFilter(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeContactRepo(t, db, apiClient, false)
-	got, err := repo.Search(context.Background(), boardapi.ContactSearchParams{ClientID: 10}, repository.ReadOptions{})
+	got, err := repo.Search(context.Background(), boardapi.ContactListOptions{ClientIDEq: 10}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
@@ -311,17 +348,16 @@ func TestContactRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	}
 }
 
-// T_R41: Search - Name filter
-func TestContactRepository_Search_NameFilter(t *testing.T) {
+// T_R41: Search - NameCont filter -> calls API with name_cont query param, returns matching items
+func TestContactRepository_Search_NameContFilter(t *testing.T) {
 	db := newTestDB(t)
-	seedContactCache(t, db, sampleContacts)
-	markSynced(t, db, "contacts")
-
-	srv := newContactAPIServer(t, nil)
+	// NameCont is a non-zero filter: bypasses cache and calls API directly.
+	// Use a server that simulates Ransack name_cont filtering.
+	srv := newContactAPIServerWithFilter(t, sampleContacts)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeContactRepo(t, db, apiClient, false)
-	got, err := repo.Search(context.Background(), boardapi.ContactSearchParams{Name: "Tanaka"}, repository.ReadOptions{})
+	got, err := repo.Search(context.Background(), boardapi.ContactListOptions{NameCont: "Tanaka"}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}

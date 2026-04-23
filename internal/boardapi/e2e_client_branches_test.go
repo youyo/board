@@ -53,7 +53,7 @@ func TestE2E_ClientBranches_List(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
 
-	raw, err := client.ListClientBranchesRaw(ctx)
+	raw, _, err := client.ListClientBranchesRaw(ctx, boardapi.ClientBranchListOptions{})
 	if err != nil {
 		// Roadmap rule: 403/429 must NOT be skipped, they must fail the test.
 		t.Fatalf("ListClientBranchesRaw: %v", err)
@@ -80,7 +80,7 @@ func TestE2E_ClientBranches_Get(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
 
-	listRaw, err := client.ListClientBranchesRaw(ctx)
+	listRaw, _, err := client.ListClientBranchesRaw(ctx, boardapi.ClientBranchListOptions{})
 	if err != nil {
 		t.Fatalf("ListClientBranchesRaw (discovery): %v", err)
 	}
@@ -102,7 +102,7 @@ func TestE2E_ClientBranches_Get(t *testing.T) {
 		t.Fatalf("first client_branch has non-positive ID: %d", id)
 	}
 
-	getRaw, err := client.GetClientBranchRaw(ctx, id)
+	getRaw, _, err := client.GetClientBranchRaw(ctx, id)
 	if err != nil {
 		// Phase D note: Get 404 would mean the 4-consecutive master-table
 		// finding extends to core-business. This is a fatal outcome that the
@@ -148,11 +148,11 @@ func TestE2E_ClientBranches_Search(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
 
-	raw, err := client.SearchClientBranchesRaw(ctx, boardapi.ClientBranchSearchParams{
-		Name: "zzz_nonexistent_keyword_for_e2e",
+	raw, _, err := client.ListClientBranchesRaw(ctx, boardapi.ClientBranchListOptions{
+		NameCont: "zzz_nonexistent_keyword_for_e2e",
 	})
 	if err != nil {
-		t.Fatalf("SearchClientBranchesRaw: %v", err)
+		t.Fatalf("ListClientBranchesRaw: %v", err)
 	}
 
 	dumpJSON(t, "client_branches_search", 0, raw)

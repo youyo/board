@@ -142,10 +142,10 @@ func findAnyDocumentID(t *testing.T, client *boardapi.Client, docType string) (p
 
 	// Step 1: 先頭 maxDiscoveryProjects 件のみ取得（1 req、全ページ走査を避ける）
 	// ListProjectsRaw は ListAll を使うため全ページを走査してしまう。
-	// ListProjectsPage(page=1, perPage=maxDiscoveryProjects) で単一ページのみ取得する。
-	page, err := client.ListProjectsPage(ctx, 1, maxDiscoveryProjects)
+	// ListProjects(page=1, perPage=maxDiscoveryProjects) で単一ページのみ取得する。
+	page, err := client.ListProjects(ctx, boardapi.ProjectListOptions{Page: 1, PerPage: maxDiscoveryProjects})
 	if err != nil {
-		t.Skipf("findAnyDocumentID: ListProjectsPage failed: %v", err)
+		t.Skipf("findAnyDocumentID: ListProjects failed: %v", err)
 	}
 	if len(page.Items) == 0 {
 		t.Skipf("findAnyDocumentID: no projects found; %s discovery pending re-verification", docType)

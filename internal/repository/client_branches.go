@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/youyo/board/internal/boardapi"
@@ -49,8 +48,43 @@ func NewClientBranchRepository(
 
 const clientBranchesResource = "client_branches"
 
-// List returns all client branches from the cache.
-func (r *ClientBranchRepository) List(ctx context.Context, opts ReadOptions) ([]boardapi.ClientBranchEntity, error) {
+// clientBranchFilterIsZero reports whether the given filter is empty (all fields
+// are zero values / nil). A zero filter routes through the local cache; a
+// non-zero filter bypasses the cache and calls the API directly because
+// filtered results must not poison the full-entity cache.
+func clientBranchFilterIsZero(f boardapi.ClientBranchListOptions) bool {
+	return f.Page == 0 &&
+		f.PerPage == 0 &&
+		f.UpdatedAtGteq == "" &&
+		f.UpdatedAtLteq == "" &&
+		f.IncludeArchiveFlg == nil &&
+		f.ClientIDEq == 0 &&
+		f.NameCont == ""
+}
+
+// List returns client branches.
+//
+// Behavior:
+//   - Zero filter (boardapi.ClientBranchListOptions{}): uses the local cache with
+//     refresh-on-demand (daily auto refresh, explicit Refresh / ForceRefresh).
+//     Returns *ListResult with Meta zero-valued (cache is source of truth).
+//   - Non-zero filter: bypasses the cache and calls api.ListClientBranches directly
+//     so that server-side filter semantics (Ransack) take effect.
+//     Returns *ListResult with Meta populated from the final page's response headers.
+//
+// Limit from readOpts is applied to the final result in either path.
+func (r *ClientBranchRepository) List(ctx context.Context, readOpts ReadOptions, filter boardapi.ClientBranchListOptions) (*boardapi.ListResult[boardapi.ClientBranchEntity], error) {
+	if !clientBranchFilterIsZero(filter) {
+		// API 直接呼び出し（cache bypass）: フィルタ結果でキャッシュを汚染しない。
+		result, err := r.api.ListClientBranches(ctx, filter)
+		if err != nil {
+			return nil, err
+		}
+		result.Items = applyLimit(result.Items, readOpts.Limit)
+		return result, nil
+	}
+
+	// ゼロフィルタ: 既存の cache → refresh → API fallback 経路
 	fetcher := &clientBranchesFetcher{api: r.api}
 	now := time.Now()
 
@@ -58,16 +92,13 @@ func (r *ClientBranchRepository) List(ctx context.Context, opts ReadOptions) ([]
 	if err != nil {
 		return nil, err
 	}
-
-	if err := maybeRefresh(ctx, r.profile, clientBranchesResource, opts, state, r.autoRefresh, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
+	if err := maybeRefresh(ctx, r.profile, clientBranchesResource, readOpts, state, r.autoRefresh, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
 		return nil, err
 	}
-
 	entries, err := r.cache.List(ctx, r.profile, clientBranchesResource)
 	if err != nil {
 		return nil, err
 	}
-
 	if len(entries) == 0 && state == nil {
 		if err := r.lockManager.WithLock(ctx, r.profile, clientBranchesResource, func() error {
 			_, err := r.refresher.ForceRefresh(ctx, r.profile, fetcher, now, r.tz)
@@ -80,16 +111,26 @@ func (r *ClientBranchRepository) List(ctx context.Context, opts ReadOptions) ([]
 			return nil, err
 		}
 	}
-
 	entities, err := decodeEntries[boardapi.ClientBranchEntity](entries)
 	if err != nil {
 		return nil, err
 	}
+	entities = applyLimit(entities, readOpts.Limit)
+	return &boardapi.ListResult[boardapi.ClientBranchEntity]{Items: entities}, nil
+}
 
-	return applyLimit(entities, opts.Limit), nil
+// ListEntities は List の items のみを返す薄いラッパ。
+// find 層（Phase L では *ListResult を扱わない）向け。
+func (r *ClientBranchRepository) ListEntities(ctx context.Context, readOpts ReadOptions, filter boardapi.ClientBranchListOptions) ([]boardapi.ClientBranchEntity, error) {
+	result, err := r.List(ctx, readOpts, filter)
+	if err != nil {
+		return nil, err
+	}
+	return result.Items, nil
 }
 
 // GetByID returns the client branch with the given ID from the cache.
+// On cache miss, it fetches from the API and upserts the result.
 func (r *ClientBranchRepository) GetByID(ctx context.Context, id int, opts ReadOptions) (*boardapi.ClientBranchEntity, error) {
 	fetcher := &clientBranchesFetcher{api: r.api}
 	now := time.Now()
@@ -118,12 +159,12 @@ func (r *ClientBranchRepository) GetByID(ctx context.Context, id int, opts ReadO
 	}
 
 	// Cache miss -> fetch single entry from API
-	entity, err := r.api.GetClientBranch(ctx, id)
+	result, err := r.api.GetClientBranch(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 
-	raw, err := json.Marshal(entity)
+	raw, err := json.Marshal(result.Item)
 	if err != nil {
 		return nil, err
 	}
@@ -131,53 +172,12 @@ func (r *ClientBranchRepository) GetByID(ctx context.Context, id int, opts ReadO
 		return nil, err
 	}
 
-	return entity, nil
+	return result.Item, nil
 }
 
-// Search returns client branches filtered by the given parameters.
-// When ClientID is set, the API-side client_id filter is used directly because
-// the BOARD API response does not include a flat client_id field; it nests the
-// parent client as {"client": {"id": N, ...}}. In-memory filtering on
-// ClientBranchEntity.ClientID (which is always 0 after unmarshal) would
-// silently return zero results. Name-only searches fall back to a full list
-// with in-memory filtering (BOARD API ignores the name parameter).
-func (r *ClientBranchRepository) Search(ctx context.Context, params boardapi.ClientBranchSearchParams, opts ReadOptions) ([]boardapi.ClientBranchEntity, error) {
-	if params.ClientID != 0 {
-		// Use API-side filter; apply Name in-memory afterward if needed.
-		entities, err := r.api.SearchClientBranches(ctx, params)
-		if err != nil {
-			return nil, err
-		}
-		if params.Name == "" {
-			return applyLimit(entities, opts.Limit), nil
-		}
-		return applyLimit(filterClientBranchesByName(entities, params.Name), opts.Limit), nil
-	}
-	// Name-only (or empty) filter: fall back to full list + in-memory.
-	listOpts := opts
-	listOpts.Limit = 0
-	all, err := r.List(ctx, listOpts)
-	if err != nil {
-		return nil, err
-	}
-	return applyLimit(filterClientBranchesByName(all, params.Name), opts.Limit), nil
-}
-
-// filterClientBranchesByName performs in-memory name filtering.
-func filterClientBranchesByName(entities []boardapi.ClientBranchEntity, name string) []boardapi.ClientBranchEntity {
-	if name == "" {
-		return entities
-	}
-	var result []boardapi.ClientBranchEntity
-	for _, e := range entities {
-		if strings.Contains(e.Name, name) {
-			result = append(result, e)
-		}
-	}
-	return result
-}
-
-// ListPage retrieves a single page of ClientBranchEntity directly from the API (cache bypass).
-func (r *ClientBranchRepository) ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.ClientBranchEntity], error) {
-	return r.api.ListClientBranchesPage(ctx, page, perPage)
+// Search は find 層向けの薄いラッパ。ListEntities と機能的に同等。
+//
+// find 層は *ListResult を扱わず []ClientBranchEntity を維持する（Phase L の方針）。
+func (r *ClientBranchRepository) Search(ctx context.Context, filter boardapi.ClientBranchListOptions, opts ReadOptions) ([]boardapi.ClientBranchEntity, error) {
+	return r.ListEntities(ctx, opts, filter)
 }

@@ -71,12 +71,12 @@ func (s *Service) FindClient(ctx context.Context, q FindClientQuery) ([]ClientRe
 
 // resolveClientDetails fetches branches and contacts for a single client.
 func (s *Service) resolveClientDetails(ctx context.Context, client boardapi.ClientEntity, opts repository.ReadOptions) (ClientResult, error) {
-	branches, err := s.clientBranches.Search(ctx, boardapi.ClientBranchSearchParams{ClientID: client.ID}, opts)
+	branches, err := s.clientBranches.Search(ctx, boardapi.ClientBranchListOptions{ClientIDEq: client.ID}, opts)
 	if err != nil {
 		return ClientResult{}, err
 	}
 
-	contacts, err := s.contacts.Search(ctx, boardapi.ContactSearchParams{ClientID: client.ID}, opts)
+	contacts, err := s.contacts.Search(ctx, boardapi.ContactListOptions{ClientIDEq: client.ID}, opts)
 	if err != nil {
 		return ClientResult{}, err
 	}

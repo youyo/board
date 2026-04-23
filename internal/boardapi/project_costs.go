@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 )
 
 // ProjectCostEntity は BOARD API の ProjectCost エンティティ。
@@ -25,47 +24,77 @@ type ProjectCostEntity struct {
 	CreatedAt   string  `json:"created_at"`   // ISO 8601
 }
 
-// ProjectCostSearchParams is the parameter for SearchProjectCosts.
-type ProjectCostSearchParams struct {
-	ProjectID int
+// ProjectCostListOptions は GET /v1/project_costs のクエリパラメータ（Ransack スタイル）。
+// ゼロ値は API に送信しない。ProjectCostListOptions{} はフィルタなしの全件取得を意味する。
+//
+// M52 で導入。旧 ProjectCostSearchParams を置き換える破壊的変更。
+type ProjectCostListOptions struct {
+	// 共通ページネーション（通常は ListAllWithResult が page を上書きする）
+	Page    int
+	PerPage int
+
+	// 全 List 共通
+	UpdatedAtGteq     string // "YYYY-MM-DD HH:MM:SS"
+	UpdatedAtLteq     string
+	IncludeArchiveFlg *bool // nil=送らない, true=1, false=0
+
+	// project_costs 専用（Ransack 準拠）
+	ProjectIDEq int // プロジェクト ID 完全一致
 }
 
-// ListProjectCosts retrieves all project costs.
-// Pagination is automatically handled by ListAll.
-func (c *Client) ListProjectCosts(ctx context.Context) ([]ProjectCostEntity, error) {
-	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+// buildProjectCostsQuery は GET /v1/project_costs の Ransack スタイルクエリ文字列を組み立てる。
+func buildProjectCostsQuery(opts ProjectCostListOptions, page, perPage int) string {
+	return NewQueryBuilder().
+		Page(page, perPage).
+		IntEq("project_id", opts.ProjectIDEq).
+		DateGteq("updated_at", opts.UpdatedAtGteq).
+		DateLteq("updated_at", opts.UpdatedAtLteq).
+		Flg01("include_archive_flg", opts.IncludeArchiveFlg).
+		Encode()
+}
+
+// ListProjectCosts は与えられたオプションでフィルタしたプロジェクト原価を取得する。
+// ページネーションは ListAllWithResult が内部で処理する。メタデータ（件数・レート制限・ETag）は
+// 返り値の *ListResult 経由で参照できる。
+//
+// フィルタなしの全件取得は ProjectCostListOptions{} を渡す。
+func (c *Client) ListProjectCosts(ctx context.Context, opts ProjectCostListOptions) (*ListResult[ProjectCostEntity], error) {
+	perPage := opts.PerPage
+	makeReq := func(ctx context.Context, page, pp int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/project_costs", nil)
 		if err != nil {
 			return nil, err
 		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		req.URL.RawQuery = q.Encode()
+		req.URL.RawQuery = buildProjectCostsQuery(opts, page, pp)
 		return req, nil
 	}
-	items, err := c.ListAll(ctx, makeReq)
+	var listOpts []ListAllOption
+	if perPage > 0 {
+		listOpts = append(listOpts, WithPerPage(perPage))
+	}
+	raw, err := c.ListAllWithResult(ctx, makeReq, listOpts...)
 	if err != nil {
 		return nil, err
 	}
-	result := make([]ProjectCostEntity, 0, len(items))
-	for _, raw := range items {
+	items := make([]ProjectCostEntity, 0, len(raw.Items))
+	for _, b := range raw.Items {
 		var x ProjectCostEntity
-		if err := json.Unmarshal(raw, &x); err != nil {
+		if err := json.Unmarshal(b, &x); err != nil {
 			return nil, &APIError{Code: APIErrorUnknown, Message: "ListProjectCosts: unmarshal: " + err.Error()}
 		}
-		result = append(result, x)
+		items = append(items, x)
 	}
-	return result, nil
+	return &ListResult[ProjectCostEntity]{Items: items, Meta: raw.Meta, Headers: raw.Headers}, nil
 }
 
-// GetProjectCost retrieves the project cost with the specified ID.
-func (c *Client) GetProjectCost(ctx context.Context, id int) (*ProjectCostEntity, error) {
+// GetProjectCost は指定 ID のプロジェクト原価を取得する。
+// レスポンスメタデータ（ETag・レート制限・Last-Modified）は *ItemResult 経由で参照できる。
+func (c *Client) GetProjectCost(ctx context.Context, id int) (*ItemResult[ProjectCostEntity], error) {
 	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/project_costs/%d", id), nil)
 	if err != nil {
 		return nil, err
 	}
-	body, err := c.DoWithRetry(req)
+	body, headers, err := c.DoWithRetryFull(req)
 	if err != nil {
 		return nil, err
 	}
@@ -73,132 +102,47 @@ func (c *Client) GetProjectCost(ctx context.Context, id int) (*ProjectCostEntity
 	if err := json.Unmarshal(body, &x); err != nil {
 		return nil, &APIError{Code: APIErrorUnknown, Message: "GetProjectCost: unmarshal: " + err.Error()}
 	}
-	return &x, nil
+	return &ItemResult[ProjectCostEntity]{
+		Item:    &x,
+		Meta:    parseItemMeta(headers),
+		Headers: headers,
+	}, nil
 }
 
-// SearchProjectCosts searches project costs with the given conditions.
-// Pagination is automatically handled by ListAll.
-func (c *Client) SearchProjectCosts(ctx context.Context, params ProjectCostSearchParams) ([]ProjectCostEntity, error) {
-	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+// ListProjectCostsRaw は与えられたオプションでフィルタしたプロジェクト原価の生 JSON 配列と
+// 最終ページのレスポンスヘッダーを返す。バイト列は BOARD API が返したものをそのまま保持するため、
+// E2E の strict field diff に使用できる。通常の呼び出しには ListProjectCosts を使うこと。
+func (c *Client) ListProjectCostsRaw(ctx context.Context, opts ProjectCostListOptions) ([]byte, http.Header, error) {
+	perPage := opts.PerPage
+	makeReq := func(ctx context.Context, page, pp int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/project_costs", nil)
 		if err != nil {
 			return nil, err
 		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		if params.ProjectID != 0 {
-			q.Set("project_id", strconv.Itoa(params.ProjectID))
-		}
-		req.URL.RawQuery = q.Encode()
+		req.URL.RawQuery = buildProjectCostsQuery(opts, page, pp)
 		return req, nil
 	}
-	items, err := c.ListAll(ctx, makeReq)
+	var listOpts []ListAllOption
+	if perPage > 0 {
+		listOpts = append(listOpts, WithPerPage(perPage))
+	}
+	raw, err := c.ListAllWithResult(ctx, makeReq, listOpts...)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	result := make([]ProjectCostEntity, 0, len(items))
-	for _, raw := range items {
-		var x ProjectCostEntity
-		if err := json.Unmarshal(raw, &x); err != nil {
-			return nil, &APIError{Code: APIErrorUnknown, Message: "SearchProjectCosts: unmarshal: " + err.Error()}
-		}
-		result = append(result, x)
+	out, err := json.Marshal(raw.Items)
+	if err != nil {
+		return nil, nil, &APIError{Code: APIErrorUnknown, Message: "ListProjectCostsRaw: marshal aggregate: " + err.Error()}
 	}
-	return result, nil
+	return out, raw.Headers, nil
 }
 
-// ListProjectCostsPage retrieves a single page of project costs.
-func (c *Client) ListProjectCostsPage(ctx context.Context, page, perPage int) (*PageResult[ProjectCostEntity], error) {
-	makeReq := func(ctx context.Context, p, pp int) (*http.Request, error) {
-		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/project_costs", nil)
-		if err != nil {
-			return nil, err
-		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(p))
-		q.Set("per_page", strconv.Itoa(pp))
-		req.URL.RawQuery = q.Encode()
-		return req, nil
-	}
-	return ListPage[ProjectCostEntity](c, ctx, makeReq, page, perPage)
-}
-
-// ListProjectCostsRaw retrieves all project costs and returns the raw HTTP
-// response bodies merged across pages as a single JSON array. Unlike
-// ListProjectCosts, the returned bytes are byte-preserving: each element JSON
-// is exactly what the BOARD API emitted, enabling strict field diff in E2E
-// tests to detect keys that are not mapped to ProjectCostEntity.
-//
-// Intended for E2E strict field diff; regular callers should use
-// ListProjectCosts.
-func (c *Client) ListProjectCostsRaw(ctx context.Context, opts ...ListAllOption) ([]byte, error) {
-	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
-		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/project_costs", nil)
-		if err != nil {
-			return nil, err
-		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		req.URL.RawQuery = q.Encode()
-		return req, nil
-	}
-	items, err := c.ListAll(ctx, makeReq, opts...)
-	if err != nil {
-		return nil, err
-	}
-	out, err := json.Marshal(items)
-	if err != nil {
-		return nil, &APIError{Code: APIErrorUnknown, Message: "ListProjectCostsRaw: marshal aggregate: " + err.Error()}
-	}
-	return out, nil
-}
-
-// GetProjectCostRaw retrieves a single project cost and returns the raw HTTP
-// response body byte-for-byte.
-//
-// Intended for E2E strict field diff; regular callers should use
-// GetProjectCost.
-func (c *Client) GetProjectCostRaw(ctx context.Context, id int) ([]byte, error) {
+// GetProjectCostRaw は指定 ID のプロジェクト原価の生 HTTP レスポンスボディとヘッダーを返す。
+// E2E の strict field diff に使用できる。通常の呼び出しには GetProjectCost を使うこと。
+func (c *Client) GetProjectCostRaw(ctx context.Context, id int) ([]byte, http.Header, error) {
 	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/project_costs/%d", id), nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return c.DoWithRetry(req)
-}
-
-// SearchProjectCostsRaw retrieves project costs matching the given search
-// parameters and returns the raw HTTP response bodies merged across pages as
-// a single JSON array. Same byte-preserving guarantee as ListProjectCostsRaw.
-//
-// Unlike contacts (client_id/name/email) or client_branches (client_id/name),
-// project_costs exposes only a single hierarchical filter `project_id`.
-//
-// Intended for E2E strict field diff; regular callers should use
-// SearchProjectCosts.
-func (c *Client) SearchProjectCostsRaw(ctx context.Context, params ProjectCostSearchParams, opts ...ListAllOption) ([]byte, error) {
-	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
-		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/project_costs", nil)
-		if err != nil {
-			return nil, err
-		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		if params.ProjectID != 0 {
-			q.Set("project_id", strconv.Itoa(params.ProjectID))
-		}
-		req.URL.RawQuery = q.Encode()
-		return req, nil
-	}
-	items, err := c.ListAll(ctx, makeReq, opts...)
-	if err != nil {
-		return nil, err
-	}
-	out, err := json.Marshal(items)
-	if err != nil {
-		return nil, &APIError{Code: APIErrorUnknown, Message: "SearchProjectCostsRaw: marshal aggregate: " + err.Error()}
-	}
-	return out, nil
+	return c.DoWithRetryFull(req)
 }

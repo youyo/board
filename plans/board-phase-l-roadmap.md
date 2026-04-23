@@ -34,9 +34,9 @@ Phase A〜K（48 M）でエンティティ準拠とリリースインフラが�
    - BOARD API 側の存在有無自体が未検証
 
 ## Current Focus
-- **ステータス**: M50 完了、M51 待機
-- **直近の完了**: M50（clients 先行パイロット、フルサイクル刷新 + E2E 整備、2026-04-23）
-- **次のアクション**: M51（projects 全面移行）着手 — `plans/board-phase-l-pattern.md` を参照しながら差分実装
+- **ステータス**: M51 完了、M52 待機
+- **直近の完了**: M51（projects 全面移行、20+ Ransack フィルタ + ListResult 刷新、2026-04-24）
+- **次のアクション**: M52（client_branches / contacts / project_costs）着手
 
 ## Progress
 
@@ -71,12 +71,15 @@ Phase A〜K（48 M）でエンティティ準拠とリリースインフラが�
 - **補足**: Agent/Task tool 未提供環境のため direct execution 経路 + advisor() 2 回（計画批評 + 実装前レビュー）で M49 同様の AI ゲート代替を実施。
 - **補足**: E10（BOARD API 正式ヘッダー名確定）は実 API 実行が未完で、pattern 手順書 §6 に TBD を残した。M51 以降の per-batch E2E 実行で随時確定していく。
 
-### M51 (L-03): projects 全面移行（最大規模）⏳
-- [ ] `ProjectSearchParams` 刷新: NameCont, ClientIDEq, ClientNameCont, OrderStatusIn []int, DeliveryStatusIn []int, ProjectNoEq, ManagementNoEq, DeliveryDateGteq/Lteq, InvoiceDateGteq/Lteq, InvoiceTimingKbnIn []int, Tags []string, CreatedAtGteq/Lteq, UpdatedAtGteq/Lteq, IncludeLostFlg, IncludeArchiveFlg, ResponseGroup
-- [ ] 「name/status フィルタが効かない」観測のリベンジ E2E
-- [ ] `GetProjectWithGroup` の URL エンコード安全化（現状 `path += "?response_group=..."` ハードコード）
-- [ ] downstream（find_project 等）のビルドが通る最小追従
-- 📄 詳細: 着手時に plans/board-phase-l-m51-projects.md として生成
+### M51 (L-03): projects 全面移行（最大規模）✅
+- [x] `ProjectListOptions` 新設（NameCont, ClientIDEq, ClientNameCont, OrderStatusIn []int, DeliveryStatusIn []int, ProjectNoEq, ManagementNoEq, DeliveryDateGteq/Lteq, InvoiceDateGteq/Lteq, InvoiceTimingKbnIn []int, Tags []string, CreatedAtGteq/Lteq, UpdatedAtGteq/Lteq, IncludeLostFlg, IncludeArchiveFlg, ResponseGroup）
+- [x] `ListProjects(ctx, ProjectListOptions) *ListResult[ProjectEntity]` に刷新、`SearchProjects`/`SearchProjectsRaw`/`ProjectSearchParams` を完全削除
+- [x] `GetProjectWithGroup` の URL エンコード安全化（`path += "?response_group=..."` → `QueryBuilder.ResponseGroup` に統合）
+- [x] repository 層: `List(ctx, ReadOptions, ProjectListOptions)` 二引数化、非ゼロ filter は cache bypass
+- [x] find 層（find_project.go 等）のビルドが通る最小追従
+- [x] T1-T16 単体テスト + E1-E8 E2E テスト追加
+- [x] `go test -count=1 ./...` / `go vet ./...` 全 Green
+- 📄 commit: 38404a9（23 ファイル変更、968 挿入 / 541 削除）
 
 ### M52 (L-04): client_branches / contacts / project_costs ⏳
 - [ ] 各 SearchParams 刷新（client_id_eq, name_cont, email_cont 等）

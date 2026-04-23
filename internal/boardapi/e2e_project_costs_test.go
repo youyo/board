@@ -57,7 +57,7 @@ func TestE2E_ProjectCosts_List(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
 
-	raw, err := client.ListProjectCostsRaw(ctx)
+	raw, _, err := client.ListProjectCostsRaw(ctx, boardapi.ProjectCostListOptions{})
 	if err != nil {
 		// Roadmap rule: 403/429 must NOT be skipped, they must fail the test.
 		t.Fatalf("ListProjectCostsRaw: %v", err)
@@ -123,7 +123,7 @@ func TestE2E_ProjectCosts_Get(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
 
-	listRaw, err := client.ListProjectCostsRaw(ctx)
+	listRaw, _, err := client.ListProjectCostsRaw(ctx, boardapi.ProjectCostListOptions{})
 	if err != nil {
 		t.Fatalf("ListProjectCostsRaw (discovery): %v", err)
 	}
@@ -145,7 +145,7 @@ func TestE2E_ProjectCosts_Get(t *testing.T) {
 		t.Fatalf("first project_cost has non-positive ID: %d", id)
 	}
 
-	getRaw, err := client.GetProjectCostRaw(ctx, id)
+	getRaw, _, err := client.GetProjectCostRaw(ctx, id)
 	if err != nil {
 		// Phase D note: M09/M10 confirmed core-business resources return 200
 		// on Get-by-id. If M11 regresses to 404 it's a new finding worthy of
@@ -193,9 +193,9 @@ func TestE2E_ProjectCosts_Search(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
 
-	raw, err := client.SearchProjectCostsRaw(ctx, boardapi.ProjectCostSearchParams{})
+	raw, _, err := client.ListProjectCostsRaw(ctx, boardapi.ProjectCostListOptions{})
 	if err != nil {
-		t.Fatalf("SearchProjectCostsRaw: %v", err)
+		t.Fatalf("ListProjectCostsRaw: %v", err)
 	}
 
 	dumpJSON(t, "project_costs_search", 0, raw)

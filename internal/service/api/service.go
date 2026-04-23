@@ -18,19 +18,23 @@ type ClientRepo interface {
 }
 
 // ClientBranchRepo is the interface for the client_branches repository.
+//
+// M52 以降: List は (readOpts, filter) 二引数化されて *ListResult を返す。
+// 非ゼロ filter 時は cache バイパスで api.ListClientBranches を直接呼ぶ。
+// Search / ListPage は削除（破壊的変更）。
 type ClientBranchRepo interface {
-	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.ClientBranchEntity, error)
+	List(ctx context.Context, readOpts repository.ReadOptions, filter boardapi.ClientBranchListOptions) (*boardapi.ListResult[boardapi.ClientBranchEntity], error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.ClientBranchEntity, error)
-	Search(ctx context.Context, params boardapi.ClientBranchSearchParams, opts repository.ReadOptions) ([]boardapi.ClientBranchEntity, error)
-	ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.ClientBranchEntity], error)
 }
 
 // ContactRepo is the interface for the contacts repository.
+//
+// M52 以降: List は (readOpts, filter) 二引数化されて *ListResult を返す。
+// 非ゼロ filter 時は cache バイパスで api.ListContacts を直接呼ぶ。
+// Search / ListPage は削除（破壊的変更）。
 type ContactRepo interface {
-	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.ContactEntity, error)
+	List(ctx context.Context, readOpts repository.ReadOptions, filter boardapi.ContactListOptions) (*boardapi.ListResult[boardapi.ContactEntity], error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.ContactEntity, error)
-	Search(ctx context.Context, params boardapi.ContactSearchParams, opts repository.ReadOptions) ([]boardapi.ContactEntity, error)
-	ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.ContactEntity], error)
 }
 
 // ProjectRepo is the interface for the projects repository.
@@ -45,11 +49,13 @@ type ProjectRepo interface {
 }
 
 // ProjectCostRepo is the interface for the project_costs repository.
+//
+// M52 以降: List は (readOpts, filter) 二引数化されて *ListResult を返す。
+// 非ゼロ filter 時は cache バイパスで api.ListProjectCosts を直接呼ぶ。
+// Search / ListPage は削除（破壊的変更）。
 type ProjectCostRepo interface {
-	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.ProjectCostEntity, error)
+	List(ctx context.Context, readOpts repository.ReadOptions, filter boardapi.ProjectCostListOptions) (*boardapi.ListResult[boardapi.ProjectCostEntity], error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.ProjectCostEntity, error)
-	Search(ctx context.Context, params boardapi.ProjectCostSearchParams, opts repository.ReadOptions) ([]boardapi.ProjectCostEntity, error)
-	ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.ProjectCostEntity], error)
 }
 
 // EstimateRepo is the interface for the estimates repository.

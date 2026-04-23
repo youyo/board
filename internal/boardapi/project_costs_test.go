@@ -84,25 +84,26 @@ func TestProjectCostEntity_UnmarshalWithNullDates(t *testing.T) {
 	}
 }
 
-// U3: TestProjectCostSearchParams_QueryEncoding — ProjectID=85079735 が
-// クエリパラメータ project_id=85079735 としてエンコードされることを確認。
-func TestProjectCostSearchParams_QueryEncoding(t *testing.T) {
+// U3: TestProjectCostListOptions_QueryEncoding — ProjectIDEq=85079735 が
+// クエリパラメータ project_id_eq=85079735 としてエンコードされることを確認。
+// M52: 旧 ProjectCostSearchParams を ProjectCostListOptions に置き換え。
+func TestProjectCostListOptions_QueryEncoding(t *testing.T) {
 	page1 := `[{"id":1,"project_id":85079735,"description":"x","cost":0,"invoice_date":null,"payment_date":null,"updated_at":"2024-01-01T00:00:00+09:00","created_at":"2024-01-01T00:00:00+09:00"}]`
 	var observedProjectID string
 	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
-		observedProjectID = r.URL.Query().Get("project_id")
+		observedProjectID = r.URL.Query().Get("project_id_eq")
 		return jsonResp(page1), nil
 	})
 	client := newProjectCostsMockClient(rt)
 
-	_, err := client.SearchProjectCostsRaw(context.Background(), boardapi.ProjectCostSearchParams{
-		ProjectID: 85079735,
+	_, _, err := client.ListProjectCostsRaw(context.Background(), boardapi.ProjectCostListOptions{
+		ProjectIDEq: 85079735,
 	})
 	if err != nil {
-		t.Fatalf("SearchProjectCostsRaw: %v", err)
+		t.Fatalf("ListProjectCostsRaw: %v", err)
 	}
 	if observedProjectID != "85079735" {
-		t.Errorf("query project_id = %q, want 85079735", observedProjectID)
+		t.Errorf("query project_id_eq = %q, want 85079735", observedProjectID)
 	}
 }
 
@@ -110,6 +111,7 @@ func TestProjectCostSearchParams_QueryEncoding(t *testing.T) {
 // single page response is served. All 8 ProjectCostEntity keys must survive
 // the round trip so StrictFieldDiff can later detect any unmapped BOARD API
 // keys in E2E.
+// M52: ListProjectCostsRaw シグネチャを ProjectCostListOptions に更新。
 func TestListProjectCostsRaw_SinglePage(t *testing.T) {
 	page1 := `[{"id":1,"project_id":100,"description":"開発費","cost":12345,"invoice_date":"2024-01-01","payment_date":null,"updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}]`
 	var gotPath string
@@ -121,7 +123,7 @@ func TestListProjectCostsRaw_SinglePage(t *testing.T) {
 	})
 	client := newProjectCostsMockClient(rt)
 
-	raw, err := client.ListProjectCostsRaw(context.Background())
+	raw, _, err := client.ListProjectCostsRaw(context.Background(), boardapi.ProjectCostListOptions{})
 	if err != nil {
 		t.Fatalf("ListProjectCostsRaw: %v", err)
 	}
@@ -156,6 +158,7 @@ func TestListProjectCostsRaw_SinglePage(t *testing.T) {
 // ListProjectCostsRaw concatenates multiple pages into a single valid JSON
 // array. per_page=2 forces pagination; server returns 2 items on page 1 and
 // 1 item on page 2. Result must be a JSON array of 3 items.
+// M52: ListProjectCostsRaw シグネチャを ProjectCostListOptions に更新。
 func TestListProjectCostsRaw_MultiPage(t *testing.T) {
 	page1Items := []string{
 		`{"id":1,"project_id":100,"description":"A","cost":1000,"invoice_date":"2024-01-01","payment_date":null,"updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}`,
@@ -184,7 +187,7 @@ func TestListProjectCostsRaw_MultiPage(t *testing.T) {
 	})
 	client := newProjectCostsMockClient(rt)
 
-	raw, err := client.ListProjectCostsRaw(context.Background(), boardapi.WithPerPage(2))
+	raw, _, err := client.ListProjectCostsRaw(context.Background(), boardapi.ProjectCostListOptions{PerPage: 2})
 	if err != nil {
 		t.Fatalf("ListProjectCostsRaw: %v", err)
 	}
@@ -207,6 +210,7 @@ func TestListProjectCostsRaw_MultiPage(t *testing.T) {
 }
 
 // GetProjectCostRaw returns body exactly as served (single object).
+// M52: GetProjectCostRaw がヘッダーも返すシグネチャに更新。
 func TestGetProjectCostRaw_Success(t *testing.T) {
 	body := []byte(`{"id":42,"project_id":100,"description":"外注費","cost":9999,"invoice_date":"2024-01-01","payment_date":"2024-02-01","updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}`)
 	var gotPath string
@@ -220,7 +224,7 @@ func TestGetProjectCostRaw_Success(t *testing.T) {
 	})
 	client := newProjectCostsMockClient(rt)
 
-	raw, err := client.GetProjectCostRaw(context.Background(), 42)
+	raw, _, err := client.GetProjectCostRaw(context.Background(), 42)
 	if err != nil {
 		t.Fatalf("GetProjectCostRaw: %v", err)
 	}
@@ -233,6 +237,7 @@ func TestGetProjectCostRaw_Success(t *testing.T) {
 }
 
 // GetProjectCostRaw on 404 returns *APIError{Code: APIErrorNotFound}.
+// M52: GetProjectCostRaw がヘッダーも返すシグネチャに更新。
 func TestGetProjectCostRaw_NotFound(t *testing.T) {
 	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
 		return &http.Response{
@@ -243,7 +248,7 @@ func TestGetProjectCostRaw_NotFound(t *testing.T) {
 	})
 	client := newProjectCostsMockClient(rt)
 
-	_, err := client.GetProjectCostRaw(context.Background(), 99)
+	_, _, err := client.GetProjectCostRaw(context.Background(), 99)
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}
@@ -256,32 +261,31 @@ func TestGetProjectCostRaw_NotFound(t *testing.T) {
 	}
 }
 
-// SearchProjectCostsRaw sends project_id in the query and returns the
-// body. Unlike contacts (client_id/name/email, 3 filters) or client_branches
-// (client_id/name, 2 filters), project_costs exposes only a single hierarchical
-// filter `project_id`. This asserts encoding of that lone parameter.
-func TestSearchProjectCostsRaw_QueryParams(t *testing.T) {
+// ListProjectCostsRaw sends project_id_eq in the query and returns the body.
+// M52: 旧 SearchProjectCostsRaw + ProjectCostSearchParams を
+// ListProjectCostsRaw + ProjectCostListOptions に置き換え。
+func TestListProjectCostsRaw_QueryParams(t *testing.T) {
 	page1 := `[{"id":7,"project_id":123,"description":"x","cost":100,"invoice_date":null,"payment_date":null,"updated_at":"2024-02-01T00:00:00+09:00","created_at":"2024-02-01T00:00:00+09:00"}]`
 	var observedProjectID, observedName string
 	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
-		observedProjectID = r.URL.Query().Get("project_id")
+		observedProjectID = r.URL.Query().Get("project_id_eq")
 		observedName = r.URL.Query().Get("name")
 		return jsonResp(page1), nil
 	})
 	client := newProjectCostsMockClient(rt)
 
-	raw, err := client.SearchProjectCostsRaw(context.Background(), boardapi.ProjectCostSearchParams{
-		ProjectID: 123,
+	raw, _, err := client.ListProjectCostsRaw(context.Background(), boardapi.ProjectCostListOptions{
+		ProjectIDEq: 123,
 	})
 	if err != nil {
-		t.Fatalf("SearchProjectCostsRaw: %v", err)
+		t.Fatalf("ListProjectCostsRaw: %v", err)
 	}
 	if observedProjectID != "123" {
-		t.Errorf("query project_id = %q, want 123", observedProjectID)
+		t.Errorf("query project_id_eq = %q, want 123", observedProjectID)
 	}
 	// project_costs does not support a `name` filter (unlike contacts /
 	// client_branches). Verify the param is not emitted even if callers
-	// happen to share the ContactSearchParams mental model.
+	// happen to share the ContactListOptions mental model.
 	if observedName != "" {
 		t.Errorf("query name should be absent for project_costs, got %q", observedName)
 	}

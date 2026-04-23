@@ -21,15 +21,15 @@ func TestE2E_Projects_M51(t *testing.T) {
 	if err != nil {
 		t.Skipf("config not available: %v", err)
 	}
-	profile := cfg.CurrentProfile()
-	if profile == nil {
-		t.Skip("no current profile configured")
+	profile, err := config.GetCurrentProfile(cfg)
+	if err != nil {
+		t.Skipf("no current profile configured: %v", err)
 	}
 
 	client := boardapi.New(
 		"https://api.the-board.jp",
 		profile.APIKey,
-		profile.AccessToken,
+		profile.APIToken,
 		30*time.Second,
 	)
 

@@ -82,9 +82,9 @@ func TestListClients_WithFilter(t *testing.T) {
 func TestListClientBranches(t *testing.T) {
 	stub := &stubClientBranchRepo{listResult: []boardapi.ClientBranchEntity{{ID: 1, Name: "BranchA"}}}
 	svc := newServiceWithClientBranches(stub)
-	got, err := svc.ListClientBranches(testCtx, defaultOpts)
+	got, err := svc.ListClientBranches(testCtx, defaultOpts, boardapi.ClientBranchListOptions{})
 	assertNoError(t, err)
-	assertLen(t, got, 1)
+	assertLen(t, got.Items, 1)
 }
 
 func TestGetClientBranch(t *testing.T) {
@@ -96,30 +96,14 @@ func TestGetClientBranch(t *testing.T) {
 	assertNotNil(t, got)
 }
 
-func TestSearchClientBranches(t *testing.T) {
-	stub := &stubClientBranchRepo{searchResult: []boardapi.ClientBranchEntity{{ID: 2, Name: "BranchB"}}}
-	svc := newServiceWithClientBranches(stub)
-	got, err := svc.SearchClientBranches(testCtx, boardapi.ClientBranchSearchParams{ClientID: 1}, defaultOpts)
-	assertNoError(t, err)
-	assertLen(t, got, 1)
-}
-
-func TestListClientBranchesPage(t *testing.T) {
-	stub := &stubClientBranchRepo{listPageResult: &boardapi.PageResult[boardapi.ClientBranchEntity]{Items: []boardapi.ClientBranchEntity{{ID: 1}}}}
-	svc := newServiceWithClientBranches(stub)
-	got, err := svc.ListClientBranchesPage(testCtx, 1, 30)
-	assertNoError(t, err)
-	assertNotNil(t, got)
-}
-
 // --- Contacts tests ---
 
 func TestListContacts(t *testing.T) {
 	stub := &stubContactRepo{listResult: []boardapi.ContactEntity{{ID: 1, LastName: "Contact", FirstName: "A"}}}
 	svc := newServiceWithContacts(stub)
-	got, err := svc.ListContacts(testCtx, defaultOpts)
+	got, err := svc.ListContacts(testCtx, defaultOpts, boardapi.ContactListOptions{})
 	assertNoError(t, err)
-	assertLen(t, got, 1)
+	assertLen(t, got.Items, 1)
 }
 
 func TestGetContact(t *testing.T) {
@@ -127,22 +111,6 @@ func TestGetContact(t *testing.T) {
 	stub := &stubContactRepo{getResult: entity}
 	svc := newServiceWithContacts(stub)
 	got, err := svc.GetContact(testCtx, 1, defaultOpts)
-	assertNoError(t, err)
-	assertNotNil(t, got)
-}
-
-func TestSearchContacts(t *testing.T) {
-	stub := &stubContactRepo{searchResult: []boardapi.ContactEntity{{ID: 2, LastName: "Contact", FirstName: "B"}}}
-	svc := newServiceWithContacts(stub)
-	got, err := svc.SearchContacts(testCtx, boardapi.ContactSearchParams{Name: "ContactB"}, defaultOpts)
-	assertNoError(t, err)
-	assertLen(t, got, 1)
-}
-
-func TestListContactsPage(t *testing.T) {
-	stub := &stubContactRepo{listPageResult: &boardapi.PageResult[boardapi.ContactEntity]{Items: []boardapi.ContactEntity{{ID: 1}}}}
-	svc := newServiceWithContacts(stub)
-	got, err := svc.ListContactsPage(testCtx, 1, 30)
 	assertNoError(t, err)
 	assertNotNil(t, got)
 }
@@ -180,9 +148,9 @@ func TestGetProjectWithGroup(t *testing.T) {
 func TestListProjectCosts(t *testing.T) {
 	stub := &stubProjectCostRepo{listResult: []boardapi.ProjectCostEntity{{ID: 1, ProjectID: 10}}}
 	svc := newServiceWithProjectCosts(stub)
-	got, err := svc.ListProjectCosts(testCtx, defaultOpts)
+	got, err := svc.ListProjectCosts(testCtx, defaultOpts, boardapi.ProjectCostListOptions{})
 	assertNoError(t, err)
-	assertLen(t, got, 1)
+	assertLen(t, got.Items, 1)
 }
 
 func TestGetProjectCost(t *testing.T) {
@@ -190,22 +158,6 @@ func TestGetProjectCost(t *testing.T) {
 	stub := &stubProjectCostRepo{getResult: entity}
 	svc := newServiceWithProjectCosts(stub)
 	got, err := svc.GetProjectCost(testCtx, 1, defaultOpts)
-	assertNoError(t, err)
-	assertNotNil(t, got)
-}
-
-func TestSearchProjectCosts(t *testing.T) {
-	stub := &stubProjectCostRepo{searchResult: []boardapi.ProjectCostEntity{{ID: 2, ProjectID: 10}}}
-	svc := newServiceWithProjectCosts(stub)
-	got, err := svc.SearchProjectCosts(testCtx, boardapi.ProjectCostSearchParams{ProjectID: 10}, defaultOpts)
-	assertNoError(t, err)
-	assertLen(t, got, 1)
-}
-
-func TestListProjectCostsPage(t *testing.T) {
-	stub := &stubProjectCostRepo{listPageResult: &boardapi.PageResult[boardapi.ProjectCostEntity]{Items: []boardapi.ProjectCostEntity{{ID: 1}}}}
-	svc := newServiceWithProjectCosts(stub)
-	got, err := svc.ListProjectCostsPage(testCtx, 1, 30)
 	assertNoError(t, err)
 	assertNotNil(t, got)
 }

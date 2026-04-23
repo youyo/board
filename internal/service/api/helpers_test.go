@@ -40,47 +40,41 @@ func (s *stubClientRepo) GetByID(_ context.Context, _ int, _ repository.ReadOpti
 }
 
 // stubClientBranchRepo is a stub implementation of ClientBranchRepo.
+// M52 以降: List は (readOpts, filter) 二引数化されて *ListResult を返す。
 type stubClientBranchRepo struct {
-	listResult     []boardapi.ClientBranchEntity
-	getResult      *boardapi.ClientBranchEntity
-	searchResult   []boardapi.ClientBranchEntity
-	listPageResult *boardapi.PageResult[boardapi.ClientBranchEntity]
-	err            error
+	listResult []boardapi.ClientBranchEntity
+	getResult  *boardapi.ClientBranchEntity
+	meta       boardapi.ListMeta
+	err        error
 }
 
-func (s *stubClientBranchRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.ClientBranchEntity, error) {
-	return s.listResult, s.err
+func (s *stubClientBranchRepo) List(_ context.Context, _ repository.ReadOptions, _ boardapi.ClientBranchListOptions) (*boardapi.ListResult[boardapi.ClientBranchEntity], error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	return &boardapi.ListResult[boardapi.ClientBranchEntity]{Items: s.listResult, Meta: s.meta}, nil
 }
 func (s *stubClientBranchRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.ClientBranchEntity, error) {
 	return s.getResult, s.err
 }
-func (s *stubClientBranchRepo) Search(_ context.Context, _ boardapi.ClientBranchSearchParams, _ repository.ReadOptions) ([]boardapi.ClientBranchEntity, error) {
-	return s.searchResult, s.err
-}
-func (s *stubClientBranchRepo) ListPage(_ context.Context, _, _ int) (*boardapi.PageResult[boardapi.ClientBranchEntity], error) {
-	return s.listPageResult, s.err
-}
 
 // stubContactRepo is a stub implementation of ContactRepo.
+// M52 以降: List は (readOpts, filter) 二引数化されて *ListResult を返す。
 type stubContactRepo struct {
-	listResult     []boardapi.ContactEntity
-	getResult      *boardapi.ContactEntity
-	searchResult   []boardapi.ContactEntity
-	listPageResult *boardapi.PageResult[boardapi.ContactEntity]
-	err            error
+	listResult []boardapi.ContactEntity
+	getResult  *boardapi.ContactEntity
+	meta       boardapi.ListMeta
+	err        error
 }
 
-func (s *stubContactRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.ContactEntity, error) {
-	return s.listResult, s.err
+func (s *stubContactRepo) List(_ context.Context, _ repository.ReadOptions, _ boardapi.ContactListOptions) (*boardapi.ListResult[boardapi.ContactEntity], error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	return &boardapi.ListResult[boardapi.ContactEntity]{Items: s.listResult, Meta: s.meta}, nil
 }
 func (s *stubContactRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.ContactEntity, error) {
 	return s.getResult, s.err
-}
-func (s *stubContactRepo) Search(_ context.Context, _ boardapi.ContactSearchParams, _ repository.ReadOptions) ([]boardapi.ContactEntity, error) {
-	return s.searchResult, s.err
-}
-func (s *stubContactRepo) ListPage(_ context.Context, _, _ int) (*boardapi.PageResult[boardapi.ContactEntity], error) {
-	return s.listPageResult, s.err
 }
 
 // stubProjectRepo is a stub implementation of ProjectRepo.
@@ -105,25 +99,22 @@ func (s *stubProjectRepo) GetByIDWithGroup(_ context.Context, _ int, _ string) (
 }
 
 // stubProjectCostRepo is a stub implementation of ProjectCostRepo.
+// M52 以降: List は (readOpts, filter) 二引数化されて *ListResult を返す。
 type stubProjectCostRepo struct {
-	listResult     []boardapi.ProjectCostEntity
-	getResult      *boardapi.ProjectCostEntity
-	searchResult   []boardapi.ProjectCostEntity
-	listPageResult *boardapi.PageResult[boardapi.ProjectCostEntity]
-	err            error
+	listResult []boardapi.ProjectCostEntity
+	getResult  *boardapi.ProjectCostEntity
+	meta       boardapi.ListMeta
+	err        error
 }
 
-func (s *stubProjectCostRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.ProjectCostEntity, error) {
-	return s.listResult, s.err
+func (s *stubProjectCostRepo) List(_ context.Context, _ repository.ReadOptions, _ boardapi.ProjectCostListOptions) (*boardapi.ListResult[boardapi.ProjectCostEntity], error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	return &boardapi.ListResult[boardapi.ProjectCostEntity]{Items: s.listResult, Meta: s.meta}, nil
 }
 func (s *stubProjectCostRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.ProjectCostEntity, error) {
 	return s.getResult, s.err
-}
-func (s *stubProjectCostRepo) Search(_ context.Context, _ boardapi.ProjectCostSearchParams, _ repository.ReadOptions) ([]boardapi.ProjectCostEntity, error) {
-	return s.searchResult, s.err
-}
-func (s *stubProjectCostRepo) ListPage(_ context.Context, _, _ int) (*boardapi.PageResult[boardapi.ProjectCostEntity], error) {
-	return s.listPageResult, s.err
 }
 
 // --- Stubs: document ---

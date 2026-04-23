@@ -159,18 +159,16 @@ func TestE2E_Projects_Get(t *testing.T) {
 	)
 }
 
-// TestE2E_Projects_Search exercises Search with a non-matching name and
-// verifies that the (possibly full) JSON array still passes strict field diff.
-// BOARD API は name フィルタを無視することがコンプライアンスロードマップで確認済み。
+// TestE2E_Projects_Search exercises ListProjectsRaw and
+// verifies that the JSON array passes strict field diff.
+// 旧 SearchProjectsRaw は M51 で ListProjectsRaw に統合済み。
 func TestE2E_Projects_Search(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
 
-	raw, err := client.SearchProjectsRaw(ctx, boardapi.ProjectSearchParams{
-		Name: "zzz_nonexistent_keyword_for_e2e",
-	})
+	raw, err := client.ListProjectsRaw(ctx)
 	if err != nil {
-		t.Fatalf("SearchProjectsRaw: %v", err)
+		t.Fatalf("ListProjectsRaw: %v", err)
 	}
 
 	dumpJSON(t, "projects_search", 0, raw)
