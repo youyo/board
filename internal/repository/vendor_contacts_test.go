@@ -76,12 +76,12 @@ func TestVendorContactRepository_List_CacheHit(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeVendorContactRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{})
+	got, err := repo.List(context.Background(), repository.ReadOptions{}, boardapi.VendorContactListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(got) != len(sampleVendorContacts) {
-		t.Errorf("len(got) = %d, want %d", len(got), len(sampleVendorContacts))
+	if len(got.Items) != len(sampleVendorContacts) {
+		t.Errorf("len(got.Items) = %d, want %d", len(got.Items), len(sampleVendorContacts))
 	}
 }
 
@@ -93,12 +93,12 @@ func TestVendorContactRepository_List_InitialLoad(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeVendorContactRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{})
+	got, err := repo.List(context.Background(), repository.ReadOptions{}, boardapi.VendorContactListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(got) != len(sampleVendorContacts) {
-		t.Errorf("len(got) = %d, want %d", len(got), len(sampleVendorContacts))
+	if len(got.Items) != len(sampleVendorContacts) {
+		t.Errorf("len(got.Items) = %d, want %d", len(got.Items), len(sampleVendorContacts))
 	}
 }
 
@@ -161,17 +161,21 @@ func TestVendorContactRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	}
 }
 
-// T_VCO06: Search - VendorID filter -> returns matching items
-func TestVendorContactRepository_Search_VendorIDFilter(t *testing.T) {
+// T_VCO06: Search - PayeeIDEq filter -> bypasses cache, returns data from API
+func TestVendorContactRepository_Search_PayeeIDEqFilter(t *testing.T) {
 	db := newTestDB(t)
-	seedVendorContactCache(t, db, sampleVendorContacts)
 	markSynced(t, db, "vendor_contacts")
 
-	srv := newVendorContactAPIServer(t, nil)
+	// API サーバーは payee_id_eq=10 に合致する 2 件を返すと想定
+	filtered := []boardapi.VendorContactEntity{
+		{ID: 1, Vendor: &boardapi.VendorRef{ID: 10}, LastName: "ContactA", Email: strPtr("a@vendor.com"), UpdatedAt: "2026-01-01T00:00:00Z"},
+		{ID: 2, Vendor: &boardapi.VendorRef{ID: 10}, LastName: "ContactB", Email: strPtr("b@vendor.com"), UpdatedAt: "2026-01-02T00:00:00Z"},
+	}
+	srv := newVendorContactAPIServer(t, filtered)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeVendorContactRepo(t, db, apiClient, false)
-	got, err := repo.Search(context.Background(), boardapi.VendorContactSearchParams{VendorID: 10}, repository.ReadOptions{})
+	got, err := repo.Search(context.Background(), boardapi.VendorContactListOptions{PayeeIDEq: 10}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
@@ -180,17 +184,19 @@ func TestVendorContactRepository_Search_VendorIDFilter(t *testing.T) {
 	}
 }
 
-// T_VCO07: Search - Email filter -> returns matching items
-func TestVendorContactRepository_Search_EmailFilter(t *testing.T) {
+// T_VCO07: Search - EmailCont filter -> bypasses cache, returns data from API
+func TestVendorContactRepository_Search_EmailContFilter(t *testing.T) {
 	db := newTestDB(t)
-	seedVendorContactCache(t, db, sampleVendorContacts)
 	markSynced(t, db, "vendor_contacts")
 
-	srv := newVendorContactAPIServer(t, nil)
+	filtered := []boardapi.VendorContactEntity{
+		{ID: 1, Vendor: &boardapi.VendorRef{ID: 10}, LastName: "ContactA", Email: strPtr("a@vendor.com"), UpdatedAt: "2026-01-01T00:00:00Z"},
+	}
+	srv := newVendorContactAPIServer(t, filtered)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeVendorContactRepo(t, db, apiClient, false)
-	got, err := repo.Search(context.Background(), boardapi.VendorContactSearchParams{Email: "a@vendor.com"}, repository.ReadOptions{})
+	got, err := repo.Search(context.Background(), boardapi.VendorContactListOptions{EmailCont: "a@vendor.com"}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
@@ -199,7 +205,7 @@ func TestVendorContactRepository_Search_EmailFilter(t *testing.T) {
 	}
 }
 
-// T_VCO08: Search - no filter -> returns all items
+// T_VCO08: Search - no filter -> returns all items from cache
 func TestVendorContactRepository_Search_NoFilter(t *testing.T) {
 	db := newTestDB(t)
 	seedVendorContactCache(t, db, sampleVendorContacts)
@@ -209,7 +215,7 @@ func TestVendorContactRepository_Search_NoFilter(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeVendorContactRepo(t, db, apiClient, false)
-	got, err := repo.Search(context.Background(), boardapi.VendorContactSearchParams{}, repository.ReadOptions{})
+	got, err := repo.Search(context.Background(), boardapi.VendorContactListOptions{}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}

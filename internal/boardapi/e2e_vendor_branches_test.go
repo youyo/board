@@ -57,7 +57,7 @@ func TestE2E_VendorBranches_List(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
 
-	raw, err := client.ListVendorBranchesRaw(ctx)
+	raw, _, err := client.ListVendorBranchesRaw(ctx, boardapi.VendorBranchListOptions{})
 	if err != nil {
 		// Roadmap rule: 403/429 must NOT be skipped, they must fail the test.
 		t.Fatalf("ListVendorBranchesRaw: %v", err)
@@ -87,7 +87,7 @@ func TestE2E_VendorBranches_Get(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
 
-	listRaw, err := client.ListVendorBranchesRaw(ctx)
+	listRaw, _, err := client.ListVendorBranchesRaw(ctx, boardapi.VendorBranchListOptions{PerPage: 1})
 	if err != nil {
 		t.Fatalf("ListVendorBranchesRaw (discovery): %v", err)
 	}
@@ -109,7 +109,7 @@ func TestE2E_VendorBranches_Get(t *testing.T) {
 		t.Fatalf("first vendor_branch has non-positive ID: %d", id)
 	}
 
-	getRaw, err := client.GetVendorBranchRaw(ctx, id)
+	getRaw, _, err := client.GetVendorBranchRaw(ctx, id)
 	if err != nil {
 		// Phase F note: Get 404 would indicate vendor resources do not support
 		// individual Get, which would be a new finding after 5 consecutive
@@ -155,11 +155,11 @@ func TestE2E_VendorBranches_Search(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
 
-	raw, err := client.SearchVendorBranchesRaw(ctx, boardapi.VendorBranchSearchParams{
-		Name: "zzz_nonexistent_keyword_for_e2e",
+	raw, _, err := client.ListVendorBranchesRaw(ctx, boardapi.VendorBranchListOptions{
+		NameCont: "zzz_nonexistent_keyword_for_e2e",
 	})
 	if err != nil {
-		t.Fatalf("SearchVendorBranchesRaw: %v", err)
+		t.Fatalf("ListVendorBranchesRaw(NameCont=zzz...): %v", err)
 	}
 
 	dumpJSON(t, "vendor_branches_search", 0, raw)

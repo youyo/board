@@ -50,7 +50,7 @@ func TestE2E_Invoices_List(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
 
-	raw, err := client.ListInvoicesRaw(ctx, boardapi.WithPerPage(1))
+	raw, _, err := client.ListInvoicesRaw(ctx, boardapi.InvoiceListOptions{PerPage: 1})
 	if err != nil {
 		// Roadmap rule: 403/429 must NOT be skipped, they must fail the test.
 		t.Fatalf("ListInvoicesRaw: %v", err)
@@ -80,7 +80,7 @@ func TestE2E_Invoices_Get(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
 
-	listRaw, err := client.ListInvoicesRaw(ctx, boardapi.WithPerPage(1))
+	listRaw, _, err := client.ListInvoicesRaw(ctx, boardapi.InvoiceListOptions{PerPage: 1})
 	if err != nil {
 		t.Fatalf("ListInvoicesRaw (discovery): %v", err)
 	}
@@ -102,7 +102,7 @@ func TestE2E_Invoices_Get(t *testing.T) {
 		t.Fatalf("first invoice has non-positive ID: %d", id)
 	}
 
-	getRaw, err := client.GetInvoiceRaw(ctx, id)
+	getRaw, _, err := client.GetInvoiceRaw(ctx, id)
 	if err != nil {
 		// Roadmap rule: 403/429 / 404 must NOT be skipped, they must fail the test.
 		t.Fatalf("GetInvoiceRaw(%d): %v", id, err)
@@ -127,32 +127,33 @@ func TestE2E_Invoices_Get(t *testing.T) {
 		got.ID, len(got.Title), len(got.Memo), got.Status, got.UpdatedAt)
 }
 
-// TestE2E_Invoices_Search exercises Search with UpdatedAtFrom=2099-01-01 to
+// TestE2E_Invoices_FilteredList exercises List with UpdatedAtGteq=2099-01-01 to
 // produce an empty result set, verifying that the (empty) JSON array still passes
 // strict field diff.
-// WithPerPage(1) is specified to minimize API requests.
-// The UpdatedAtFrom far-future filter is intentional: it exercises request encoding
+// PerPage=1 is specified to minimize API requests.
+// The UpdatedAtGteq far-future filter is intentional: it exercises request encoding
 // without triggering full pagination on a large dataset.
-func TestE2E_Invoices_Search(t *testing.T) {
+func TestE2E_Invoices_FilteredList(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
 
-	raw, err := client.SearchInvoicesRaw(ctx, boardapi.InvoiceSearchParams{
-		UpdatedAtFrom: "2099-01-01",
-	}, boardapi.WithPerPage(1))
+	raw, _, err := client.ListInvoicesRaw(ctx, boardapi.InvoiceListOptions{
+		UpdatedAtGteq: "2099-01-01",
+		PerPage:       1,
+	})
 	if err != nil {
-		t.Fatalf("SearchInvoicesRaw: %v", err)
+		t.Fatalf("ListInvoicesRaw(UpdatedAtGteq=2099-01-01): %v", err)
 	}
 
-	dumpJSON(t, "invoices_search", 0, raw)
+	dumpJSON(t, "invoices_filtered", 0, raw)
 
 	if diff := testhelper.StrictFieldDiff(t, raw, &[]boardapi.InvoiceEntity{}); len(diff) > 0 {
-		t.Errorf("invoices search unmapped fields: %v", diff)
+		t.Errorf("invoices filtered list unmapped fields: %v", diff)
 	}
 
 	var items []boardapi.InvoiceEntity
 	if err := json.Unmarshal(raw, &items); err != nil {
-		t.Fatalf("unmarshal search: %v", err)
+		t.Fatalf("unmarshal filtered list: %v", err)
 	}
-	t.Logf("TestE2E_Invoices_Search: %d items returned (UpdatedAtFrom=2099-01-01)", len(items))
+	t.Logf("TestE2E_Invoices_FilteredList: %d items returned (UpdatedAtGteq=2099-01-01)", len(items))
 }

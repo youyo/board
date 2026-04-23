@@ -29,7 +29,7 @@ func (s *Service) FindPurchaseOrder(ctx context.Context, q FindPurchaseOrderQuer
 		purchaseOrders = []boardapi.PurchaseOrderEntity{*po}
 
 	case q.VendorName != "":
-		vendors, err := s.vendors.Search(ctx, boardapi.VendorSearchParams{Name: q.VendorName}, opts)
+		vendors, err := s.vendors.Search(ctx, boardapi.VendorListOptions{NameCont: q.VendorName}, opts)
 		if err != nil {
 			return nil, err
 		}

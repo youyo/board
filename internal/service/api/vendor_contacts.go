@@ -7,22 +7,14 @@ import (
 	"github.com/youyo/board/internal/repository"
 )
 
-// ListVendorContacts returns all vendor contacts.
-func (s *Service) ListVendorContacts(ctx context.Context, opts repository.ReadOptions) ([]boardapi.VendorContactEntity, error) {
-	return s.vendorContacts.List(ctx, opts)
+// ListVendorContacts returns vendor contacts filtered by the given options.
+// Pass boardapi.VendorContactListOptions{} for an unfiltered list (cache-backed).
+// Non-zero filter bypasses the cache (see repository.VendorContactRepository.List).
+func (s *Service) ListVendorContacts(ctx context.Context, readOpts repository.ReadOptions, filter boardapi.VendorContactListOptions) (*boardapi.ListResult[boardapi.VendorContactEntity], error) {
+	return s.vendorContacts.List(ctx, readOpts, filter)
 }
 
 // GetVendorContact returns a vendor contact by ID.
 func (s *Service) GetVendorContact(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.VendorContactEntity, error) {
 	return s.vendorContacts.GetByID(ctx, id, opts)
-}
-
-// SearchVendorContacts returns vendor contacts filtered by the given parameters.
-func (s *Service) SearchVendorContacts(ctx context.Context, params boardapi.VendorContactSearchParams, opts repository.ReadOptions) ([]boardapi.VendorContactEntity, error) {
-	return s.vendorContacts.Search(ctx, params, opts)
-}
-
-// ListVendorContactsPage returns a single page of vendor contacts.
-func (s *Service) ListVendorContactsPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.VendorContactEntity], error) {
-	return s.vendorContacts.ListPage(ctx, page, perPage)
 }

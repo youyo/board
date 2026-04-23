@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/youyo/board/internal/boardapi"
@@ -49,8 +48,41 @@ func NewVendorContactRepository(
 
 const vendorContactsResource = "vendor_contacts"
 
-// List returns all vendor contacts from the cache.
-func (r *VendorContactRepository) List(ctx context.Context, opts ReadOptions) ([]boardapi.VendorContactEntity, error) {
+// vendorContactFilterIsZero は filter が空（全フィールドがゼロ値 / nil）かどうかを返す。
+// ゼロフィルタはローカルキャッシュ経路を使い、非ゼロフィルタは cache bypass で API を直呼びする。
+func vendorContactFilterIsZero(f boardapi.VendorContactListOptions) bool {
+	return f.Page == 0 &&
+		f.PerPage == 0 &&
+		f.UpdatedAtGteq == "" &&
+		f.UpdatedAtLteq == "" &&
+		f.IncludeArchiveFlg == nil &&
+		f.PayeeIDEq == 0 &&
+		f.NameCont == "" &&
+		f.EmailCont == ""
+}
+
+// List は仕入先担当者を返す。
+//
+// 動作:
+//   - ゼロフィルタ（boardapi.VendorContactListOptions{}）: ローカルキャッシュを使い
+//     refresh-on-demand（daily auto refresh, explicit Refresh / ForceRefresh）を行う。
+//     返り値の *ListResult.Meta はゼロ値（キャッシュが正）。
+//   - 非ゼロフィルタ: cache bypass で api.ListVendorContacts を直接呼び、サーバーサイドの
+//     Ransack フィルタ意味論を活かす。返り値の *ListResult.Meta はヘッダーから埋まる。
+//
+// readOpts.Limit は両経路の最終結果に適用される。
+func (r *VendorContactRepository) List(ctx context.Context, readOpts ReadOptions, filter boardapi.VendorContactListOptions) (*boardapi.ListResult[boardapi.VendorContactEntity], error) {
+	if !vendorContactFilterIsZero(filter) {
+		// API 直接呼び出し（cache bypass）: フィルタ結果でキャッシュを汚染しない。
+		result, err := r.api.ListVendorContacts(ctx, filter)
+		if err != nil {
+			return nil, err
+		}
+		result.Items = applyLimit(result.Items, readOpts.Limit)
+		return result, nil
+	}
+
+	// ゼロフィルタ: 既存の cache → refresh → API fallback 経路
 	fetcher := &vendorContactsFetcher{api: r.api}
 	now := time.Now()
 
@@ -58,16 +90,13 @@ func (r *VendorContactRepository) List(ctx context.Context, opts ReadOptions) ([
 	if err != nil {
 		return nil, err
 	}
-
-	if err := maybeRefresh(ctx, r.profile, vendorContactsResource, opts, state, r.autoRefresh, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
+	if err := maybeRefresh(ctx, r.profile, vendorContactsResource, readOpts, state, r.autoRefresh, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
 		return nil, err
 	}
-
 	entries, err := r.cache.List(ctx, r.profile, vendorContactsResource)
 	if err != nil {
 		return nil, err
 	}
-
 	if len(entries) == 0 && state == nil {
 		if err := r.lockManager.WithLock(ctx, r.profile, vendorContactsResource, func() error {
 			_, err := r.refresher.ForceRefresh(ctx, r.profile, fetcher, now, r.tz)
@@ -80,13 +109,22 @@ func (r *VendorContactRepository) List(ctx context.Context, opts ReadOptions) ([
 			return nil, err
 		}
 	}
-
 	entities, err := decodeEntries[boardapi.VendorContactEntity](entries)
 	if err != nil {
 		return nil, err
 	}
+	entities = applyLimit(entities, readOpts.Limit)
+	return &boardapi.ListResult[boardapi.VendorContactEntity]{Items: entities}, nil
+}
 
-	return applyLimit(entities, opts.Limit), nil
+// ListEntities は List の items のみを返す薄いラッパ。
+// find 層（Phase L では *ListResult を扱わない）向け。
+func (r *VendorContactRepository) ListEntities(ctx context.Context, readOpts ReadOptions, filter boardapi.VendorContactListOptions) ([]boardapi.VendorContactEntity, error) {
+	result, err := r.List(ctx, readOpts, filter)
+	if err != nil {
+		return nil, err
+	}
+	return result.Items, nil
 }
 
 // GetByID returns the vendor contact with the given ID from the cache.
@@ -118,13 +156,13 @@ func (r *VendorContactRepository) GetByID(ctx context.Context, id int, opts Read
 		return &entity, nil
 	}
 
-	// Cache miss → fetch single entity from API
-	entity, err := r.api.GetVendorContact(ctx, id)
+	// Cache miss -> fetch single entry from API
+	result, err := r.api.GetVendorContact(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 
-	raw, err := json.Marshal(entity)
+	raw, err := json.Marshal(result.Item)
 	if err != nil {
 		return nil, err
 	}
@@ -132,44 +170,12 @@ func (r *VendorContactRepository) GetByID(ctx context.Context, id int, opts Read
 		return nil, err
 	}
 
-	return entity, nil
+	return result.Item, nil
 }
 
-// Search returns vendor contacts filtered by the given parameters from the cache.
-func (r *VendorContactRepository) Search(ctx context.Context, params boardapi.VendorContactSearchParams, opts ReadOptions) ([]boardapi.VendorContactEntity, error) {
-	listOpts := opts
-	listOpts.Limit = 0
-	all, err := r.List(ctx, listOpts)
-	if err != nil {
-		return nil, err
-	}
-	return applyLimit(filterVendorContacts(all, params), opts.Limit), nil
-}
-
-// filterVendorContacts は in-memory フィルタリングを行う。
-// VendorID は accessor（VendorID()）経由で参照する（M42 再設計: nested Vendor 構造）。
-// Name は DisplayName()（LastName+FirstName）で部分一致検索する。
-// Email は *string 型のため nil ガード付きで参照する。
-func filterVendorContacts(entities []boardapi.VendorContactEntity, params boardapi.VendorContactSearchParams) []boardapi.VendorContactEntity {
-	var result []boardapi.VendorContactEntity
-	for _, e := range entities {
-		if params.VendorID != 0 && e.VendorID() != params.VendorID {
-			continue
-		}
-		if params.Name != "" && !strings.Contains(e.DisplayName(), params.Name) {
-			continue
-		}
-		if params.Email != "" {
-			if e.Email == nil || !strings.Contains(*e.Email, params.Email) {
-				continue
-			}
-		}
-		result = append(result, e)
-	}
-	return result
-}
-
-// ListPage retrieves a single page of VendorContactEntity directly from the API (cache bypass).
-func (r *VendorContactRepository) ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.VendorContactEntity], error) {
-	return r.api.ListVendorContactsPage(ctx, page, perPage)
+// Search は find 層向けの薄いラッパ。ListEntities と機能的に同等。
+//
+// find 層は *ListResult を扱わず []VendorContactEntity を維持する（Phase L の方針）。
+func (r *VendorContactRepository) Search(ctx context.Context, filter boardapi.VendorContactListOptions, opts ReadOptions) ([]boardapi.VendorContactEntity, error) {
+	return r.ListEntities(ctx, opts, filter)
 }

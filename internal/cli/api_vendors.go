@@ -9,7 +9,7 @@ import (
 	"github.com/youyo/board/internal/output"
 )
 
-// NewAPIVendorsCmd  returns the board api vendors subcommand group.
+// NewAPIVendorsCmd returns the board api vendors subcommand group.
 func NewAPIVendorsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "vendors",
@@ -18,42 +18,67 @@ func NewAPIVendorsCmd() *cobra.Command {
 	cmd.AddCommand(
 		newAPIVendorsListCmd(),
 		newAPIVendorsGetCmd(),
-		newAPIVendorsSearchCmd(),
 	)
 	return cmd
+}
+
+// vendorListFlagsFromCmd reads the Ransack-style filter flags and returns a
+// VendorListOptions. All flags are optional; any flag left at its zero value
+// is omitted from the outgoing request.
+func vendorListFlagsFromCmd(cmd *cobra.Command) boardapi.VendorListOptions {
+	nameCont, _ := cmd.Flags().GetString("name-cont")
+	updatedAtGteq, _ := cmd.Flags().GetString("updated-at-gteq")
+	updatedAtLteq, _ := cmd.Flags().GetString("updated-at-lteq")
+
+	var includeArchive *bool
+	if cmd.Flags().Changed("include-archive-flg") {
+		v, _ := cmd.Flags().GetBool("include-archive-flg")
+		includeArchive = &v
+	}
+
+	return boardapi.VendorListOptions{
+		NameCont:          nameCont,
+		UpdatedAtGteq:     updatedAtGteq,
+		UpdatedAtLteq:     updatedAtLteq,
+		IncludeArchiveFlg: includeArchive,
+	}
 }
 
 func newAPIVendorsListCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
-		Short: "List all vendors",
+		Short: "List vendors (optionally filtered by Ransack-style query params)",
+		Long: `List vendors. Filters are forwarded to the BOARD API as Ransack-style
+query parameters (e.g. --name-cont sends name_cont). A zero-filter request
+uses the local cache; any non-zero filter bypasses the cache and calls the
+API directly so server-side filter semantics take effect.
+
+JSON output includes an _meta object (total_count, page, per_page, rate
+limits, ETag, last_modified) derived from response headers. Use
+--no-show-meta to omit it.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			svc, err := apiServiceFromCmd(cmd)
 			if err != nil {
 				return err
 			}
-			page, _ := cmd.Flags().GetInt("page")
-			perPage, _ := cmd.Flags().GetInt("per-page")
-			if page > 0 {
-				result, err := svc.ListVendorsPage(cmd.Context(), page, perPage)
-				if err != nil {
-					return err
-				}
-				totalPages := (result.TotalCount + result.PerPage - 1) / result.PerPage
-				fmt.Fprintf(os.Stderr, "# Total: %d, Page: %d/%d, PerPage: %d\n",
-					result.TotalCount, result.Page, totalPages, result.PerPage)
-				return output.Write(os.Stdout, result.Items, prettyFromCmd(cmd))
-			}
-			opts := readOptionsFromCmd(cmd)
-			result, err := svc.ListVendors(cmd.Context(), opts)
+			readOpts := readOptionsFromCmd(cmd)
+			filter := vendorListFlagsFromCmd(cmd)
+			result, err := svc.ListVendors(cmd.Context(), readOpts, filter)
 			if err != nil {
 				return err
 			}
-			return output.Write(os.Stdout, result, prettyFromCmd(cmd))
+			showMeta, _ := cmd.Flags().GetBool("show-meta")
+			if showMeta {
+				return output.Write(os.Stdout, result, prettyFromCmd(cmd))
+			}
+			return output.Write(os.Stdout, result.Items, prettyFromCmd(cmd))
 		},
 	}
-	cmd.Flags().Int("page", 0, "Page number (1-based, bypasses cache)")
-	cmd.Flags().Int("per-page", 50, "Items per page (max 100, used with --page)")
+	cmd.Flags().String("name-cont", "", "Filter by vendor name (Ransack name_cont, partial match)")
+	cmd.Flags().String("updated-at-gteq", "", `updated_at >= (YYYY-MM-DD HH:MM:SS)`)
+	cmd.Flags().String("updated-at-lteq", "", `updated_at <= (YYYY-MM-DD HH:MM:SS)`)
+	cmd.Flags().Bool("include-archive-flg", false, "Include archived vendors (send include_archive_flg=1)")
+	cmd.Flags().Bool("show-meta", true, "Include _meta (pagination / rate limit / ETag) in JSON output")
 	return cmd
 }
 
@@ -79,32 +104,5 @@ func newAPIVendorsGetCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().IntVar(&id, "id", 0, "Vendor ID (required)")
-	return cmd
-}
-
-func newAPIVendorsSearchCmd() *cobra.Command {
-	var name, updatedAtFrom string
-	cmd := &cobra.Command{
-		Use:   "search",
-		Short: "Search vendors by criteria",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			svc, err := apiServiceFromCmd(cmd)
-			if err != nil {
-				return err
-			}
-			opts := readOptionsFromCmd(cmd)
-			params := boardapi.VendorSearchParams{
-				Name:          name,
-				UpdatedAtFrom: updatedAtFrom,
-			}
-			result, err := svc.SearchVendors(cmd.Context(), params, opts)
-			if err != nil {
-				return err
-			}
-			return output.Write(os.Stdout, result, prettyFromCmd(cmd))
-		},
-	}
-	cmd.Flags().StringVar(&name, "name", "", "Filter by vendor name")
-	cmd.Flags().StringVar(&updatedAtFrom, "updated-at-from", "", "Filter by updated_at (ISO 8601, lower bound)")
 	return cmd
 }

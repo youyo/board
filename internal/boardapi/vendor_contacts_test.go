@@ -30,11 +30,8 @@ func newVendorContactsMockClient(rt roundTripperFunc) *boardapi.Client {
 }
 
 // U1: ListVendorContactsRaw returns the raw JSON array body byte-for-byte when
-// a single page response is served. The exact JSON bytes the server emits must
-// be preserved inside the returned array payload (element contents and order
-// must not change) because StrictFieldDiff relies on the original response
-// shape. URL path must be /v1/payee_contacts (the real BOARD API path, not
-// /v1/vendor_contacts).
+// a single page response is served. URL path must be /v1/payee_contacts.
+// M55: ListVendorContactsRaw(ctx, VendorContactListOptions) に更新。
 func TestListVendorContactsRaw_SinglePage(t *testing.T) {
 	// 新スキーマ（M42 再設計）: vendor nested / last_name / first_name / title(*string) / department(*string) / email(*string) / note(*string) / archive_flg
 	page1 := `[{"id":1,"vendor":{"id":10,"name":"Vendor X","name_disp":"Vendor X","custom_no":"VX01"},"last_name":"Yamada","first_name":"Taro","honorific_title":"様","title":"部長","department":"営業部","email":"taro@example.com","note":"note","archive_flg":0,"updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}]`
@@ -47,7 +44,7 @@ func TestListVendorContactsRaw_SinglePage(t *testing.T) {
 	})
 	client := newVendorContactsMockClient(rt)
 
-	raw, err := client.ListVendorContactsRaw(context.Background())
+	raw, _, err := client.ListVendorContactsRaw(context.Background(), boardapi.VendorContactListOptions{})
 	if err != nil {
 		t.Fatalf("ListVendorContactsRaw: %v", err)
 	}
@@ -83,6 +80,7 @@ func TestListVendorContactsRaw_SinglePage(t *testing.T) {
 // U2: ListVendorContactsRaw concatenates multiple pages into a single valid
 // JSON array. per_page=2 forces pagination; server returns 2 items on page 1
 // and 1 item on page 2. Result must be a JSON array of 3 items.
+// M55: ListVendorContactsRaw(ctx, VendorContactListOptions{PerPage: 2}) に更新。
 func TestListVendorContactsRaw_MultiPage(t *testing.T) {
 	page1Items := []string{
 		`{"id":1,"vendor":{"id":10,"name":"VX","name_disp":"VX","custom_no":""},"last_name":"A","first_name":"","honorific_title":"","title":null,"department":null,"email":null,"note":null,"archive_flg":0,"updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}`,
@@ -111,7 +109,7 @@ func TestListVendorContactsRaw_MultiPage(t *testing.T) {
 	})
 	client := newVendorContactsMockClient(rt)
 
-	raw, err := client.ListVendorContactsRaw(context.Background(), boardapi.WithPerPage(2))
+	raw, _, err := client.ListVendorContactsRaw(context.Background(), boardapi.VendorContactListOptions{PerPage: 2})
 	if err != nil {
 		t.Fatalf("ListVendorContactsRaw: %v", err)
 	}
@@ -135,6 +133,7 @@ func TestListVendorContactsRaw_MultiPage(t *testing.T) {
 
 // U3: GetVendorContactRaw returns body exactly as served (single object).
 // Path must be /v1/payee_contacts/42 (real BOARD API path).
+// M55: GetVendorContactRaw(ctx, id) -> ([]byte, http.Header, error) に更新。
 func TestGetVendorContactRaw_Success(t *testing.T) {
 	body := []byte(`{"id":42,"vendor":{"id":10,"name":"Vendor X","name_disp":"Vendor X","custom_no":"VX01"},"last_name":"Yamada","first_name":"Taro","honorific_title":"様","title":"部長","department":"営業部","email":"taro@example.com","note":"note","archive_flg":0,"updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}`)
 	var gotPath string
@@ -148,7 +147,7 @@ func TestGetVendorContactRaw_Success(t *testing.T) {
 	})
 	client := newVendorContactsMockClient(rt)
 
-	raw, err := client.GetVendorContactRaw(context.Background(), 42)
+	raw, _, err := client.GetVendorContactRaw(context.Background(), 42)
 	if err != nil {
 		t.Fatalf("GetVendorContactRaw: %v", err)
 	}
@@ -162,6 +161,7 @@ func TestGetVendorContactRaw_Success(t *testing.T) {
 }
 
 // U4: GetVendorContactRaw on 404 returns *APIError{Code: APIErrorNotFound}.
+// M55: GetVendorContactRaw(ctx, id) -> ([]byte, http.Header, error) に更新。
 func TestGetVendorContactRaw_NotFound(t *testing.T) {
 	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
 		return &http.Response{
@@ -172,7 +172,7 @@ func TestGetVendorContactRaw_NotFound(t *testing.T) {
 	})
 	client := newVendorContactsMockClient(rt)
 
-	_, err := client.GetVendorContactRaw(context.Background(), 99)
+	_, _, err := client.GetVendorContactRaw(context.Background(), 99)
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}
@@ -185,48 +185,47 @@ func TestGetVendorContactRaw_NotFound(t *testing.T) {
 	}
 }
 
-// U5: SearchVendorContactsRaw sends all four parameters (VendorID, Name, Email,
-// UpdatedAtFrom) in the query. VendorContactSearchParams has 4 fields — one
-// more than M14's VendorBranchSearchParams (VendorID, Name, UpdatedAtFrom).
-// This test ensures all four query params are correctly encoded.
-func TestSearchVendorContactsRaw_QueryParams(t *testing.T) {
+// U5: ListVendorContactsRaw with PayeeIDEq + NameCont + EmailCont sends Ransack params.
+// M55: VendorContactListOptions に更新（Ransack payee_id_eq / name_cont / email_cont）。
+// 注意: BOARD API の実際のパラメータ名は E2E テストで確認すること。
+func TestListVendorContactsRaw_Filters(t *testing.T) {
 	page1 := `[{"id":7,"vendor":{"id":123,"name":"VZ","name_disp":"VZ","custom_no":""},"last_name":"keyword","first_name":"","honorific_title":"","title":null,"department":null,"email":"test@example.com","note":null,"archive_flg":0,"updated_at":"2024-02-01T00:00:00+09:00","created_at":"2024-02-01T00:00:00+09:00"}]`
-	var observedVendorID, observedName, observedEmail, observedUpdatedFrom string
+	var observedPayeeIDEq, observedNameCont, observedEmailCont, observedUpdatedFrom string
 	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
-		observedVendorID = r.URL.Query().Get("vendor_id")
-		observedName = r.URL.Query().Get("name")
-		observedEmail = r.URL.Query().Get("email")
-		observedUpdatedFrom = r.URL.Query().Get("updated_at_from")
+		observedPayeeIDEq = r.URL.Query().Get("payee_id_eq")
+		observedNameCont = r.URL.Query().Get("name_cont")
+		observedEmailCont = r.URL.Query().Get("email_cont")
+		observedUpdatedFrom = r.URL.Query().Get("updated_at_gteq")
 		return jsonResp(page1), nil
 	})
 	client := newVendorContactsMockClient(rt)
 
-	raw, err := client.SearchVendorContactsRaw(context.Background(), boardapi.VendorContactSearchParams{
-		VendorID:      123,
-		Name:          "keyword",
-		Email:         "test@example.com",
-		UpdatedAtFrom: "2024-01-01T00:00:00+09:00",
+	raw, _, err := client.ListVendorContactsRaw(context.Background(), boardapi.VendorContactListOptions{
+		PayeeIDEq:     123,
+		NameCont:      "keyword",
+		EmailCont:     "test@example.com",
+		UpdatedAtGteq: "2024-01-01 00:00:00",
 	})
 	if err != nil {
-		t.Fatalf("SearchVendorContactsRaw: %v", err)
+		t.Fatalf("ListVendorContactsRaw: %v", err)
 	}
 
-	if observedVendorID != "123" {
-		t.Errorf("vendor_id = %s, want 123", observedVendorID)
+	if observedPayeeIDEq != "123" {
+		t.Errorf("payee_id_eq = %s, want 123", observedPayeeIDEq)
 	}
-	if observedName != "keyword" {
-		t.Errorf("name = %s, want keyword", observedName)
+	if observedNameCont != "keyword" {
+		t.Errorf("name_cont = %s, want keyword", observedNameCont)
 	}
-	if observedEmail != "test@example.com" {
-		t.Errorf("email = %s, want test@example.com", observedEmail)
+	if observedEmailCont != "test@example.com" {
+		t.Errorf("email_cont = %s, want test@example.com", observedEmailCont)
 	}
-	if observedUpdatedFrom != "2024-01-01T00:00:00+09:00" {
-		t.Errorf("updated_at_from = %s, want 2024-01-01T00:00:00+09:00", observedUpdatedFrom)
+	if observedUpdatedFrom != "2024-01-01 00:00:00" {
+		t.Errorf("updated_at_gteq = %s, want 2024-01-01 00:00:00", observedUpdatedFrom)
 	}
 
 	var arr []map[string]any
 	if err := json.Unmarshal(raw, &arr); err != nil {
-		t.Fatalf("SearchVendorContactsRaw returned invalid JSON: %v\nraw=%s", err, string(raw))
+		t.Fatalf("ListVendorContactsRaw returned invalid JSON: %v\nraw=%s", err, string(raw))
 	}
 	if len(arr) != 1 {
 		t.Fatalf("expected 1 element, got %d", len(arr))

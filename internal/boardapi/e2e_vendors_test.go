@@ -57,7 +57,7 @@ func TestE2E_Vendors_List(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
 
-	raw, err := client.ListVendorsRaw(ctx)
+	raw, _, err := client.ListVendorsRaw(ctx, boardapi.VendorListOptions{})
 	if err != nil {
 		// Roadmap rule: 403/429 must NOT be skipped, they must fail the test.
 		t.Fatalf("ListVendorsRaw: %v", err)
@@ -89,7 +89,7 @@ func TestE2E_Vendors_Get(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
 
-	listRaw, err := client.ListVendorsRaw(ctx)
+	listRaw, _, err := client.ListVendorsRaw(ctx, boardapi.VendorListOptions{PerPage: 1})
 	if err != nil {
 		t.Fatalf("ListVendorsRaw (discovery): %v", err)
 	}
@@ -111,7 +111,7 @@ func TestE2E_Vendors_Get(t *testing.T) {
 		t.Fatalf("first vendor has non-positive ID: %d", id)
 	}
 
-	getRaw, err := client.GetVendorRaw(ctx, id)
+	getRaw, _, err := client.GetVendorRaw(ctx, id)
 	if err != nil {
 		// Phase F note: Get 404 would indicate vendors do not support
 		// individual Get, which would be a new finding. 403 is similarly
@@ -148,11 +148,11 @@ func TestE2E_Vendors_Search(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
 
-	raw, err := client.SearchVendorsRaw(ctx, boardapi.VendorSearchParams{
-		Name: "zzz_nonexistent_keyword_for_e2e",
+	raw, _, err := client.ListVendorsRaw(ctx, boardapi.VendorListOptions{
+		NameCont: "zzz_nonexistent_keyword_for_e2e",
 	})
 	if err != nil {
-		t.Fatalf("SearchVendorsRaw: %v", err)
+		t.Fatalf("ListVendorsRaw(NameCont=zzz...): %v", err)
 	}
 
 	dumpJSON(t, "vendors_search", 0, raw)

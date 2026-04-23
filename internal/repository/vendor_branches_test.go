@@ -76,12 +76,12 @@ func TestVendorBranchRepository_List_CacheHit(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeVendorBranchRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{})
+	got, err := repo.List(context.Background(), repository.ReadOptions{}, boardapi.VendorBranchListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(got) != len(sampleVendorBranches) {
-		t.Errorf("len(got) = %d, want %d", len(got), len(sampleVendorBranches))
+	if len(got.Items) != len(sampleVendorBranches) {
+		t.Errorf("len(got.Items) = %d, want %d", len(got.Items), len(sampleVendorBranches))
 	}
 }
 
@@ -93,12 +93,12 @@ func TestVendorBranchRepository_List_InitialLoad(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeVendorBranchRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{})
+	got, err := repo.List(context.Background(), repository.ReadOptions{}, boardapi.VendorBranchListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(got) != len(sampleVendorBranches) {
-		t.Errorf("len(got) = %d, want %d", len(got), len(sampleVendorBranches))
+	if len(got.Items) != len(sampleVendorBranches) {
+		t.Errorf("len(got.Items) = %d, want %d", len(got.Items), len(sampleVendorBranches))
 	}
 }
 
@@ -161,17 +161,21 @@ func TestVendorBranchRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	}
 }
 
-// T_VBR06: Search - VendorID filter -> returns matching items
-func TestVendorBranchRepository_Search_VendorIDFilter(t *testing.T) {
+// T_VBR06: Search - PayeeIDEq filter -> bypasses cache, returns data from API
+func TestVendorBranchRepository_Search_PayeeIDEqFilter(t *testing.T) {
 	db := newTestDB(t)
-	seedVendorBranchCache(t, db, sampleVendorBranches)
 	markSynced(t, db, "vendor_branches")
 
-	srv := newVendorBranchAPIServer(t, nil)
+	// API サーバーは payee_id_eq=10 に合致する 2 件を返すと想定
+	filtered := []boardapi.VendorBranchEntity{
+		{ID: 1, Vendor: &boardapi.VendorRef{ID: 10}, Name: "BranchA", UpdatedAt: "2026-01-01T00:00:00Z"},
+		{ID: 2, Vendor: &boardapi.VendorRef{ID: 10}, Name: "BranchB", UpdatedAt: "2026-01-02T00:00:00Z"},
+	}
+	srv := newVendorBranchAPIServer(t, filtered)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeVendorBranchRepo(t, db, apiClient, false)
-	got, err := repo.Search(context.Background(), boardapi.VendorBranchSearchParams{VendorID: 10}, repository.ReadOptions{})
+	got, err := repo.Search(context.Background(), boardapi.VendorBranchListOptions{PayeeIDEq: 10}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
@@ -180,17 +184,19 @@ func TestVendorBranchRepository_Search_VendorIDFilter(t *testing.T) {
 	}
 }
 
-// T_VBR07: Search - Name filter -> returns matching items
-func TestVendorBranchRepository_Search_NameFilter(t *testing.T) {
+// T_VBR07: Search - NameCont filter -> bypasses cache, returns data from API
+func TestVendorBranchRepository_Search_NameContFilter(t *testing.T) {
 	db := newTestDB(t)
-	seedVendorBranchCache(t, db, sampleVendorBranches)
 	markSynced(t, db, "vendor_branches")
 
-	srv := newVendorBranchAPIServer(t, nil)
+	filtered := []boardapi.VendorBranchEntity{
+		{ID: 1, Vendor: &boardapi.VendorRef{ID: 10}, Name: "BranchA", UpdatedAt: "2026-01-01T00:00:00Z"},
+	}
+	srv := newVendorBranchAPIServer(t, filtered)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeVendorBranchRepo(t, db, apiClient, false)
-	got, err := repo.Search(context.Background(), boardapi.VendorBranchSearchParams{Name: "BranchA"}, repository.ReadOptions{})
+	got, err := repo.Search(context.Background(), boardapi.VendorBranchListOptions{NameCont: "BranchA"}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
@@ -199,7 +205,7 @@ func TestVendorBranchRepository_Search_NameFilter(t *testing.T) {
 	}
 }
 
-// T_VBR08: Search - no filter -> returns all items
+// T_VBR08: Search - no filter -> returns all items from cache
 func TestVendorBranchRepository_Search_NoFilter(t *testing.T) {
 	db := newTestDB(t)
 	seedVendorBranchCache(t, db, sampleVendorBranches)
@@ -209,7 +215,7 @@ func TestVendorBranchRepository_Search_NoFilter(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeVendorBranchRepo(t, db, apiClient, false)
-	got, err := repo.Search(context.Background(), boardapi.VendorBranchSearchParams{}, repository.ReadOptions{})
+	got, err := repo.Search(context.Background(), boardapi.VendorBranchListOptions{}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}

@@ -50,7 +50,7 @@ func TestE2E_PurchaseOrders_List(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
 
-	raw, err := client.ListPurchaseOrdersRaw(ctx)
+	raw, _, err := client.ListPurchaseOrdersRaw(ctx, boardapi.PurchaseOrderListOptions{})
 	if err != nil {
 		// Roadmap rule: 403/429 must NOT be skipped, they must fail the test.
 		t.Fatalf("ListPurchaseOrdersRaw: %v", err)
@@ -80,7 +80,7 @@ func TestE2E_PurchaseOrders_Get(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
 
-	listRaw, err := client.ListPurchaseOrdersRaw(ctx, boardapi.WithPerPage(1))
+	listRaw, _, err := client.ListPurchaseOrdersRaw(ctx, boardapi.PurchaseOrderListOptions{PerPage: 1})
 	if err != nil {
 		t.Fatalf("ListPurchaseOrdersRaw (discovery): %v", err)
 	}
@@ -102,7 +102,7 @@ func TestE2E_PurchaseOrders_Get(t *testing.T) {
 		t.Fatalf("first purchase_order has non-positive ID: %d", id)
 	}
 
-	getRaw, err := client.GetPurchaseOrderRaw(ctx, id)
+	getRaw, _, err := client.GetPurchaseOrderRaw(ctx, id)
 	if err != nil {
 		// Roadmap rule: 403/429 / 404 must NOT be skipped, they must fail the test.
 		t.Fatalf("GetPurchaseOrderRaw(%d): %v", id, err)
@@ -135,11 +135,12 @@ func TestE2E_PurchaseOrders_Search(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
 
-	raw, err := client.SearchPurchaseOrdersRaw(ctx, boardapi.PurchaseOrderSearchParams{
-		UpdatedAtFrom: "2099-01-01",
-	}, boardapi.WithPerPage(1))
+	raw, _, err := client.ListPurchaseOrdersRaw(ctx, boardapi.PurchaseOrderListOptions{
+		UpdatedAtGteq: "2099-01-01",
+		PerPage:       1,
+	})
 	if err != nil {
-		t.Fatalf("SearchPurchaseOrdersRaw: %v", err)
+		t.Fatalf("ListPurchaseOrdersRaw(UpdatedAtGteq=2099-01-01): %v", err)
 	}
 
 	dumpJSON(t, "purchase_orders_search", 0, raw)

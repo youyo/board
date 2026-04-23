@@ -115,7 +115,7 @@ func TestE2E_Payments_M54(t *testing.T) {
 		if result.Item.ID != targetID {
 			t.Errorf("GetPayment: Item.ID = %d, want %d", result.Item.ID, targetID)
 		}
-		t.Logf("E5: GetPayment(%d): vendor_id=%d status=%q amount=%d",
+		t.Logf("E5: GetPayment(%d): vendor_id=%d status=%q amount=%g",
 			result.Item.ID, result.Item.VendorID, result.Item.Status, result.Item.Amount)
 	})
 }

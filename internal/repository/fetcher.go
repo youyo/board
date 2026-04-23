@@ -321,20 +321,23 @@ type vendorsFetcher struct {
 func (f *vendorsFetcher) ResourceName() string { return "vendors" }
 
 func (f *vendorsFetcher) ListAll(ctx context.Context) ([]json.RawMessage, error) {
-	entities, err := f.api.ListVendors(ctx)
+	result, err := f.api.ListVendors(ctx, boardapi.VendorListOptions{})
 	if err != nil {
 		return nil, err
 	}
-	return entitiesToRaw(entities)
+	return entitiesToRaw(result.Items)
 }
 
 func (f *vendorsFetcher) ListUpdatedSince(ctx context.Context, since string) ([]json.RawMessage, error) {
-	params := boardapi.VendorSearchParams{UpdatedAtFrom: since}
-	entities, err := f.api.SearchVendors(ctx, params)
+	// since は cache.SyncState.CursorUpdatedAt 由来の ISO 8601（BOARD API の
+	// エンティティ updated_at）。BOARD API の Ransack `_gteq` は
+	// `YYYY-MM-DD HH:MM:SS` 形式を期待するため、ここで変換する。
+	gteq := isoToBoardDateTime(since)
+	result, err := f.api.ListVendors(ctx, boardapi.VendorListOptions{UpdatedAtGteq: gteq})
 	if err != nil {
 		return nil, err
 	}
-	return entitiesToRaw(entities)
+	return entitiesToRaw(result.Items)
 }
 
 // --- vendor_branches Fetcher ---
@@ -347,20 +350,23 @@ type vendorBranchesFetcher struct {
 func (f *vendorBranchesFetcher) ResourceName() string { return "vendor_branches" }
 
 func (f *vendorBranchesFetcher) ListAll(ctx context.Context) ([]json.RawMessage, error) {
-	entities, err := f.api.ListVendorBranches(ctx)
+	result, err := f.api.ListVendorBranches(ctx, boardapi.VendorBranchListOptions{})
 	if err != nil {
 		return nil, err
 	}
-	return entitiesToRaw(entities)
+	return entitiesToRaw(result.Items)
 }
 
-// ListUpdatedSince: VendorBranchSearchParams has no UpdatedAtFrom, so all entries are fetched.
-func (f *vendorBranchesFetcher) ListUpdatedSince(ctx context.Context, _ string) ([]json.RawMessage, error) {
-	entities, err := f.api.ListVendorBranches(ctx)
+func (f *vendorBranchesFetcher) ListUpdatedSince(ctx context.Context, since string) ([]json.RawMessage, error) {
+	// since は cache.SyncState.CursorUpdatedAt 由来の ISO 8601（BOARD API の
+	// エンティティ updated_at）。BOARD API の Ransack `_gteq` は
+	// `YYYY-MM-DD HH:MM:SS` 形式を期待するため、ここで変換する。
+	gteq := isoToBoardDateTime(since)
+	result, err := f.api.ListVendorBranches(ctx, boardapi.VendorBranchListOptions{UpdatedAtGteq: gteq})
 	if err != nil {
 		return nil, err
 	}
-	return entitiesToRaw(entities)
+	return entitiesToRaw(result.Items)
 }
 
 // --- vendor_contacts Fetcher ---
@@ -373,20 +379,23 @@ type vendorContactsFetcher struct {
 func (f *vendorContactsFetcher) ResourceName() string { return "vendor_contacts" }
 
 func (f *vendorContactsFetcher) ListAll(ctx context.Context) ([]json.RawMessage, error) {
-	entities, err := f.api.ListVendorContacts(ctx)
+	result, err := f.api.ListVendorContacts(ctx, boardapi.VendorContactListOptions{})
 	if err != nil {
 		return nil, err
 	}
-	return entitiesToRaw(entities)
+	return entitiesToRaw(result.Items)
 }
 
-// ListUpdatedSince: VendorContactSearchParams has no UpdatedAtFrom, so all entries are fetched.
-func (f *vendorContactsFetcher) ListUpdatedSince(ctx context.Context, _ string) ([]json.RawMessage, error) {
-	entities, err := f.api.ListVendorContacts(ctx)
+func (f *vendorContactsFetcher) ListUpdatedSince(ctx context.Context, since string) ([]json.RawMessage, error) {
+	// since は cache.SyncState.CursorUpdatedAt 由来の ISO 8601（BOARD API の
+	// エンティティ updated_at）。BOARD API の Ransack `_gteq` は
+	// `YYYY-MM-DD HH:MM:SS` 形式を期待するため、ここで変換する。
+	gteq := isoToBoardDateTime(since)
+	result, err := f.api.ListVendorContacts(ctx, boardapi.VendorContactListOptions{UpdatedAtGteq: gteq})
 	if err != nil {
 		return nil, err
 	}
-	return entitiesToRaw(entities)
+	return entitiesToRaw(result.Items)
 }
 
 // --- users Fetcher ---

@@ -1923,7 +1923,7 @@ func TestGetReceipt_OK(t *testing.T) {
 }
 
 // ============================================================
-// M08: vendors entity tests (T112-T117)
+// M08: vendors entity tests (T112-T117) — M55 で ListResult に更新
 // ============================================================
 
 // T112: ListVendors — happy path (2 items)
@@ -1936,15 +1936,15 @@ func TestListVendors_OK(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.ListVendors(context.Background())
+	result, err := c.ListVendors(context.Background(), boardapi.VendorListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result) != 2 {
-		t.Errorf("want 2 vendors, got %d", len(result))
+	if len(result.Items) != 2 {
+		t.Errorf("want 2 vendors, got %d", len(result.Items))
 	}
-	if result[0].ID != 1 || result[0].Name != "Vendor A" || result[0].Code != "VA001" {
-		t.Errorf("vendor[0]: got %+v", result[0])
+	if result.Items[0].ID != 1 || result.Items[0].Name != "Vendor A" || result.Items[0].Code != "VA001" {
+		t.Errorf("vendor[0]: got %+v", result.Items[0])
 	}
 }
 
@@ -1957,7 +1957,7 @@ func TestListVendors_Unauthorized(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	_, err := c.ListVendors(context.Background())
+	_, err := c.ListVendors(context.Background(), boardapi.VendorListOptions{})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -1988,11 +1988,11 @@ func TestGetVendor_OK(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got == nil {
-		t.Fatal("got nil VendorEntity")
+	if got == nil || got.Item == nil {
+		t.Fatal("got nil ItemResult or Item")
 	}
-	if got.ID != 1 || got.Name != "Vendor A" || got.Code != "VA001" {
-		t.Errorf("GetVendor: got %+v", got)
+	if got.Item.ID != 1 || got.Item.Name != "Vendor A" || got.Item.Code != "VA001" {
+		t.Errorf("GetVendor: got %+v", got.Item)
 	}
 }
 
@@ -2018,11 +2018,11 @@ func TestGetVendor_NotFound(t *testing.T) {
 	}
 }
 
-// T116: SearchVendors — with Name parameter
-func TestSearchVendors_WithName(t *testing.T) {
-	var gotName string
+// T116: ListVendors — with NameCont filter (M55: Ransack name_cont)
+func TestListVendors_WithNameCont(t *testing.T) {
+	var gotNameCont string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotName = r.URL.Query().Get("name")
+		gotNameCont = r.URL.Query().Get("name_cont")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`[{"id":1,"name":"Company A","code":"A001","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
 	}))
@@ -2030,23 +2030,23 @@ func TestSearchVendors_WithName(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.SearchVendors(context.Background(), boardapi.VendorSearchParams{Name: "Company A"})
+	result, err := c.ListVendors(context.Background(), boardapi.VendorListOptions{NameCont: "Company A"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result) != 1 {
-		t.Errorf("want 1 result, got %d", len(result))
+	if len(result.Items) != 1 {
+		t.Errorf("want 1 result, got %d", len(result.Items))
 	}
-	if gotName != "Company A" {
-		t.Errorf("name param: want %q, got %q", "Company A", gotName)
+	if gotNameCont != "Company A" {
+		t.Errorf("name_cont param: want %q, got %q", "Company A", gotNameCont)
 	}
 }
 
-// T117: SearchVendors — with UpdatedAtFrom parameter
-func TestSearchVendors_WithUpdatedAtFrom(t *testing.T) {
-	var gotUpdatedAtFrom string
+// T117: ListVendors — with UpdatedAtGteq filter (M55: Ransack updated_at_gteq)
+func TestListVendors_WithUpdatedAtGteq(t *testing.T) {
+	var gotUpdatedAtGteq string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotUpdatedAtFrom = r.URL.Query().Get("updated_at_from")
+		gotUpdatedAtGteq = r.URL.Query().Get("updated_at_gteq")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`[]`))
 	}))
@@ -2054,17 +2054,17 @@ func TestSearchVendors_WithUpdatedAtFrom(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	_, err := c.SearchVendors(context.Background(), boardapi.VendorSearchParams{UpdatedAtFrom: "2024-01-01T00:00:00Z"})
+	_, err := c.ListVendors(context.Background(), boardapi.VendorListOptions{UpdatedAtGteq: "2024-01-01 00:00:00"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if gotUpdatedAtFrom != "2024-01-01T00:00:00Z" {
-		t.Errorf("updated_at_from param: want %q, got %q", "2024-01-01T00:00:00Z", gotUpdatedAtFrom)
+	if gotUpdatedAtGteq != "2024-01-01 00:00:00" {
+		t.Errorf("updated_at_gteq param: want %q, got %q", "2024-01-01 00:00:00", gotUpdatedAtGteq)
 	}
 }
 
 // ============================================================
-// M08: vendor_branches entity tests (T118-T123)
+// M08: vendor_branches entity tests (T118-T123) — M55 で ListResult に更新
 // ============================================================
 
 // T118: ListVendorBranches — happy path (2 items)
@@ -2077,15 +2077,15 @@ func TestListVendorBranches_OK(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.ListVendorBranches(context.Background())
+	result, err := c.ListVendorBranches(context.Background(), boardapi.VendorBranchListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result) != 2 {
-		t.Errorf("want 2 vendor branches, got %d", len(result))
+	if len(result.Items) != 2 {
+		t.Errorf("want 2 vendor branches, got %d", len(result.Items))
 	}
-	if result[0].ID != 10 || result[0].VendorID() != 1 || result[0].Zip != "100-0001" {
-		t.Errorf("vendorBranch[0]: got %+v", result[0])
+	if result.Items[0].ID != 10 || result.Items[0].VendorID() != 1 || result.Items[0].Zip != "100-0001" {
+		t.Errorf("vendorBranch[0]: got %+v", result.Items[0])
 	}
 }
 
@@ -2098,7 +2098,7 @@ func TestListVendorBranches_Unauthorized(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	_, err := c.ListVendorBranches(context.Background())
+	_, err := c.ListVendorBranches(context.Background(), boardapi.VendorBranchListOptions{})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -2129,11 +2129,11 @@ func TestGetVendorBranch_OK(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got == nil {
-		t.Fatal("got nil VendorBranchEntity")
+	if got == nil || got.Item == nil {
+		t.Fatal("got nil ItemResult or Item")
 	}
-	if got.ID != 10 || got.Zip != "100-0001" {
-		t.Errorf("GetVendorBranch: got %+v", got)
+	if got.Item.ID != 10 || got.Item.Zip != "100-0001" {
+		t.Errorf("GetVendorBranch: got %+v", got.Item)
 	}
 }
 
@@ -2159,35 +2159,35 @@ func TestGetVendorBranch_NotFound(t *testing.T) {
 	}
 }
 
-// T122: SearchVendorBranches — with VendorID parameter
-func TestSearchVendorBranches_WithVendorID(t *testing.T) {
-	var gotVendorID string
+// T122: ListVendorBranches — with PayeeIDEq filter (M55: Ransack payee_id_eq)
+func TestListVendorBranches_WithPayeeIDEq(t *testing.T) {
+	var gotPayeeIDEq string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotVendorID = r.URL.Query().Get("vendor_id")
+		gotPayeeIDEq = r.URL.Query().Get("payee_id_eq")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":10,"vendor_id":5,"name":"Tokyo Branch","postal_code":"100-0001","address":"Chiyoda, Tokyo","phone":"","fax":"","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
+		w.Write([]byte(`[{"id":10,"vendor":{"id":5,"name":"VX","name_disp":"VX","custom_no":""},"name":"Tokyo Branch","zip":"100-0001","pref":"東京都","address1":"千代田区","address2":"","tel":null,"fax":null,"archive_flg":0,"updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
 	}))
 	defer ts.Close()
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.SearchVendorBranches(context.Background(), boardapi.VendorBranchSearchParams{VendorID: 5})
+	result, err := c.ListVendorBranches(context.Background(), boardapi.VendorBranchListOptions{PayeeIDEq: 5})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result) != 1 {
-		t.Errorf("want 1 result, got %d", len(result))
+	if len(result.Items) != 1 {
+		t.Errorf("want 1 result, got %d", len(result.Items))
 	}
-	if gotVendorID != "5" {
-		t.Errorf("vendor_id param: want %q, got %q", "5", gotVendorID)
+	if gotPayeeIDEq != "5" {
+		t.Errorf("payee_id_eq param: want %q, got %q", "5", gotPayeeIDEq)
 	}
 }
 
-// T123: SearchVendorBranches — with Name parameter
-func TestSearchVendorBranches_WithName(t *testing.T) {
-	var gotName string
+// T123: ListVendorBranches — with NameCont filter (M55: Ransack name_cont)
+func TestListVendorBranches_WithNameCont(t *testing.T) {
+	var gotNameCont string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotName = r.URL.Query().Get("name")
+		gotNameCont = r.URL.Query().Get("name_cont")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`[]`))
 	}))
@@ -2195,17 +2195,17 @@ func TestSearchVendorBranches_WithName(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	_, err := c.SearchVendorBranches(context.Background(), boardapi.VendorBranchSearchParams{Name: "Tokyo Branch"})
+	_, err := c.ListVendorBranches(context.Background(), boardapi.VendorBranchListOptions{NameCont: "Tokyo Branch"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if gotName != "Tokyo Branch" {
-		t.Errorf("name param: want %q, got %q", "Tokyo Branch", gotName)
+	if gotNameCont != "Tokyo Branch" {
+		t.Errorf("name_cont param: want %q, got %q", "Tokyo Branch", gotNameCont)
 	}
 }
 
 // ============================================================
-// M08: vendor_contacts entity tests (T124-T129)
+// M08: vendor_contacts entity tests (T124-T129) — M55 で ListResult に更新
 // ============================================================
 
 // T124: ListVendorContacts — happy path (2 items)
@@ -2218,19 +2218,19 @@ func TestListVendorContacts_OK(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.ListVendorContacts(context.Background())
+	result, err := c.ListVendorContacts(context.Background(), boardapi.VendorContactListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result) != 2 {
-		t.Errorf("want 2 vendor contacts, got %d", len(result))
+	if len(result.Items) != 2 {
+		t.Errorf("want 2 vendor contacts, got %d", len(result.Items))
 	}
 	email := ""
-	if result[0].Email != nil {
-		email = *result[0].Email
+	if result.Items[0].Email != nil {
+		email = *result.Items[0].Email
 	}
-	if result[0].ID != 1 || email != "yamada@example.com" {
-		t.Errorf("vendorContact[0]: got %+v", result[0])
+	if result.Items[0].ID != 1 || email != "yamada@example.com" {
+		t.Errorf("vendorContact[0]: got %+v", result.Items[0])
 	}
 }
 
@@ -2243,7 +2243,7 @@ func TestListVendorContacts_Unauthorized(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	_, err := c.ListVendorContacts(context.Background())
+	_, err := c.ListVendorContacts(context.Background(), boardapi.VendorContactListOptions{})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -2274,15 +2274,15 @@ func TestGetVendorContact_OK(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got == nil {
-		t.Fatal("got nil VendorContactEntity")
+	if got == nil || got.Item == nil {
+		t.Fatal("got nil ItemResult or Item")
 	}
 	gotEmail := ""
-	if got.Email != nil {
-		gotEmail = *got.Email
+	if got.Item.Email != nil {
+		gotEmail = *got.Item.Email
 	}
-	if got.ID != 1 || gotEmail != "yamada@example.com" {
-		t.Errorf("GetVendorContact: got %+v", got)
+	if got.Item.ID != 1 || gotEmail != "yamada@example.com" {
+		t.Errorf("GetVendorContact: got %+v", got.Item)
 	}
 }
 
@@ -2308,39 +2308,39 @@ func TestGetVendorContact_NotFound(t *testing.T) {
 	}
 }
 
-// T128: SearchVendorContacts — with VendorID + Email parameters
-func TestSearchVendorContacts_WithVendorIDAndEmail(t *testing.T) {
-	var gotVendorID, gotEmail string
+// T128: ListVendorContacts — with PayeeIDEq + EmailCont filter (M55: Ransack payee_id_eq / email_cont)
+func TestListVendorContacts_WithPayeeIDAndEmailCont(t *testing.T) {
+	var gotPayeeIDEq, gotEmailCont string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotVendorID = r.URL.Query().Get("vendor_id")
-		gotEmail = r.URL.Query().Get("email")
+		gotPayeeIDEq = r.URL.Query().Get("payee_id_eq")
+		gotEmailCont = r.URL.Query().Get("email_cont")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`[{"id":1,"vendor_id":3,"vendor_branch_id":10,"name":"Taro Yamada","name_kana":"YAMADATARO","title":"Manager","email":"test@example.com","phone":"","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
+		w.Write([]byte(`[{"id":1,"vendor":{"id":3,"name":"VX","name_disp":"VX","custom_no":""},"last_name":"Yamada","first_name":"Taro","honorific_title":"","title":null,"department":null,"email":"test@example.com","note":null,"archive_flg":0,"updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
 	}))
 	defer ts.Close()
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.SearchVendorContacts(context.Background(), boardapi.VendorContactSearchParams{VendorID: 3, Email: "test@example.com"})
+	result, err := c.ListVendorContacts(context.Background(), boardapi.VendorContactListOptions{PayeeIDEq: 3, EmailCont: "example.com"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result) != 1 {
-		t.Errorf("want 1 result, got %d", len(result))
+	if len(result.Items) != 1 {
+		t.Errorf("want 1 result, got %d", len(result.Items))
 	}
-	if gotVendorID != "3" {
-		t.Errorf("vendor_id param: want %q, got %q", "3", gotVendorID)
+	if gotPayeeIDEq != "3" {
+		t.Errorf("payee_id_eq param: want %q, got %q", "3", gotPayeeIDEq)
 	}
-	if gotEmail != "test@example.com" {
-		t.Errorf("email param: want %q, got %q", "test@example.com", gotEmail)
+	if gotEmailCont != "example.com" {
+		t.Errorf("email_cont param: want %q, got %q", "example.com", gotEmailCont)
 	}
 }
 
-// T129: SearchVendorContacts — with Name parameter
-func TestSearchVendorContacts_WithName(t *testing.T) {
-	var gotName string
+// T129: ListVendorContacts — with NameCont filter (M55: Ransack name_cont)
+func TestListVendorContacts_WithNameCont(t *testing.T) {
+	var gotNameCont string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotName = r.URL.Query().Get("name")
+		gotNameCont = r.URL.Query().Get("name_cont")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`[]`))
 	}))
@@ -2348,12 +2348,12 @@ func TestSearchVendorContacts_WithName(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	_, err := c.SearchVendorContacts(context.Background(), boardapi.VendorContactSearchParams{Name: "Yamada"})
+	_, err := c.ListVendorContacts(context.Background(), boardapi.VendorContactListOptions{NameCont: "Yamada"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if gotName != "Yamada" {
-		t.Errorf("name param: want %q, got %q", "Yamada", gotName)
+	if gotNameCont != "Yamada" {
+		t.Errorf("name_cont param: want %q, got %q", "Yamada", gotNameCont)
 	}
 }
 
@@ -2683,12 +2683,12 @@ func TestListVendors_TwoPages(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.ListVendors(context.Background())
+	result, err := c.ListVendors(context.Background(), boardapi.VendorListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result) != 150 {
-		t.Errorf("want 150 vendors, got %d", len(result))
+	if len(result.Items) != 150 {
+		t.Errorf("want 150 vendors, got %d", len(result.Items))
 	}
 }
 
@@ -2829,7 +2829,7 @@ func TestListVendors_UnmarshalError(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	_, err := c.ListVendors(context.Background())
+	_, err := c.ListVendors(context.Background(), boardapi.VendorListOptions{})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -2888,8 +2888,8 @@ func TestListPayments_UnmarshalError(t *testing.T) {
 	}
 }
 
-// T152: SearchVendors — all parameters zero value
-func TestSearchVendors_ZeroParams(t *testing.T) {
+// T152: ListVendors — all parameters zero value (M55: Ransack-style)
+func TestListVendors_ZeroParams(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`[]`))
@@ -2898,17 +2898,17 @@ func TestSearchVendors_ZeroParams(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.SearchVendors(context.Background(), boardapi.VendorSearchParams{})
+	result, err := c.ListVendors(context.Background(), boardapi.VendorListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result) != 0 {
-		t.Errorf("want 0 results, got %d", len(result))
+	if len(result.Items) != 0 {
+		t.Errorf("want 0 results, got %d", len(result.Items))
 	}
 }
 
-// T153: SearchVendorBranches — all parameters zero value
-func TestSearchVendorBranches_ZeroParams(t *testing.T) {
+// T153: ListVendorBranches — all parameters zero value (M55: Ransack-style)
+func TestListVendorBranches_ZeroParams(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`[]`))
@@ -2917,12 +2917,12 @@ func TestSearchVendorBranches_ZeroParams(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.SearchVendorBranches(context.Background(), boardapi.VendorBranchSearchParams{})
+	result, err := c.ListVendorBranches(context.Background(), boardapi.VendorBranchListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result) != 0 {
-		t.Errorf("want 0 results, got %d", len(result))
+	if len(result.Items) != 0 {
+		t.Errorf("want 0 results, got %d", len(result.Items))
 	}
 }
 
@@ -2964,8 +2964,8 @@ func TestListPayments_ZeroParams(t *testing.T) {
 	}
 }
 
-// T156: SearchVendorContacts — all parameters zero value
-func TestSearchVendorContacts_ZeroParams(t *testing.T) {
+// T156: ListVendorContacts — all parameters zero value (M55: Ransack-style)
+func TestListVendorContacts_ZeroParams(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`[]`))
@@ -2974,12 +2974,12 @@ func TestSearchVendorContacts_ZeroParams(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.SearchVendorContacts(context.Background(), boardapi.VendorContactSearchParams{})
+	result, err := c.ListVendorContacts(context.Background(), boardapi.VendorContactListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result) != 0 {
-		t.Errorf("want 0 results, got %d", len(result))
+	if len(result.Items) != 0 {
+		t.Errorf("want 0 results, got %d", len(result.Items))
 	}
 }
 

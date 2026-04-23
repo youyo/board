@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 )
 
 // VendorBranchEntity は BOARD API の仕入先支社エンティティ。
@@ -39,49 +38,82 @@ func (e VendorBranchEntity) VendorID() int {
 	return e.Vendor.ID
 }
 
-// VendorBranchSearchParams is the parameter for SearchVendorBranches.
-type VendorBranchSearchParams struct {
-	VendorID      int
-	Name          string
-	UpdatedAtFrom string
+// VendorBranchListOptions は GET /v1/payee_branches のクエリパラメータ（Ransack スタイル）。
+// ゼロ値は API に送信しない。VendorBranchListOptions{} はフィルタなしの全件取得を意味する。
+//
+// M55 で導入。旧 VendorBranchSearchParams を置き換える破壊的変更。
+//
+// 注意: PayeeIDEq の Ransack パラメータ名は payee_id_eq（BOARD API の URL が /v1/payees である
+// ため Rails モデル名は Payee と推定）。E2E テストで実際の挙動を確認すること。
+type VendorBranchListOptions struct {
+	// 共通ページネーション（通常は ListAllWithResult が page を上書きする）
+	Page    int
+	PerPage int
+
+	// 全 List 共通
+	UpdatedAtGteq     string // "YYYY-MM-DD HH:MM:SS"
+	UpdatedAtLteq     string
+	IncludeArchiveFlg *bool // nil=送らない, true=1, false=0
+
+	// vendor_branches 専用（Ransack 準拠）
+	PayeeIDEq int    // 仕入先 ID 完全一致（Ransack payee_id_eq）
+	NameCont  string // 支社名部分一致（Ransack _cont）
 }
 
-// ListVendorBranches retrieves all vendor branches.
-// Pagination is automatically handled by ListAll.
-func (c *Client) ListVendorBranches(ctx context.Context) ([]VendorBranchEntity, error) {
-	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+// buildVendorBranchesQuery は GET /v1/payee_branches の Ransack スタイルクエリ文字列を組み立てる。
+func buildVendorBranchesQuery(opts VendorBranchListOptions, page, perPage int) string {
+	return NewQueryBuilder().
+		Page(page, perPage).
+		IntEq("payee_id", opts.PayeeIDEq).
+		StrCont("name", opts.NameCont).
+		DateGteq("updated_at", opts.UpdatedAtGteq).
+		DateLteq("updated_at", opts.UpdatedAtLteq).
+		Flg01("include_archive_flg", opts.IncludeArchiveFlg).
+		Encode()
+}
+
+// ListVendorBranches は与えられたオプションでフィルタした仕入先支社を取得する。
+// ページネーションは ListAllWithResult が内部で処理する。メタデータ（件数・レート制限・ETag）は
+// 返り値の *ListResult 経由で参照できる。
+//
+// フィルタなしの全件取得は VendorBranchListOptions{} を渡す。
+func (c *Client) ListVendorBranches(ctx context.Context, opts VendorBranchListOptions) (*ListResult[VendorBranchEntity], error) {
+	perPage := opts.PerPage
+	makeReq := func(ctx context.Context, page, pp int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/payee_branches", nil)
 		if err != nil {
 			return nil, err
 		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		req.URL.RawQuery = q.Encode()
+		req.URL.RawQuery = buildVendorBranchesQuery(opts, page, pp)
 		return req, nil
 	}
-	items, err := c.ListAll(ctx, makeReq)
+	var listOpts []ListAllOption
+	if perPage > 0 {
+		listOpts = append(listOpts, WithPerPage(perPage))
+	}
+	raw, err := c.ListAllWithResult(ctx, makeReq, listOpts...)
 	if err != nil {
 		return nil, err
 	}
-	result := make([]VendorBranchEntity, 0, len(items))
-	for _, raw := range items {
+	items := make([]VendorBranchEntity, 0, len(raw.Items))
+	for _, b := range raw.Items {
 		var x VendorBranchEntity
-		if err := json.Unmarshal(raw, &x); err != nil {
+		if err := json.Unmarshal(b, &x); err != nil {
 			return nil, &APIError{Code: APIErrorUnknown, Message: "ListVendorBranches: unmarshal: " + err.Error()}
 		}
-		result = append(result, x)
+		items = append(items, x)
 	}
-	return result, nil
+	return &ListResult[VendorBranchEntity]{Items: items, Meta: raw.Meta, Headers: raw.Headers}, nil
 }
 
-// GetVendorBranch retrieves the vendor branch with the specified ID.
-func (c *Client) GetVendorBranch(ctx context.Context, id int) (*VendorBranchEntity, error) {
+// GetVendorBranch は指定 ID の仕入先支社を取得する。
+// レスポンスメタデータ（ETag・レート制限・Last-Modified）は *ItemResult 経由で参照できる。
+func (c *Client) GetVendorBranch(ctx context.Context, id int) (*ItemResult[VendorBranchEntity], error) {
 	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/payee_branches/%d", id), nil)
 	if err != nil {
 		return nil, err
 	}
-	body, err := c.DoWithRetry(req)
+	body, headers, err := c.DoWithRetryFull(req)
 	if err != nil {
 		return nil, err
 	}
@@ -89,150 +121,49 @@ func (c *Client) GetVendorBranch(ctx context.Context, id int) (*VendorBranchEnti
 	if err := json.Unmarshal(body, &x); err != nil {
 		return nil, &APIError{Code: APIErrorUnknown, Message: "GetVendorBranch: unmarshal: " + err.Error()}
 	}
-	return &x, nil
+	return &ItemResult[VendorBranchEntity]{
+		Item:    &x,
+		Meta:    parseItemMeta(headers),
+		Headers: headers,
+	}, nil
 }
 
-// SearchVendorBranches searches vendor branches with the given conditions.
-// Pagination is automatically handled by ListAll.
-func (c *Client) SearchVendorBranches(ctx context.Context, params VendorBranchSearchParams) ([]VendorBranchEntity, error) {
-	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+// ListVendorBranchesRaw は与えられたオプションでフィルタした仕入先支社の生 JSON 配列と
+// 最終ページのレスポンスヘッダーを返す。バイト列は BOARD API が返したものをそのまま保持するため、
+// E2E の strict field diff に使用できる。通常の呼び出しには ListVendorBranches を使うこと。
+//
+// 注意: BOARD API の実パスは /v1/payee_branches（/v1/vendor_branches ではない）。
+func (c *Client) ListVendorBranchesRaw(ctx context.Context, opts VendorBranchListOptions) ([]byte, http.Header, error) {
+	perPage := opts.PerPage
+	makeReq := func(ctx context.Context, page, pp int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/payee_branches", nil)
 		if err != nil {
 			return nil, err
 		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		if params.VendorID != 0 {
-			q.Set("vendor_id", strconv.Itoa(params.VendorID))
-		}
-		if params.Name != "" {
-			q.Set("name", params.Name)
-		}
-		if params.UpdatedAtFrom != "" {
-			q.Set("updated_at_from", params.UpdatedAtFrom)
-		}
-		req.URL.RawQuery = q.Encode()
+		req.URL.RawQuery = buildVendorBranchesQuery(opts, page, pp)
 		return req, nil
 	}
-	items, err := c.ListAll(ctx, makeReq)
+	var listOpts []ListAllOption
+	if perPage > 0 {
+		listOpts = append(listOpts, WithPerPage(perPage))
+	}
+	raw, err := c.ListAllWithResult(ctx, makeReq, listOpts...)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	result := make([]VendorBranchEntity, 0, len(items))
-	for _, raw := range items {
-		var x VendorBranchEntity
-		if err := json.Unmarshal(raw, &x); err != nil {
-			return nil, &APIError{Code: APIErrorUnknown, Message: "SearchVendorBranches: unmarshal: " + err.Error()}
-		}
-		result = append(result, x)
+	out, err := json.Marshal(raw.Items)
+	if err != nil {
+		return nil, nil, &APIError{Code: APIErrorUnknown, Message: "ListVendorBranchesRaw: marshal aggregate: " + err.Error()}
 	}
-	return result, nil
+	return out, raw.Headers, nil
 }
 
-// ListVendorBranchesRaw retrieves all vendor branches and returns the raw HTTP
-// response bodies merged across pages as a single JSON array. Unlike
-// ListVendorBranches, the returned bytes are byte-preserving: each element
-// JSON is exactly what the BOARD API emitted, enabling strict field diff in
-// E2E tests to detect keys that are not mapped to VendorBranchEntity.
-//
-// Note: the real BOARD API path is /v1/payee_branches (not /v1/vendor_branches).
-//
-// Intended for E2E strict field diff; regular callers should use
-// ListVendorBranches.
-func (c *Client) ListVendorBranchesRaw(ctx context.Context, opts ...ListAllOption) ([]byte, error) {
-	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
-		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/payee_branches", nil)
-		if err != nil {
-			return nil, err
-		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		req.URL.RawQuery = q.Encode()
-		return req, nil
-	}
-	items, err := c.ListAll(ctx, makeReq, opts...)
-	if err != nil {
-		return nil, err
-	}
-	out, err := json.Marshal(items)
-	if err != nil {
-		return nil, &APIError{Code: APIErrorUnknown, Message: "ListVendorBranchesRaw: marshal aggregate: " + err.Error()}
-	}
-	return out, nil
-}
-
-// GetVendorBranchRaw retrieves a single vendor branch and returns the raw HTTP
-// response body byte-for-byte.
-//
-// Note: the real BOARD API path is /v1/payee_branches/{id}.
-//
-// Intended for E2E strict field diff; regular callers should use
-// GetVendorBranch.
-func (c *Client) GetVendorBranchRaw(ctx context.Context, id int) ([]byte, error) {
+// GetVendorBranchRaw は指定 ID の仕入先支社の生 HTTP レスポンスボディとヘッダーを返す。
+// E2E の strict field diff に使用できる。通常の呼び出しには GetVendorBranch を使うこと。
+func (c *Client) GetVendorBranchRaw(ctx context.Context, id int) ([]byte, http.Header, error) {
 	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/payee_branches/%d", id), nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return c.DoWithRetry(req)
-}
-
-// SearchVendorBranchesRaw retrieves vendor branches matching the given search
-// parameters and returns the raw HTTP response bodies merged across pages as a
-// single JSON array. Same byte-preserving guarantee as ListVendorBranchesRaw.
-//
-// VendorBranchSearchParams exposes 3 filters (VendorID, Name, UpdatedAtFrom).
-// Note that the BOARD API has been observed to ignore the `name` filter across
-// 9 consecutive milestones (M03-M13), so the Name value in Search only
-// exercises request encoding, not server-side filtering.
-//
-// Intended for E2E strict field diff; regular callers should use
-// SearchVendorBranches.
-func (c *Client) SearchVendorBranchesRaw(ctx context.Context, params VendorBranchSearchParams, opts ...ListAllOption) ([]byte, error) {
-	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
-		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/payee_branches", nil)
-		if err != nil {
-			return nil, err
-		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		if params.VendorID != 0 {
-			q.Set("vendor_id", strconv.Itoa(params.VendorID))
-		}
-		if params.Name != "" {
-			q.Set("name", params.Name)
-		}
-		if params.UpdatedAtFrom != "" {
-			q.Set("updated_at_from", params.UpdatedAtFrom)
-		}
-		req.URL.RawQuery = q.Encode()
-		return req, nil
-	}
-	items, err := c.ListAll(ctx, makeReq, opts...)
-	if err != nil {
-		return nil, err
-	}
-	out, err := json.Marshal(items)
-	if err != nil {
-		return nil, &APIError{Code: APIErrorUnknown, Message: "SearchVendorBranchesRaw: marshal aggregate: " + err.Error()}
-	}
-	return out, nil
-}
-
-// ListVendorBranchesPage retrieves a single page of VendorBranchEntity.
-func (c *Client) ListVendorBranchesPage(ctx context.Context, page, perPage int) (*PageResult[VendorBranchEntity], error) {
-	makeReq := func(ctx context.Context, p, pp int) (*http.Request, error) {
-		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/payee_branches", nil)
-		if err != nil {
-			return nil, err
-		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(p))
-		q.Set("per_page", strconv.Itoa(pp))
-		req.URL.RawQuery = q.Encode()
-		return req, nil
-	}
-	return ListPage[VendorBranchEntity](c, ctx, makeReq, page, perPage)
+	return c.DoWithRetryFull(req)
 }

@@ -76,12 +76,12 @@ func TestVendorRepository_List_CacheHit(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeVendorRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{})
+	got, err := repo.List(context.Background(), repository.ReadOptions{}, boardapi.VendorListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(got) != len(sampleVendors) {
-		t.Errorf("len(got) = %d, want %d", len(got), len(sampleVendors))
+	if len(got.Items) != len(sampleVendors) {
+		t.Errorf("len(got.Items) = %d, want %d", len(got.Items), len(sampleVendors))
 	}
 }
 
@@ -93,12 +93,12 @@ func TestVendorRepository_List_InitialLoad(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeVendorRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{})
+	got, err := repo.List(context.Background(), repository.ReadOptions{}, boardapi.VendorListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(got) != len(sampleVendors) {
-		t.Errorf("len(got) = %d, want %d", len(got), len(sampleVendors))
+	if len(got.Items) != len(sampleVendors) {
+		t.Errorf("len(got.Items) = %d, want %d", len(got.Items), len(sampleVendors))
 	}
 }
 
@@ -161,17 +161,20 @@ func TestVendorRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	}
 }
 
-// T_VEN06: Search - Name filter -> returns matching items
-func TestVendorRepository_Search_NameFilter(t *testing.T) {
+// T_VEN06: Search - NameCont filter -> bypasses cache, returns data from API
+func TestVendorRepository_Search_NameContFilter(t *testing.T) {
 	db := newTestDB(t)
-	seedVendorCache(t, db, sampleVendors)
 	markSynced(t, db, "vendors")
 
-	srv := newVendorAPIServer(t, nil)
+	// API サーバーは name_cont=VendorA に合致する 1 件を返すと想定
+	filtered := []boardapi.VendorEntity{
+		{ID: 1, Name: "VendorA", UpdatedAt: "2026-01-01T00:00:00Z"},
+	}
+	srv := newVendorAPIServer(t, filtered)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeVendorRepo(t, db, apiClient, false)
-	got, err := repo.Search(context.Background(), boardapi.VendorSearchParams{Name: "VendorA"}, repository.ReadOptions{})
+	got, err := repo.Search(context.Background(), boardapi.VendorListOptions{NameCont: "VendorA"}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
@@ -180,7 +183,7 @@ func TestVendorRepository_Search_NameFilter(t *testing.T) {
 	}
 }
 
-// T_VEN07: Search - no filter -> returns all items
+// T_VEN07: Search - no filter -> returns all items from cache
 func TestVendorRepository_Search_NoFilter(t *testing.T) {
 	db := newTestDB(t)
 	seedVendorCache(t, db, sampleVendors)
@@ -190,7 +193,7 @@ func TestVendorRepository_Search_NoFilter(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeVendorRepo(t, db, apiClient, false)
-	got, err := repo.Search(context.Background(), boardapi.VendorSearchParams{}, repository.ReadOptions{})
+	got, err := repo.Search(context.Background(), boardapi.VendorListOptions{}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}

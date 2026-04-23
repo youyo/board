@@ -89,27 +89,33 @@ type ReceiptRepo interface {
 }
 
 // VendorRepo is the interface for the vendors repository.
+//
+// M55 以降: List は (readOpts, filter) 二引数化されて *ListResult を返す。
+// 非ゼロ filter 時は cache バイパスで api.ListVendors を直接呼ぶ。
+// Search / ListPage は削除（破壊的変更）。
 type VendorRepo interface {
-	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.VendorEntity, error)
+	List(ctx context.Context, readOpts repository.ReadOptions, filter boardapi.VendorListOptions) (*boardapi.ListResult[boardapi.VendorEntity], error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.VendorEntity, error)
-	Search(ctx context.Context, params boardapi.VendorSearchParams, opts repository.ReadOptions) ([]boardapi.VendorEntity, error)
-	ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.VendorEntity], error)
 }
 
 // VendorBranchRepo is the interface for the vendor_branches repository.
+//
+// M55 以降: List は (readOpts, filter) 二引数化されて *ListResult を返す。
+// 非ゼロ filter 時は cache バイパスで api.ListVendorBranches を直接呼ぶ。
+// Search / ListPage は削除（破壊的変更）。
 type VendorBranchRepo interface {
-	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.VendorBranchEntity, error)
+	List(ctx context.Context, readOpts repository.ReadOptions, filter boardapi.VendorBranchListOptions) (*boardapi.ListResult[boardapi.VendorBranchEntity], error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.VendorBranchEntity, error)
-	Search(ctx context.Context, params boardapi.VendorBranchSearchParams, opts repository.ReadOptions) ([]boardapi.VendorBranchEntity, error)
-	ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.VendorBranchEntity], error)
 }
 
 // VendorContactRepo is the interface for the vendor_contacts repository.
+//
+// M55 以降: List は (readOpts, filter) 二引数化されて *ListResult を返す。
+// 非ゼロ filter 時は cache バイパスで api.ListVendorContacts を直接呼ぶ。
+// Search / ListPage は削除（破壊的変更）。
 type VendorContactRepo interface {
-	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.VendorContactEntity, error)
+	List(ctx context.Context, readOpts repository.ReadOptions, filter boardapi.VendorContactListOptions) (*boardapi.ListResult[boardapi.VendorContactEntity], error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.VendorContactEntity, error)
-	Search(ctx context.Context, params boardapi.VendorContactSearchParams, opts repository.ReadOptions) ([]boardapi.VendorContactEntity, error)
-	ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.VendorContactEntity], error)
 }
 
 // PurchaseOrderRepo is the interface for the purchase_orders repository.

@@ -50,7 +50,7 @@ func TestE2E_Payments_List(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
 
-	raw, err := client.ListPaymentsRaw(ctx)
+	raw, _, err := client.ListPaymentsRaw(ctx, boardapi.PaymentListOptions{})
 	if err != nil {
 		// Roadmap rule: 403/429 must NOT be skipped, they must fail the test.
 		t.Fatalf("ListPaymentsRaw: %v", err)
@@ -80,7 +80,7 @@ func TestE2E_Payments_Get(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
 
-	listRaw, err := client.ListPaymentsRaw(ctx, boardapi.WithPerPage(1))
+	listRaw, _, err := client.ListPaymentsRaw(ctx, boardapi.PaymentListOptions{PerPage: 1})
 	if err != nil {
 		t.Fatalf("ListPaymentsRaw (discovery): %v", err)
 	}
@@ -102,7 +102,7 @@ func TestE2E_Payments_Get(t *testing.T) {
 		t.Fatalf("first payment has non-positive ID: %d", id)
 	}
 
-	getRaw, err := client.GetPaymentRaw(ctx, id)
+	getRaw, _, err := client.GetPaymentRaw(ctx, id)
 	if err != nil {
 		// Roadmap rule: 403/429 / 404 must NOT be skipped, they must fail the test.
 		t.Fatalf("GetPaymentRaw(%d): %v", id, err)
@@ -135,11 +135,12 @@ func TestE2E_Payments_Search(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
 
-	raw, err := client.SearchPaymentsRaw(ctx, boardapi.PaymentSearchParams{
-		UpdatedAtFrom: "2099-01-01",
-	}, boardapi.WithPerPage(1))
+	raw, _, err := client.ListPaymentsRaw(ctx, boardapi.PaymentListOptions{
+		UpdatedAtGteq: "2099-01-01",
+		PerPage:       1,
+	})
 	if err != nil {
-		t.Fatalf("SearchPaymentsRaw: %v", err)
+		t.Fatalf("ListPaymentsRaw(UpdatedAtGteq=2099-01-01): %v", err)
 	}
 
 	dumpJSON(t, "payments_search", 0, raw)

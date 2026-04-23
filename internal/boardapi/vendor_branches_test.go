@@ -30,11 +30,8 @@ func newVendorBranchesMockClient(rt roundTripperFunc) *boardapi.Client {
 }
 
 // U1: ListVendorBranchesRaw returns the raw JSON array body byte-for-byte when
-// a single page response is served. The exact JSON bytes the server emits must
-// be preserved inside the returned array payload (element contents and order
-// must not change) because StrictFieldDiff relies on the original response
-// shape. URL path must be /v1/payee_branches (the real BOARD API path, not
-// /v1/vendor_branches).
+// a single page response is served. URL path must be /v1/payee_branches.
+// M55: ListVendorBranchesRaw(ctx, VendorBranchListOptions) に更新。
 func TestListVendorBranchesRaw_SinglePage(t *testing.T) {
 	// 新スキーマ（M41 再設計）: vendor nested / zip / pref / address1 / address2 / tel / fax(*string) / archive_flg
 	page1 := `[{"id":1,"vendor":{"id":10,"name":"Vendor X","name_disp":"Vendor X","custom_no":"VX01"},"name":"Main Branch","zip":"100-0001","pref":"東京都","address1":"千代田区","address2":"","tel":"03-0000-0000","fax":null,"archive_flg":0,"updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}]`
@@ -47,7 +44,7 @@ func TestListVendorBranchesRaw_SinglePage(t *testing.T) {
 	})
 	client := newVendorBranchesMockClient(rt)
 
-	raw, err := client.ListVendorBranchesRaw(context.Background())
+	raw, _, err := client.ListVendorBranchesRaw(context.Background(), boardapi.VendorBranchListOptions{})
 	if err != nil {
 		t.Fatalf("ListVendorBranchesRaw: %v", err)
 	}
@@ -82,6 +79,7 @@ func TestListVendorBranchesRaw_SinglePage(t *testing.T) {
 // U2: ListVendorBranchesRaw concatenates multiple pages into a single valid
 // JSON array. per_page=2 forces pagination; server returns 2 items on page 1
 // and 1 item on page 2. Result must be a JSON array of 3 items.
+// M55: ListVendorBranchesRaw(ctx, VendorBranchListOptions{PerPage: 2}) に更新。
 func TestListVendorBranchesRaw_MultiPage(t *testing.T) {
 	page1Items := []string{
 		`{"id":1,"vendor":{"id":10,"name":"VX","name_disp":"VX","custom_no":""},"name":"A","zip":"","pref":"","address1":"","address2":"","tel":null,"fax":null,"archive_flg":0,"updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}`,
@@ -110,7 +108,7 @@ func TestListVendorBranchesRaw_MultiPage(t *testing.T) {
 	})
 	client := newVendorBranchesMockClient(rt)
 
-	raw, err := client.ListVendorBranchesRaw(context.Background(), boardapi.WithPerPage(2))
+	raw, _, err := client.ListVendorBranchesRaw(context.Background(), boardapi.VendorBranchListOptions{PerPage: 2})
 	if err != nil {
 		t.Fatalf("ListVendorBranchesRaw: %v", err)
 	}
@@ -134,6 +132,7 @@ func TestListVendorBranchesRaw_MultiPage(t *testing.T) {
 
 // U3: GetVendorBranchRaw returns body exactly as served (single object).
 // Path must be /v1/payee_branches/42 (real BOARD API path).
+// M55: GetVendorBranchRaw(ctx, id) -> ([]byte, http.Header, error) に更新。
 func TestGetVendorBranchRaw_Success(t *testing.T) {
 	body := []byte(`{"id":42,"vendor":{"id":10,"name":"Vendor X","name_disp":"Vendor X","custom_no":"VX01"},"name":"Branch","zip":"100-0002","pref":"東京都","address1":"港区","address2":"","tel":"03-1111-2222","fax":"03-1111-2223","archive_flg":0,"updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}`)
 	var gotPath string
@@ -147,7 +146,7 @@ func TestGetVendorBranchRaw_Success(t *testing.T) {
 	})
 	client := newVendorBranchesMockClient(rt)
 
-	raw, err := client.GetVendorBranchRaw(context.Background(), 42)
+	raw, _, err := client.GetVendorBranchRaw(context.Background(), 42)
 	if err != nil {
 		t.Fatalf("GetVendorBranchRaw: %v", err)
 	}
@@ -161,6 +160,7 @@ func TestGetVendorBranchRaw_Success(t *testing.T) {
 }
 
 // U4: GetVendorBranchRaw on 404 returns *APIError{Code: APIErrorNotFound}.
+// M55: GetVendorBranchRaw(ctx, id) -> ([]byte, http.Header, error) に更新。
 func TestGetVendorBranchRaw_NotFound(t *testing.T) {
 	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
 		return &http.Response{
@@ -171,7 +171,7 @@ func TestGetVendorBranchRaw_NotFound(t *testing.T) {
 	})
 	client := newVendorBranchesMockClient(rt)
 
-	_, err := client.GetVendorBranchRaw(context.Background(), 99)
+	_, _, err := client.GetVendorBranchRaw(context.Background(), 99)
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}
@@ -184,37 +184,31 @@ func TestGetVendorBranchRaw_NotFound(t *testing.T) {
 	}
 }
 
-// U5: SearchVendorBranchesRaw sends all three parameters (VendorID, Name,
-// UpdatedAtFrom) in the query. VendorBranchSearchParams has 3 fields — one
-// more than M09's ClientBranchSearchParams (ClientID, Name). This test ensures
-// all three query params are correctly encoded.
-func TestSearchVendorBranchesRaw_QueryParams(t *testing.T) {
+// U5: ListVendorBranchesRaw with PayeeIDEq sends payee_id_eq in the query.
+// M55: VendorBranchListOptions{PayeeIDEq: 123} に更新（Ransack 準拠）。
+// 注意: BOARD API の実際のパラメータ名は E2E テストで確認すること。
+func TestListVendorBranchesRaw_PayeeIDEq(t *testing.T) {
 	page1 := `[{"id":7,"vendor":{"id":123,"name":"VZ","name_disp":"VZ","custom_no":""},"name":"keyword","zip":"","pref":"","address1":"","address2":"","tel":null,"fax":null,"archive_flg":0,"updated_at":"2024-02-01T00:00:00+09:00","created_at":"2024-02-01T00:00:00+09:00"}]`
-	var observedVendorID, observedName, observedUpdatedFrom string
+	var observedPayeeIDEq, observedNameCont string
 	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
-		observedVendorID = r.URL.Query().Get("vendor_id")
-		observedName = r.URL.Query().Get("name")
-		observedUpdatedFrom = r.URL.Query().Get("updated_at_from")
+		observedPayeeIDEq = r.URL.Query().Get("payee_id_eq")
+		observedNameCont = r.URL.Query().Get("name_cont")
 		return jsonResp(page1), nil
 	})
 	client := newVendorBranchesMockClient(rt)
 
-	raw, err := client.SearchVendorBranchesRaw(context.Background(), boardapi.VendorBranchSearchParams{
-		VendorID:      123,
-		Name:          "keyword",
-		UpdatedAtFrom: "2024-01-01T00:00:00+09:00",
+	raw, _, err := client.ListVendorBranchesRaw(context.Background(), boardapi.VendorBranchListOptions{
+		PayeeIDEq: 123,
+		NameCont:  "keyword",
 	})
 	if err != nil {
-		t.Fatalf("SearchVendorBranchesRaw: %v", err)
+		t.Fatalf("ListVendorBranchesRaw: %v", err)
 	}
-	if observedVendorID != "123" {
-		t.Errorf("query vendor_id = %q, want 123", observedVendorID)
+	if observedPayeeIDEq != "123" {
+		t.Errorf("query payee_id_eq = %q, want 123", observedPayeeIDEq)
 	}
-	if observedName != "keyword" {
-		t.Errorf("query name = %q, want keyword", observedName)
-	}
-	if observedUpdatedFrom != "2024-01-01T00:00:00+09:00" {
-		t.Errorf("query updated_at_from = %q, want 2024-01-01T00:00:00+09:00", observedUpdatedFrom)
+	if observedNameCont != "keyword" {
+		t.Errorf("query name_cont = %q, want keyword", observedNameCont)
 	}
 	var arr []map[string]any
 	if err := json.Unmarshal(raw, &arr); err != nil {

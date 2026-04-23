@@ -174,63 +174,51 @@ func (s *stubReceiptRepo) GetByDocumentID(_ context.Context, _ int, _ repository
 // --- Stubs: vendor ---
 
 type stubVendorRepo struct {
-	listResult   []boardapi.VendorEntity
-	getResult    *boardapi.VendorEntity
-	searchResult []boardapi.VendorEntity
-	err          error
+	listResult *boardapi.ListResult[boardapi.VendorEntity]
+	getResult  *boardapi.VendorEntity
+	err        error
 }
 
-func (s *stubVendorRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.VendorEntity, error) {
+func (s *stubVendorRepo) List(_ context.Context, _ repository.ReadOptions, _ boardapi.VendorListOptions) (*boardapi.ListResult[boardapi.VendorEntity], error) {
+	if s.listResult == nil {
+		return &boardapi.ListResult[boardapi.VendorEntity]{}, s.err
+	}
 	return s.listResult, s.err
 }
 func (s *stubVendorRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.VendorEntity, error) {
 	return s.getResult, s.err
 }
-func (s *stubVendorRepo) Search(_ context.Context, _ boardapi.VendorSearchParams, _ repository.ReadOptions) ([]boardapi.VendorEntity, error) {
-	return s.searchResult, s.err
-}
-func (s *stubVendorRepo) ListPage(_ context.Context, _, _ int) (*boardapi.PageResult[boardapi.VendorEntity], error) {
-	return nil, s.err
-}
 
 type stubVendorBranchRepo struct {
-	listResult   []boardapi.VendorBranchEntity
-	getResult    *boardapi.VendorBranchEntity
-	searchResult []boardapi.VendorBranchEntity
-	err          error
+	listResult *boardapi.ListResult[boardapi.VendorBranchEntity]
+	getResult  *boardapi.VendorBranchEntity
+	err        error
 }
 
-func (s *stubVendorBranchRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.VendorBranchEntity, error) {
+func (s *stubVendorBranchRepo) List(_ context.Context, _ repository.ReadOptions, _ boardapi.VendorBranchListOptions) (*boardapi.ListResult[boardapi.VendorBranchEntity], error) {
+	if s.listResult == nil {
+		return &boardapi.ListResult[boardapi.VendorBranchEntity]{}, s.err
+	}
 	return s.listResult, s.err
 }
 func (s *stubVendorBranchRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.VendorBranchEntity, error) {
 	return s.getResult, s.err
 }
-func (s *stubVendorBranchRepo) Search(_ context.Context, _ boardapi.VendorBranchSearchParams, _ repository.ReadOptions) ([]boardapi.VendorBranchEntity, error) {
-	return s.searchResult, s.err
-}
-func (s *stubVendorBranchRepo) ListPage(_ context.Context, _, _ int) (*boardapi.PageResult[boardapi.VendorBranchEntity], error) {
-	return nil, s.err
-}
 
 type stubVendorContactRepo struct {
-	listResult   []boardapi.VendorContactEntity
-	getResult    *boardapi.VendorContactEntity
-	searchResult []boardapi.VendorContactEntity
-	err          error
+	listResult *boardapi.ListResult[boardapi.VendorContactEntity]
+	getResult  *boardapi.VendorContactEntity
+	err        error
 }
 
-func (s *stubVendorContactRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.VendorContactEntity, error) {
+func (s *stubVendorContactRepo) List(_ context.Context, _ repository.ReadOptions, _ boardapi.VendorContactListOptions) (*boardapi.ListResult[boardapi.VendorContactEntity], error) {
+	if s.listResult == nil {
+		return &boardapi.ListResult[boardapi.VendorContactEntity]{}, s.err
+	}
 	return s.listResult, s.err
 }
 func (s *stubVendorContactRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.VendorContactEntity, error) {
 	return s.getResult, s.err
-}
-func (s *stubVendorContactRepo) Search(_ context.Context, _ boardapi.VendorContactSearchParams, _ repository.ReadOptions) ([]boardapi.VendorContactEntity, error) {
-	return s.searchResult, s.err
-}
-func (s *stubVendorContactRepo) ListPage(_ context.Context, _, _ int) (*boardapi.PageResult[boardapi.VendorContactEntity], error) {
-	return nil, s.err
 }
 
 type stubPurchaseOrderRepo struct {

@@ -369,24 +369,28 @@ func TestNewAPIVendorsCmd(t *testing.T) {
 	for _, sub := range cmd.Commands() {
 		subNames[sub.Use] = true
 	}
-	for _, name := range []string{"list", "get", "search"} {
+	// M55 以降: search サブコマンドは廃止。list に Ransack フラグを追加。
+	for _, name := range []string{"list", "get"} {
 		if !subNames[name] {
 			t.Errorf("subcommand %q is not registered", name)
 		}
 	}
+	if subNames["search"] {
+		t.Errorf("subcommand \"search\" should not be registered (removed in M55)")
+	}
 
-	var searchCmd *cobra.Command
+	var listCmd *cobra.Command
 	for _, sub := range cmd.Commands() {
-		if sub.Use == "search" {
-			searchCmd = sub
+		if sub.Use == "list" {
+			listCmd = sub
 		}
 	}
-	if searchCmd == nil {
-		t.Fatal("search command not found")
+	if listCmd == nil {
+		t.Fatal("list command not found")
 	}
-	for _, flagName := range []string{"name", "updated-at-from"} {
-		if f := searchCmd.Flags().Lookup(flagName); f == nil {
-			t.Errorf("search: --%s flag is not defined", flagName)
+	for _, flagName := range []string{"name-cont", "updated-at-gteq", "updated-at-lteq", "include-archive-flg", "show-meta"} {
+		if f := listCmd.Flags().Lookup(flagName); f == nil {
+			t.Errorf("list: --%s flag is not defined", flagName)
 		}
 	}
 }
@@ -400,24 +404,28 @@ func TestNewAPIVendorBranchesCmd(t *testing.T) {
 	for _, sub := range cmd.Commands() {
 		subNames[sub.Use] = true
 	}
-	for _, name := range []string{"list", "get", "search"} {
+	// M55 以降: search サブコマンドは廃止。list に Ransack フラグを追加。
+	for _, name := range []string{"list", "get"} {
 		if !subNames[name] {
 			t.Errorf("subcommand %q is not registered", name)
 		}
 	}
+	if subNames["search"] {
+		t.Errorf("subcommand \"search\" should not be registered (removed in M55)")
+	}
 
-	var searchCmd *cobra.Command
+	var listCmd *cobra.Command
 	for _, sub := range cmd.Commands() {
-		if sub.Use == "search" {
-			searchCmd = sub
+		if sub.Use == "list" {
+			listCmd = sub
 		}
 	}
-	if searchCmd == nil {
-		t.Fatal("search command not found")
+	if listCmd == nil {
+		t.Fatal("list command not found")
 	}
-	for _, flagName := range []string{"vendor-id", "updated-at-from"} {
-		if f := searchCmd.Flags().Lookup(flagName); f == nil {
-			t.Errorf("search: --%s flag is not defined", flagName)
+	for _, flagName := range []string{"payee-id-eq", "name-cont", "updated-at-gteq", "updated-at-lteq", "include-archive-flg", "show-meta"} {
+		if f := listCmd.Flags().Lookup(flagName); f == nil {
+			t.Errorf("list: --%s flag is not defined", flagName)
 		}
 	}
 }
@@ -431,24 +439,28 @@ func TestNewAPIVendorContactsCmd(t *testing.T) {
 	for _, sub := range cmd.Commands() {
 		subNames[sub.Use] = true
 	}
-	for _, name := range []string{"list", "get", "search"} {
+	// M55 以降: search サブコマンドは廃止。list に Ransack フラグを追加。
+	for _, name := range []string{"list", "get"} {
 		if !subNames[name] {
 			t.Errorf("subcommand %q is not registered", name)
 		}
 	}
+	if subNames["search"] {
+		t.Errorf("subcommand \"search\" should not be registered (removed in M55)")
+	}
 
-	var searchCmd *cobra.Command
+	var listCmd *cobra.Command
 	for _, sub := range cmd.Commands() {
-		if sub.Use == "search" {
-			searchCmd = sub
+		if sub.Use == "list" {
+			listCmd = sub
 		}
 	}
-	if searchCmd == nil {
-		t.Fatal("search command not found")
+	if listCmd == nil {
+		t.Fatal("list command not found")
 	}
-	for _, flagName := range []string{"vendor-id", "name", "updated-at-from"} {
-		if f := searchCmd.Flags().Lookup(flagName); f == nil {
-			t.Errorf("search: --%s flag is not defined", flagName)
+	for _, flagName := range []string{"payee-id-eq", "name-cont", "email-cont", "updated-at-gteq", "updated-at-lteq", "include-archive-flg", "show-meta"} {
+		if f := listCmd.Flags().Lookup(flagName); f == nil {
+			t.Errorf("list: --%s flag is not defined", flagName)
 		}
 	}
 }

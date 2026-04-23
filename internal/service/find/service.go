@@ -102,24 +102,31 @@ type PaymentRepo interface {
 }
 
 // VendorRepo is the repository interface for vendors used by service/find.
+//
+// M55 以降: Search は VendorListOptions（Ransack スタイル）を受け取る。
+// 旧 VendorSearchParams は削除。List は ListEntities 経由で廃止。
 type VendorRepo interface {
-	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.VendorEntity, error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.VendorEntity, error)
-	Search(ctx context.Context, params boardapi.VendorSearchParams, opts repository.ReadOptions) ([]boardapi.VendorEntity, error)
+	Search(ctx context.Context, filter boardapi.VendorListOptions, opts repository.ReadOptions) ([]boardapi.VendorEntity, error)
+	ListEntities(ctx context.Context, readOpts repository.ReadOptions, filter boardapi.VendorListOptions) ([]boardapi.VendorEntity, error)
 }
 
 // VendorBranchRepo is the repository interface for vendor branches.
+//
+// M55 以降: Search は VendorBranchListOptions（Ransack スタイル）を受け取る。
+// 旧 VendorBranchSearchParams は削除。
 type VendorBranchRepo interface {
-	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.VendorBranchEntity, error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.VendorBranchEntity, error)
-	Search(ctx context.Context, params boardapi.VendorBranchSearchParams, opts repository.ReadOptions) ([]boardapi.VendorBranchEntity, error)
+	Search(ctx context.Context, filter boardapi.VendorBranchListOptions, opts repository.ReadOptions) ([]boardapi.VendorBranchEntity, error)
 }
 
 // VendorContactRepo is the repository interface for vendor contacts.
+//
+// M55 以降: Search は VendorContactListOptions（Ransack スタイル）を受け取る。
+// 旧 VendorContactSearchParams は削除。
 type VendorContactRepo interface {
-	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.VendorContactEntity, error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.VendorContactEntity, error)
-	Search(ctx context.Context, params boardapi.VendorContactSearchParams, opts repository.ReadOptions) ([]boardapi.VendorContactEntity, error)
+	Search(ctx context.Context, filter boardapi.VendorContactListOptions, opts repository.ReadOptions) ([]boardapi.VendorContactEntity, error)
 }
 
 // UserRepo is the repository interface for users.

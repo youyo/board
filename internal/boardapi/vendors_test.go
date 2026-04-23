@@ -30,11 +30,8 @@ func newVendorsMockClient(rt roundTripperFunc) *boardapi.Client {
 }
 
 // U1: ListVendorsRaw returns the raw JSON array body byte-for-byte when
-// a single page response is served. The exact JSON bytes the server emits must
-// be preserved inside the returned array payload (element contents and order
-// must not change) because StrictFieldDiff relies on the original response
-// shape. URL path must be /v1/payees (the real BOARD API path, not
-// /v1/vendors).
+// a single page response is served. URL path must be /v1/payees.
+// M55: ListVendorsRaw(ctx, VendorListOptions) に更新。
 func TestListVendorsRaw_SinglePage(t *testing.T) {
 	page1 := `[{"id":1,"name":"テスト商事","code":"V001","memo":"メモ","updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}]`
 	var gotPath string
@@ -46,7 +43,7 @@ func TestListVendorsRaw_SinglePage(t *testing.T) {
 	})
 	client := newVendorsMockClient(rt)
 
-	raw, err := client.ListVendorsRaw(context.Background())
+	raw, _, err := client.ListVendorsRaw(context.Background(), boardapi.VendorListOptions{})
 	if err != nil {
 		t.Fatalf("ListVendorsRaw: %v", err)
 	}
@@ -77,6 +74,7 @@ func TestListVendorsRaw_SinglePage(t *testing.T) {
 // U2: ListVendorsRaw concatenates multiple pages into a single valid
 // JSON array. per_page=2 forces pagination; server returns 2 items on page 1
 // and 1 item on page 2. Result must be a JSON array of 3 items.
+// M55: ListVendorsRaw(ctx, VendorListOptions{PerPage: 2}) に更新。
 func TestListVendorsRaw_MultiPage(t *testing.T) {
 	page1Items := []string{
 		`{"id":1,"name":"A社","code":"V001","memo":"","updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}`,
@@ -105,7 +103,7 @@ func TestListVendorsRaw_MultiPage(t *testing.T) {
 	})
 	client := newVendorsMockClient(rt)
 
-	raw, err := client.ListVendorsRaw(context.Background(), boardapi.WithPerPage(2))
+	raw, _, err := client.ListVendorsRaw(context.Background(), boardapi.VendorListOptions{PerPage: 2})
 	if err != nil {
 		t.Fatalf("ListVendorsRaw: %v", err)
 	}
@@ -129,6 +127,7 @@ func TestListVendorsRaw_MultiPage(t *testing.T) {
 
 // U3: GetVendorRaw returns body exactly as served (single object).
 // Path must be /v1/payees/42 (real BOARD API path).
+// M55: GetVendorRaw(ctx, id) -> ([]byte, http.Header, error) に更新。
 func TestGetVendorRaw_Success(t *testing.T) {
 	body := []byte(`{"id":42,"name":"テスト商事","code":"V042","memo":"メモ","updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}`)
 	var gotPath string
@@ -142,7 +141,7 @@ func TestGetVendorRaw_Success(t *testing.T) {
 	})
 	client := newVendorsMockClient(rt)
 
-	raw, err := client.GetVendorRaw(context.Background(), 42)
+	raw, _, err := client.GetVendorRaw(context.Background(), 42)
 	if err != nil {
 		t.Fatalf("GetVendorRaw: %v", err)
 	}
@@ -156,6 +155,7 @@ func TestGetVendorRaw_Success(t *testing.T) {
 }
 
 // U4: GetVendorRaw on 404 returns *APIError{Code: APIErrorNotFound}.
+// M55: GetVendorRaw(ctx, id) -> ([]byte, http.Header, error) に更新。
 func TestGetVendorRaw_NotFound(t *testing.T) {
 	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
 		return &http.Response{
@@ -166,7 +166,7 @@ func TestGetVendorRaw_NotFound(t *testing.T) {
 	})
 	client := newVendorsMockClient(rt)
 
-	_, err := client.GetVendorRaw(context.Background(), 99)
+	_, _, err := client.GetVendorRaw(context.Background(), 99)
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}
@@ -179,32 +179,31 @@ func TestGetVendorRaw_NotFound(t *testing.T) {
 	}
 }
 
-// U5: SearchVendorsRaw sends both parameters (Name, UpdatedAtFrom) in the
-// query. VendorSearchParams has 2 fields — fewer than M15's VendorContactSearchParams
-// (4 fields). This test ensures both query params are correctly encoded.
-func TestSearchVendorsRaw_QueryParams(t *testing.T) {
+// U5: ListVendorsRaw with NameCont sends name_cont in the query.
+// M55: VendorListOptions{NameCont: "keyword"} に更新（Ransack 準拠）。
+func TestListVendorsRaw_NameCont(t *testing.T) {
 	page1 := `[{"id":7,"name":"keyword商事","code":"V007","memo":"","updated_at":"2024-02-01T00:00:00+09:00","created_at":"2024-02-01T00:00:00+09:00"}]`
-	var observedName, observedUpdatedFrom string
+	var observedNameCont, observedUpdatedGteq string
 	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
-		observedName = r.URL.Query().Get("name")
-		observedUpdatedFrom = r.URL.Query().Get("updated_at_from")
+		observedNameCont = r.URL.Query().Get("name_cont")
+		observedUpdatedGteq = r.URL.Query().Get("updated_at_gteq")
 		return jsonResp(page1), nil
 	})
 	client := newVendorsMockClient(rt)
 
-	raw, err := client.SearchVendorsRaw(context.Background(), boardapi.VendorSearchParams{
-		Name:          "keyword",
-		UpdatedAtFrom: "2024-01-01T00:00:00+09:00",
+	raw, _, err := client.ListVendorsRaw(context.Background(), boardapi.VendorListOptions{
+		NameCont:      "keyword",
+		UpdatedAtGteq: "2024-01-01 00:00:00",
 	})
 	if err != nil {
-		t.Fatalf("SearchVendorsRaw: %v", err)
+		t.Fatalf("ListVendorsRaw: %v", err)
 	}
 
-	if observedName != "keyword" {
-		t.Errorf("name = %q, want %q", observedName, "keyword")
+	if observedNameCont != "keyword" {
+		t.Errorf("name_cont = %q, want %q", observedNameCont, "keyword")
 	}
-	if observedUpdatedFrom != "2024-01-01T00:00:00+09:00" {
-		t.Errorf("updated_at_from = %q, want %q", observedUpdatedFrom, "2024-01-01T00:00:00+09:00")
+	if observedUpdatedGteq != "2024-01-01 00:00:00" {
+		t.Errorf("updated_at_gteq = %q, want %q", observedUpdatedGteq, "2024-01-01 00:00:00")
 	}
 
 	var arr []map[string]any

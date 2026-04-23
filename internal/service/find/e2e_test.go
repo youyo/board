@@ -856,9 +856,9 @@ func TestE2E_FindInvoice_ByID_Strict(t *testing.T) {
 	ctx := context.Background()
 
 	// per_page=1 で先頭 1 件だけ取得（全件 pagination を避ける）
-	page, err := api.ListInvoicesPage(ctx, 1, 1)
+	page, err := api.ListInvoices(ctx, boardapi.InvoiceListOptions{PerPage: 1})
 	if err != nil {
-		t.Fatalf("ListInvoicesPage(1, 1): %v", err)
+		t.Fatalf("ListInvoices(PerPage=1): %v", err)
 	}
 	if len(page.Items) == 0 {
 		t.Skip("no invoices available")
@@ -1459,9 +1459,9 @@ func TestE2E_FindVendor_StrictEnrichment(t *testing.T) {
 	ctx := context.Background()
 
 	// 1. vendor 一覧取得 → 0 件ならスキップ
-	page, err := api.ListVendorsPage(ctx, 1, 1)
+	page, err := api.ListVendors(ctx, boardapi.VendorListOptions{PerPage: 1})
 	if err != nil {
-		t.Fatalf("ListVendorsPage: %v", err)
+		t.Fatalf("ListVendors(PerPage=1): %v", err)
 	}
 	if len(page.Items) == 0 {
 		t.Skip("no vendors; pending re-verification (vendor data not yet populated in this BOARD account)")
@@ -1487,9 +1487,9 @@ func TestE2E_FindVendor_StrictEnrichment(t *testing.T) {
 	}
 
 	// 4. 独立 raw fetch で Branches 件数・ID 集合を突合
-	branchesRaw, err := api.SearchVendorBranchesRaw(ctx, boardapi.VendorBranchSearchParams{VendorID: targetID})
+	branchesRaw, _, err := api.ListVendorBranchesRaw(ctx, boardapi.VendorBranchListOptions{PayeeIDEq: targetID})
 	if err != nil {
-		t.Fatalf("SearchVendorBranchesRaw(VendorID=%d): %v", targetID, err)
+		t.Fatalf("ListVendorBranchesRaw(PayeeIDEq=%d): %v", targetID, err)
 	}
 	var independentBranches []boardapi.VendorBranchEntity
 	if err := json.Unmarshal(branchesRaw, &independentBranches); err != nil {
@@ -1516,9 +1516,9 @@ func TestE2E_FindVendor_StrictEnrichment(t *testing.T) {
 	}
 
 	// 5. 独立 raw fetch で Contacts 件数・ID 集合を突合
-	contactsRaw, err := api.SearchVendorContactsRaw(ctx, boardapi.VendorContactSearchParams{VendorID: targetID})
+	contactsRaw, _, err := api.ListVendorContactsRaw(ctx, boardapi.VendorContactListOptions{PayeeIDEq: targetID})
 	if err != nil {
-		t.Fatalf("SearchVendorContactsRaw(VendorID=%d): %v", targetID, err)
+		t.Fatalf("ListVendorContactsRaw(PayeeIDEq=%d): %v", targetID, err)
 	}
 	var independentContacts []boardapi.VendorContactEntity
 	if err := json.Unmarshal(contactsRaw, &independentContacts); err != nil {
@@ -1568,9 +1568,9 @@ func TestE2E_FindPurchaseOrder_ByID_Strict(t *testing.T) {
 	ctx := context.Background()
 
 	// 1 件取得 → 0 件ならスキップ
-	page, err := api.ListPurchaseOrdersPage(ctx, 1, 1)
+	page, err := api.ListPurchaseOrders(ctx, boardapi.PurchaseOrderListOptions{PerPage: 1})
 	if err != nil {
-		t.Fatalf("ListPurchaseOrdersPage: %v", err)
+		t.Fatalf("ListPurchaseOrders(PerPage=1): %v", err)
 	}
 	if len(page.Items) == 0 {
 		t.Skip("no purchase_orders; pending re-verification (purchase_order data not yet populated in this BOARD account)")
@@ -1640,9 +1640,9 @@ func TestE2E_FindPurchaseOrder_ByText_Strict(t *testing.T) {
 	ctx := context.Background()
 
 	// 1 件取得 → 0 件ならスキップ
-	page, err := api.ListPurchaseOrdersPage(ctx, 1, 1)
+	page, err := api.ListPurchaseOrders(ctx, boardapi.PurchaseOrderListOptions{PerPage: 1})
 	if err != nil {
-		t.Fatalf("ListPurchaseOrdersPage: %v", err)
+		t.Fatalf("ListPurchaseOrders(PerPage=1): %v", err)
 	}
 	if len(page.Items) == 0 {
 		t.Skip("no purchase_orders; pending re-verification")
@@ -1684,9 +1684,9 @@ func TestE2E_FindPurchaseOrder_ByStatus_Strict(t *testing.T) {
 	ctx := context.Background()
 
 	// 5 件取得して status を discovery する
-	page, err := api.ListPurchaseOrdersPage(ctx, 1, 5)
+	page, err := api.ListPurchaseOrders(ctx, boardapi.PurchaseOrderListOptions{PerPage: 5})
 	if err != nil {
-		t.Fatalf("ListPurchaseOrdersPage: %v", err)
+		t.Fatalf("ListPurchaseOrders(PerPage=5): %v", err)
 	}
 	if len(page.Items) == 0 {
 		t.Skip("no purchase_orders; pending re-verification")
@@ -1738,9 +1738,9 @@ func TestE2E_FindPayment_ByID_Strict(t *testing.T) {
 	ctx := context.Background()
 
 	// 1 件取得 → 0 件ならスキップ
-	page, err := api.ListPaymentsPage(ctx, 1, 1)
+	page, err := api.ListPayments(ctx, boardapi.PaymentListOptions{PerPage: 1})
 	if err != nil {
-		t.Fatalf("ListPaymentsPage: %v", err)
+		t.Fatalf("ListPayments(PerPage=1): %v", err)
 	}
 	if len(page.Items) == 0 {
 		t.Skip("no payments; pending re-verification (payment data not yet populated in this BOARD account)")
@@ -1798,9 +1798,9 @@ func TestE2E_FindPayment_ByText_Strict(t *testing.T) {
 	ctx := context.Background()
 
 	// 1 件取得 → 0 件ならスキップ
-	page, err := api.ListPaymentsPage(ctx, 1, 1)
+	page, err := api.ListPayments(ctx, boardapi.PaymentListOptions{PerPage: 1})
 	if err != nil {
-		t.Fatalf("ListPaymentsPage: %v", err)
+		t.Fatalf("ListPayments(PerPage=1): %v", err)
 	}
 	if len(page.Items) == 0 {
 		t.Skip("no payments; pending re-verification")
@@ -1841,9 +1841,9 @@ func TestE2E_FindPayment_ByStatus_Strict(t *testing.T) {
 	ctx := context.Background()
 
 	// 5 件取得して status を discovery する
-	page, err := api.ListPaymentsPage(ctx, 1, 5)
+	page, err := api.ListPayments(ctx, boardapi.PaymentListOptions{PerPage: 5})
 	if err != nil {
-		t.Fatalf("ListPaymentsPage: %v", err)
+		t.Fatalf("ListPayments(PerPage=5): %v", err)
 	}
 	if len(page.Items) == 0 {
 		t.Skip("no payments; pending re-verification")

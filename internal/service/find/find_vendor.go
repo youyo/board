@@ -29,14 +29,14 @@ func (s *Service) FindVendor(ctx context.Context, q FindVendorQuery) ([]VendorRe
 		vendors = []boardapi.VendorEntity{*v}
 
 	case q.Name != "":
-		result, err := s.vendors.Search(ctx, boardapi.VendorSearchParams{Name: q.Name}, opts)
+		result, err := s.vendors.Search(ctx, boardapi.VendorListOptions{NameCont: q.Name}, opts)
 		if err != nil {
 			return nil, err
 		}
 		vendors = result
 
 	case q.Text != "":
-		all, err := s.vendors.List(ctx, opts)
+		all, err := s.vendors.ListEntities(ctx, opts, boardapi.VendorListOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -66,12 +66,12 @@ func (s *Service) FindVendor(ctx context.Context, q FindVendorQuery) ([]VendorRe
 
 // resolveVendorDetails fetches branches and contacts for a single vendor.
 func (s *Service) resolveVendorDetails(ctx context.Context, vendor boardapi.VendorEntity, opts repository.ReadOptions) (VendorResult, error) {
-	branches, err := s.vendorBranches.Search(ctx, boardapi.VendorBranchSearchParams{VendorID: vendor.ID}, opts)
+	branches, err := s.vendorBranches.Search(ctx, boardapi.VendorBranchListOptions{PayeeIDEq: vendor.ID}, opts)
 	if err != nil {
 		return VendorResult{}, err
 	}
 
-	contacts, err := s.vendorContacts.Search(ctx, boardapi.VendorContactSearchParams{VendorID: vendor.ID}, opts)
+	contacts, err := s.vendorContacts.Search(ctx, boardapi.VendorContactListOptions{PayeeIDEq: vendor.ID}, opts)
 	if err != nil {
 		return VendorResult{}, err
 	}
