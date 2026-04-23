@@ -57,7 +57,8 @@ List/Search は実装しない。Get のみ。
 - `GetDelivery(ctx, id, opts) (*boardapi.ItemResult[DeliveryEntity], error)` に刷新
 - `GetReceipt(ctx, id, opts) (*boardapi.ItemResult[ReceiptEntity], error)` に刷新
 - 内部で repository.GetByDocumentID を呼び、`*ItemResult{Item: entity}` にラップ
-- キャッシュヒット時は ItemMeta がゼロ値になる（許容）
+- repository 層が `*Entity` を返すため、キャッシュヒット・ミスに関わらず ItemMeta/Headers は常にゼロ値になる（設計上許容）
+- boardapi.Client を直接呼ぶ E2E テスト経由の場合のみ ItemMeta/Headers が設定される
 
 ### cli 層
 
@@ -71,6 +72,7 @@ List/Search は実装しない。Get のみ。
 - `e2e_{estimates,orders,deliveries,receipts}_test.go`: `GetXRaw` 呼び出しを 2 変数 → 3 変数に変更
 - `service/find/e2e_test.go`: `GetOrderRaw`, `GetDeliveryRaw`, `GetReceiptRaw` の呼び出しを更新
 - `estimates_m53_test.go` 新設（U1-U5: GetEstimate, GetEstimateRaw, GetOrder, GetDelivery, GetReceipt の新シグネチャ検証）
+- `e2e_{estimates,orders,deliveries,receipts}_m53_test.go` 新設（M53 E2E: ItemResult + Meta + Headers の動作確認）
 
 ## 成功基準（達成確認）
 
@@ -86,7 +88,8 @@ List/Search は実装しない。Get のみ。
 - `internal/boardapi/orders.go` — GetOrder / GetOrderRaw 刷新
 - `internal/boardapi/deliveries.go` — GetDelivery / GetDeliveryRaw 刷新
 - `internal/boardapi/receipts.go` — GetReceipt / GetReceiptRaw 刷新
-- `internal/boardapi/estimates_m53_test.go` — M53 ユニットテスト
+- `internal/boardapi/estimates_m53_test.go` — M53 ユニットテスト（U1-U5）
+- `internal/boardapi/e2e_{estimates,orders,deliveries,receipts}_m53_test.go` — M53 E2E テスト（ItemResult + Meta + Headers 検証）
 - `internal/repository/{estimates,orders,deliveries,receipts}.go` — .Item 展開追従
 - `internal/service/api/{estimates,orders,deliveries,receipts}.go` — ItemResult 返却に刷新
 - `internal/cli/api_{estimates,orders,deliveries,receipts}.go` — show-meta フラグ追加
