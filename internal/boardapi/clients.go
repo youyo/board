@@ -71,32 +71,32 @@ type ClientSearchParams struct {
 }
 
 // ListClients retrieves all customers.
-// Pagination is automatically handled by ListAll.
-func (c *Client) ListClients(ctx context.Context) ([]ClientEntity, error) {
+// Pagination is automatically handled by ListAllWithResult; metadata (total
+// count, page, rate limits, ETag) is surfaced via the returned *ListResult.
+// This is the M49 pilot usage of the ListResult / QueryBuilder pipeline; the
+// remaining 21 resources will migrate in M50+.
+func (c *Client) ListClients(ctx context.Context) (*ListResult[ClientEntity], error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/clients", nil)
 		if err != nil {
 			return nil, err
 		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		req.URL.RawQuery = q.Encode()
+		req.URL.RawQuery = NewQueryBuilder().Page(page, perPage).Encode()
 		return req, nil
 	}
-	items, err := c.ListAll(ctx, makeReq)
+	raw, err := c.ListAllWithResult(ctx, makeReq)
 	if err != nil {
 		return nil, err
 	}
-	result := make([]ClientEntity, 0, len(items))
-	for _, raw := range items {
+	items := make([]ClientEntity, 0, len(raw.Items))
+	for _, b := range raw.Items {
 		var x ClientEntity
-		if err := json.Unmarshal(raw, &x); err != nil {
+		if err := json.Unmarshal(b, &x); err != nil {
 			return nil, &APIError{Code: APIErrorUnknown, Message: "ListClients: unmarshal: " + err.Error()}
 		}
-		result = append(result, x)
+		items = append(items, x)
 	}
-	return result, nil
+	return &ListResult[ClientEntity]{Items: items, Meta: raw.Meta, Headers: raw.Headers}, nil
 }
 
 // GetClient retrieves the customer with the specified ID.
@@ -117,8 +117,12 @@ func (c *Client) GetClient(ctx context.Context, id int) (*ClientEntity, error) {
 }
 
 // SearchClients searches customers with the given conditions.
-// Pagination is automatically handled by ListAll.
-func (c *Client) SearchClients(ctx context.Context, params ClientSearchParams) ([]ClientEntity, error) {
+// Pagination is automatically handled by ListAllWithResult.
+//
+// NOTE: Parameter names (name / updated_at_from) are preserved from the
+// pre-M49 contract. The Ransack-compliant parameter migration (name_cont /
+// updated_at_gteq / response_group, etc.) lands in M50.
+func (c *Client) SearchClients(ctx context.Context, params ClientSearchParams) (*ListResult[ClientEntity], error) {
 	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/clients", nil)
 		if err != nil {
@@ -136,19 +140,19 @@ func (c *Client) SearchClients(ctx context.Context, params ClientSearchParams) (
 		req.URL.RawQuery = q.Encode()
 		return req, nil
 	}
-	items, err := c.ListAll(ctx, makeReq)
+	raw, err := c.ListAllWithResult(ctx, makeReq)
 	if err != nil {
 		return nil, err
 	}
-	result := make([]ClientEntity, 0, len(items))
-	for _, raw := range items {
+	items := make([]ClientEntity, 0, len(raw.Items))
+	for _, b := range raw.Items {
 		var x ClientEntity
-		if err := json.Unmarshal(raw, &x); err != nil {
+		if err := json.Unmarshal(b, &x); err != nil {
 			return nil, &APIError{Code: APIErrorUnknown, Message: "SearchClients: unmarshal: " + err.Error()}
 		}
-		result = append(result, x)
+		items = append(items, x)
 	}
-	return result, nil
+	return &ListResult[ClientEntity]{Items: items, Meta: raw.Meta, Headers: raw.Headers}, nil
 }
 
 // ListClientsPage retrieves a single page of customers.

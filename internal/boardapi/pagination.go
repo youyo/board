@@ -77,6 +77,12 @@ func ListPage[T any](c *Client, ctx context.Context, makeReq PagedRequest, page,
 // ListAll fetches all pages and returns []json.RawMessage.
 // Each element corresponds to one element in the top-level JSON array of the API response.
 // End condition: number of items in response < perPage.
+//
+// Deprecated: Prefer ListAllWithResult, which returns both items and the final
+// page's response metadata (X-Total-Count / Rate Limit / ETag / Last-Modified).
+// ListAll is retained for M49 backward compatibility with the 21 resources not
+// yet migrated to ListResult[T]; individual resource migrations happen in
+// M50-M56 and the legacy helper is scheduled for removal in M57.
 func (c *Client) ListAll(ctx context.Context, makeReq PagedRequest, opts ...ListAllOption) ([]json.RawMessage, error) {
 	cfg := &listAllConfig{perPage: defaultPerPage}
 	for _, o := range opts {
@@ -116,4 +122,59 @@ func (c *Client) ListAll(ctx context.Context, makeReq PagedRequest, opts ...List
 		}
 	}
 	return all, nil
+}
+
+// ListAllWithResult fetches all pages and returns a *ListResult[json.RawMessage]
+// whose Meta and Headers are extracted from the FINAL page's HTTP response.
+// Callers typically unmarshal each json.RawMessage into a concrete entity and
+// wrap the result in ListResult[Entity] (see boardapi.ListClients for the
+// canonical example introduced by M49).
+//
+// End condition: number of items in response < perPage. ctx cancellation is
+// honoured at each page boundary.
+func (c *Client) ListAllWithResult(ctx context.Context, makeReq PagedRequest, opts ...ListAllOption) (*ListResult[json.RawMessage], error) {
+	cfg := &listAllConfig{perPage: defaultPerPage}
+	for _, o := range opts {
+		o(cfg)
+	}
+
+	var all []json.RawMessage
+	var lastHeaders http.Header
+	for page := 1; ; page++ {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
+
+		req, err := makeReq(ctx, page, cfg.perPage)
+		if err != nil {
+			return nil, err
+		}
+
+		body, headers, err := c.DoWithRetryFull(req)
+		if err != nil {
+			return nil, err
+		}
+		lastHeaders = headers
+
+		var items []json.RawMessage
+		if err := json.Unmarshal(body, &items); err != nil {
+			return nil, &APIError{
+				Code:    APIErrorUnknown,
+				Message: "ListAllWithResult: failed to unmarshal page response: " + err.Error(),
+			}
+		}
+
+		all = append(all, items...)
+
+		if len(items) < cfg.perPage {
+			break // last page
+		}
+	}
+	return &ListResult[json.RawMessage]{
+		Items:   all,
+		Meta:    parseListMeta(lastHeaders),
+		Headers: lastHeaders,
+	}, nil
 }

@@ -121,20 +121,20 @@ type clientsFetcher struct {
 func (f *clientsFetcher) ResourceName() string { return "clients" }
 
 func (f *clientsFetcher) ListAll(ctx context.Context) ([]json.RawMessage, error) {
-	entities, err := f.api.ListClients(ctx)
+	result, err := f.api.ListClients(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return entitiesToRaw(entities)
+	return entitiesToRaw(result.Items)
 }
 
 func (f *clientsFetcher) ListUpdatedSince(ctx context.Context, since string) ([]json.RawMessage, error) {
 	params := boardapi.ClientSearchParams{UpdatedAtFrom: since}
-	entities, err := f.api.SearchClients(ctx, params)
+	result, err := f.api.SearchClients(ctx, params)
 	if err != nil {
 		return nil, err
 	}
-	return entitiesToRaw(entities)
+	return entitiesToRaw(result.Items)
 }
 
 // --- client_branches Fetcher ---

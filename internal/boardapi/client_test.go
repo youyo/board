@@ -1180,14 +1180,14 @@ func TestListClients_TwoPages(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(clients) != 2 {
-		t.Errorf("want 2 clients, got %d", len(clients))
+	if len(clients.Items) != 2 {
+		t.Errorf("want 2 clients, got %d", len(clients.Items))
 	}
-	if clients[0].ID != 1 || clients[0].Name != "Client A" {
-		t.Errorf("clients[0]: got %+v", clients[0])
+	if clients.Items[0].ID != 1 || clients.Items[0].Name != "Client A" {
+		t.Errorf("clients[0]: got %+v", clients.Items[0])
 	}
-	if clients[1].ID != 2 || clients[1].Name != "Client B" {
-		t.Errorf("clients[1]: got %+v", clients[1])
+	if clients.Items[1].ID != 2 || clients.Items[1].Name != "Client B" {
+		t.Errorf("clients[1]: got %+v", clients.Items[1])
 	}
 }
 
@@ -1288,8 +1288,8 @@ func TestSearchClients_WithName(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result) != 1 {
-		t.Errorf("want 1 client, got %d", len(result))
+	if len(result.Items) != 1 {
+		t.Errorf("want 1 client, got %d", len(result.Items))
 	}
 	if gotName != "test" {
 		t.Errorf("name param: want %q, got %q", "test", gotName)
@@ -1310,8 +1310,8 @@ func TestSearchClients_EmptyResult(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result) != 0 {
-		t.Errorf("want 0 clients, got %d", len(result))
+	if len(result.Items) != 0 {
+		t.Errorf("want 0 clients, got %d", len(result.Items))
 	}
 }
 
