@@ -34,9 +34,9 @@ Phase A〜K（48 M）でエンティティ準拠とリリースインフラが�
    - BOARD API 側の存在有無自体が未検証
 
 ## Current Focus
-- **ステータス**: M53 完了、M54 待機
-- **直近の完了**: M53（ドキュメント系 4 件 estimates/orders/deliveries/receipts、2026-04-24）
-- **次のアクション**: M54（invoices / purchase_orders / payments）着手
+- **ステータス**: M55 完了、M56 待機
+- **直近の完了**: M55（vendors / vendor_branches / vendor_contacts、2026-04-24）
+- **次のアクション**: M56（users / groups）着手
 
 ## Progress
 
@@ -100,16 +100,22 @@ Phase A〜K（48 M）でエンティティ準拠とリリースインフラが�
 - [x] `go test -count=1 ./...` / `go vet ./...` / `go vet -tags e2e ./...` 全 Green
 - 📄 詳細: plans/board-phase-l-m53-documents.md
 
-### M54 (L-06): 取引系 3 件（invoices, purchase_orders, payments）⏳
-- [ ] invoices: client_id_eq, project_id_eq, status_in[] 系
-- [ ] purchase_orders (/v1/expenditures): vendor_id_eq, project_id_eq, status_in[]
-- [ ] payments (/v1/expenditure_payments): vendor_id_eq, purchase_order_id_eq
-- 📄 詳細: 着手時に plans/board-phase-l-m54-transactions.md として生成
+### M54 (L-06): 取引系 3 件（invoices, purchase_orders, payments）✅
+- [x] `InvoiceListOptions` / `PurchaseOrderListOptions` / `PaymentListOptions` 新設（client_id_eq, project_id_eq, vendor_id_eq, status_in[], purchase_order_id_eq 等）
+- [x] `ListX(ctx, XListOptions) (*ListResult[XEntity], error)` に刷新、旧 SearchParams deprecated 残置
+- [x] repository / service / find / cli 層の追従（32 ファイル変更）
+- [x] `go test -count=1 ./...` / `go vet ./...` 全 Green
+- [x] E2E テスト 3 件追加（//go:build e2e）
 
-### M55 (L-07): ベンダー系 3 件 ⏳
-- [ ] vendors (/v1/payees), vendor_branches (/v1/payee_branches), vendor_contacts (/v1/payee_contacts)
-- [ ] clients 群と同一構造を期待（name_cont, vendor_id_eq 等）
-- 📄 詳細: 着手時に plans/board-phase-l-m55-vendor-side.md として生成
+### M55 (L-07): ベンダー系 3 件 ✅
+- [x] vendors (/v1/payees), vendor_branches (/v1/payee_branches), vendor_contacts (/v1/payee_contacts)
+- [x] `VendorListOptions` / `VendorBranchListOptions` / `VendorContactListOptions` 新設（PayeeIDEq, NameCont, UpdatedAtGteq/Lteq, IncludeArchiveFlg 等）
+- [x] `ListX(ctx, XListOptions) (*ListResult[XEntity], error)` に刷新、旧 SearchXRaw/SearchXParams 削除
+- [x] repository: vendor_branches/vendor_contacts を空ファイルから完全実装、cache bypass パターン適用
+- [x] fetcher: ListUpdatedSince に UpdatedAtGteq を活用するよう修正
+- [x] CLI: search サブコマンド廃止、list に Ransack フラグ + --show-meta 追加
+- [x] e2e テスト: 旧 SearchXRaw/ListXPage/WithPerPage を新 API に一括修正（M54 取り残し含む）
+- [x] `go test -count=1 ./...` / `go vet ./...` / `go vet -tags e2e ./...` 全 Green
 
 ### M56 (L-08): マスタ系 7 件一括 ⏳
 - [ ] users, groups, payment_terms, project_types, purchase_types, accounting_types, document_send_channels
