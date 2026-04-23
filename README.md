@@ -72,12 +72,14 @@ board configure path
 
 ### `board api`
 
-Low-level access to the BOARD API. Each resource supports `list`, `get`, and `search`.
+Low-level access to the BOARD API. Each resource supports `list` and `get`.
 
 ```sh
 board api <resource> list
+board api <resource> list --name-cont "Acme"           # Ransack-style filter
+board api <resource> list --updated-at-gteq 2026-01-01 --show-meta
 board api <resource> get --id <ID>
-board api <resource> search [flags]
+board api <resource> get --id <ID> --show-meta         # include _meta (headers) in output
 ```
 
 **Available resources** (22):
@@ -138,7 +140,7 @@ board completion bash > /etc/bash_completion.d/board
 |------|---------|-------------|
 | `--profile`, `-p` | (current) | Profile name to use |
 | `--pretty` | false | Pretty-print JSON output |
-| `--limit` | 50 | Max results to return |
+| `--limit` | 0 (unlimited) | Max results to return (0 = no limit) |
 | `--refresh` | false | Force cache refresh before reading |
 | `--force-refresh` | false | Force full cache refresh |
 | `--version` | — | Print version |

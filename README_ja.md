@@ -72,12 +72,14 @@ board configure path
 
 ### `board api`
 
-BOARD API への低レベルアクセス。各リソースは `list`、`get`、`search` をサポート。
+BOARD API への低レベルアクセス。各リソースは `list` と `get` をサポート。
 
 ```sh
 board api <resource> list
+board api <resource> list --name-cont "エス"              # Ransack 風フィルタ
+board api <resource> list --updated-at-gteq 2026-01-01 --show-meta
 board api <resource> get --id <ID>
-board api <resource> search [flags]
+board api <resource> get --id <ID> --show-meta            # _meta（ヘッダー情報）を出力に含める
 ```
 
 **利用可能なリソース**（22 種）:
@@ -138,7 +140,7 @@ board completion bash > /etc/bash_completion.d/board
 |--------|-----------|------|
 | `--profile`、`-p` | （現在のプロファイル） | 使用するプロファイル名 |
 | `--pretty` | false | JSON を整形して出力 |
-| `--limit` | 50 | 返す最大件数 |
+| `--limit` | 0（無制限） | 返す最大件数（0 = 制限なし） |
 | `--refresh` | false | 読み込み前にキャッシュをリフレッシュ |
 | `--force-refresh` | false | キャッシュを強制的に全件リフレッシュ |
 | `--version` | — | バージョンを表示 |

@@ -307,11 +307,11 @@ func (c *Client) ListProjectsRaw(ctx context.Context, opts ...ListAllOption) ([]
 		req.URL.RawQuery = q.Encode()
 		return req, nil
 	}
-	items, err := c.ListAll(ctx, makeReq, opts...)
+	result, err := c.ListAllWithResult(ctx, makeReq, opts...)
 	if err != nil {
 		return nil, err
 	}
-	out, err := json.Marshal(items)
+	out, err := json.Marshal(result.Items)
 	if err != nil {
 		return nil, &APIError{Code: APIErrorUnknown, Message: "ListProjectsRaw: marshal aggregate: " + err.Error()}
 	}

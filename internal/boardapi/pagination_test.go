@@ -3,6 +3,7 @@ package boardapi_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -206,6 +207,162 @@ func TestListAllWithResult_StopsOnShortPage(t *testing.T) {
 	}
 	if _, ok := first["only"]; !ok {
 		t.Errorf("want key 'only' in first item, got %v", first)
+	}
+}
+
+// U13: ListAllWithResult — 空配列レスポンスで 0 件を返す。
+func TestListAllWithResult_EmptyResponse(t *testing.T) {
+	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
+		return jsonRespWithHeaders(`[]`, http.Header{"X-Total-Count": {"0"}}), nil
+	})
+	client := newPaginationMockClient(rt)
+	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+		req, err := client.NewRequest(ctx, http.MethodGet, "/v1/whatever", nil)
+		if err != nil {
+			return nil, err
+		}
+		return req, nil
+	}
+	result, err := client.ListAllWithResult(context.Background(), makeReq)
+	if err != nil {
+		t.Fatalf("ListAllWithResult: %v", err)
+	}
+	if len(result.Items) != 0 {
+		t.Errorf("Items count = %d, want 0", len(result.Items))
+	}
+}
+
+// U14: ListAllWithResult — ExactMultiple: per_page ぴったり返す → 空ページで終了。
+func TestListAllWithResult_ExactMultiple(t *testing.T) {
+	callCount := 0
+	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
+		callCount++
+		if callCount == 1 {
+			return jsonRespWithHeaders(`[{"id":1},{"id":2},{"id":3}]`, http.Header{"X-Total-Count": {"3"}}), nil
+		}
+		// 2 回目: 空配列
+		return jsonRespWithHeaders(`[]`, http.Header{"X-Total-Count": {"3"}}), nil
+	})
+	client := newPaginationMockClient(rt)
+	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+		req, err := client.NewRequest(ctx, http.MethodGet, "/v1/whatever", nil)
+		if err != nil {
+			return nil, err
+		}
+		q := req.URL.Query()
+		q.Set("page", jitoa(page))
+		q.Set("per_page", jitoa(perPage))
+		req.URL.RawQuery = q.Encode()
+		return req, nil
+	}
+	result, err := client.ListAllWithResult(context.Background(), makeReq, boardapi.WithPerPage(3))
+	if err != nil {
+		t.Fatalf("ListAllWithResult: %v", err)
+	}
+	if len(result.Items) != 3 {
+		t.Errorf("Items count = %d, want 3", len(result.Items))
+	}
+	if callCount != 2 {
+		t.Errorf("callCount = %d, want 2", callCount)
+	}
+}
+
+// U15: ListAllWithResult — per_page クエリパラメータが正しく渡される。
+func TestListAllWithResult_PerPageQueryParam(t *testing.T) {
+	var gotPerPage string
+	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
+		gotPerPage = r.URL.Query().Get("per_page")
+		return jsonRespWithHeaders(`[{"id":1}]`, http.Header{}), nil
+	})
+	client := newPaginationMockClient(rt)
+	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+		req, err := client.NewRequest(ctx, http.MethodGet, "/v1/whatever", nil)
+		if err != nil {
+			return nil, err
+		}
+		q := req.URL.Query()
+		q.Set("page", jitoa(page))
+		q.Set("per_page", jitoa(perPage))
+		req.URL.RawQuery = q.Encode()
+		return req, nil
+	}
+	_, err := client.ListAllWithResult(context.Background(), makeReq, boardapi.WithPerPage(50))
+	if err != nil {
+		t.Fatalf("ListAllWithResult: %v", err)
+	}
+	if gotPerPage != "50" {
+		t.Errorf("per_page = %q, want %q", gotPerPage, "50")
+	}
+}
+
+// U16: ListAllWithResult — page パラメータが 1, 2, 3 ... と正しくインクリメントされる。
+func TestListAllWithResult_PageQueryParam(t *testing.T) {
+	var gotPages []string
+	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
+		page := r.URL.Query().Get("page")
+		gotPages = append(gotPages, page)
+		if len(gotPages) < 3 {
+			// 3 件/ページ × 3 ページ
+			return jsonRespWithHeaders(`[{"id":1},{"id":2},{"id":3}]`, http.Header{}), nil
+		}
+		return jsonRespWithHeaders(`[{"id":7}]`, http.Header{}), nil
+	})
+	client := newPaginationMockClient(rt)
+	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+		req, err := client.NewRequest(ctx, http.MethodGet, "/v1/whatever", nil)
+		if err != nil {
+			return nil, err
+		}
+		q := req.URL.Query()
+		q.Set("page", jitoa(page))
+		q.Set("per_page", jitoa(perPage))
+		req.URL.RawQuery = q.Encode()
+		return req, nil
+	}
+	_, err := client.ListAllWithResult(context.Background(), makeReq, boardapi.WithPerPage(3))
+	if err != nil {
+		t.Fatalf("ListAllWithResult: %v", err)
+	}
+	wantPages := []string{"1", "2", "3"}
+	for i, want := range wantPages {
+		if i >= len(gotPages) || gotPages[i] != want {
+			t.Errorf("gotPages[%d] = %q, want %q", i, gotPages[i], want)
+		}
+	}
+}
+
+// U17: ListAllWithResult — 途中ページでエラーが起きたら即座に返す。
+func TestListAllWithResult_ErrorPropagation(t *testing.T) {
+	callCount := 0
+	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
+		callCount++
+		if callCount == 1 {
+			return jsonRespWithHeaders(`[{"id":1},{"id":2}]`, http.Header{}), nil
+		}
+		return &http.Response{
+			StatusCode: 500,
+			Header:     http.Header{"Content-Type": {"application/json"}},
+			Body:       io.NopCloser(strings.NewReader(`{"message":"server error"}`)),
+		}, nil
+	})
+	client := newPaginationMockClient(rt)
+	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+		req, err := client.NewRequest(ctx, http.MethodGet, "/v1/whatever", nil)
+		if err != nil {
+			return nil, err
+		}
+		return req, nil
+	}
+	_, err := client.ListAllWithResult(context.Background(), makeReq, boardapi.WithPerPage(2))
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	var apiErr *boardapi.APIError
+	if !errors.As(err, &apiErr) {
+		t.Fatalf("expected *APIError, got %T: %v", err, err)
+	}
+	if apiErr.Code != boardapi.APIErrorTemporary {
+		t.Errorf("Code = %q, want %q", apiErr.Code, boardapi.APIErrorTemporary)
 	}
 }
 

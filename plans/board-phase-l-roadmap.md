@@ -34,9 +34,9 @@ Phase A〜K（48 M）でエンティティ準拠とリリースインフラが�
    - BOARD API 側の存在有無自体が未検証
 
 ## Current Focus
-- **ステータス**: M55 完了、M56 待機
-- **直近の完了**: M55（vendors / vendor_branches / vendor_contacts、2026-04-24）
-- **次のアクション**: M56（users / groups）着手
+- **ステータス**: M56 完了、M57 待機
+- **直近の完了**: M56（マスタ系 7 件一括、2026-04-24）
+- **次のアクション**: M57（仕上げ + v0.5.0 リリース準備）着手
 
 ## Progress
 
@@ -117,22 +117,24 @@ Phase A〜K（48 M）でエンティティ準拠とリリースインフラが�
 - [x] e2e テスト: 旧 SearchXRaw/ListXPage/WithPerPage を新 API に一括修正（M54 取り残し含む）
 - [x] `go test -count=1 ./...` / `go vet ./...` / `go vet -tags e2e ./...` 全 Green
 
-### M56 (L-08): マスタ系 7 件一括 ⏳
-- [ ] users, groups, payment_terms, project_types, purchase_types, accounting_types, document_send_channels
-- [ ] 共通 3 点セット（name_cont, updated_at_gteq/lteq, include_archive_flg）で統一想定
-- [ ] groups.go の SearchGroupsRaw 欠落を補完
-- 📄 詳細: 着手時に plans/board-phase-l-m56-masters.md として生成
+### M56 (L-08): マスタ系 7 件一括 ✅
+- [x] users, groups, payment_terms, project_types, purchase_types, accounting_types, document_send_channels
+- [x] `XListOptions` 新設（name_cont, updated_at_gteq/lteq, include_archive_flg の共通 3 点セット）
+- [x] `ListX(ctx, XListOptions) (*ListResult[XEntity], error)` に刷新、旧 SearchX/ListXPage 削除
+- [x] repository / service / find / cli 層の追従
+- [x] `go test -count=1 ./...` / `go vet ./...` 全 Green
+- 📄 commit: c7712c5
 
-### M57 (L-09): 仕上げ（追従集約 + 全体 E2E + v0.5.0 リリース準備）⏳
-- [ ] repository / service/api / cli 層の追従を最終集約
-- [ ] CLI 代表 flag 追加（`--name-cont`, `--updated-at-gteq`, `--response-group`, `--include-archive-flg`）
-- [ ] `internal/output/` の `_meta` フィールド仕上げ（`--show-meta` flag も検討）
-- [ ] 全 22 リソース per-batch E2E 実行（rate limit 遵守、M 単位分割）
-- [ ] StrictFieldDiff で未マップフィールド 0 の再確認
-- [ ] README / docs/api-reference.md 更新
-- [ ] CHANGELOG v0.5.0 破壊的変更案内（`board cache clear` 必須ガイド含む）
-- [ ] find 層ビルドが通る最小追従（Phase M の発射台）
-- 📄 詳細: 着手時に plans/board-phase-l-m57-finalize.md として生成
+### M57 (L-09): 仕上げ（追従集約 + v0.5.0 リリース準備）✅
+- [x] `PageResult[T]` / `ListPage` / `ListAll` 撤去（`ListAllWithResult` に完全移行）
+- [x] `parsePaginationHeaders` 撤去（`ListPage` 削除で不要化）
+- [x] `ListProjectsRaw` を `ListAllWithResult` に移行
+- [x] `TestListAll_*` を `TestListAllWithResult_*`（U13-U17）に移行し削除
+- [x] `golangci-lint run` 0 issues（SA1019 完全解消）
+- [x] CHANGELOG.md 新設（v0.5.0 破壊的変更案内 + `board cache clear` 必須ガイド含む）
+- [x] README / README_ja.md 更新（`search` コマンド廃止、Ransack 風フィルタ例示、`--limit` デフォルト修正）
+- [x] `go build ./...` / `go test -count=1 ./...` / `go vet ./...` 全 Green
+- 📄 commit: M57 仕上げ — 旧 PageResult/ListAll 撤去 + v0.5.0 リリース準備
 
 ## 依存関係
 
