@@ -26,6 +26,12 @@ func WithPerPage(n int) ListAllOption {
 }
 
 // PageResult holds a single page of results with pagination metadata.
+//
+// Deprecated: Prefer ListResult[T], which aggregates multi-page results and
+// carries a richer ListMeta (rate limits, ETag, Last-Modified). PageResult is
+// retained for the pre-M49 `--page` / `ListClientsPage` flow and is scheduled
+// for removal in M57 once all resources migrate to ListAllWithResult-backed
+// APIs.
 type PageResult[T any] struct {
 	Items      []T `json:"items"`
 	TotalCount int `json:"total_count"`
@@ -49,6 +55,10 @@ func parsePaginationHeaders(h http.Header) (totalCount, page, perPage int) {
 }
 
 // ListPage fetches a single page of results and returns a PageResult.
+//
+// Deprecated: Prefer ListAllWithResult (which returns ListResult[T] with full
+// metadata) or drive pagination explicitly through QueryBuilder. ListPage is
+// scheduled for removal in M57.
 func ListPage[T any](c *Client, ctx context.Context, makeReq PagedRequest, page, perPage int) (*PageResult[T], error) {
 	req, err := makeReq(ctx, page, perPage)
 	if err != nil {

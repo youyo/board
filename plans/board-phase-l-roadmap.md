@@ -44,7 +44,8 @@ Phase A〜K（48 M）でエンティティ準拠とリリースインフラが�
 - [x] `internal/boardapi/result.go` 新設（`ListResult[T]{Items, Meta, Headers}` / `ListMeta{TotalCount, Page, PerPage, RateLimit*, ETag, LastModified}`）
 - [x] `internal/boardapi/query.go` 新設（`QueryBuilder` ヘルパ: `_cont` / `_eq` / `_gteq` / `_lteq` / `_in[]` / bool / response_group）
 - [x] `ListAllWithResult` 新設（戻り値 `*ListResult[json.RawMessage]`、最終ページヘッダーを保持）
-- [x] 旧 `ListAll` / `PageResult[T]` は Deprecated コメント付きで残置（M57 で削除予定）
+- [x] 旧 `ListAll` / `PageResult[T]` / `ListPage` は Deprecated コメント付きで残置（M57 で削除予定）
+- [x] `error.go` 確認: 5xx → APIErrorTemporary マップ済、`Retry-After` も parseErrorWithHeader で抽出済
 - [x] `parseListMeta` / `parseItemMeta` 実装（X-Total-Count / X-Page / X-Per-Page / X-Ratelimit-* / ETag / Last-Modified / Retry-After）
 - [x] clients パイロット: `ListClients` / `SearchClients` を `*ListResult[ClientEntity]` に変更（repository/fetcher は `.Items` 展開で追従）
 - [x] ユニットテスト追加: QueryBuilder 14 種 + parseListMeta/parseItemMeta 5 種 + ListAllWithResult 3 種 + MarshalJSON 3 種

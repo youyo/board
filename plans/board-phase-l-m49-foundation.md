@@ -418,7 +418,8 @@ E2E テストは M49 では追加しない（M50 で初実測）。
   - `internal/service/api/clients.go`: 変更不要（repository が `[]ClientEntity` を返す既存 I/F を維持）
   - `internal/cli/api_clients.go`: 変更不要
   - `internal/boardapi/client_test.go`: 既存 T46 / T50 / T51 を `.Items` 参照に更新
-- [x] **Step 7 (Refactor)**: `ListAll` に `Deprecated:` コメント追加（M57 で削除予定）。`PageResult[T]` / `ListClientsPage` / repository.ListPage / service.ListClientsPage / CLI `--page` flag 群は M49 時点では温存（M57 で一括削除対象）
+- [x] **Step 7 (Refactor)**: `ListAll` / `PageResult[T]` / `ListPage` に `Deprecated:` コメント追加（M57 で一括削除予定）。`ListClientsPage` / repository.ListPage / service.ListClientsPage / CLI `--page` flag 群は M49 時点では温存（M57 で削除）
+- [x] **Step 7b**: `error.go` の 503 ハンドリング確認 — `ClassifyStatusCode` は `statusCode >= 500 && < 600` で `APIErrorTemporary` にマップ済み。`Retry-After` ヘッダーも `parseErrorWithHeader` で抽出済み（`APIError.RetryAfter` に格納）。追加対応不要。
 - [x] **Step 8**: `go build ./...` 成功、`go test -count=1 ./...` 全 Green、`go vet ./...` 0 警告、`golangci-lint run` 0 issues
 - [x] **Step 9**: roadmap 更新（M49 → 完了、Changelog 追記）
 
