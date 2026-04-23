@@ -34,9 +34,9 @@ Phase A〜K（48 M）でエンティティ準拠とリリースインフラが�
    - BOARD API 側の存在有無自体が未検証
 
 ## Current Focus
-- **ステータス**: M56 完了、M57 待機
-- **直近の完了**: M56（マスタ系 7 件一括、2026-04-24）
-- **次のアクション**: M57（仕上げ + v0.5.0 リリース準備）着手
+- **ステータス**: **Phase L 完走 ✅**（M49〜M57 全 9 M 完了、2026-04-24）
+- **直近の完了**: M57（旧 API 撤去 + CHANGELOG + README + docs/api-reference.md 更新）
+- **次のアクション**: v0.5.0 リリース実行 → Phase M（find 層仕上げ）へ
 
 ## Progress
 
@@ -44,7 +44,7 @@ Phase A〜K（48 M）でエンティティ準拠とリリースインフラが�
 - [x] `internal/boardapi/result.go` 新設（`ListResult[T]{Items, Meta, Headers}` / `ListMeta{TotalCount, Page, PerPage, RateLimit*, ETag, LastModified}`）
 - [x] `internal/boardapi/query.go` 新設（`QueryBuilder` ヘルパ: `_cont` / `_eq` / `_gteq` / `_lteq` / `_in[]` / bool / response_group）
 - [x] `ListAllWithResult` 新設（戻り値 `*ListResult[json.RawMessage]`、最終ページヘッダーを保持）
-- [x] 旧 `ListAll` / `PageResult[T]` / `ListPage` は Deprecated コメント付きで残置（M57 で削除予定）
+- [x] 旧 `ListAll` / `PageResult[T]` / `ListPage` は Deprecated コメント付きで残置（M57 で完全撤去済み）
 - [x] `error.go` 確認: 5xx → APIErrorTemporary マップ済、`Retry-After` も parseErrorWithHeader で抽出済
 - [x] `parseListMeta` / `parseItemMeta` 実装（X-Total-Count / X-Page / X-Per-Page / X-Ratelimit-* / ETag / Last-Modified / Retry-After）
 - [x] clients パイロット: `ListClients` / `SearchClients` を `*ListResult[ClientEntity]` に変更（repository/fetcher は `.Items` 展開で追従）
