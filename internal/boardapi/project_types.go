@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 )
 
 // ProjectTypeEntity is a BOARD API project type entity.
@@ -18,48 +17,77 @@ type ProjectTypeEntity struct {
 	CreatedAt string `json:"created_at"` // ISO 8601
 }
 
-// ProjectTypeSearchParams is the parameter for SearchProjectTypes.
-type ProjectTypeSearchParams struct {
-	Name          string
-	UpdatedAtFrom string
+// ProjectTypeListOptions は GET /v1/project_types のクエリパラメータ（Ransack スタイル）。
+// ゼロ値は API に送信しない。ProjectTypeListOptions{} はフィルタなしの全件取得を意味する。
+//
+// M56 で導入。旧 ProjectTypeSearchParams を置き換える破壊的変更。
+type ProjectTypeListOptions struct {
+	// 共通ページネーション（通常は ListAllWithResult が page を上書きする）
+	Page    int
+	PerPage int
+
+	// 全 List 共通
+	UpdatedAtGteq     string // "YYYY-MM-DD HH:MM:SS"
+	UpdatedAtLteq     string
+	IncludeArchiveFlg *bool // nil=送らない, true=1, false=0
+
+	// project_types 専用（Ransack 準拠）
+	NameCont string // 案件種別名部分一致（Ransack _cont）
 }
 
-// ListProjectTypes retrieves all project types.
-// Pagination is automatically handled by ListAll.
-func (c *Client) ListProjectTypes(ctx context.Context) ([]ProjectTypeEntity, error) {
-	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+// buildProjectTypesQuery は GET /v1/project_types の Ransack スタイルクエリ文字列を組み立てる。
+func buildProjectTypesQuery(opts ProjectTypeListOptions, page, perPage int) string {
+	return NewQueryBuilder().
+		Page(page, perPage).
+		StrCont("name", opts.NameCont).
+		DateGteq("updated_at", opts.UpdatedAtGteq).
+		DateLteq("updated_at", opts.UpdatedAtLteq).
+		Flg01("include_archive_flg", opts.IncludeArchiveFlg).
+		Encode()
+}
+
+// ListProjectTypes は与えられたオプションでフィルタした案件種別を取得する。
+// ページネーションは ListAllWithResult が内部で処理する。メタデータは
+// 返り値の *ListResult 経由で参照できる。
+//
+// フィルタなしの全件取得は ProjectTypeListOptions{} を渡す。
+func (c *Client) ListProjectTypes(ctx context.Context, opts ProjectTypeListOptions) (*ListResult[ProjectTypeEntity], error) {
+	perPage := opts.PerPage
+	makeReq := func(ctx context.Context, page, pp int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/project_types", nil)
 		if err != nil {
 			return nil, err
 		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		req.URL.RawQuery = q.Encode()
+		req.URL.RawQuery = buildProjectTypesQuery(opts, page, pp)
 		return req, nil
 	}
-	items, err := c.ListAll(ctx, makeReq)
+	var listOpts []ListAllOption
+	if perPage > 0 {
+		listOpts = append(listOpts, WithPerPage(perPage))
+	}
+	raw, err := c.ListAllWithResult(ctx, makeReq, listOpts...)
 	if err != nil {
 		return nil, err
 	}
-	result := make([]ProjectTypeEntity, 0, len(items))
-	for _, raw := range items {
+	items := make([]ProjectTypeEntity, 0, len(raw.Items))
+	for _, b := range raw.Items {
 		var x ProjectTypeEntity
-		if err := json.Unmarshal(raw, &x); err != nil {
+		if err := json.Unmarshal(b, &x); err != nil {
 			return nil, &APIError{Code: APIErrorUnknown, Message: "ListProjectTypes: unmarshal: " + err.Error()}
 		}
-		result = append(result, x)
+		items = append(items, x)
 	}
-	return result, nil
+	return &ListResult[ProjectTypeEntity]{Items: items, Meta: raw.Meta, Headers: raw.Headers}, nil
 }
 
-// GetProjectType retrieves the project type with the specified ID.
-func (c *Client) GetProjectType(ctx context.Context, id int) (*ProjectTypeEntity, error) {
+// GetProjectType は指定 ID の案件種別を取得する。
+// レスポンスメタデータ（ETag・レート制限・Last-Modified）は *ItemResult 経由で参照できる。
+func (c *Client) GetProjectType(ctx context.Context, id int) (*ItemResult[ProjectTypeEntity], error) {
 	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/project_types/%d", id), nil)
 	if err != nil {
 		return nil, err
 	}
-	body, err := c.DoWithRetry(req)
+	body, headers, err := c.DoWithRetryFull(req)
 	if err != nil {
 		return nil, err
 	}
@@ -67,132 +95,47 @@ func (c *Client) GetProjectType(ctx context.Context, id int) (*ProjectTypeEntity
 	if err := json.Unmarshal(body, &x); err != nil {
 		return nil, &APIError{Code: APIErrorUnknown, Message: "GetProjectType: unmarshal: " + err.Error()}
 	}
-	return &x, nil
+	return &ItemResult[ProjectTypeEntity]{
+		Item:    &x,
+		Meta:    parseItemMeta(headers),
+		Headers: headers,
+	}, nil
 }
 
-// SearchProjectTypes searches project types with the given conditions.
-// Pagination is automatically handled by ListAll.
-func (c *Client) SearchProjectTypes(ctx context.Context, params ProjectTypeSearchParams) ([]ProjectTypeEntity, error) {
-	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+// ListProjectTypesRaw は与えられたオプションでフィルタした案件種別の生 JSON 配列と
+// 最終ページのレスポンスヘッダーを返す。バイト列は BOARD API が返したものをそのまま保持するため、
+// E2E の strict field diff に使用できる。通常の呼び出しには ListProjectTypes を使うこと。
+func (c *Client) ListProjectTypesRaw(ctx context.Context, opts ProjectTypeListOptions) ([]byte, http.Header, error) {
+	perPage := opts.PerPage
+	makeReq := func(ctx context.Context, page, pp int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/project_types", nil)
 		if err != nil {
 			return nil, err
 		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		if params.Name != "" {
-			q.Set("name", params.Name)
-		}
-		if params.UpdatedAtFrom != "" {
-			q.Set("updated_at_from", params.UpdatedAtFrom)
-		}
-		req.URL.RawQuery = q.Encode()
+		req.URL.RawQuery = buildProjectTypesQuery(opts, page, pp)
 		return req, nil
 	}
-	items, err := c.ListAll(ctx, makeReq)
+	var listOpts []ListAllOption
+	if perPage > 0 {
+		listOpts = append(listOpts, WithPerPage(perPage))
+	}
+	raw, err := c.ListAllWithResult(ctx, makeReq, listOpts...)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	result := make([]ProjectTypeEntity, 0, len(items))
-	for _, raw := range items {
-		var x ProjectTypeEntity
-		if err := json.Unmarshal(raw, &x); err != nil {
-			return nil, &APIError{Code: APIErrorUnknown, Message: "SearchProjectTypes: unmarshal: " + err.Error()}
-		}
-		result = append(result, x)
+	out, err := json.Marshal(raw.Items)
+	if err != nil {
+		return nil, nil, &APIError{Code: APIErrorUnknown, Message: "ListProjectTypesRaw: marshal aggregate: " + err.Error()}
 	}
-	return result, nil
+	return out, raw.Headers, nil
 }
 
-// ListProjectTypesPage retrieves a single page of ProjectTypeEntity.
-func (c *Client) ListProjectTypesPage(ctx context.Context, page, perPage int) (*PageResult[ProjectTypeEntity], error) {
-	makeReq := func(ctx context.Context, p, pp int) (*http.Request, error) {
-		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/project_types", nil)
-		if err != nil {
-			return nil, err
-		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(p))
-		q.Set("per_page", strconv.Itoa(pp))
-		req.URL.RawQuery = q.Encode()
-		return req, nil
-	}
-	return ListPage[ProjectTypeEntity](c, ctx, makeReq, page, perPage)
-}
-
-// ListProjectTypesRaw retrieves all project types and returns the raw HTTP
-// response bodies merged across pages as a single JSON array.
-// Unlike ListProjectTypes, the returned bytes are byte-preserving: each
-// element JSON is exactly what the BOARD API emitted, enabling strict field
-// diff in E2E tests to detect keys that are not mapped to ProjectTypeEntity.
-//
-// Intended for E2E strict field diff; regular callers should use ListProjectTypes.
-func (c *Client) ListProjectTypesRaw(ctx context.Context, opts ...ListAllOption) ([]byte, error) {
-	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
-		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/project_types", nil)
-		if err != nil {
-			return nil, err
-		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		req.URL.RawQuery = q.Encode()
-		return req, nil
-	}
-	items, err := c.ListAll(ctx, makeReq, opts...)
-	if err != nil {
-		return nil, err
-	}
-	out, err := json.Marshal(items)
-	if err != nil {
-		return nil, &APIError{Code: APIErrorUnknown, Message: "ListProjectTypesRaw: marshal aggregate: " + err.Error()}
-	}
-	return out, nil
-}
-
-// GetProjectTypeRaw retrieves a single project type and returns the raw HTTP
-// response body byte-for-byte.
-//
-// Intended for E2E strict field diff; regular callers should use GetProjectType.
-func (c *Client) GetProjectTypeRaw(ctx context.Context, id int) ([]byte, error) {
+// GetProjectTypeRaw は指定 ID の案件種別の生 HTTP レスポンスボディとヘッダーを返す。
+// E2E の strict field diff に使用できる。通常の呼び出しには GetProjectType を使うこと。
+func (c *Client) GetProjectTypeRaw(ctx context.Context, id int) ([]byte, http.Header, error) {
 	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/project_types/%d", id), nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return c.DoWithRetry(req)
-}
-
-// SearchProjectTypesRaw retrieves project types matching the given search
-// parameters and returns the raw HTTP response bodies merged across pages as a
-// single JSON array. Same byte-preserving guarantee as ListProjectTypesRaw.
-//
-// Intended for E2E strict field diff; regular callers should use SearchProjectTypes.
-func (c *Client) SearchProjectTypesRaw(ctx context.Context, params ProjectTypeSearchParams, opts ...ListAllOption) ([]byte, error) {
-	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
-		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/project_types", nil)
-		if err != nil {
-			return nil, err
-		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		if params.Name != "" {
-			q.Set("name", params.Name)
-		}
-		if params.UpdatedAtFrom != "" {
-			q.Set("updated_at_from", params.UpdatedAtFrom)
-		}
-		req.URL.RawQuery = q.Encode()
-		return req, nil
-	}
-	items, err := c.ListAll(ctx, makeReq, opts...)
-	if err != nil {
-		return nil, err
-	}
-	out, err := json.Marshal(items)
-	if err != nil {
-		return nil, &APIError{Code: APIErrorUnknown, Message: "SearchProjectTypesRaw: marshal aggregate: " + err.Error()}
-	}
-	return out, nil
+	return c.DoWithRetryFull(req)
 }

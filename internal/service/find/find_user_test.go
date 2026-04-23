@@ -55,7 +55,7 @@ func TestFindUser_ByText(t *testing.T) {
 
 	svc := newServiceWith(
 		nil, nil, nil, nil,
-		&stubUserRepo{listResult: allUsers},
+		&stubUserRepo{searchResult: allUsers},
 	)
 
 	got, err := svc.FindUser(testCtx, find.FindUserQuery{Text: "alice"})
@@ -73,7 +73,7 @@ func TestFindUser_ByText_LastNameFirstName(t *testing.T) {
 
 	svc := newServiceWith(
 		nil, nil, nil, nil,
-		&stubUserRepo{listResult: allUsers},
+		&stubUserRepo{searchResult: allUsers},
 	)
 
 	got, err := svc.FindUser(testCtx, find.FindUserQuery{Text: "立花"})
@@ -141,7 +141,6 @@ func TestFindUser_NamePriorityOverText(t *testing.T) {
 		nil, nil, nil, nil,
 		&stubUserRepo{
 			searchResult: searchResult,
-			listResult:   []boardapi.UserEntity{{ID: 2, Name: "List Result"}},
 		},
 	)
 

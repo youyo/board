@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 )
 
 // DocumentSendChannelEntity is a BOARD API document send channel entity.
@@ -18,48 +17,77 @@ type DocumentSendChannelEntity struct {
 	CreatedAt string `json:"created_at"` // ISO 8601
 }
 
-// DocumentSendChannelSearchParams is the parameter for SearchDocumentSendChannels.
-type DocumentSendChannelSearchParams struct {
-	Name          string
-	UpdatedAtFrom string
+// DocumentSendChannelListOptions は GET /v1/document_send_channels のクエリパラメータ（Ransack スタイル）。
+// ゼロ値は API に送信しない。DocumentSendChannelListOptions{} はフィルタなしの全件取得を意味する。
+//
+// M56 で導入。旧 DocumentSendChannelSearchParams を置き換える破壊的変更。
+type DocumentSendChannelListOptions struct {
+	// 共通ページネーション（通常は ListAllWithResult が page を上書きする）
+	Page    int
+	PerPage int
+
+	// 全 List 共通
+	UpdatedAtGteq     string // "YYYY-MM-DD HH:MM:SS"
+	UpdatedAtLteq     string
+	IncludeArchiveFlg *bool // nil=送らない, true=1, false=0
+
+	// document_send_channels 専用（Ransack 準拠）
+	NameCont string // 書類送付方法名部分一致（Ransack _cont）
 }
 
-// ListDocumentSendChannels retrieves all document send channels.
-// Pagination is automatically handled by ListAll.
-func (c *Client) ListDocumentSendChannels(ctx context.Context) ([]DocumentSendChannelEntity, error) {
-	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+// buildDocumentSendChannelsQuery は GET /v1/document_send_channels の Ransack スタイルクエリ文字列を組み立てる。
+func buildDocumentSendChannelsQuery(opts DocumentSendChannelListOptions, page, perPage int) string {
+	return NewQueryBuilder().
+		Page(page, perPage).
+		StrCont("name", opts.NameCont).
+		DateGteq("updated_at", opts.UpdatedAtGteq).
+		DateLteq("updated_at", opts.UpdatedAtLteq).
+		Flg01("include_archive_flg", opts.IncludeArchiveFlg).
+		Encode()
+}
+
+// ListDocumentSendChannels は与えられたオプションでフィルタした書類送付方法を取得する。
+// ページネーションは ListAllWithResult が内部で処理する。メタデータは
+// 返り値の *ListResult 経由で参照できる。
+//
+// フィルタなしの全件取得は DocumentSendChannelListOptions{} を渡す。
+func (c *Client) ListDocumentSendChannels(ctx context.Context, opts DocumentSendChannelListOptions) (*ListResult[DocumentSendChannelEntity], error) {
+	perPage := opts.PerPage
+	makeReq := func(ctx context.Context, page, pp int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/document_send_channels", nil)
 		if err != nil {
 			return nil, err
 		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		req.URL.RawQuery = q.Encode()
+		req.URL.RawQuery = buildDocumentSendChannelsQuery(opts, page, pp)
 		return req, nil
 	}
-	items, err := c.ListAll(ctx, makeReq)
+	var listOpts []ListAllOption
+	if perPage > 0 {
+		listOpts = append(listOpts, WithPerPage(perPage))
+	}
+	raw, err := c.ListAllWithResult(ctx, makeReq, listOpts...)
 	if err != nil {
 		return nil, err
 	}
-	result := make([]DocumentSendChannelEntity, 0, len(items))
-	for _, raw := range items {
+	items := make([]DocumentSendChannelEntity, 0, len(raw.Items))
+	for _, b := range raw.Items {
 		var x DocumentSendChannelEntity
-		if err := json.Unmarshal(raw, &x); err != nil {
+		if err := json.Unmarshal(b, &x); err != nil {
 			return nil, &APIError{Code: APIErrorUnknown, Message: "ListDocumentSendChannels: unmarshal: " + err.Error()}
 		}
-		result = append(result, x)
+		items = append(items, x)
 	}
-	return result, nil
+	return &ListResult[DocumentSendChannelEntity]{Items: items, Meta: raw.Meta, Headers: raw.Headers}, nil
 }
 
-// GetDocumentSendChannel retrieves the document send channel with the specified ID.
-func (c *Client) GetDocumentSendChannel(ctx context.Context, id int) (*DocumentSendChannelEntity, error) {
+// GetDocumentSendChannel は指定 ID の書類送付方法を取得する。
+// レスポンスメタデータ（ETag・レート制限・Last-Modified）は *ItemResult 経由で参照できる。
+func (c *Client) GetDocumentSendChannel(ctx context.Context, id int) (*ItemResult[DocumentSendChannelEntity], error) {
 	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/document_send_channels/%d", id), nil)
 	if err != nil {
 		return nil, err
 	}
-	body, err := c.DoWithRetry(req)
+	body, headers, err := c.DoWithRetryFull(req)
 	if err != nil {
 		return nil, err
 	}
@@ -67,133 +95,47 @@ func (c *Client) GetDocumentSendChannel(ctx context.Context, id int) (*DocumentS
 	if err := json.Unmarshal(body, &x); err != nil {
 		return nil, &APIError{Code: APIErrorUnknown, Message: "GetDocumentSendChannel: unmarshal: " + err.Error()}
 	}
-	return &x, nil
+	return &ItemResult[DocumentSendChannelEntity]{
+		Item:    &x,
+		Meta:    parseItemMeta(headers),
+		Headers: headers,
+	}, nil
 }
 
-// SearchDocumentSendChannels searches document send channels with the given conditions.
-// Pagination is automatically handled by ListAll.
-func (c *Client) SearchDocumentSendChannels(ctx context.Context, params DocumentSendChannelSearchParams) ([]DocumentSendChannelEntity, error) {
-	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+// ListDocumentSendChannelsRaw は与えられたオプションでフィルタした書類送付方法の生 JSON 配列と
+// 最終ページのレスポンスヘッダーを返す。バイト列は BOARD API が返したものをそのまま保持するため、
+// E2E の strict field diff に使用できる。通常の呼び出しには ListDocumentSendChannels を使うこと。
+func (c *Client) ListDocumentSendChannelsRaw(ctx context.Context, opts DocumentSendChannelListOptions) ([]byte, http.Header, error) {
+	perPage := opts.PerPage
+	makeReq := func(ctx context.Context, page, pp int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/document_send_channels", nil)
 		if err != nil {
 			return nil, err
 		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		if params.Name != "" {
-			q.Set("name", params.Name)
-		}
-		if params.UpdatedAtFrom != "" {
-			q.Set("updated_at_from", params.UpdatedAtFrom)
-		}
-		req.URL.RawQuery = q.Encode()
+		req.URL.RawQuery = buildDocumentSendChannelsQuery(opts, page, pp)
 		return req, nil
 	}
-	items, err := c.ListAll(ctx, makeReq)
+	var listOpts []ListAllOption
+	if perPage > 0 {
+		listOpts = append(listOpts, WithPerPage(perPage))
+	}
+	raw, err := c.ListAllWithResult(ctx, makeReq, listOpts...)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	result := make([]DocumentSendChannelEntity, 0, len(items))
-	for _, raw := range items {
-		var x DocumentSendChannelEntity
-		if err := json.Unmarshal(raw, &x); err != nil {
-			return nil, &APIError{Code: APIErrorUnknown, Message: "SearchDocumentSendChannels: unmarshal: " + err.Error()}
-		}
-		result = append(result, x)
+	out, err := json.Marshal(raw.Items)
+	if err != nil {
+		return nil, nil, &APIError{Code: APIErrorUnknown, Message: "ListDocumentSendChannelsRaw: marshal aggregate: " + err.Error()}
 	}
-	return result, nil
+	return out, raw.Headers, nil
 }
 
-// ListDocumentSendChannelsPage retrieves a single page of document send channels.
-func (c *Client) ListDocumentSendChannelsPage(ctx context.Context, page, perPage int) (*PageResult[DocumentSendChannelEntity], error) {
-	makeReq := func(ctx context.Context, p, pp int) (*http.Request, error) {
-		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/document_send_channels", nil)
-		if err != nil {
-			return nil, err
-		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(p))
-		q.Set("per_page", strconv.Itoa(pp))
-		req.URL.RawQuery = q.Encode()
-		return req, nil
-	}
-	return ListPage[DocumentSendChannelEntity](c, ctx, makeReq, page, perPage)
-}
-
-// ListDocumentSendChannelsRaw retrieves all document send channels and returns
-// the raw HTTP response bodies merged across pages as a single JSON array.
-// Unlike ListDocumentSendChannels, the returned bytes are byte-preserving: each
-// element JSON is exactly what the BOARD API emitted, enabling strict field
-// diff in E2E tests to detect keys that are not mapped to DocumentSendChannelEntity.
-//
-// Intended for E2E strict field diff; regular callers should use ListDocumentSendChannels.
-func (c *Client) ListDocumentSendChannelsRaw(ctx context.Context, opts ...ListAllOption) ([]byte, error) {
-	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
-		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/document_send_channels", nil)
-		if err != nil {
-			return nil, err
-		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		req.URL.RawQuery = q.Encode()
-		return req, nil
-	}
-	items, err := c.ListAll(ctx, makeReq, opts...)
-	if err != nil {
-		return nil, err
-	}
-	out, err := json.Marshal(items)
-	if err != nil {
-		return nil, &APIError{Code: APIErrorUnknown, Message: "ListDocumentSendChannelsRaw: marshal aggregate: " + err.Error()}
-	}
-	return out, nil
-}
-
-// GetDocumentSendChannelRaw retrieves a single document send channel and
-// returns the raw HTTP response body byte-for-byte.
-//
-// Intended for E2E strict field diff; regular callers should use GetDocumentSendChannel.
-func (c *Client) GetDocumentSendChannelRaw(ctx context.Context, id int) ([]byte, error) {
+// GetDocumentSendChannelRaw は指定 ID の書類送付方法の生 HTTP レスポンスボディとヘッダーを返す。
+// E2E の strict field diff に使用できる。通常の呼び出しには GetDocumentSendChannel を使うこと。
+func (c *Client) GetDocumentSendChannelRaw(ctx context.Context, id int) ([]byte, http.Header, error) {
 	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/document_send_channels/%d", id), nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return c.DoWithRetry(req)
-}
-
-// SearchDocumentSendChannelsRaw retrieves document send channels matching the
-// given search parameters and returns the raw HTTP response bodies merged
-// across pages as a single JSON array. Same byte-preserving guarantee as
-// ListDocumentSendChannelsRaw.
-//
-// Intended for E2E strict field diff; regular callers should use SearchDocumentSendChannels.
-func (c *Client) SearchDocumentSendChannelsRaw(ctx context.Context, params DocumentSendChannelSearchParams, opts ...ListAllOption) ([]byte, error) {
-	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
-		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/document_send_channels", nil)
-		if err != nil {
-			return nil, err
-		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		if params.Name != "" {
-			q.Set("name", params.Name)
-		}
-		if params.UpdatedAtFrom != "" {
-			q.Set("updated_at_from", params.UpdatedAtFrom)
-		}
-		req.URL.RawQuery = q.Encode()
-		return req, nil
-	}
-	items, err := c.ListAll(ctx, makeReq, opts...)
-	if err != nil {
-		return nil, err
-	}
-	out, err := json.Marshal(items)
-	if err != nil {
-		return nil, &APIError{Code: APIErrorUnknown, Message: "SearchDocumentSendChannelsRaw: marshal aggregate: " + err.Error()}
-	}
-	return out, nil
+	return c.DoWithRetryFull(req)
 }

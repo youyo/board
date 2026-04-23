@@ -9,7 +9,7 @@ import (
 	"github.com/youyo/board/internal/output"
 )
 
-// NewAPIDocumentSendChannelsCmd  returns the board api document_send_channels subcommand group.
+// NewAPIDocumentSendChannelsCmd returns the board api document_send_channels subcommand group.
 func NewAPIDocumentSendChannelsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "document_send_channels",
@@ -18,42 +18,67 @@ func NewAPIDocumentSendChannelsCmd() *cobra.Command {
 	cmd.AddCommand(
 		newAPIDocumentSendChannelsListCmd(),
 		newAPIDocumentSendChannelsGetCmd(),
-		newAPIDocumentSendChannelsSearchCmd(),
 	)
 	return cmd
+}
+
+// documentSendChannelListFlagsFromCmd reads the Ransack-style filter flags and returns a
+// DocumentSendChannelListOptions. All flags are optional; any flag left at its zero value
+// is omitted from the outgoing request.
+func documentSendChannelListFlagsFromCmd(cmd *cobra.Command) boardapi.DocumentSendChannelListOptions {
+	nameCont, _ := cmd.Flags().GetString("name-cont")
+	updatedAtGteq, _ := cmd.Flags().GetString("updated-at-gteq")
+	updatedAtLteq, _ := cmd.Flags().GetString("updated-at-lteq")
+
+	var includeArchive *bool
+	if cmd.Flags().Changed("include-archive-flg") {
+		v, _ := cmd.Flags().GetBool("include-archive-flg")
+		includeArchive = &v
+	}
+
+	return boardapi.DocumentSendChannelListOptions{
+		NameCont:          nameCont,
+		UpdatedAtGteq:     updatedAtGteq,
+		UpdatedAtLteq:     updatedAtLteq,
+		IncludeArchiveFlg: includeArchive,
+	}
 }
 
 func newAPIDocumentSendChannelsListCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
-		Short: "List all document_send_channels",
+		Short: "List document send channels (optionally filtered by Ransack-style query params)",
+		Long: `List document send channels. Filters are forwarded to the BOARD API as Ransack-style
+query parameters (e.g. --name-cont sends name_cont). A zero-filter request
+uses the local cache; any non-zero filter bypasses the cache and calls the
+API directly so server-side filter semantics take effect.
+
+JSON output includes an _meta object (total_count, page, per_page, rate
+limits, ETag, last_modified) derived from response headers. Use
+--no-show-meta to omit it.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			svc, err := apiServiceFromCmd(cmd)
 			if err != nil {
 				return err
 			}
-			page, _ := cmd.Flags().GetInt("page")
-			perPage, _ := cmd.Flags().GetInt("per-page")
-			if page > 0 {
-				result, err := svc.ListDocumentSendChannelsPage(cmd.Context(), page, perPage)
-				if err != nil {
-					return err
-				}
-				totalPages := (result.TotalCount + result.PerPage - 1) / result.PerPage
-				fmt.Fprintf(os.Stderr, "# Total: %d, Page: %d/%d, PerPage: %d\n",
-					result.TotalCount, result.Page, totalPages, result.PerPage)
-				return output.Write(os.Stdout, result.Items, prettyFromCmd(cmd))
-			}
-			opts := readOptionsFromCmd(cmd)
-			result, err := svc.ListDocumentSendChannels(cmd.Context(), opts)
+			readOpts := readOptionsFromCmd(cmd)
+			filter := documentSendChannelListFlagsFromCmd(cmd)
+			result, err := svc.ListDocumentSendChannels(cmd.Context(), readOpts, filter)
 			if err != nil {
 				return err
 			}
-			return output.Write(os.Stdout, result, prettyFromCmd(cmd))
+			showMeta, _ := cmd.Flags().GetBool("show-meta")
+			if showMeta {
+				return output.Write(os.Stdout, result, prettyFromCmd(cmd))
+			}
+			return output.Write(os.Stdout, result.Items, prettyFromCmd(cmd))
 		},
 	}
-	cmd.Flags().Int("page", 0, "Page number (1-based, bypasses cache)")
-	cmd.Flags().Int("per-page", 50, "Items per page (max 100, used with --page)")
+	cmd.Flags().String("name-cont", "", "Filter by document send channel name (Ransack name_cont, partial match)")
+	cmd.Flags().String("updated-at-gteq", "", `updated_at >= (YYYY-MM-DD HH:MM:SS)`)
+	cmd.Flags().String("updated-at-lteq", "", `updated_at <= (YYYY-MM-DD HH:MM:SS)`)
+	cmd.Flags().Bool("include-archive-flg", false, "Include archived document send channels (send include_archive_flg=1)")
+	cmd.Flags().Bool("show-meta", true, "Include _meta (pagination / rate limit / ETag) in JSON output")
 	return cmd
 }
 
@@ -79,32 +104,5 @@ func newAPIDocumentSendChannelsGetCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().IntVar(&id, "id", 0, "Document send channel ID (required)")
-	return cmd
-}
-
-func newAPIDocumentSendChannelsSearchCmd() *cobra.Command {
-	var name, updatedAtFrom string
-	cmd := &cobra.Command{
-		Use:   "search",
-		Short: "Search document_send_channels by criteria",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			svc, err := apiServiceFromCmd(cmd)
-			if err != nil {
-				return err
-			}
-			opts := readOptionsFromCmd(cmd)
-			params := boardapi.DocumentSendChannelSearchParams{
-				Name:          name,
-				UpdatedAtFrom: updatedAtFrom,
-			}
-			result, err := svc.SearchDocumentSendChannels(cmd.Context(), params, opts)
-			if err != nil {
-				return err
-			}
-			return output.Write(os.Stdout, result, prettyFromCmd(cmd))
-		},
-	}
-	cmd.Flags().StringVar(&name, "name", "", "Filter by document send channel name")
-	cmd.Flags().StringVar(&updatedAtFrom, "updated-at-from", "", "Filter by updated_at (ISO 8601, lower bound)")
 	return cmd
 }

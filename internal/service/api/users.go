@@ -7,25 +7,14 @@ import (
 	"github.com/youyo/board/internal/repository"
 )
 
-// ListUsers returns all users.
-func (s *Service) ListUsers(ctx context.Context, opts repository.ReadOptions) ([]boardapi.UserEntity, error) {
-	return s.users.List(ctx, opts)
+// ListUsers returns users filtered by the given options.
+// Pass boardapi.UserListOptions{} for an unfiltered list (cache-backed).
+// Non-zero filter bypasses the cache (see repository.UserRepository.List).
+func (s *Service) ListUsers(ctx context.Context, readOpts repository.ReadOptions, filter boardapi.UserListOptions) (*boardapi.ListResult[boardapi.UserEntity], error) {
+	return s.users.List(ctx, readOpts, filter)
 }
 
 // GetUser returns a user by ID.
 func (s *Service) GetUser(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.UserEntity, error) {
 	return s.users.GetByID(ctx, id, opts)
-}
-
-// SearchUsers returns users filtered by the given parameters.
-func (s *Service) SearchUsers(ctx context.Context, params boardapi.UserSearchParams, opts repository.ReadOptions) ([]boardapi.UserEntity, error) {
-	return s.users.Search(ctx, params, opts)
-}
-
-// ListUsersPage returns a single page of users.
-// TODO(M57): PageResult は M57 で ListResult[T] に移行予定。
-//
-//nolint:staticcheck
-func (s *Service) ListUsersPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.UserEntity], error) {
-	return s.users.ListPage(ctx, page, perPage)
 }

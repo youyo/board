@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/youyo/board/internal/boardapi"
@@ -49,8 +48,39 @@ func NewAccountingTypeRepository(
 
 const accountingTypesResource = "accounting_types"
 
-// List returns all accounting types from the cache.
-func (r *AccountingTypeRepository) List(ctx context.Context, opts ReadOptions) ([]boardapi.AccountingTypeEntity, error) {
+// accountingTypeFilterIsZero は filter が空（全フィールドがゼロ値 / nil）かどうかを返す。
+// ゼロフィルタはローカルキャッシュ経路を使い、非ゼロフィルタは cache bypass で API を直呼びする。
+func accountingTypeFilterIsZero(f boardapi.AccountingTypeListOptions) bool {
+	return f.Page == 0 &&
+		f.PerPage == 0 &&
+		f.UpdatedAtGteq == "" &&
+		f.UpdatedAtLteq == "" &&
+		f.IncludeArchiveFlg == nil &&
+		f.NameCont == ""
+}
+
+// List は勘定科目を返す。
+//
+// 動作:
+//   - ゼロフィルタ（boardapi.AccountingTypeListOptions{}）: ローカルキャッシュを使い
+//     refresh-on-demand（daily auto refresh, explicit Refresh / ForceRefresh）を行う。
+//     返り値の *ListResult.Meta はゼロ値（キャッシュが正）。
+//   - 非ゼロフィルタ: cache bypass で api.ListAccountingTypes を直接呼び、サーバーサイドの
+//     Ransack フィルタ意味論を活かす。返り値の *ListResult.Meta はヘッダーから埋まる。
+//
+// readOpts.Limit は両経路の最終結果に適用される。
+func (r *AccountingTypeRepository) List(ctx context.Context, readOpts ReadOptions, filter boardapi.AccountingTypeListOptions) (*boardapi.ListResult[boardapi.AccountingTypeEntity], error) {
+	if !accountingTypeFilterIsZero(filter) {
+		// API 直接呼び出し（cache bypass）: フィルタ結果でキャッシュを汚染しない。
+		result, err := r.api.ListAccountingTypes(ctx, filter)
+		if err != nil {
+			return nil, err
+		}
+		result.Items = applyLimit(result.Items, readOpts.Limit)
+		return result, nil
+	}
+
+	// ゼロフィルタ: 既存の cache → refresh → API fallback 経路
 	fetcher := &accountingTypesFetcher{api: r.api}
 	now := time.Now()
 
@@ -58,16 +88,13 @@ func (r *AccountingTypeRepository) List(ctx context.Context, opts ReadOptions) (
 	if err != nil {
 		return nil, err
 	}
-
-	if err := maybeRefresh(ctx, r.profile, accountingTypesResource, opts, state, r.autoRefresh, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
+	if err := maybeRefresh(ctx, r.profile, accountingTypesResource, readOpts, state, r.autoRefresh, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
 		return nil, err
 	}
-
 	entries, err := r.cache.List(ctx, r.profile, accountingTypesResource)
 	if err != nil {
 		return nil, err
 	}
-
 	if len(entries) == 0 && state == nil {
 		if err := r.lockManager.WithLock(ctx, r.profile, accountingTypesResource, func() error {
 			_, err := r.refresher.ForceRefresh(ctx, r.profile, fetcher, now, r.tz)
@@ -80,13 +107,22 @@ func (r *AccountingTypeRepository) List(ctx context.Context, opts ReadOptions) (
 			return nil, err
 		}
 	}
-
 	entities, err := decodeEntries[boardapi.AccountingTypeEntity](entries)
 	if err != nil {
 		return nil, err
 	}
+	entities = applyLimit(entities, readOpts.Limit)
+	return &boardapi.ListResult[boardapi.AccountingTypeEntity]{Items: entities}, nil
+}
 
-	return applyLimit(entities, opts.Limit), nil
+// ListEntities は List の items のみを返す薄いラッパ。
+// find 層（Phase L では *ListResult を扱わない）向け。
+func (r *AccountingTypeRepository) ListEntities(ctx context.Context, readOpts ReadOptions, filter boardapi.AccountingTypeListOptions) ([]boardapi.AccountingTypeEntity, error) {
+	result, err := r.List(ctx, readOpts, filter)
+	if err != nil {
+		return nil, err
+	}
+	return result.Items, nil
 }
 
 // GetByID returns the accounting type with the given ID from the cache.
@@ -118,13 +154,13 @@ func (r *AccountingTypeRepository) GetByID(ctx context.Context, id int, opts Rea
 		return &entity, nil
 	}
 
-	// Cache miss → fetch single entity from API
-	entity, err := r.api.GetAccountingType(ctx, id)
+	// Cache miss -> fetch single entry from API
+	result, err := r.api.GetAccountingType(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 
-	raw, err := json.Marshal(entity)
+	raw, err := json.Marshal(result.Item)
 	if err != nil {
 		return nil, err
 	}
@@ -132,37 +168,12 @@ func (r *AccountingTypeRepository) GetByID(ctx context.Context, id int, opts Rea
 		return nil, err
 	}
 
-	return entity, nil
+	return result.Item, nil
 }
 
-// Search returns accounting types filtered by the given parameters from the cache.
-func (r *AccountingTypeRepository) Search(ctx context.Context, params boardapi.AccountingTypeSearchParams, opts ReadOptions) ([]boardapi.AccountingTypeEntity, error) {
-	listOpts := opts
-	listOpts.Limit = 0
-	all, err := r.List(ctx, listOpts)
-	if err != nil {
-		return nil, err
-	}
-	return applyLimit(filterAccountingTypes(all, params), opts.Limit), nil
-}
-
-// filterAccountingTypes performs in-memory filtering.
-// UpdatedAtFrom is used as a delta fetch cursor and is not included in the filter.
-func filterAccountingTypes(entities []boardapi.AccountingTypeEntity, params boardapi.AccountingTypeSearchParams) []boardapi.AccountingTypeEntity {
-	var result []boardapi.AccountingTypeEntity
-	for _, e := range entities {
-		if params.Name != "" && !strings.Contains(e.Name, params.Name) {
-			continue
-		}
-		result = append(result, e)
-	}
-	return result
-}
-
-// ListPage retrieves a single page of AccountingTypeEntity directly from the API (cache bypass).
-// TODO(M57): PageResult は M57 で ListResult[T] に移行予定。
+// Search は find 層向けの薄いラッパ。ListEntities と機能的に同等。
 //
-//nolint:staticcheck
-func (r *AccountingTypeRepository) ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.AccountingTypeEntity], error) {
-	return r.api.ListAccountingTypesPage(ctx, page, perPage)
+// find 層は *ListResult を扱わず []AccountingTypeEntity を維持する（Phase L の方針）。
+func (r *AccountingTypeRepository) Search(ctx context.Context, filter boardapi.AccountingTypeListOptions, opts ReadOptions) ([]boardapi.AccountingTypeEntity, error) {
+	return r.ListEntities(ctx, opts, filter)
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/youyo/board/internal/boardapi"
@@ -49,8 +48,39 @@ func NewProjectTypeRepository(
 
 const projectTypesResource = "project_types"
 
-// List returns all project types from the cache.
-func (r *ProjectTypeRepository) List(ctx context.Context, opts ReadOptions) ([]boardapi.ProjectTypeEntity, error) {
+// projectTypeFilterIsZero は filter が空（全フィールドがゼロ値 / nil）かどうかを返す。
+// ゼロフィルタはローカルキャッシュ経路を使い、非ゼロフィルタは cache bypass で API を直呼びする。
+func projectTypeFilterIsZero(f boardapi.ProjectTypeListOptions) bool {
+	return f.Page == 0 &&
+		f.PerPage == 0 &&
+		f.UpdatedAtGteq == "" &&
+		f.UpdatedAtLteq == "" &&
+		f.IncludeArchiveFlg == nil &&
+		f.NameCont == ""
+}
+
+// List はプロジェクト種別を返す。
+//
+// 動作:
+//   - ゼロフィルタ（boardapi.ProjectTypeListOptions{}）: ローカルキャッシュを使い
+//     refresh-on-demand（daily auto refresh, explicit Refresh / ForceRefresh）を行う。
+//     返り値の *ListResult.Meta はゼロ値（キャッシュが正）。
+//   - 非ゼロフィルタ: cache bypass で api.ListProjectTypes を直接呼び、サーバーサイドの
+//     Ransack フィルタ意味論を活かす。返り値の *ListResult.Meta はヘッダーから埋まる。
+//
+// readOpts.Limit は両経路の最終結果に適用される。
+func (r *ProjectTypeRepository) List(ctx context.Context, readOpts ReadOptions, filter boardapi.ProjectTypeListOptions) (*boardapi.ListResult[boardapi.ProjectTypeEntity], error) {
+	if !projectTypeFilterIsZero(filter) {
+		// API 直接呼び出し（cache bypass）: フィルタ結果でキャッシュを汚染しない。
+		result, err := r.api.ListProjectTypes(ctx, filter)
+		if err != nil {
+			return nil, err
+		}
+		result.Items = applyLimit(result.Items, readOpts.Limit)
+		return result, nil
+	}
+
+	// ゼロフィルタ: 既存の cache → refresh → API fallback 経路
 	fetcher := &projectTypesFetcher{api: r.api}
 	now := time.Now()
 
@@ -58,16 +88,13 @@ func (r *ProjectTypeRepository) List(ctx context.Context, opts ReadOptions) ([]b
 	if err != nil {
 		return nil, err
 	}
-
-	if err := maybeRefresh(ctx, r.profile, projectTypesResource, opts, state, r.autoRefresh, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
+	if err := maybeRefresh(ctx, r.profile, projectTypesResource, readOpts, state, r.autoRefresh, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
 		return nil, err
 	}
-
 	entries, err := r.cache.List(ctx, r.profile, projectTypesResource)
 	if err != nil {
 		return nil, err
 	}
-
 	if len(entries) == 0 && state == nil {
 		if err := r.lockManager.WithLock(ctx, r.profile, projectTypesResource, func() error {
 			_, err := r.refresher.ForceRefresh(ctx, r.profile, fetcher, now, r.tz)
@@ -80,13 +107,22 @@ func (r *ProjectTypeRepository) List(ctx context.Context, opts ReadOptions) ([]b
 			return nil, err
 		}
 	}
-
 	entities, err := decodeEntries[boardapi.ProjectTypeEntity](entries)
 	if err != nil {
 		return nil, err
 	}
+	entities = applyLimit(entities, readOpts.Limit)
+	return &boardapi.ListResult[boardapi.ProjectTypeEntity]{Items: entities}, nil
+}
 
-	return applyLimit(entities, opts.Limit), nil
+// ListEntities は List の items のみを返す薄いラッパ。
+// find 層（Phase L では *ListResult を扱わない）向け。
+func (r *ProjectTypeRepository) ListEntities(ctx context.Context, readOpts ReadOptions, filter boardapi.ProjectTypeListOptions) ([]boardapi.ProjectTypeEntity, error) {
+	result, err := r.List(ctx, readOpts, filter)
+	if err != nil {
+		return nil, err
+	}
+	return result.Items, nil
 }
 
 // GetByID returns the project type with the given ID from the cache.
@@ -118,13 +154,13 @@ func (r *ProjectTypeRepository) GetByID(ctx context.Context, id int, opts ReadOp
 		return &entity, nil
 	}
 
-	// Cache miss → fetch single entity from API
-	entity, err := r.api.GetProjectType(ctx, id)
+	// Cache miss -> fetch single entry from API
+	result, err := r.api.GetProjectType(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 
-	raw, err := json.Marshal(entity)
+	raw, err := json.Marshal(result.Item)
 	if err != nil {
 		return nil, err
 	}
@@ -132,37 +168,12 @@ func (r *ProjectTypeRepository) GetByID(ctx context.Context, id int, opts ReadOp
 		return nil, err
 	}
 
-	return entity, nil
+	return result.Item, nil
 }
 
-// Search returns project types filtered by the given parameters from the cache.
-func (r *ProjectTypeRepository) Search(ctx context.Context, params boardapi.ProjectTypeSearchParams, opts ReadOptions) ([]boardapi.ProjectTypeEntity, error) {
-	listOpts := opts
-	listOpts.Limit = 0
-	all, err := r.List(ctx, listOpts)
-	if err != nil {
-		return nil, err
-	}
-	return applyLimit(filterProjectTypes(all, params), opts.Limit), nil
-}
-
-// filterProjectTypes performs in-memory filtering.
-// UpdatedAtFrom is used as a delta fetch cursor and is not included in the filter.
-func filterProjectTypes(entities []boardapi.ProjectTypeEntity, params boardapi.ProjectTypeSearchParams) []boardapi.ProjectTypeEntity {
-	var result []boardapi.ProjectTypeEntity
-	for _, e := range entities {
-		if params.Name != "" && !strings.Contains(e.Name, params.Name) {
-			continue
-		}
-		result = append(result, e)
-	}
-	return result
-}
-
-// ListPage retrieves a single page of ProjectTypeEntity directly from the API (cache bypass).
-// TODO(M57): PageResult は M57 で ListResult[T] に移行予定。
+// Search は find 層向けの薄いラッパ。ListEntities と機能的に同等。
 //
-//nolint:staticcheck
-func (r *ProjectTypeRepository) ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.ProjectTypeEntity], error) {
-	return r.api.ListProjectTypesPage(ctx, page, perPage)
+// find 層は *ListResult を扱わず []ProjectTypeEntity を維持する（Phase L の方針）。
+func (r *ProjectTypeRepository) Search(ctx context.Context, filter boardapi.ProjectTypeListOptions, opts ReadOptions) ([]boardapi.ProjectTypeEntity, error) {
+	return r.ListEntities(ctx, opts, filter)
 }

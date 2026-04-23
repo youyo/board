@@ -2988,6 +2988,7 @@ func TestListVendorContacts_ZeroParams(t *testing.T) {
 // ============================================================
 
 // T157: ListUsers — happy path (2 items)
+// M56: ListUsers(ctx, UserListOptions) *ListResult[UserEntity] に更新。
 func TestListUsers_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -2997,19 +2998,20 @@ func TestListUsers_OK(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.ListUsers(context.Background())
+	result, err := c.ListUsers(context.Background(), boardapi.UserListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result) != 2 {
-		t.Errorf("want 2 users, got %d", len(result))
+	if len(result.Items) != 2 {
+		t.Errorf("want 2 users, got %d", len(result.Items))
 	}
-	if result[0].ID != 1 || result[0].Name != "Taro Yamada" || result[0].Email != "yamada@example.com" {
-		t.Errorf("user[0]: got %+v", result[0])
+	if result.Items[0].ID != 1 || result.Items[0].Name != "Taro Yamada" || result.Items[0].Email != "yamada@example.com" {
+		t.Errorf("user[0]: got %+v", result.Items[0])
 	}
 }
 
 // T158: GetUser — happy path
+// M56: GetUser(ctx, id) *ItemResult[UserEntity] に更新。
 func TestGetUser_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/users/1" {
@@ -3027,19 +3029,20 @@ func TestGetUser_OK(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got == nil {
-		t.Fatal("got nil UserEntity")
+	if got == nil || got.Item == nil {
+		t.Fatal("got nil ItemResult or Item")
 	}
-	if got.ID != 1 || got.Name != "Taro Yamada" || got.Email != "yamada@example.com" {
-		t.Errorf("GetUser: got %+v", got)
+	if got.Item.ID != 1 || got.Item.Name != "Taro Yamada" || got.Item.Email != "yamada@example.com" {
+		t.Errorf("GetUser: got %+v", got.Item)
 	}
 }
 
-// T159: SearchUsers — with Name parameter
-func TestSearchUsers_WithName(t *testing.T) {
-	var gotName string
+// T159: ListUsers with NameCont — Ransack name_cont parameter
+// M56: SearchUsers 廃止、ListUsers(ctx, UserListOptions{NameCont: ...}) に更新。
+func TestListUsers_WithNameCont(t *testing.T) {
+	var gotNameCont string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotName = r.URL.Query().Get("name")
+		gotNameCont = r.URL.Query().Get("name_cont")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`[{"id":1,"name":"Taro Yamada","email":"yamada@example.com","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
 	}))
@@ -3047,19 +3050,20 @@ func TestSearchUsers_WithName(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.SearchUsers(context.Background(), boardapi.UserSearchParams{Name: "Taro Yamada"})
+	result, err := c.ListUsers(context.Background(), boardapi.UserListOptions{NameCont: "Taro Yamada"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result) != 1 {
-		t.Errorf("want 1 result, got %d", len(result))
+	if len(result.Items) != 1 {
+		t.Errorf("want 1 result, got %d", len(result.Items))
 	}
-	if gotName != "Taro Yamada" {
-		t.Errorf("name param: want %q, got %q", "Taro Yamada", gotName)
+	if gotNameCont != "Taro Yamada" {
+		t.Errorf("name_cont param: want %q, got %q", "Taro Yamada", gotNameCont)
 	}
 }
 
 // T160: ListGroups — happy path (2 items)
+// M56: ListGroups(ctx, GroupListOptions) *ListResult[GroupEntity] に更新。
 func TestListGroups_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -3069,19 +3073,20 @@ func TestListGroups_OK(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.ListGroups(context.Background())
+	result, err := c.ListGroups(context.Background(), boardapi.GroupListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result) != 2 {
-		t.Errorf("want 2 groups, got %d", len(result))
+	if len(result.Items) != 2 {
+		t.Errorf("want 2 groups, got %d", len(result.Items))
 	}
-	if result[0].ID != 1 || result[0].Name != "Sales Dept" || result[0].Memo != "Sales Group" {
-		t.Errorf("group[0]: got %+v", result[0])
+	if result.Items[0].ID != 1 || result.Items[0].Name != "Sales Dept" || result.Items[0].Memo != "Sales Group" {
+		t.Errorf("group[0]: got %+v", result.Items[0])
 	}
 }
 
 // T161: GetGroup — happy path
+// M56: GetGroup(ctx, id) *ItemResult[GroupEntity] に更新。
 func TestGetGroup_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/groups/1" {
@@ -3099,19 +3104,20 @@ func TestGetGroup_OK(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got == nil {
-		t.Fatal("got nil GroupEntity")
+	if got == nil || got.Item == nil {
+		t.Fatal("got nil ItemResult or Item")
 	}
-	if got.ID != 1 || got.Name != "Sales Dept" || got.Memo != "Sales Group" {
-		t.Errorf("GetGroup: got %+v", got)
+	if got.Item.ID != 1 || got.Item.Name != "Sales Dept" || got.Item.Memo != "Sales Group" {
+		t.Errorf("GetGroup: got %+v", got.Item)
 	}
 }
 
-// T162: SearchGroups — with Name parameter
-func TestSearchGroups_WithName(t *testing.T) {
-	var gotName string
+// T162: ListGroups with NameCont — Ransack name_cont parameter
+// M56: SearchGroups 廃止、ListGroups(ctx, GroupListOptions{NameCont: ...}) に更新。
+func TestListGroups_WithNameCont(t *testing.T) {
+	var gotNameCont string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotName = r.URL.Query().Get("name")
+		gotNameCont = r.URL.Query().Get("name_cont")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`[{"id":1,"name":"Sales Dept","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
 	}))
@@ -3119,19 +3125,20 @@ func TestSearchGroups_WithName(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.SearchGroups(context.Background(), boardapi.GroupSearchParams{Name: "Sales Dept"})
+	result, err := c.ListGroups(context.Background(), boardapi.GroupListOptions{NameCont: "Sales Dept"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result) != 1 {
-		t.Errorf("want 1 result, got %d", len(result))
+	if len(result.Items) != 1 {
+		t.Errorf("want 1 result, got %d", len(result.Items))
 	}
-	if gotName != "Sales Dept" {
-		t.Errorf("name param: want %q, got %q", "Sales Dept", gotName)
+	if gotNameCont != "Sales Dept" {
+		t.Errorf("name_cont param: want %q, got %q", "Sales Dept", gotNameCont)
 	}
 }
 
 // T163: ListPaymentTerms — happy path (2 items)
+// M56: ListPaymentTerms(ctx, PaymentTermListOptions) *ListResult[PaymentTermEntity] に更新。
 func TestListPaymentTerms_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -3141,19 +3148,20 @@ func TestListPaymentTerms_OK(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.ListPaymentTerms(context.Background())
+	result, err := c.ListPaymentTerms(context.Background(), boardapi.PaymentTermListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result) != 2 {
-		t.Errorf("want 2 payment_terms, got %d", len(result))
+	if len(result.Items) != 2 {
+		t.Errorf("want 2 payment_terms, got %d", len(result.Items))
 	}
-	if result[0].ID != 1 || result[0].Name != "End of Month Payment" {
-		t.Errorf("payment_term[0]: got %+v", result[0])
+	if result.Items[0].ID != 1 || result.Items[0].Name != "End of Month Payment" {
+		t.Errorf("payment_term[0]: got %+v", result.Items[0])
 	}
 }
 
 // T164: GetPaymentTerm — happy path
+// M56: GetPaymentTerm(ctx, id) *ItemResult[PaymentTermEntity] に更新。
 func TestGetPaymentTerm_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/payment_terms/1" {
@@ -3171,19 +3179,20 @@ func TestGetPaymentTerm_OK(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got == nil {
-		t.Fatal("got nil PaymentTermEntity")
+	if got == nil || got.Item == nil {
+		t.Fatal("got nil ItemResult or Item")
 	}
-	if got.ID != 1 || got.Name != "End of Month Payment" || got.Memo != "Standard Payment Terms" {
-		t.Errorf("GetPaymentTerm: got %+v", got)
+	if got.Item.ID != 1 || got.Item.Name != "End of Month Payment" || got.Item.Memo != "Standard Payment Terms" {
+		t.Errorf("GetPaymentTerm: got %+v", got.Item)
 	}
 }
 
-// T165: SearchPaymentTerms — with Name parameter
-func TestSearchPaymentTerms_WithName(t *testing.T) {
-	var gotName string
+// T165: ListPaymentTerms with NameCont — Ransack name_cont parameter
+// M56: SearchPaymentTerms 廃止、ListPaymentTerms(ctx, PaymentTermListOptions{NameCont: ...}) に更新。
+func TestListPaymentTerms_WithNameCont(t *testing.T) {
+	var gotNameCont string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotName = r.URL.Query().Get("name")
+		gotNameCont = r.URL.Query().Get("name_cont")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`[{"id":1,"name":"End of Month Payment","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
 	}))
@@ -3191,19 +3200,20 @@ func TestSearchPaymentTerms_WithName(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.SearchPaymentTerms(context.Background(), boardapi.PaymentTermSearchParams{Name: "End of Month Payment"})
+	result, err := c.ListPaymentTerms(context.Background(), boardapi.PaymentTermListOptions{NameCont: "End of Month Payment"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result) != 1 {
-		t.Errorf("want 1 result, got %d", len(result))
+	if len(result.Items) != 1 {
+		t.Errorf("want 1 result, got %d", len(result.Items))
 	}
-	if gotName != "End of Month Payment" {
-		t.Errorf("name param: want %q, got %q", "End of Month Payment", gotName)
+	if gotNameCont != "End of Month Payment" {
+		t.Errorf("name_cont param: want %q, got %q", "End of Month Payment", gotNameCont)
 	}
 }
 
 // T166: ListProjectTypes — happy path (2 items)
+// M56: ListProjectTypes(ctx, ProjectTypeListOptions) *ListResult[ProjectTypeEntity] に更新。
 func TestListProjectTypes_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -3213,19 +3223,20 @@ func TestListProjectTypes_OK(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.ListProjectTypes(context.Background())
+	result, err := c.ListProjectTypes(context.Background(), boardapi.ProjectTypeListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result) != 2 {
-		t.Errorf("want 2 project_types, got %d", len(result))
+	if len(result.Items) != 2 {
+		t.Errorf("want 2 project_types, got %d", len(result.Items))
 	}
-	if result[0].ID != 1 || result[0].Name != "Contract Development" {
-		t.Errorf("project_type[0]: got %+v", result[0])
+	if result.Items[0].ID != 1 || result.Items[0].Name != "Contract Development" {
+		t.Errorf("project_type[0]: got %+v", result.Items[0])
 	}
 }
 
 // T167: GetProjectType — happy path
+// M56: GetProjectType(ctx, id) *ItemResult[ProjectTypeEntity] に更新。
 func TestGetProjectType_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/project_types/1" {
@@ -3243,19 +3254,20 @@ func TestGetProjectType_OK(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got == nil {
-		t.Fatal("got nil ProjectTypeEntity")
+	if got == nil || got.Item == nil {
+		t.Fatal("got nil ItemResult or Item")
 	}
-	if got.ID != 1 || got.Name != "Contract Development" || got.Memo != "External Contract Project" {
-		t.Errorf("GetProjectType: got %+v", got)
+	if got.Item.ID != 1 || got.Item.Name != "Contract Development" || got.Item.Memo != "External Contract Project" {
+		t.Errorf("GetProjectType: got %+v", got.Item)
 	}
 }
 
-// T168: SearchProjectTypes — with Name parameter
-func TestSearchProjectTypes_WithName(t *testing.T) {
-	var gotName string
+// T168: ListProjectTypes with NameCont — Ransack name_cont parameter
+// M56: SearchProjectTypes 廃止、ListProjectTypes(ctx, ProjectTypeListOptions{NameCont: ...}) に更新。
+func TestListProjectTypes_WithNameCont(t *testing.T) {
+	var gotNameCont string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotName = r.URL.Query().Get("name")
+		gotNameCont = r.URL.Query().Get("name_cont")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`[{"id":1,"name":"Contract Development","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
 	}))
@@ -3263,19 +3275,20 @@ func TestSearchProjectTypes_WithName(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.SearchProjectTypes(context.Background(), boardapi.ProjectTypeSearchParams{Name: "Contract Development"})
+	result, err := c.ListProjectTypes(context.Background(), boardapi.ProjectTypeListOptions{NameCont: "Contract Development"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result) != 1 {
-		t.Errorf("want 1 result, got %d", len(result))
+	if len(result.Items) != 1 {
+		t.Errorf("want 1 result, got %d", len(result.Items))
 	}
-	if gotName != "Contract Development" {
-		t.Errorf("name param: want %q, got %q", "Contract Development", gotName)
+	if gotNameCont != "Contract Development" {
+		t.Errorf("name_cont param: want %q, got %q", "Contract Development", gotNameCont)
 	}
 }
 
 // T169: ListPurchaseTypes — happy path (2 items)
+// M56: ListPurchaseTypes(ctx, PurchaseTypeListOptions) *ListResult[PurchaseTypeEntity] に更新。
 func TestListPurchaseTypes_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -3285,19 +3298,20 @@ func TestListPurchaseTypes_OK(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.ListPurchaseTypes(context.Background())
+	result, err := c.ListPurchaseTypes(context.Background(), boardapi.PurchaseTypeListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result) != 2 {
-		t.Errorf("want 2 purchase_types, got %d", len(result))
+	if len(result.Items) != 2 {
+		t.Errorf("want 2 purchase_types, got %d", len(result.Items))
 	}
-	if result[0].ID != 1 || result[0].Name != "Outsourcing Cost" {
-		t.Errorf("purchase_type[0]: got %+v", result[0])
+	if result.Items[0].ID != 1 || result.Items[0].Name != "Outsourcing Cost" {
+		t.Errorf("purchase_type[0]: got %+v", result.Items[0])
 	}
 }
 
 // T170: GetPurchaseType — happy path
+// M56: GetPurchaseType(ctx, id) *ItemResult[PurchaseTypeEntity] に更新。パスは /v1/expenditure_types/1。
 func TestGetPurchaseType_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/expenditure_types/1" {
@@ -3315,19 +3329,20 @@ func TestGetPurchaseType_OK(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got == nil {
-		t.Fatal("got nil PurchaseTypeEntity")
+	if got == nil || got.Item == nil {
+		t.Fatal("got nil ItemResult or Item")
 	}
-	if got.ID != 1 || got.Name != "Outsourcing Cost" || got.Memo != "Outsourcing Expense" {
-		t.Errorf("GetPurchaseType: got %+v", got)
+	if got.Item.ID != 1 || got.Item.Name != "Outsourcing Cost" || got.Item.Memo != "Outsourcing Expense" {
+		t.Errorf("GetPurchaseType: got %+v", got.Item)
 	}
 }
 
-// T171: SearchPurchaseTypes — with Name parameter
-func TestSearchPurchaseTypes_WithName(t *testing.T) {
-	var gotName string
+// T171: ListPurchaseTypes with NameCont — Ransack name_cont parameter
+// M56: SearchPurchaseTypes 廃止、ListPurchaseTypes(ctx, PurchaseTypeListOptions{NameCont: ...}) に更新。
+func TestListPurchaseTypes_WithNameCont(t *testing.T) {
+	var gotNameCont string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotName = r.URL.Query().Get("name")
+		gotNameCont = r.URL.Query().Get("name_cont")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`[{"id":1,"name":"Outsourcing Cost","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
 	}))
@@ -3335,19 +3350,20 @@ func TestSearchPurchaseTypes_WithName(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.SearchPurchaseTypes(context.Background(), boardapi.PurchaseTypeSearchParams{Name: "Outsourcing Cost"})
+	result, err := c.ListPurchaseTypes(context.Background(), boardapi.PurchaseTypeListOptions{NameCont: "Outsourcing Cost"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result) != 1 {
-		t.Errorf("want 1 result, got %d", len(result))
+	if len(result.Items) != 1 {
+		t.Errorf("want 1 result, got %d", len(result.Items))
 	}
-	if gotName != "Outsourcing Cost" {
-		t.Errorf("name param: want %q, got %q", "Outsourcing Cost", gotName)
+	if gotNameCont != "Outsourcing Cost" {
+		t.Errorf("name_cont param: want %q, got %q", "Outsourcing Cost", gotNameCont)
 	}
 }
 
 // T172: ListAccountingTypes — happy path (2 items)
+// M56: ListAccountingTypes(ctx, AccountingTypeListOptions) *ListResult[AccountingTypeEntity] に更新。
 func TestListAccountingTypes_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -3357,19 +3373,20 @@ func TestListAccountingTypes_OK(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.ListAccountingTypes(context.Background())
+	result, err := c.ListAccountingTypes(context.Background(), boardapi.AccountingTypeListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result) != 2 {
-		t.Errorf("want 2 accounting_types, got %d", len(result))
+	if len(result.Items) != 2 {
+		t.Errorf("want 2 accounting_types, got %d", len(result.Items))
 	}
-	if result[0].ID != 1 || result[0].Name != "Revenue" {
-		t.Errorf("accounting_type[0]: got %+v", result[0])
+	if result.Items[0].ID != 1 || result.Items[0].Name != "Revenue" {
+		t.Errorf("accounting_type[0]: got %+v", result.Items[0])
 	}
 }
 
 // T173: GetAccountingType — happy path
+// M56: GetAccountingType(ctx, id) *ItemResult[AccountingTypeEntity] に更新。
 func TestGetAccountingType_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/accounting_types/1" {
@@ -3387,19 +3404,20 @@ func TestGetAccountingType_OK(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got == nil {
-		t.Fatal("got nil AccountingTypeEntity")
+	if got == nil || got.Item == nil {
+		t.Fatal("got nil ItemResult or Item")
 	}
-	if got.ID != 1 || got.Name != "Revenue" || got.Memo != "Revenue Category" {
-		t.Errorf("GetAccountingType: got %+v", got)
+	if got.Item.ID != 1 || got.Item.Name != "Revenue" || got.Item.Memo != "Revenue Category" {
+		t.Errorf("GetAccountingType: got %+v", got.Item)
 	}
 }
 
-// T174: SearchAccountingTypes — with Name parameter
-func TestSearchAccountingTypes_WithName(t *testing.T) {
-	var gotName string
+// T174: ListAccountingTypes with NameCont — Ransack name_cont parameter
+// M56: SearchAccountingTypes 廃止、ListAccountingTypes(ctx, AccountingTypeListOptions{NameCont: ...}) に更新。
+func TestListAccountingTypes_WithNameCont(t *testing.T) {
+	var gotNameCont string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotName = r.URL.Query().Get("name")
+		gotNameCont = r.URL.Query().Get("name_cont")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`[{"id":1,"name":"Revenue","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
 	}))
@@ -3407,19 +3425,20 @@ func TestSearchAccountingTypes_WithName(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.SearchAccountingTypes(context.Background(), boardapi.AccountingTypeSearchParams{Name: "Revenue"})
+	result, err := c.ListAccountingTypes(context.Background(), boardapi.AccountingTypeListOptions{NameCont: "Revenue"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result) != 1 {
-		t.Errorf("want 1 result, got %d", len(result))
+	if len(result.Items) != 1 {
+		t.Errorf("want 1 result, got %d", len(result.Items))
 	}
-	if gotName != "Revenue" {
-		t.Errorf("name param: want %q, got %q", "Revenue", gotName)
+	if gotNameCont != "Revenue" {
+		t.Errorf("name_cont param: want %q, got %q", "Revenue", gotNameCont)
 	}
 }
 
 // T175: ListDocumentSendChannels — happy path (2 items)
+// M56: ListDocumentSendChannels(ctx, DocumentSendChannelListOptions) *ListResult[DocumentSendChannelEntity] に更新。
 func TestListDocumentSendChannels_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -3429,19 +3448,20 @@ func TestListDocumentSendChannels_OK(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.ListDocumentSendChannels(context.Background())
+	result, err := c.ListDocumentSendChannels(context.Background(), boardapi.DocumentSendChannelListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result) != 2 {
-		t.Errorf("want 2 document_send_channels, got %d", len(result))
+	if len(result.Items) != 2 {
+		t.Errorf("want 2 document_send_channels, got %d", len(result.Items))
 	}
-	if result[0].ID != 1 || result[0].Name != "Mail" {
-		t.Errorf("document_send_channel[0]: got %+v", result[0])
+	if result.Items[0].ID != 1 || result.Items[0].Name != "Mail" {
+		t.Errorf("document_send_channel[0]: got %+v", result.Items[0])
 	}
 }
 
 // T176: GetDocumentSendChannel — happy path
+// M56: GetDocumentSendChannel(ctx, id) *ItemResult[DocumentSendChannelEntity] に更新。
 func TestGetDocumentSendChannel_OK(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/document_send_channels/1" {
@@ -3459,19 +3479,20 @@ func TestGetDocumentSendChannel_OK(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got == nil {
-		t.Fatal("got nil DocumentSendChannelEntity")
+	if got == nil || got.Item == nil {
+		t.Fatal("got nil ItemResult or Item")
 	}
-	if got.ID != 1 || got.Name != "Mail" || got.Memo != "Document Mail Channel" {
-		t.Errorf("GetDocumentSendChannel: got %+v", got)
+	if got.Item.ID != 1 || got.Item.Name != "Mail" || got.Item.Memo != "Document Mail Channel" {
+		t.Errorf("GetDocumentSendChannel: got %+v", got.Item)
 	}
 }
 
-// T177: SearchDocumentSendChannels — with Name parameter
-func TestSearchDocumentSendChannels_WithName(t *testing.T) {
-	var gotName string
+// T177: ListDocumentSendChannels with NameCont — Ransack name_cont parameter
+// M56: SearchDocumentSendChannels 廃止、ListDocumentSendChannels(ctx, DocumentSendChannelListOptions{NameCont: ...}) に更新。
+func TestListDocumentSendChannels_WithNameCont(t *testing.T) {
+	var gotNameCont string
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotName = r.URL.Query().Get("name")
+		gotNameCont = r.URL.Query().Get("name_cont")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`[{"id":1,"name":"Mail","memo":"","updated_at":"2026-01-01T00:00:00Z","created_at":"2026-01-01T00:00:00Z"}]`))
 	}))
@@ -3479,15 +3500,15 @@ func TestSearchDocumentSendChannels_WithName(t *testing.T) {
 
 	noSleep := func(time.Duration) {}
 	c := boardapi.New(ts.URL, "key", "token", 5*time.Second, boardapi.WithSleepFn(noSleep))
-	result, err := c.SearchDocumentSendChannels(context.Background(), boardapi.DocumentSendChannelSearchParams{Name: "Mail"})
+	result, err := c.ListDocumentSendChannels(context.Background(), boardapi.DocumentSendChannelListOptions{NameCont: "Mail"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result) != 1 {
-		t.Errorf("want 1 result, got %d", len(result))
+	if len(result.Items) != 1 {
+		t.Errorf("want 1 result, got %d", len(result.Items))
 	}
-	if gotName != "Mail" {
-		t.Errorf("name param: want %q, got %q", "Mail", gotName)
+	if gotNameCont != "Mail" {
+		t.Errorf("name_cont param: want %q, got %q", "Mail", gotNameCont)
 	}
 }
 

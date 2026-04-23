@@ -76,12 +76,12 @@ func TestDocumentSendChannelRepository_List_CacheHit(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeDocumentSendChannelRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{})
+	got, err := repo.List(context.Background(), repository.ReadOptions{}, boardapi.DocumentSendChannelListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(got) != len(sampleDocumentSendChannels) {
-		t.Errorf("len(got) = %d, want %d", len(got), len(sampleDocumentSendChannels))
+	if len(got.Items) != len(sampleDocumentSendChannels) {
+		t.Errorf("len(got.Items) = %d, want %d", len(got.Items), len(sampleDocumentSendChannels))
 	}
 }
 
@@ -93,12 +93,12 @@ func TestDocumentSendChannelRepository_List_InitialLoad(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeDocumentSendChannelRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{})
+	got, err := repo.List(context.Background(), repository.ReadOptions{}, boardapi.DocumentSendChannelListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(got) != len(sampleDocumentSendChannels) {
-		t.Errorf("len(got) = %d, want %d", len(got), len(sampleDocumentSendChannels))
+	if len(got.Items) != len(sampleDocumentSendChannels) {
+		t.Errorf("len(got.Items) = %d, want %d", len(got.Items), len(sampleDocumentSendChannels))
 	}
 }
 
@@ -161,17 +161,20 @@ func TestDocumentSendChannelRepository_GetByID_CacheMiss_APIError(t *testing.T) 
 	}
 }
 
-// T_DSC06: Search - Name filter -> returns matching items
+// T_DSC06: Search - Name filter -> bypasses cache, returns data from API
 func TestDocumentSendChannelRepository_Search_NameFilter(t *testing.T) {
 	db := newTestDB(t)
-	seedDocumentSendChannelCache(t, db, sampleDocumentSendChannels)
 	markSynced(t, db, "document_send_channels")
 
-	srv := newDocumentSendChannelAPIServer(t, nil)
+	// API サーバーは name_cont=Mail に合致する 1 件を返すと想定
+	filtered := []boardapi.DocumentSendChannelEntity{
+		{ID: 1, Name: "Mail", UpdatedAt: "2026-01-01T00:00:00Z"},
+	}
+	srv := newDocumentSendChannelAPIServer(t, filtered)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeDocumentSendChannelRepo(t, db, apiClient, false)
-	got, err := repo.Search(context.Background(), boardapi.DocumentSendChannelSearchParams{Name: "Mail"}, repository.ReadOptions{})
+	got, err := repo.Search(context.Background(), boardapi.DocumentSendChannelListOptions{NameCont: "Mail"}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
@@ -190,7 +193,7 @@ func TestDocumentSendChannelRepository_Search_NoFilter(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeDocumentSendChannelRepo(t, db, apiClient, false)
-	got, err := repo.Search(context.Background(), boardapi.DocumentSendChannelSearchParams{}, repository.ReadOptions{})
+	got, err := repo.Search(context.Background(), boardapi.DocumentSendChannelListOptions{}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}

@@ -130,17 +130,21 @@ type VendorContactRepo interface {
 }
 
 // UserRepo is the repository interface for users.
+//
+// M56 以降: Search は UserListOptions（Ransack スタイル）を受け取る。
+// 旧 UserSearchParams は削除。
 type UserRepo interface {
-	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.UserEntity, error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.UserEntity, error)
-	Search(ctx context.Context, params boardapi.UserSearchParams, opts repository.ReadOptions) ([]boardapi.UserEntity, error)
+	Search(ctx context.Context, filter boardapi.UserListOptions, opts repository.ReadOptions) ([]boardapi.UserEntity, error)
 }
 
 // GroupRepo is the repository interface for groups.
+//
+// M56 以降: Search は GroupListOptions（Ransack スタイル）を受け取る。
+// 旧 GroupSearchParams は削除。
 type GroupRepo interface {
-	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.GroupEntity, error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.GroupEntity, error)
-	Search(ctx context.Context, params boardapi.GroupSearchParams, opts repository.ReadOptions) ([]boardapi.GroupEntity, error)
+	Search(ctx context.Context, filter boardapi.GroupListOptions, opts repository.ReadOptions) ([]boardapi.GroupEntity, error)
 }
 
 // Repos holds all repository dependencies for the find service.

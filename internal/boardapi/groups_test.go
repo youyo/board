@@ -17,10 +17,7 @@ import (
 )
 
 // newGroupsMockClient returns a boardapi.Client whose HTTP client routes every
-// request through rt. Mirrors newPurchaseTypesMockClient (M06) and
-// newPaymentTermsMockClient (M04) to keep unit tests runnable in the sandbox
-// where opening a local listener is denied. The shared roundTripperFunc and
-// jsonResp helpers are defined in accounting_types_test.go (package-scope).
+// request through rt.
 func newGroupsMockClient(rt roundTripperFunc) *boardapi.Client {
 	hc := &http.Client{Transport: rt, Timeout: 5 * time.Second}
 	return boardapi.New("https://mock.example.test", "test-key", "test-token", 5*time.Second,
@@ -30,9 +27,8 @@ func newGroupsMockClient(rt roundTripperFunc) *boardapi.Client {
 }
 
 // U1: ListGroupsRaw returns the raw JSON array body byte-for-byte when a single
-// page response is served. The exact JSON bytes the server emits must be
-// preserved inside the returned array payload (element contents and order must
-// not change) because StrictFieldDiff relies on the original response shape.
+// page response is served.
+// M56: ListGroupsRaw(ctx, GroupListOptions) に更新。
 func TestListGroupsRaw_SinglePage(t *testing.T) {
 	page1 := `[{"id":1,"name":"Alpha","memo":"m","updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}]`
 	var gotPath string
@@ -44,7 +40,7 @@ func TestListGroupsRaw_SinglePage(t *testing.T) {
 	})
 	client := newGroupsMockClient(rt)
 
-	raw, err := client.ListGroupsRaw(context.Background())
+	raw, _, err := client.ListGroupsRaw(context.Background(), boardapi.GroupListOptions{})
 	if err != nil {
 		t.Fatalf("ListGroupsRaw: %v", err)
 	}
@@ -72,9 +68,7 @@ func TestListGroupsRaw_SinglePage(t *testing.T) {
 }
 
 // U2: ListGroupsRaw concatenates multiple pages into a single valid JSON array.
-// per_page=2 forces pagination; server returns 2 items on page 1 and 1 item on
-// page 2. Result must be a JSON array of 3 items, preserving original element
-// JSON byte-for-byte.
+// M56: ListGroupsRaw(ctx, GroupListOptions{PerPage: 2}) に更新。
 func TestListGroupsRaw_MultiPage(t *testing.T) {
 	page1Items := []string{
 		`{"id":1,"name":"A","memo":"","updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}`,
@@ -103,7 +97,7 @@ func TestListGroupsRaw_MultiPage(t *testing.T) {
 	})
 	client := newGroupsMockClient(rt)
 
-	raw, err := client.ListGroupsRaw(context.Background(), boardapi.WithPerPage(2))
+	raw, _, err := client.ListGroupsRaw(context.Background(), boardapi.GroupListOptions{PerPage: 2})
 	if err != nil {
 		t.Fatalf("ListGroupsRaw: %v", err)
 	}
@@ -126,6 +120,7 @@ func TestListGroupsRaw_MultiPage(t *testing.T) {
 }
 
 // U3: GetGroupRaw returns body exactly as served (single object).
+// M56: GetGroupRaw(ctx, id) -> ([]byte, http.Header, error) に更新。
 func TestGetGroupRaw_Success(t *testing.T) {
 	body := []byte(`{"id":42,"name":"Engineering","memo":"mm","updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}`)
 	var gotPath string
@@ -139,7 +134,7 @@ func TestGetGroupRaw_Success(t *testing.T) {
 	})
 	client := newGroupsMockClient(rt)
 
-	raw, err := client.GetGroupRaw(context.Background(), 42)
+	raw, _, err := client.GetGroupRaw(context.Background(), 42)
 	if err != nil {
 		t.Fatalf("GetGroupRaw: %v", err)
 	}
@@ -152,6 +147,7 @@ func TestGetGroupRaw_Success(t *testing.T) {
 }
 
 // U4: GetGroupRaw on 404 returns *APIError{Code: APIErrorNotFound}.
+// M56: GetGroupRaw(ctx, id) -> ([]byte, http.Header, error) に更新。
 func TestGetGroupRaw_NotFound(t *testing.T) {
 	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
 		return &http.Response{
@@ -162,7 +158,7 @@ func TestGetGroupRaw_NotFound(t *testing.T) {
 	})
 	client := newGroupsMockClient(rt)
 
-	_, err := client.GetGroupRaw(context.Background(), 99)
+	_, _, err := client.GetGroupRaw(context.Background(), 99)
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}
@@ -175,26 +171,29 @@ func TestGetGroupRaw_NotFound(t *testing.T) {
 	}
 }
 
-// U5: ListGroupsRaw without WithPerPage uses the client default per_page=100.
-// M06 までは Search Raw のクエリ検証ケースで 5 本目を埋めていたが、M07 は
-// Search Raw を提供しないため、その代わりに「既定 per_page」の検証を入れて
-// 5 ケース構成を維持する。
-func TestListGroupsRaw_DefaultQueryParams(t *testing.T) {
-	var observedPage, observedPerPage string
+// U5: ListGroupsRaw with NameCont sends name_cont in the query.
+// M56: Ransack スタイルフィルタ検証。
+func TestListGroupsRaw_NameCont(t *testing.T) {
+	page1 := `[{"id":7,"name":"keyword","memo":"","updated_at":"2024-02-01T00:00:00+09:00","created_at":"2024-02-01T00:00:00+09:00"}]`
+	var observedNameCont string
 	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
-		observedPage = r.URL.Query().Get("page")
-		observedPerPage = r.URL.Query().Get("per_page")
-		return jsonResp("[]"), nil
+		observedNameCont = r.URL.Query().Get("name_cont")
+		return jsonResp(page1), nil
 	})
 	client := newGroupsMockClient(rt)
 
-	if _, err := client.ListGroupsRaw(context.Background()); err != nil {
+	raw, _, err := client.ListGroupsRaw(context.Background(), boardapi.GroupListOptions{NameCont: "keyword"})
+	if err != nil {
 		t.Fatalf("ListGroupsRaw: %v", err)
 	}
-	if observedPage != "1" {
-		t.Errorf("page = %q, want 1", observedPage)
+	if observedNameCont != "keyword" {
+		t.Errorf("name_cont = %q, want keyword", observedNameCont)
 	}
-	if observedPerPage != "100" {
-		t.Errorf("per_page = %q, want 100 (client default)", observedPerPage)
+	var arr []map[string]any
+	if err := json.Unmarshal(raw, &arr); err != nil {
+		t.Fatalf("returned raw is not a valid JSON array: %v", err)
+	}
+	if len(arr) != 1 {
+		t.Fatalf("expected 1 element, got %d", len(arr))
 	}
 }

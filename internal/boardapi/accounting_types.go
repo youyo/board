@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 )
 
 // AccountingTypeEntity is a BOARD API accounting type entity.
@@ -18,48 +17,77 @@ type AccountingTypeEntity struct {
 	CreatedAt string `json:"created_at"` // ISO 8601
 }
 
-// AccountingTypeSearchParams is the parameter for SearchAccountingTypes.
-type AccountingTypeSearchParams struct {
-	Name          string
-	UpdatedAtFrom string
+// AccountingTypeListOptions は GET /v1/accounting_types のクエリパラメータ（Ransack スタイル）。
+// ゼロ値は API に送信しない。AccountingTypeListOptions{} はフィルタなしの全件取得を意味する。
+//
+// M56 で導入。旧 AccountingTypeSearchParams を置き換える破壊的変更。
+type AccountingTypeListOptions struct {
+	// 共通ページネーション（通常は ListAllWithResult が page を上書きする）
+	Page    int
+	PerPage int
+
+	// 全 List 共通
+	UpdatedAtGteq     string // "YYYY-MM-DD HH:MM:SS"
+	UpdatedAtLteq     string
+	IncludeArchiveFlg *bool // nil=送らない, true=1, false=0
+
+	// accounting_types 専用（Ransack 準拠）
+	NameCont string // 経理種別名部分一致（Ransack _cont）
 }
 
-// ListAccountingTypes retrieves all accounting types.
-// Pagination is automatically handled by ListAll.
-func (c *Client) ListAccountingTypes(ctx context.Context) ([]AccountingTypeEntity, error) {
-	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+// buildAccountingTypesQuery は GET /v1/accounting_types の Ransack スタイルクエリ文字列を組み立てる。
+func buildAccountingTypesQuery(opts AccountingTypeListOptions, page, perPage int) string {
+	return NewQueryBuilder().
+		Page(page, perPage).
+		StrCont("name", opts.NameCont).
+		DateGteq("updated_at", opts.UpdatedAtGteq).
+		DateLteq("updated_at", opts.UpdatedAtLteq).
+		Flg01("include_archive_flg", opts.IncludeArchiveFlg).
+		Encode()
+}
+
+// ListAccountingTypes は与えられたオプションでフィルタした経理種別を取得する。
+// ページネーションは ListAllWithResult が内部で処理する。メタデータは
+// 返り値の *ListResult 経由で参照できる。
+//
+// フィルタなしの全件取得は AccountingTypeListOptions{} を渡す。
+func (c *Client) ListAccountingTypes(ctx context.Context, opts AccountingTypeListOptions) (*ListResult[AccountingTypeEntity], error) {
+	perPage := opts.PerPage
+	makeReq := func(ctx context.Context, page, pp int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/accounting_types", nil)
 		if err != nil {
 			return nil, err
 		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		req.URL.RawQuery = q.Encode()
+		req.URL.RawQuery = buildAccountingTypesQuery(opts, page, pp)
 		return req, nil
 	}
-	items, err := c.ListAll(ctx, makeReq)
+	var listOpts []ListAllOption
+	if perPage > 0 {
+		listOpts = append(listOpts, WithPerPage(perPage))
+	}
+	raw, err := c.ListAllWithResult(ctx, makeReq, listOpts...)
 	if err != nil {
 		return nil, err
 	}
-	result := make([]AccountingTypeEntity, 0, len(items))
-	for _, raw := range items {
+	items := make([]AccountingTypeEntity, 0, len(raw.Items))
+	for _, b := range raw.Items {
 		var x AccountingTypeEntity
-		if err := json.Unmarshal(raw, &x); err != nil {
+		if err := json.Unmarshal(b, &x); err != nil {
 			return nil, &APIError{Code: APIErrorUnknown, Message: "ListAccountingTypes: unmarshal: " + err.Error()}
 		}
-		result = append(result, x)
+		items = append(items, x)
 	}
-	return result, nil
+	return &ListResult[AccountingTypeEntity]{Items: items, Meta: raw.Meta, Headers: raw.Headers}, nil
 }
 
-// GetAccountingType retrieves the accounting type with the specified ID.
-func (c *Client) GetAccountingType(ctx context.Context, id int) (*AccountingTypeEntity, error) {
+// GetAccountingType は指定 ID の経理種別を取得する。
+// レスポンスメタデータ（ETag・レート制限・Last-Modified）は *ItemResult 経由で参照できる。
+func (c *Client) GetAccountingType(ctx context.Context, id int) (*ItemResult[AccountingTypeEntity], error) {
 	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/accounting_types/%d", id), nil)
 	if err != nil {
 		return nil, err
 	}
-	body, err := c.DoWithRetry(req)
+	body, headers, err := c.DoWithRetryFull(req)
 	if err != nil {
 		return nil, err
 	}
@@ -67,132 +95,47 @@ func (c *Client) GetAccountingType(ctx context.Context, id int) (*AccountingType
 	if err := json.Unmarshal(body, &x); err != nil {
 		return nil, &APIError{Code: APIErrorUnknown, Message: "GetAccountingType: unmarshal: " + err.Error()}
 	}
-	return &x, nil
+	return &ItemResult[AccountingTypeEntity]{
+		Item:    &x,
+		Meta:    parseItemMeta(headers),
+		Headers: headers,
+	}, nil
 }
 
-// SearchAccountingTypes searches accounting types with the given conditions.
-// Pagination is automatically handled by ListAll.
-func (c *Client) SearchAccountingTypes(ctx context.Context, params AccountingTypeSearchParams) ([]AccountingTypeEntity, error) {
-	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+// ListAccountingTypesRaw は与えられたオプションでフィルタした経理種別の生 JSON 配列と
+// 最終ページのレスポンスヘッダーを返す。バイト列は BOARD API が返したものをそのまま保持するため、
+// E2E の strict field diff に使用できる。通常の呼び出しには ListAccountingTypes を使うこと。
+func (c *Client) ListAccountingTypesRaw(ctx context.Context, opts AccountingTypeListOptions) ([]byte, http.Header, error) {
+	perPage := opts.PerPage
+	makeReq := func(ctx context.Context, page, pp int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/accounting_types", nil)
 		if err != nil {
 			return nil, err
 		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		if params.Name != "" {
-			q.Set("name", params.Name)
-		}
-		if params.UpdatedAtFrom != "" {
-			q.Set("updated_at_from", params.UpdatedAtFrom)
-		}
-		req.URL.RawQuery = q.Encode()
+		req.URL.RawQuery = buildAccountingTypesQuery(opts, page, pp)
 		return req, nil
 	}
-	items, err := c.ListAll(ctx, makeReq)
+	var listOpts []ListAllOption
+	if perPage > 0 {
+		listOpts = append(listOpts, WithPerPage(perPage))
+	}
+	raw, err := c.ListAllWithResult(ctx, makeReq, listOpts...)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	result := make([]AccountingTypeEntity, 0, len(items))
-	for _, raw := range items {
-		var x AccountingTypeEntity
-		if err := json.Unmarshal(raw, &x); err != nil {
-			return nil, &APIError{Code: APIErrorUnknown, Message: "SearchAccountingTypes: unmarshal: " + err.Error()}
-		}
-		result = append(result, x)
+	out, err := json.Marshal(raw.Items)
+	if err != nil {
+		return nil, nil, &APIError{Code: APIErrorUnknown, Message: "ListAccountingTypesRaw: marshal aggregate: " + err.Error()}
 	}
-	return result, nil
+	return out, raw.Headers, nil
 }
 
-// ListAccountingTypesPage retrieves a single page of accounting types.
-func (c *Client) ListAccountingTypesPage(ctx context.Context, page, perPage int) (*PageResult[AccountingTypeEntity], error) {
-	makeReq := func(ctx context.Context, p, pp int) (*http.Request, error) {
-		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/accounting_types", nil)
-		if err != nil {
-			return nil, err
-		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(p))
-		q.Set("per_page", strconv.Itoa(pp))
-		req.URL.RawQuery = q.Encode()
-		return req, nil
-	}
-	return ListPage[AccountingTypeEntity](c, ctx, makeReq, page, perPage)
-}
-
-// ListAccountingTypesRaw retrieves all accounting types and returns the raw
-// HTTP response bodies merged across pages as a single JSON array.
-// Unlike ListAccountingTypes, the returned bytes are byte-preserving: each
-// element JSON is exactly what the BOARD API emitted, enabling strict field
-// diff in E2E tests to detect keys that are not mapped to AccountingTypeEntity.
-//
-// Intended for E2E strict field diff; regular callers should use ListAccountingTypes.
-func (c *Client) ListAccountingTypesRaw(ctx context.Context, opts ...ListAllOption) ([]byte, error) {
-	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
-		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/accounting_types", nil)
-		if err != nil {
-			return nil, err
-		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		req.URL.RawQuery = q.Encode()
-		return req, nil
-	}
-	items, err := c.ListAll(ctx, makeReq, opts...)
-	if err != nil {
-		return nil, err
-	}
-	out, err := json.Marshal(items)
-	if err != nil {
-		return nil, &APIError{Code: APIErrorUnknown, Message: "ListAccountingTypesRaw: marshal aggregate: " + err.Error()}
-	}
-	return out, nil
-}
-
-// GetAccountingTypeRaw retrieves a single accounting type and returns the raw
-// HTTP response body byte-for-byte.
-//
-// Intended for E2E strict field diff; regular callers should use GetAccountingType.
-func (c *Client) GetAccountingTypeRaw(ctx context.Context, id int) ([]byte, error) {
+// GetAccountingTypeRaw は指定 ID の経理種別の生 HTTP レスポンスボディとヘッダーを返す。
+// E2E の strict field diff に使用できる。通常の呼び出しには GetAccountingType を使うこと。
+func (c *Client) GetAccountingTypeRaw(ctx context.Context, id int) ([]byte, http.Header, error) {
 	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/accounting_types/%d", id), nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return c.DoWithRetry(req)
-}
-
-// SearchAccountingTypesRaw retrieves accounting types matching the given search
-// parameters and returns the raw HTTP response bodies merged across pages as a
-// single JSON array. Same byte-preserving guarantee as ListAccountingTypesRaw.
-//
-// Intended for E2E strict field diff; regular callers should use SearchAccountingTypes.
-func (c *Client) SearchAccountingTypesRaw(ctx context.Context, params AccountingTypeSearchParams, opts ...ListAllOption) ([]byte, error) {
-	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
-		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/accounting_types", nil)
-		if err != nil {
-			return nil, err
-		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		if params.Name != "" {
-			q.Set("name", params.Name)
-		}
-		if params.UpdatedAtFrom != "" {
-			q.Set("updated_at_from", params.UpdatedAtFrom)
-		}
-		req.URL.RawQuery = q.Encode()
-		return req, nil
-	}
-	items, err := c.ListAll(ctx, makeReq, opts...)
-	if err != nil {
-		return nil, err
-	}
-	out, err := json.Marshal(items)
-	if err != nil {
-		return nil, &APIError{Code: APIErrorUnknown, Message: "SearchAccountingTypesRaw: marshal aggregate: " + err.Error()}
-	}
-	return out, nil
+	return c.DoWithRetryFull(req)
 }

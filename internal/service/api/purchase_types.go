@@ -7,25 +7,14 @@ import (
 	"github.com/youyo/board/internal/repository"
 )
 
-// ListPurchaseTypes returns all purchase types.
-func (s *Service) ListPurchaseTypes(ctx context.Context, opts repository.ReadOptions) ([]boardapi.PurchaseTypeEntity, error) {
-	return s.purchaseTypes.List(ctx, opts)
+// ListPurchaseTypes returns purchase types filtered by the given options.
+// Pass boardapi.PurchaseTypeListOptions{} for an unfiltered list (cache-backed).
+// Non-zero filter bypasses the cache (see repository.PurchaseTypeRepository.List).
+func (s *Service) ListPurchaseTypes(ctx context.Context, readOpts repository.ReadOptions, filter boardapi.PurchaseTypeListOptions) (*boardapi.ListResult[boardapi.PurchaseTypeEntity], error) {
+	return s.purchaseTypes.List(ctx, readOpts, filter)
 }
 
 // GetPurchaseType returns a purchase type by ID.
 func (s *Service) GetPurchaseType(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.PurchaseTypeEntity, error) {
 	return s.purchaseTypes.GetByID(ctx, id, opts)
-}
-
-// SearchPurchaseTypes returns purchase types filtered by the given parameters.
-func (s *Service) SearchPurchaseTypes(ctx context.Context, params boardapi.PurchaseTypeSearchParams, opts repository.ReadOptions) ([]boardapi.PurchaseTypeEntity, error) {
-	return s.purchaseTypes.Search(ctx, params, opts)
-}
-
-// ListPurchaseTypesPage returns a single page of purchase types.
-// TODO(M57): PageResult は M57 で ListResult[T] に移行予定。
-//
-//nolint:staticcheck
-func (s *Service) ListPurchaseTypesPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.PurchaseTypeEntity], error) {
-	return s.purchaseTypes.ListPage(ctx, page, perPage)
 }

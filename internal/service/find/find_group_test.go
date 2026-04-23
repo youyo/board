@@ -55,7 +55,7 @@ func TestFindGroup_ByText(t *testing.T) {
 
 	svc := newServiceWith(
 		nil, nil, nil, nil,
-		&stubGroupRepo{listResult: allGroups},
+		&stubGroupRepo{searchResult: allGroups},
 	)
 
 	got, err := svc.FindGroup(testCtx, find.FindGroupQuery{Text: "dev"})
@@ -121,7 +121,6 @@ func TestFindGroup_NamePriorityOverText(t *testing.T) {
 		nil, nil, nil, nil,
 		&stubGroupRepo{
 			searchResult: searchResult,
-			listResult:   []boardapi.GroupEntity{{ID: 2, Name: "List Result"}},
 		},
 	)
 

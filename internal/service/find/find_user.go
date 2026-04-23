@@ -27,14 +27,14 @@ func (s *Service) FindUser(ctx context.Context, q FindUserQuery) ([]UserResult, 
 		users = []boardapi.UserEntity{*u}
 
 	case q.Name != "":
-		result, err := s.users.Search(ctx, boardapi.UserSearchParams{Name: q.Name}, opts)
+		result, err := s.users.Search(ctx, boardapi.UserListOptions{NameCont: q.Name}, opts)
 		if err != nil {
 			return nil, err
 		}
 		users = result
 
 	case q.Text != "":
-		all, err := s.users.List(ctx, opts)
+		all, err := s.users.Search(ctx, boardapi.UserListOptions{}, opts)
 		if err != nil {
 			return nil, err
 		}

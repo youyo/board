@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 )
 
 // PurchaseTypeEntity is a BOARD API purchase type entity.
-// Corresponds to one element in the GET /v1/purchase_types response.
+// Corresponds to one element in the GET /v1/expenditure_types response.
+// 注意: BOARD API の実パスは /v1/expenditure_types（/v1/purchase_types ではない）。
 type PurchaseTypeEntity struct {
 	ID        int    `json:"id"`
 	Name      string `json:"name"`
@@ -18,48 +18,79 @@ type PurchaseTypeEntity struct {
 	CreatedAt string `json:"created_at"` // ISO 8601
 }
 
-// PurchaseTypeSearchParams is the parameter for SearchPurchaseTypes.
-type PurchaseTypeSearchParams struct {
-	Name          string
-	UpdatedAtFrom string
+// PurchaseTypeListOptions は GET /v1/expenditure_types のクエリパラメータ（Ransack スタイル）。
+// ゼロ値は API に送信しない。PurchaseTypeListOptions{} はフィルタなしの全件取得を意味する。
+//
+// M56 で導入。旧 PurchaseTypeSearchParams を置き換える破壊的変更。
+type PurchaseTypeListOptions struct {
+	// 共通ページネーション（通常は ListAllWithResult が page を上書きする）
+	Page    int
+	PerPage int
+
+	// 全 List 共通
+	UpdatedAtGteq     string // "YYYY-MM-DD HH:MM:SS"
+	UpdatedAtLteq     string
+	IncludeArchiveFlg *bool // nil=送らない, true=1, false=0
+
+	// purchase_types 専用（Ransack 準拠）
+	NameCont string // 仕入種別名部分一致（Ransack _cont）
 }
 
-// ListPurchaseTypes retrieves all purchase types.
-// Pagination is automatically handled by ListAll.
-func (c *Client) ListPurchaseTypes(ctx context.Context) ([]PurchaseTypeEntity, error) {
-	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+// buildPurchaseTypesQuery は GET /v1/expenditure_types の Ransack スタイルクエリ文字列を組み立てる。
+func buildPurchaseTypesQuery(opts PurchaseTypeListOptions, page, perPage int) string {
+	return NewQueryBuilder().
+		Page(page, perPage).
+		StrCont("name", opts.NameCont).
+		DateGteq("updated_at", opts.UpdatedAtGteq).
+		DateLteq("updated_at", opts.UpdatedAtLteq).
+		Flg01("include_archive_flg", opts.IncludeArchiveFlg).
+		Encode()
+}
+
+// ListPurchaseTypes は与えられたオプションでフィルタした仕入種別を取得する。
+// ページネーションは ListAllWithResult が内部で処理する。メタデータは
+// 返り値の *ListResult 経由で参照できる。
+//
+// 注意: BOARD API の実パスは /v1/expenditure_types（/v1/purchase_types ではない）。
+// フィルタなしの全件取得は PurchaseTypeListOptions{} を渡す。
+func (c *Client) ListPurchaseTypes(ctx context.Context, opts PurchaseTypeListOptions) (*ListResult[PurchaseTypeEntity], error) {
+	perPage := opts.PerPage
+	makeReq := func(ctx context.Context, page, pp int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/expenditure_types", nil)
 		if err != nil {
 			return nil, err
 		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		req.URL.RawQuery = q.Encode()
+		req.URL.RawQuery = buildPurchaseTypesQuery(opts, page, pp)
 		return req, nil
 	}
-	items, err := c.ListAll(ctx, makeReq)
+	var listOpts []ListAllOption
+	if perPage > 0 {
+		listOpts = append(listOpts, WithPerPage(perPage))
+	}
+	raw, err := c.ListAllWithResult(ctx, makeReq, listOpts...)
 	if err != nil {
 		return nil, err
 	}
-	result := make([]PurchaseTypeEntity, 0, len(items))
-	for _, raw := range items {
+	items := make([]PurchaseTypeEntity, 0, len(raw.Items))
+	for _, b := range raw.Items {
 		var x PurchaseTypeEntity
-		if err := json.Unmarshal(raw, &x); err != nil {
+		if err := json.Unmarshal(b, &x); err != nil {
 			return nil, &APIError{Code: APIErrorUnknown, Message: "ListPurchaseTypes: unmarshal: " + err.Error()}
 		}
-		result = append(result, x)
+		items = append(items, x)
 	}
-	return result, nil
+	return &ListResult[PurchaseTypeEntity]{Items: items, Meta: raw.Meta, Headers: raw.Headers}, nil
 }
 
-// GetPurchaseType retrieves the purchase type with the specified ID.
-func (c *Client) GetPurchaseType(ctx context.Context, id int) (*PurchaseTypeEntity, error) {
+// GetPurchaseType は指定 ID の仕入種別を取得する。
+// 注意: BOARD API の実パスは /v1/expenditure_types/{id}。
+// レスポンスメタデータ（ETag・レート制限・Last-Modified）は *ItemResult 経由で参照できる。
+func (c *Client) GetPurchaseType(ctx context.Context, id int) (*ItemResult[PurchaseTypeEntity], error) {
 	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/expenditure_types/%d", id), nil)
 	if err != nil {
 		return nil, err
 	}
-	body, err := c.DoWithRetry(req)
+	body, headers, err := c.DoWithRetryFull(req)
 	if err != nil {
 		return nil, err
 	}
@@ -67,132 +98,47 @@ func (c *Client) GetPurchaseType(ctx context.Context, id int) (*PurchaseTypeEnti
 	if err := json.Unmarshal(body, &x); err != nil {
 		return nil, &APIError{Code: APIErrorUnknown, Message: "GetPurchaseType: unmarshal: " + err.Error()}
 	}
-	return &x, nil
+	return &ItemResult[PurchaseTypeEntity]{
+		Item:    &x,
+		Meta:    parseItemMeta(headers),
+		Headers: headers,
+	}, nil
 }
 
-// SearchPurchaseTypes searches purchase types with the given conditions.
-// Pagination is automatically handled by ListAll.
-func (c *Client) SearchPurchaseTypes(ctx context.Context, params PurchaseTypeSearchParams) ([]PurchaseTypeEntity, error) {
-	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+// ListPurchaseTypesRaw は与えられたオプションでフィルタした仕入種別の生 JSON 配列と
+// 最終ページのレスポンスヘッダーを返す。バイト列は BOARD API が返したものをそのまま保持するため、
+// E2E の strict field diff に使用できる。通常の呼び出しには ListPurchaseTypes を使うこと。
+func (c *Client) ListPurchaseTypesRaw(ctx context.Context, opts PurchaseTypeListOptions) ([]byte, http.Header, error) {
+	perPage := opts.PerPage
+	makeReq := func(ctx context.Context, page, pp int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/expenditure_types", nil)
 		if err != nil {
 			return nil, err
 		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		if params.Name != "" {
-			q.Set("name", params.Name)
-		}
-		if params.UpdatedAtFrom != "" {
-			q.Set("updated_at_from", params.UpdatedAtFrom)
-		}
-		req.URL.RawQuery = q.Encode()
+		req.URL.RawQuery = buildPurchaseTypesQuery(opts, page, pp)
 		return req, nil
 	}
-	items, err := c.ListAll(ctx, makeReq)
+	var listOpts []ListAllOption
+	if perPage > 0 {
+		listOpts = append(listOpts, WithPerPage(perPage))
+	}
+	raw, err := c.ListAllWithResult(ctx, makeReq, listOpts...)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	result := make([]PurchaseTypeEntity, 0, len(items))
-	for _, raw := range items {
-		var x PurchaseTypeEntity
-		if err := json.Unmarshal(raw, &x); err != nil {
-			return nil, &APIError{Code: APIErrorUnknown, Message: "SearchPurchaseTypes: unmarshal: " + err.Error()}
-		}
-		result = append(result, x)
+	out, err := json.Marshal(raw.Items)
+	if err != nil {
+		return nil, nil, &APIError{Code: APIErrorUnknown, Message: "ListPurchaseTypesRaw: marshal aggregate: " + err.Error()}
 	}
-	return result, nil
+	return out, raw.Headers, nil
 }
 
-// ListPurchaseTypesPage retrieves a single page of PurchaseTypeEntity.
-func (c *Client) ListPurchaseTypesPage(ctx context.Context, page, perPage int) (*PageResult[PurchaseTypeEntity], error) {
-	makeReq := func(ctx context.Context, p, pp int) (*http.Request, error) {
-		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/expenditure_types", nil)
-		if err != nil {
-			return nil, err
-		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(p))
-		q.Set("per_page", strconv.Itoa(pp))
-		req.URL.RawQuery = q.Encode()
-		return req, nil
-	}
-	return ListPage[PurchaseTypeEntity](c, ctx, makeReq, page, perPage)
-}
-
-// ListPurchaseTypesRaw retrieves all purchase types and returns the raw HTTP
-// response bodies merged across pages as a single JSON array.
-// Unlike ListPurchaseTypes, the returned bytes are byte-preserving: each
-// element JSON is exactly what the BOARD API emitted, enabling strict field
-// diff in E2E tests to detect keys that are not mapped to PurchaseTypeEntity.
-//
-// Intended for E2E strict field diff; regular callers should use ListPurchaseTypes.
-func (c *Client) ListPurchaseTypesRaw(ctx context.Context, opts ...ListAllOption) ([]byte, error) {
-	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
-		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/expenditure_types", nil)
-		if err != nil {
-			return nil, err
-		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		req.URL.RawQuery = q.Encode()
-		return req, nil
-	}
-	items, err := c.ListAll(ctx, makeReq, opts...)
-	if err != nil {
-		return nil, err
-	}
-	out, err := json.Marshal(items)
-	if err != nil {
-		return nil, &APIError{Code: APIErrorUnknown, Message: "ListPurchaseTypesRaw: marshal aggregate: " + err.Error()}
-	}
-	return out, nil
-}
-
-// GetPurchaseTypeRaw retrieves a single purchase type and returns the raw HTTP
-// response body byte-for-byte.
-//
-// Intended for E2E strict field diff; regular callers should use GetPurchaseType.
-func (c *Client) GetPurchaseTypeRaw(ctx context.Context, id int) ([]byte, error) {
+// GetPurchaseTypeRaw は指定 ID の仕入種別の生 HTTP レスポンスボディとヘッダーを返す。
+// E2E の strict field diff に使用できる。通常の呼び出しには GetPurchaseType を使うこと。
+func (c *Client) GetPurchaseTypeRaw(ctx context.Context, id int) ([]byte, http.Header, error) {
 	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/expenditure_types/%d", id), nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return c.DoWithRetry(req)
-}
-
-// SearchPurchaseTypesRaw retrieves purchase types matching the given search
-// parameters and returns the raw HTTP response bodies merged across pages as a
-// single JSON array. Same byte-preserving guarantee as ListPurchaseTypesRaw.
-//
-// Intended for E2E strict field diff; regular callers should use SearchPurchaseTypes.
-func (c *Client) SearchPurchaseTypesRaw(ctx context.Context, params PurchaseTypeSearchParams, opts ...ListAllOption) ([]byte, error) {
-	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
-		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/expenditure_types", nil)
-		if err != nil {
-			return nil, err
-		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		if params.Name != "" {
-			q.Set("name", params.Name)
-		}
-		if params.UpdatedAtFrom != "" {
-			q.Set("updated_at_from", params.UpdatedAtFrom)
-		}
-		req.URL.RawQuery = q.Encode()
-		return req, nil
-	}
-	items, err := c.ListAll(ctx, makeReq, opts...)
-	if err != nil {
-		return nil, err
-	}
-	out, err := json.Marshal(items)
-	if err != nil {
-		return nil, &APIError{Code: APIErrorUnknown, Message: "SearchPurchaseTypesRaw: marshal aggregate: " + err.Error()}
-	}
-	return out, nil
+	return c.DoWithRetryFull(req)
 }

@@ -30,9 +30,9 @@ func newPurchaseTypesMockClient(rt roundTripperFunc) *boardapi.Client {
 }
 
 // U1: ListPurchaseTypesRaw returns the raw JSON array body byte-for-byte when a
-// single page response is served. The exact JSON bytes the server emits must be
-// preserved inside the returned array payload (element contents and order must
-// not change) because StrictFieldDiff relies on the original response shape.
+// single page response is served.
+// M56: ListPurchaseTypesRaw(ctx, PurchaseTypeListOptions) に更新。
+// APIパス: /v1/expenditure_types（resource名と異なる点に注意）
 func TestListPurchaseTypesRaw_SinglePage(t *testing.T) {
 	page1 := `[{"id":1,"name":"A","memo":"m","updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}]`
 	var gotPath string
@@ -44,7 +44,7 @@ func TestListPurchaseTypesRaw_SinglePage(t *testing.T) {
 	})
 	client := newPurchaseTypesMockClient(rt)
 
-	raw, err := client.ListPurchaseTypesRaw(context.Background())
+	raw, _, err := client.ListPurchaseTypesRaw(context.Background(), boardapi.PurchaseTypeListOptions{})
 	if err != nil {
 		t.Fatalf("ListPurchaseTypesRaw: %v", err)
 	}
@@ -71,10 +71,8 @@ func TestListPurchaseTypesRaw_SinglePage(t *testing.T) {
 	}
 }
 
-// U2: ListPurchaseTypesRaw concatenates multiple pages into a single valid JSON
-// array. per_page=2 forces pagination; server returns 2 items on page 1 and 1
-// on page 2. Result must be a JSON array of 3 items, preserving original
-// element JSON byte-for-byte.
+// U2: ListPurchaseTypesRaw concatenates multiple pages into a single valid JSON array.
+// M56: ListPurchaseTypesRaw(ctx, PurchaseTypeListOptions{PerPage: 2}) に更新。
 func TestListPurchaseTypesRaw_MultiPage(t *testing.T) {
 	page1Items := []string{
 		`{"id":1,"name":"A","memo":"","updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}`,
@@ -103,7 +101,7 @@ func TestListPurchaseTypesRaw_MultiPage(t *testing.T) {
 	})
 	client := newPurchaseTypesMockClient(rt)
 
-	raw, err := client.ListPurchaseTypesRaw(context.Background(), boardapi.WithPerPage(2))
+	raw, _, err := client.ListPurchaseTypesRaw(context.Background(), boardapi.PurchaseTypeListOptions{PerPage: 2})
 	if err != nil {
 		t.Fatalf("ListPurchaseTypesRaw: %v", err)
 	}
@@ -126,6 +124,7 @@ func TestListPurchaseTypesRaw_MultiPage(t *testing.T) {
 }
 
 // U3: GetPurchaseTypeRaw returns body exactly as served (single object).
+// M56: GetPurchaseTypeRaw(ctx, id) -> ([]byte, http.Header, error) に更新。
 func TestGetPurchaseTypeRaw_Success(t *testing.T) {
 	body := []byte(`{"id":42,"name":"Foo","memo":"mm","updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}`)
 	var gotPath string
@@ -139,7 +138,7 @@ func TestGetPurchaseTypeRaw_Success(t *testing.T) {
 	})
 	client := newPurchaseTypesMockClient(rt)
 
-	raw, err := client.GetPurchaseTypeRaw(context.Background(), 42)
+	raw, _, err := client.GetPurchaseTypeRaw(context.Background(), 42)
 	if err != nil {
 		t.Fatalf("GetPurchaseTypeRaw: %v", err)
 	}
@@ -151,29 +150,30 @@ func TestGetPurchaseTypeRaw_Success(t *testing.T) {
 	}
 }
 
-// U4: SearchPurchaseTypesRaw sends name / updated_at_from in the query and returns body.
-func TestSearchPurchaseTypesRaw_QueryParams(t *testing.T) {
+// U4: ListPurchaseTypesRaw with NameCont sends name_cont in the query.
+// M56: SearchPurchaseTypesRaw 廃止、ListPurchaseTypesRaw(ctx, PurchaseTypeListOptions{NameCont: ...}) に更新。
+func TestListPurchaseTypesRaw_NameCont(t *testing.T) {
 	page1 := `[{"id":7,"name":"keyword","memo":"","updated_at":"2024-02-01T00:00:00+09:00","created_at":"2024-02-01T00:00:00+09:00"}]`
-	var observedName, observedFrom string
+	var observedNameCont, observedGteq string
 	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
-		observedName = r.URL.Query().Get("name")
-		observedFrom = r.URL.Query().Get("updated_at_from")
+		observedNameCont = r.URL.Query().Get("name_cont")
+		observedGteq = r.URL.Query().Get("updated_at_gteq")
 		return jsonResp(page1), nil
 	})
 	client := newPurchaseTypesMockClient(rt)
 
-	raw, err := client.SearchPurchaseTypesRaw(context.Background(), boardapi.PurchaseTypeSearchParams{
-		Name:          "keyword",
-		UpdatedAtFrom: "2024-01-01T00:00:00+09:00",
+	raw, _, err := client.ListPurchaseTypesRaw(context.Background(), boardapi.PurchaseTypeListOptions{
+		NameCont:      "keyword",
+		UpdatedAtGteq: "2024-01-01 00:00:00",
 	})
 	if err != nil {
-		t.Fatalf("SearchPurchaseTypesRaw: %v", err)
+		t.Fatalf("ListPurchaseTypesRaw: %v", err)
 	}
-	if observedName != "keyword" {
-		t.Errorf("query name = %q, want keyword", observedName)
+	if observedNameCont != "keyword" {
+		t.Errorf("name_cont = %q, want keyword", observedNameCont)
 	}
-	if observedFrom != "2024-01-01T00:00:00+09:00" {
-		t.Errorf("query updated_at_from = %q, want %q", observedFrom, "2024-01-01T00:00:00+09:00")
+	if observedGteq != "2024-01-01 00:00:00" {
+		t.Errorf("updated_at_gteq = %q, want %q", observedGteq, "2024-01-01 00:00:00")
 	}
 	var arr []map[string]any
 	if err := json.Unmarshal(raw, &arr); err != nil {
@@ -185,6 +185,7 @@ func TestSearchPurchaseTypesRaw_QueryParams(t *testing.T) {
 }
 
 // U5: GetPurchaseTypeRaw on 404 returns *APIError{Code: APIErrorNotFound}.
+// M56: GetPurchaseTypeRaw(ctx, id) -> ([]byte, http.Header, error) に更新。
 func TestGetPurchaseTypeRaw_NotFound(t *testing.T) {
 	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
 		return &http.Response{
@@ -195,7 +196,7 @@ func TestGetPurchaseTypeRaw_NotFound(t *testing.T) {
 	})
 	client := newPurchaseTypesMockClient(rt)
 
-	_, err := client.GetPurchaseTypeRaw(context.Background(), 99)
+	_, _, err := client.GetPurchaseTypeRaw(context.Background(), 99)
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}

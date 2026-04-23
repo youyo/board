@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/youyo/board/internal/boardapi"
@@ -49,8 +48,39 @@ func NewPurchaseTypeRepository(
 
 const purchaseTypesResource = "purchase_types"
 
-// List returns all purchase types from the cache.
-func (r *PurchaseTypeRepository) List(ctx context.Context, opts ReadOptions) ([]boardapi.PurchaseTypeEntity, error) {
+// purchaseTypeFilterIsZero は filter が空（全フィールドがゼロ値 / nil）かどうかを返す。
+// ゼロフィルタはローカルキャッシュ経路を使い、非ゼロフィルタは cache bypass で API を直呼びする。
+func purchaseTypeFilterIsZero(f boardapi.PurchaseTypeListOptions) bool {
+	return f.Page == 0 &&
+		f.PerPage == 0 &&
+		f.UpdatedAtGteq == "" &&
+		f.UpdatedAtLteq == "" &&
+		f.IncludeArchiveFlg == nil &&
+		f.NameCont == ""
+}
+
+// List は仕入種別を返す。
+//
+// 動作:
+//   - ゼロフィルタ（boardapi.PurchaseTypeListOptions{}）: ローカルキャッシュを使い
+//     refresh-on-demand（daily auto refresh, explicit Refresh / ForceRefresh）を行う。
+//     返り値の *ListResult.Meta はゼロ値（キャッシュが正）。
+//   - 非ゼロフィルタ: cache bypass で api.ListPurchaseTypes を直接呼び、サーバーサイドの
+//     Ransack フィルタ意味論を活かす。返り値の *ListResult.Meta はヘッダーから埋まる。
+//
+// readOpts.Limit は両経路の最終結果に適用される。
+func (r *PurchaseTypeRepository) List(ctx context.Context, readOpts ReadOptions, filter boardapi.PurchaseTypeListOptions) (*boardapi.ListResult[boardapi.PurchaseTypeEntity], error) {
+	if !purchaseTypeFilterIsZero(filter) {
+		// API 直接呼び出し（cache bypass）: フィルタ結果でキャッシュを汚染しない。
+		result, err := r.api.ListPurchaseTypes(ctx, filter)
+		if err != nil {
+			return nil, err
+		}
+		result.Items = applyLimit(result.Items, readOpts.Limit)
+		return result, nil
+	}
+
+	// ゼロフィルタ: 既存の cache → refresh → API fallback 経路
 	fetcher := &purchaseTypesFetcher{api: r.api}
 	now := time.Now()
 
@@ -58,16 +88,13 @@ func (r *PurchaseTypeRepository) List(ctx context.Context, opts ReadOptions) ([]
 	if err != nil {
 		return nil, err
 	}
-
-	if err := maybeRefresh(ctx, r.profile, purchaseTypesResource, opts, state, r.autoRefresh, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
+	if err := maybeRefresh(ctx, r.profile, purchaseTypesResource, readOpts, state, r.autoRefresh, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
 		return nil, err
 	}
-
 	entries, err := r.cache.List(ctx, r.profile, purchaseTypesResource)
 	if err != nil {
 		return nil, err
 	}
-
 	if len(entries) == 0 && state == nil {
 		if err := r.lockManager.WithLock(ctx, r.profile, purchaseTypesResource, func() error {
 			_, err := r.refresher.ForceRefresh(ctx, r.profile, fetcher, now, r.tz)
@@ -80,13 +107,22 @@ func (r *PurchaseTypeRepository) List(ctx context.Context, opts ReadOptions) ([]
 			return nil, err
 		}
 	}
-
 	entities, err := decodeEntries[boardapi.PurchaseTypeEntity](entries)
 	if err != nil {
 		return nil, err
 	}
+	entities = applyLimit(entities, readOpts.Limit)
+	return &boardapi.ListResult[boardapi.PurchaseTypeEntity]{Items: entities}, nil
+}
 
-	return applyLimit(entities, opts.Limit), nil
+// ListEntities は List の items のみを返す薄いラッパ。
+// find 層（Phase L では *ListResult を扱わない）向け。
+func (r *PurchaseTypeRepository) ListEntities(ctx context.Context, readOpts ReadOptions, filter boardapi.PurchaseTypeListOptions) ([]boardapi.PurchaseTypeEntity, error) {
+	result, err := r.List(ctx, readOpts, filter)
+	if err != nil {
+		return nil, err
+	}
+	return result.Items, nil
 }
 
 // GetByID returns the purchase type with the given ID from the cache.
@@ -118,13 +154,13 @@ func (r *PurchaseTypeRepository) GetByID(ctx context.Context, id int, opts ReadO
 		return &entity, nil
 	}
 
-	// Cache miss → fetch single entity from API
-	entity, err := r.api.GetPurchaseType(ctx, id)
+	// Cache miss -> fetch single entry from API
+	result, err := r.api.GetPurchaseType(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 
-	raw, err := json.Marshal(entity)
+	raw, err := json.Marshal(result.Item)
 	if err != nil {
 		return nil, err
 	}
@@ -132,37 +168,12 @@ func (r *PurchaseTypeRepository) GetByID(ctx context.Context, id int, opts ReadO
 		return nil, err
 	}
 
-	return entity, nil
+	return result.Item, nil
 }
 
-// Search returns purchase types filtered by the given parameters from the cache.
-func (r *PurchaseTypeRepository) Search(ctx context.Context, params boardapi.PurchaseTypeSearchParams, opts ReadOptions) ([]boardapi.PurchaseTypeEntity, error) {
-	listOpts := opts
-	listOpts.Limit = 0
-	all, err := r.List(ctx, listOpts)
-	if err != nil {
-		return nil, err
-	}
-	return applyLimit(filterPurchaseTypes(all, params), opts.Limit), nil
-}
-
-// filterPurchaseTypes performs in-memory filtering.
-// UpdatedAtFrom is used as a delta fetch cursor and is not included in the filter.
-func filterPurchaseTypes(entities []boardapi.PurchaseTypeEntity, params boardapi.PurchaseTypeSearchParams) []boardapi.PurchaseTypeEntity {
-	var result []boardapi.PurchaseTypeEntity
-	for _, e := range entities {
-		if params.Name != "" && !strings.Contains(e.Name, params.Name) {
-			continue
-		}
-		result = append(result, e)
-	}
-	return result
-}
-
-// ListPage retrieves a single page of PurchaseTypeEntity directly from the API (cache bypass).
-// TODO(M57): PageResult は M57 で ListResult[T] に移行予定。
+// Search は find 層向けの薄いラッパ。ListEntities と機能的に同等。
 //
-//nolint:staticcheck
-func (r *PurchaseTypeRepository) ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.PurchaseTypeEntity], error) {
-	return r.api.ListPurchaseTypesPage(ctx, page, perPage)
+// find 層は *ListResult を扱わず []PurchaseTypeEntity を維持する（Phase L の方針）。
+func (r *PurchaseTypeRepository) Search(ctx context.Context, filter boardapi.PurchaseTypeListOptions, opts ReadOptions) ([]boardapi.PurchaseTypeEntity, error) {
+	return r.ListEntities(ctx, opts, filter)
 }

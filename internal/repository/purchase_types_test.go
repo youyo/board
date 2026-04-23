@@ -76,12 +76,12 @@ func TestPurchaseTypeRepository_List_CacheHit(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makePurchaseTypeRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{})
+	got, err := repo.List(context.Background(), repository.ReadOptions{}, boardapi.PurchaseTypeListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(got) != len(samplePurchaseTypes) {
-		t.Errorf("len(got) = %d, want %d", len(got), len(samplePurchaseTypes))
+	if len(got.Items) != len(samplePurchaseTypes) {
+		t.Errorf("len(got.Items) = %d, want %d", len(got.Items), len(samplePurchaseTypes))
 	}
 }
 
@@ -93,12 +93,12 @@ func TestPurchaseTypeRepository_List_InitialLoad(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makePurchaseTypeRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{})
+	got, err := repo.List(context.Background(), repository.ReadOptions{}, boardapi.PurchaseTypeListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(got) != len(samplePurchaseTypes) {
-		t.Errorf("len(got) = %d, want %d", len(got), len(samplePurchaseTypes))
+	if len(got.Items) != len(samplePurchaseTypes) {
+		t.Errorf("len(got.Items) = %d, want %d", len(got.Items), len(samplePurchaseTypes))
 	}
 }
 
@@ -161,17 +161,20 @@ func TestPurchaseTypeRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	}
 }
 
-// T_PRCT06: Search - Name filter -> returns matching items
+// T_PRCT06: Search - Name filter -> bypasses cache, returns data from API
 func TestPurchaseTypeRepository_Search_NameFilter(t *testing.T) {
 	db := newTestDB(t)
-	seedPurchaseTypeCache(t, db, samplePurchaseTypes)
 	markSynced(t, db, "purchase_types")
 
-	srv := newPurchaseTypeAPIServer(t, nil)
+	// API サーバーは name_cont=Outsourcing に合致する 1 件を返すと想定
+	filtered := []boardapi.PurchaseTypeEntity{
+		{ID: 1, Name: "Outsourcing", UpdatedAt: "2026-01-01T00:00:00Z"},
+	}
+	srv := newPurchaseTypeAPIServer(t, filtered)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makePurchaseTypeRepo(t, db, apiClient, false)
-	got, err := repo.Search(context.Background(), boardapi.PurchaseTypeSearchParams{Name: "Outsourcing"}, repository.ReadOptions{})
+	got, err := repo.Search(context.Background(), boardapi.PurchaseTypeListOptions{NameCont: "Outsourcing"}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
@@ -190,7 +193,7 @@ func TestPurchaseTypeRepository_Search_NoFilter(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makePurchaseTypeRepo(t, db, apiClient, false)
-	got, err := repo.Search(context.Background(), boardapi.PurchaseTypeSearchParams{}, repository.ReadOptions{})
+	got, err := repo.Search(context.Background(), boardapi.PurchaseTypeListOptions{}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}

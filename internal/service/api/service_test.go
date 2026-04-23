@@ -371,11 +371,11 @@ func TestListPaymentsWithFilter(t *testing.T) {
 // --- Users tests ---
 
 func TestListUsers(t *testing.T) {
-	stub := &stubUserRepo{listResult: []boardapi.UserEntity{{ID: 1, Name: "UserA"}}}
+	stub := &stubUserRepo{listResult: &boardapi.ListResult[boardapi.UserEntity]{Items: []boardapi.UserEntity{{ID: 1, Name: "UserA"}}}}
 	svc := newServiceWithUsers(stub)
-	got, err := svc.ListUsers(testCtx, defaultOpts)
+	got, err := svc.ListUsers(testCtx, defaultOpts, boardapi.UserListOptions{})
 	assertNoError(t, err)
-	assertLen(t, got, 1)
+	assertLen(t, got.Items, 1)
 }
 
 func TestGetUser(t *testing.T) {
@@ -387,30 +387,14 @@ func TestGetUser(t *testing.T) {
 	assertNotNil(t, got)
 }
 
-func TestSearchUsers(t *testing.T) {
-	stub := &stubUserRepo{searchResult: []boardapi.UserEntity{{ID: 2, Name: "UserB"}}}
-	svc := newServiceWithUsers(stub)
-	got, err := svc.SearchUsers(testCtx, boardapi.UserSearchParams{Name: "UserB"}, defaultOpts)
-	assertNoError(t, err)
-	assertLen(t, got, 1)
-}
-
-func TestListUsersPage(t *testing.T) {
-	stub := &stubUserRepo{listPageResult: &boardapi.PageResult[boardapi.UserEntity]{Items: []boardapi.UserEntity{{ID: 1}}}} //nolint:staticcheck
-	svc := newServiceWithUsers(stub)
-	got, err := svc.ListUsersPage(testCtx, 1, 30)
-	assertNoError(t, err)
-	assertNotNil(t, got)
-}
-
 // --- Groups tests ---
 
 func TestListGroups(t *testing.T) {
-	stub := &stubGroupRepo{listResult: []boardapi.GroupEntity{{ID: 1, Name: "GroupA"}}}
+	stub := &stubGroupRepo{listResult: &boardapi.ListResult[boardapi.GroupEntity]{Items: []boardapi.GroupEntity{{ID: 1, Name: "GroupA"}}}}
 	svc := newServiceWithGroups(stub)
-	got, err := svc.ListGroups(testCtx, defaultOpts)
+	got, err := svc.ListGroups(testCtx, defaultOpts, boardapi.GroupListOptions{})
 	assertNoError(t, err)
-	assertLen(t, got, 1)
+	assertLen(t, got.Items, 1)
 }
 
 func TestGetGroup(t *testing.T) {
@@ -422,30 +406,14 @@ func TestGetGroup(t *testing.T) {
 	assertNotNil(t, got)
 }
 
-func TestSearchGroups(t *testing.T) {
-	stub := &stubGroupRepo{searchResult: []boardapi.GroupEntity{{ID: 2, Name: "GroupB"}}}
-	svc := newServiceWithGroups(stub)
-	got, err := svc.SearchGroups(testCtx, boardapi.GroupSearchParams{Name: "GroupB"}, defaultOpts)
-	assertNoError(t, err)
-	assertLen(t, got, 1)
-}
-
-func TestListGroupsPage(t *testing.T) {
-	stub := &stubGroupRepo{listPageResult: &boardapi.PageResult[boardapi.GroupEntity]{Items: []boardapi.GroupEntity{{ID: 1}}}} //nolint:staticcheck
-	svc := newServiceWithGroups(stub)
-	got, err := svc.ListGroupsPage(testCtx, 1, 30)
-	assertNoError(t, err)
-	assertNotNil(t, got)
-}
-
 // --- PaymentTerms tests ---
 
 func TestListPaymentTerms(t *testing.T) {
-	stub := &stubPaymentTermRepo{listResult: []boardapi.PaymentTermEntity{{ID: 1, Name: "PaymentTermA"}}}
+	stub := &stubPaymentTermRepo{listResult: &boardapi.ListResult[boardapi.PaymentTermEntity]{Items: []boardapi.PaymentTermEntity{{ID: 1, Name: "PaymentTermA"}}}}
 	svc := newServiceWithPaymentTerms(stub)
-	got, err := svc.ListPaymentTerms(testCtx, defaultOpts)
+	got, err := svc.ListPaymentTerms(testCtx, defaultOpts, boardapi.PaymentTermListOptions{})
 	assertNoError(t, err)
-	assertLen(t, got, 1)
+	assertLen(t, got.Items, 1)
 }
 
 func TestGetPaymentTerm(t *testing.T) {
@@ -457,30 +425,14 @@ func TestGetPaymentTerm(t *testing.T) {
 	assertNotNil(t, got)
 }
 
-func TestSearchPaymentTerms(t *testing.T) {
-	stub := &stubPaymentTermRepo{searchResult: []boardapi.PaymentTermEntity{{ID: 2, Name: "PaymentTermB"}}}
-	svc := newServiceWithPaymentTerms(stub)
-	got, err := svc.SearchPaymentTerms(testCtx, boardapi.PaymentTermSearchParams{Name: "PaymentTermB"}, defaultOpts)
-	assertNoError(t, err)
-	assertLen(t, got, 1)
-}
-
-func TestListPaymentTermsPage(t *testing.T) {
-	stub := &stubPaymentTermRepo{listPageResult: &boardapi.PageResult[boardapi.PaymentTermEntity]{Items: []boardapi.PaymentTermEntity{{ID: 1}}}} //nolint:staticcheck
-	svc := newServiceWithPaymentTerms(stub)
-	got, err := svc.ListPaymentTermsPage(testCtx, 1, 30)
-	assertNoError(t, err)
-	assertNotNil(t, got)
-}
-
 // --- ProjectTypes tests ---
 
 func TestListProjectTypes(t *testing.T) {
-	stub := &stubProjectTypeRepo{listResult: []boardapi.ProjectTypeEntity{{ID: 1, Name: "ProjectTypeA"}}}
+	stub := &stubProjectTypeRepo{listResult: &boardapi.ListResult[boardapi.ProjectTypeEntity]{Items: []boardapi.ProjectTypeEntity{{ID: 1, Name: "ProjectTypeA"}}}}
 	svc := newServiceWithProjectTypes(stub)
-	got, err := svc.ListProjectTypes(testCtx, defaultOpts)
+	got, err := svc.ListProjectTypes(testCtx, defaultOpts, boardapi.ProjectTypeListOptions{})
 	assertNoError(t, err)
-	assertLen(t, got, 1)
+	assertLen(t, got.Items, 1)
 }
 
 func TestGetProjectType(t *testing.T) {
@@ -492,22 +444,14 @@ func TestGetProjectType(t *testing.T) {
 	assertNotNil(t, got)
 }
 
-func TestSearchProjectTypes(t *testing.T) {
-	stub := &stubProjectTypeRepo{searchResult: []boardapi.ProjectTypeEntity{{ID: 2, Name: "ProjectTypeB"}}}
-	svc := newServiceWithProjectTypes(stub)
-	got, err := svc.SearchProjectTypes(testCtx, boardapi.ProjectTypeSearchParams{Name: "ProjectTypeB"}, defaultOpts)
-	assertNoError(t, err)
-	assertLen(t, got, 1)
-}
-
 // --- PurchaseTypes tests ---
 
 func TestListPurchaseTypes(t *testing.T) {
-	stub := &stubPurchaseTypeRepo{listResult: []boardapi.PurchaseTypeEntity{{ID: 1, Name: "PurchaseTypeA"}}}
+	stub := &stubPurchaseTypeRepo{listResult: &boardapi.ListResult[boardapi.PurchaseTypeEntity]{Items: []boardapi.PurchaseTypeEntity{{ID: 1, Name: "PurchaseTypeA"}}}}
 	svc := newServiceWithPurchaseTypes(stub)
-	got, err := svc.ListPurchaseTypes(testCtx, defaultOpts)
+	got, err := svc.ListPurchaseTypes(testCtx, defaultOpts, boardapi.PurchaseTypeListOptions{})
 	assertNoError(t, err)
-	assertLen(t, got, 1)
+	assertLen(t, got.Items, 1)
 }
 
 func TestGetPurchaseType(t *testing.T) {
@@ -519,22 +463,14 @@ func TestGetPurchaseType(t *testing.T) {
 	assertNotNil(t, got)
 }
 
-func TestSearchPurchaseTypes(t *testing.T) {
-	stub := &stubPurchaseTypeRepo{searchResult: []boardapi.PurchaseTypeEntity{{ID: 2, Name: "PurchaseTypeB"}}}
-	svc := newServiceWithPurchaseTypes(stub)
-	got, err := svc.SearchPurchaseTypes(testCtx, boardapi.PurchaseTypeSearchParams{Name: "PurchaseTypeB"}, defaultOpts)
-	assertNoError(t, err)
-	assertLen(t, got, 1)
-}
-
 // --- AccountingTypes tests ---
 
 func TestListAccountingTypes(t *testing.T) {
-	stub := &stubAccountingTypeRepo{listResult: []boardapi.AccountingTypeEntity{{ID: 1, Name: "AccountingTypeA"}}}
+	stub := &stubAccountingTypeRepo{listResult: &boardapi.ListResult[boardapi.AccountingTypeEntity]{Items: []boardapi.AccountingTypeEntity{{ID: 1, Name: "AccountingTypeA"}}}}
 	svc := newServiceWithAccountingTypes(stub)
-	got, err := svc.ListAccountingTypes(testCtx, defaultOpts)
+	got, err := svc.ListAccountingTypes(testCtx, defaultOpts, boardapi.AccountingTypeListOptions{})
 	assertNoError(t, err)
-	assertLen(t, got, 1)
+	assertLen(t, got.Items, 1)
 }
 
 func TestGetAccountingType(t *testing.T) {
@@ -546,30 +482,14 @@ func TestGetAccountingType(t *testing.T) {
 	assertNotNil(t, got)
 }
 
-func TestSearchAccountingTypes(t *testing.T) {
-	stub := &stubAccountingTypeRepo{searchResult: []boardapi.AccountingTypeEntity{{ID: 2, Name: "AccountingTypeB"}}}
-	svc := newServiceWithAccountingTypes(stub)
-	got, err := svc.SearchAccountingTypes(testCtx, boardapi.AccountingTypeSearchParams{Name: "AccountingTypeB"}, defaultOpts)
-	assertNoError(t, err)
-	assertLen(t, got, 1)
-}
-
-func TestListAccountingTypesPage(t *testing.T) {
-	stub := &stubAccountingTypeRepo{listPageResult: &boardapi.PageResult[boardapi.AccountingTypeEntity]{Items: []boardapi.AccountingTypeEntity{{ID: 1}}}} //nolint:staticcheck
-	svc := newServiceWithAccountingTypes(stub)
-	got, err := svc.ListAccountingTypesPage(testCtx, 1, 30)
-	assertNoError(t, err)
-	assertNotNil(t, got)
-}
-
 // --- DocumentSendChannels tests ---
 
 func TestListDocumentSendChannels(t *testing.T) {
-	stub := &stubDocumentSendChannelRepo{listResult: []boardapi.DocumentSendChannelEntity{{ID: 1, Name: "DocumentSendChannelA"}}}
+	stub := &stubDocumentSendChannelRepo{listResult: &boardapi.ListResult[boardapi.DocumentSendChannelEntity]{Items: []boardapi.DocumentSendChannelEntity{{ID: 1, Name: "DocumentSendChannelA"}}}}
 	svc := newServiceWithDocumentSendChannels(stub)
-	got, err := svc.ListDocumentSendChannels(testCtx, defaultOpts)
+	got, err := svc.ListDocumentSendChannels(testCtx, defaultOpts, boardapi.DocumentSendChannelListOptions{})
 	assertNoError(t, err)
-	assertLen(t, got, 1)
+	assertLen(t, got.Items, 1)
 }
 
 func TestGetDocumentSendChannel(t *testing.T) {
@@ -577,22 +497,6 @@ func TestGetDocumentSendChannel(t *testing.T) {
 	stub := &stubDocumentSendChannelRepo{getResult: entity}
 	svc := newServiceWithDocumentSendChannels(stub)
 	got, err := svc.GetDocumentSendChannel(testCtx, 1, defaultOpts)
-	assertNoError(t, err)
-	assertNotNil(t, got)
-}
-
-func TestSearchDocumentSendChannels(t *testing.T) {
-	stub := &stubDocumentSendChannelRepo{searchResult: []boardapi.DocumentSendChannelEntity{{ID: 2, Name: "DocumentSendChannelB"}}}
-	svc := newServiceWithDocumentSendChannels(stub)
-	got, err := svc.SearchDocumentSendChannels(testCtx, boardapi.DocumentSendChannelSearchParams{Name: "DocumentSendChannelB"}, defaultOpts)
-	assertNoError(t, err)
-	assertLen(t, got, 1)
-}
-
-func TestListDocumentSendChannelsPage(t *testing.T) {
-	stub := &stubDocumentSendChannelRepo{listPageResult: &boardapi.PageResult[boardapi.DocumentSendChannelEntity]{Items: []boardapi.DocumentSendChannelEntity{{ID: 1}}}} //nolint:staticcheck
-	svc := newServiceWithDocumentSendChannels(stub)
-	got, err := svc.ListDocumentSendChannelsPage(testCtx, 1, 30)
 	assertNoError(t, err)
 	assertNotNil(t, got)
 }

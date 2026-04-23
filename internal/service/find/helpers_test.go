@@ -397,36 +397,28 @@ func paymentListOptionsIsZero(f boardapi.PaymentListOptions) bool {
 }
 
 type stubUserRepo struct {
-	listResult   []boardapi.UserEntity
-	getResult    *boardapi.UserEntity
 	searchResult []boardapi.UserEntity
+	getResult    *boardapi.UserEntity
 	err          error
 }
 
-func (s *stubUserRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.UserEntity, error) {
-	return s.listResult, s.err
-}
 func (s *stubUserRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.UserEntity, error) {
 	return s.getResult, s.err
 }
-func (s *stubUserRepo) Search(_ context.Context, _ boardapi.UserSearchParams, _ repository.ReadOptions) ([]boardapi.UserEntity, error) {
+func (s *stubUserRepo) Search(_ context.Context, _ boardapi.UserListOptions, _ repository.ReadOptions) ([]boardapi.UserEntity, error) {
 	return s.searchResult, s.err
 }
 
 type stubGroupRepo struct {
-	listResult   []boardapi.GroupEntity
-	getResult    *boardapi.GroupEntity
 	searchResult []boardapi.GroupEntity
+	getResult    *boardapi.GroupEntity
 	err          error
 }
 
-func (s *stubGroupRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.GroupEntity, error) {
-	return s.listResult, s.err
-}
 func (s *stubGroupRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.GroupEntity, error) {
 	return s.getResult, s.err
 }
-func (s *stubGroupRepo) Search(_ context.Context, _ boardapi.GroupSearchParams, _ repository.ReadOptions) ([]boardapi.GroupEntity, error) {
+func (s *stubGroupRepo) Search(_ context.Context, _ boardapi.GroupListOptions, _ repository.ReadOptions) ([]boardapi.GroupEntity, error) {
 	return s.searchResult, s.err
 }
 

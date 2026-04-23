@@ -44,10 +44,8 @@ func jsonResp(body string) *http.Response {
 }
 
 // U1: ListAccountingTypesRaw returns the raw JSON array body byte-for-byte
-// when a single page response is served. The exact JSON bytes the server emits
-// must be preserved inside the returned array payload (element contents and
-// order must not change), because StrictFieldDiff relies on the original
-// response shape.
+// when a single page response is served.
+// M56: ListAccountingTypesRaw(ctx, AccountingTypeListOptions) に更新。
 func TestListAccountingTypesRaw_SinglePage(t *testing.T) {
 	page1 := `[{"id":1,"name":"A","memo":"m","updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}]`
 	var gotPath string
@@ -59,7 +57,7 @@ func TestListAccountingTypesRaw_SinglePage(t *testing.T) {
 	})
 	client := newAccountingTypesMockClient(rt)
 
-	raw, err := client.ListAccountingTypesRaw(context.Background())
+	raw, _, err := client.ListAccountingTypesRaw(context.Background(), boardapi.AccountingTypeListOptions{})
 	if err != nil {
 		t.Fatalf("ListAccountingTypesRaw: %v", err)
 	}
@@ -87,8 +85,7 @@ func TestListAccountingTypesRaw_SinglePage(t *testing.T) {
 }
 
 // U2: ListAccountingTypesRaw concatenates multiple pages into a single valid JSON array.
-// per_page=2 forces pagination; server returns 2 items on page 1 and 1 item on page 2.
-// Result must be a JSON array of 3 items, preserving original element JSON byte-for-byte.
+// M56: ListAccountingTypesRaw(ctx, AccountingTypeListOptions{PerPage: 2}) に更新。
 func TestListAccountingTypesRaw_MultiPage(t *testing.T) {
 	page1Items := []string{
 		`{"id":1,"name":"A","memo":"","updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}`,
@@ -117,7 +114,7 @@ func TestListAccountingTypesRaw_MultiPage(t *testing.T) {
 	})
 	client := newAccountingTypesMockClient(rt)
 
-	raw, err := client.ListAccountingTypesRaw(context.Background(), boardapi.WithPerPage(2))
+	raw, _, err := client.ListAccountingTypesRaw(context.Background(), boardapi.AccountingTypeListOptions{PerPage: 2})
 	if err != nil {
 		t.Fatalf("ListAccountingTypesRaw: %v", err)
 	}
@@ -140,6 +137,7 @@ func TestListAccountingTypesRaw_MultiPage(t *testing.T) {
 }
 
 // U3: GetAccountingTypeRaw returns body exactly as served (single object).
+// M56: GetAccountingTypeRaw(ctx, id) -> ([]byte, http.Header, error) に更新。
 func TestGetAccountingTypeRaw_Success(t *testing.T) {
 	body := []byte(`{"id":42,"name":"Foo","memo":"mm","updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}`)
 	var gotPath string
@@ -153,7 +151,7 @@ func TestGetAccountingTypeRaw_Success(t *testing.T) {
 	})
 	client := newAccountingTypesMockClient(rt)
 
-	raw, err := client.GetAccountingTypeRaw(context.Background(), 42)
+	raw, _, err := client.GetAccountingTypeRaw(context.Background(), 42)
 	if err != nil {
 		t.Fatalf("GetAccountingTypeRaw: %v", err)
 	}
@@ -165,29 +163,30 @@ func TestGetAccountingTypeRaw_Success(t *testing.T) {
 	}
 }
 
-// U4: SearchAccountingTypesRaw sends name / updated_at_from in the query and returns body.
-func TestSearchAccountingTypesRaw_QueryParams(t *testing.T) {
+// U4: ListAccountingTypesRaw with NameCont sends name_cont in the query.
+// M56: SearchAccountingTypesRaw 廃止、ListAccountingTypesRaw(ctx, AccountingTypeListOptions{NameCont: ...}) に更新。
+func TestListAccountingTypesRaw_NameCont(t *testing.T) {
 	page1 := `[{"id":7,"name":"keyword","memo":"","updated_at":"2024-02-01T00:00:00+09:00","created_at":"2024-02-01T00:00:00+09:00"}]`
-	var observedName, observedFrom string
+	var observedNameCont, observedGteq string
 	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
-		observedName = r.URL.Query().Get("name")
-		observedFrom = r.URL.Query().Get("updated_at_from")
+		observedNameCont = r.URL.Query().Get("name_cont")
+		observedGteq = r.URL.Query().Get("updated_at_gteq")
 		return jsonResp(page1), nil
 	})
 	client := newAccountingTypesMockClient(rt)
 
-	raw, err := client.SearchAccountingTypesRaw(context.Background(), boardapi.AccountingTypeSearchParams{
-		Name:          "keyword",
-		UpdatedAtFrom: "2024-01-01T00:00:00+09:00",
+	raw, _, err := client.ListAccountingTypesRaw(context.Background(), boardapi.AccountingTypeListOptions{
+		NameCont:      "keyword",
+		UpdatedAtGteq: "2024-01-01 00:00:00",
 	})
 	if err != nil {
-		t.Fatalf("SearchAccountingTypesRaw: %v", err)
+		t.Fatalf("ListAccountingTypesRaw: %v", err)
 	}
-	if observedName != "keyword" {
-		t.Errorf("query name = %q, want keyword", observedName)
+	if observedNameCont != "keyword" {
+		t.Errorf("name_cont = %q, want keyword", observedNameCont)
 	}
-	if observedFrom != "2024-01-01T00:00:00+09:00" {
-		t.Errorf("query updated_at_from = %q, want %q", observedFrom, "2024-01-01T00:00:00+09:00")
+	if observedGteq != "2024-01-01 00:00:00" {
+		t.Errorf("updated_at_gteq = %q, want %q", observedGteq, "2024-01-01 00:00:00")
 	}
 	var arr []map[string]any
 	if err := json.Unmarshal(raw, &arr); err != nil {
@@ -199,6 +198,7 @@ func TestSearchAccountingTypesRaw_QueryParams(t *testing.T) {
 }
 
 // U5: GetAccountingTypeRaw on 404 returns *APIError{Code: APIErrorNotFound}.
+// M56: GetAccountingTypeRaw(ctx, id) -> ([]byte, http.Header, error) に更新。
 func TestGetAccountingTypeRaw_NotFound(t *testing.T) {
 	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
 		return &http.Response{
@@ -209,7 +209,7 @@ func TestGetAccountingTypeRaw_NotFound(t *testing.T) {
 	})
 	client := newAccountingTypesMockClient(rt)
 
-	_, err := client.GetAccountingTypeRaw(context.Background(), 99)
+	_, _, err := client.GetAccountingTypeRaw(context.Background(), 99)
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}

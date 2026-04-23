@@ -27,14 +27,14 @@ func (s *Service) FindGroup(ctx context.Context, q FindGroupQuery) ([]GroupResul
 		groups = []boardapi.GroupEntity{*g}
 
 	case q.Name != "":
-		result, err := s.groups.Search(ctx, boardapi.GroupSearchParams{Name: q.Name}, opts)
+		result, err := s.groups.Search(ctx, boardapi.GroupListOptions{NameCont: q.Name}, opts)
 		if err != nil {
 			return nil, err
 		}
 		groups = result
 
 	case q.Text != "":
-		all, err := s.groups.List(ctx, opts)
+		all, err := s.groups.Search(ctx, boardapi.GroupListOptions{}, opts)
 		if err != nil {
 			return nil, err
 		}

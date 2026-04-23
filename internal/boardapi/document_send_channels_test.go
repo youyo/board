@@ -30,10 +30,8 @@ func newDocumentSendChannelsMockClient(rt roundTripperFunc) *boardapi.Client {
 }
 
 // U1: ListDocumentSendChannelsRaw returns the raw JSON array body byte-for-byte
-// when a single page response is served. The exact JSON bytes the server emits
-// must be preserved inside the returned array payload (element contents and
-// order must not change) because StrictFieldDiff relies on the original
-// response shape.
+// when a single page response is served.
+// M56: ListDocumentSendChannelsRaw(ctx, DocumentSendChannelListOptions) に更新。
 func TestListDocumentSendChannelsRaw_SinglePage(t *testing.T) {
 	page1 := `[{"id":1,"name":"A","memo":"m","updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}]`
 	var gotPath string
@@ -45,7 +43,7 @@ func TestListDocumentSendChannelsRaw_SinglePage(t *testing.T) {
 	})
 	client := newDocumentSendChannelsMockClient(rt)
 
-	raw, err := client.ListDocumentSendChannelsRaw(context.Background())
+	raw, _, err := client.ListDocumentSendChannelsRaw(context.Background(), boardapi.DocumentSendChannelListOptions{})
 	if err != nil {
 		t.Fatalf("ListDocumentSendChannelsRaw: %v", err)
 	}
@@ -72,10 +70,8 @@ func TestListDocumentSendChannelsRaw_SinglePage(t *testing.T) {
 	}
 }
 
-// U2: ListDocumentSendChannelsRaw concatenates multiple pages into a single
-// valid JSON array. per_page=2 forces pagination; server returns 2 items on
-// page 1 and 1 on page 2. Result must be a JSON array of 3 items, preserving
-// original element JSON byte-for-byte.
+// U2: ListDocumentSendChannelsRaw concatenates multiple pages into a single valid JSON array.
+// M56: ListDocumentSendChannelsRaw(ctx, DocumentSendChannelListOptions{PerPage: 2}) に更新。
 func TestListDocumentSendChannelsRaw_MultiPage(t *testing.T) {
 	page1Items := []string{
 		`{"id":1,"name":"A","memo":"","updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}`,
@@ -104,7 +100,7 @@ func TestListDocumentSendChannelsRaw_MultiPage(t *testing.T) {
 	})
 	client := newDocumentSendChannelsMockClient(rt)
 
-	raw, err := client.ListDocumentSendChannelsRaw(context.Background(), boardapi.WithPerPage(2))
+	raw, _, err := client.ListDocumentSendChannelsRaw(context.Background(), boardapi.DocumentSendChannelListOptions{PerPage: 2})
 	if err != nil {
 		t.Fatalf("ListDocumentSendChannelsRaw: %v", err)
 	}
@@ -127,6 +123,7 @@ func TestListDocumentSendChannelsRaw_MultiPage(t *testing.T) {
 }
 
 // U3: GetDocumentSendChannelRaw returns body exactly as served (single object).
+// M56: GetDocumentSendChannelRaw(ctx, id) -> ([]byte, http.Header, error) に更新。
 func TestGetDocumentSendChannelRaw_Success(t *testing.T) {
 	body := []byte(`{"id":42,"name":"Foo","memo":"mm","updated_at":"2024-01-01T00:00:00+09:00","created_at":"2023-01-01T00:00:00+09:00"}`)
 	var gotPath string
@@ -140,7 +137,7 @@ func TestGetDocumentSendChannelRaw_Success(t *testing.T) {
 	})
 	client := newDocumentSendChannelsMockClient(rt)
 
-	raw, err := client.GetDocumentSendChannelRaw(context.Background(), 42)
+	raw, _, err := client.GetDocumentSendChannelRaw(context.Background(), 42)
 	if err != nil {
 		t.Fatalf("GetDocumentSendChannelRaw: %v", err)
 	}
@@ -152,30 +149,30 @@ func TestGetDocumentSendChannelRaw_Success(t *testing.T) {
 	}
 }
 
-// U4: SearchDocumentSendChannelsRaw sends name / updated_at_from in the query
-// and returns body.
-func TestSearchDocumentSendChannelsRaw_QueryParams(t *testing.T) {
+// U4: ListDocumentSendChannelsRaw with NameCont sends name_cont in the query.
+// M56: SearchDocumentSendChannelsRaw 廃止、ListDocumentSendChannelsRaw(ctx, DocumentSendChannelListOptions{NameCont: ...}) に更新。
+func TestListDocumentSendChannelsRaw_NameCont(t *testing.T) {
 	page1 := `[{"id":7,"name":"keyword","memo":"","updated_at":"2024-02-01T00:00:00+09:00","created_at":"2024-02-01T00:00:00+09:00"}]`
-	var observedName, observedFrom string
+	var observedNameCont, observedGteq string
 	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
-		observedName = r.URL.Query().Get("name")
-		observedFrom = r.URL.Query().Get("updated_at_from")
+		observedNameCont = r.URL.Query().Get("name_cont")
+		observedGteq = r.URL.Query().Get("updated_at_gteq")
 		return jsonResp(page1), nil
 	})
 	client := newDocumentSendChannelsMockClient(rt)
 
-	raw, err := client.SearchDocumentSendChannelsRaw(context.Background(), boardapi.DocumentSendChannelSearchParams{
-		Name:          "keyword",
-		UpdatedAtFrom: "2024-01-01T00:00:00+09:00",
+	raw, _, err := client.ListDocumentSendChannelsRaw(context.Background(), boardapi.DocumentSendChannelListOptions{
+		NameCont:      "keyword",
+		UpdatedAtGteq: "2024-01-01 00:00:00",
 	})
 	if err != nil {
-		t.Fatalf("SearchDocumentSendChannelsRaw: %v", err)
+		t.Fatalf("ListDocumentSendChannelsRaw: %v", err)
 	}
-	if observedName != "keyword" {
-		t.Errorf("query name = %q, want keyword", observedName)
+	if observedNameCont != "keyword" {
+		t.Errorf("name_cont = %q, want keyword", observedNameCont)
 	}
-	if observedFrom != "2024-01-01T00:00:00+09:00" {
-		t.Errorf("query updated_at_from = %q, want %q", observedFrom, "2024-01-01T00:00:00+09:00")
+	if observedGteq != "2024-01-01 00:00:00" {
+		t.Errorf("updated_at_gteq = %q, want %q", observedGteq, "2024-01-01 00:00:00")
 	}
 	var arr []map[string]any
 	if err := json.Unmarshal(raw, &arr); err != nil {
@@ -187,6 +184,7 @@ func TestSearchDocumentSendChannelsRaw_QueryParams(t *testing.T) {
 }
 
 // U5: GetDocumentSendChannelRaw on 404 returns *APIError{Code: APIErrorNotFound}.
+// M56: GetDocumentSendChannelRaw(ctx, id) -> ([]byte, http.Header, error) に更新。
 func TestGetDocumentSendChannelRaw_NotFound(t *testing.T) {
 	rt := roundTripperFunc(func(r *http.Request) (*http.Response, error) {
 		return &http.Response{
@@ -197,7 +195,7 @@ func TestGetDocumentSendChannelRaw_NotFound(t *testing.T) {
 	})
 	client := newDocumentSendChannelsMockClient(rt)
 
-	_, err := client.GetDocumentSendChannelRaw(context.Background(), 99)
+	_, _, err := client.GetDocumentSendChannelRaw(context.Background(), 99)
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/youyo/board/internal/boardapi"
@@ -49,8 +48,39 @@ func NewDocumentSendChannelRepository(
 
 const documentSendChannelsResource = "document_send_channels"
 
-// List returns all document send channels from the cache.
-func (r *DocumentSendChannelRepository) List(ctx context.Context, opts ReadOptions) ([]boardapi.DocumentSendChannelEntity, error) {
+// documentSendChannelFilterIsZero は filter が空（全フィールドがゼロ値 / nil）かどうかを返す。
+// ゼロフィルタはローカルキャッシュ経路を使い、非ゼロフィルタは cache bypass で API を直呼びする。
+func documentSendChannelFilterIsZero(f boardapi.DocumentSendChannelListOptions) bool {
+	return f.Page == 0 &&
+		f.PerPage == 0 &&
+		f.UpdatedAtGteq == "" &&
+		f.UpdatedAtLteq == "" &&
+		f.IncludeArchiveFlg == nil &&
+		f.NameCont == ""
+}
+
+// List は送付方法を返す。
+//
+// 動作:
+//   - ゼロフィルタ（boardapi.DocumentSendChannelListOptions{}）: ローカルキャッシュを使い
+//     refresh-on-demand（daily auto refresh, explicit Refresh / ForceRefresh）を行う。
+//     返り値の *ListResult.Meta はゼロ値（キャッシュが正）。
+//   - 非ゼロフィルタ: cache bypass で api.ListDocumentSendChannels を直接呼び、サーバーサイドの
+//     Ransack フィルタ意味論を活かす。返り値の *ListResult.Meta はヘッダーから埋まる。
+//
+// readOpts.Limit は両経路の最終結果に適用される。
+func (r *DocumentSendChannelRepository) List(ctx context.Context, readOpts ReadOptions, filter boardapi.DocumentSendChannelListOptions) (*boardapi.ListResult[boardapi.DocumentSendChannelEntity], error) {
+	if !documentSendChannelFilterIsZero(filter) {
+		// API 直接呼び出し（cache bypass）: フィルタ結果でキャッシュを汚染しない。
+		result, err := r.api.ListDocumentSendChannels(ctx, filter)
+		if err != nil {
+			return nil, err
+		}
+		result.Items = applyLimit(result.Items, readOpts.Limit)
+		return result, nil
+	}
+
+	// ゼロフィルタ: 既存の cache → refresh → API fallback 経路
 	fetcher := &documentSendChannelsFetcher{api: r.api}
 	now := time.Now()
 
@@ -58,16 +88,13 @@ func (r *DocumentSendChannelRepository) List(ctx context.Context, opts ReadOptio
 	if err != nil {
 		return nil, err
 	}
-
-	if err := maybeRefresh(ctx, r.profile, documentSendChannelsResource, opts, state, r.autoRefresh, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
+	if err := maybeRefresh(ctx, r.profile, documentSendChannelsResource, readOpts, state, r.autoRefresh, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
 		return nil, err
 	}
-
 	entries, err := r.cache.List(ctx, r.profile, documentSendChannelsResource)
 	if err != nil {
 		return nil, err
 	}
-
 	if len(entries) == 0 && state == nil {
 		if err := r.lockManager.WithLock(ctx, r.profile, documentSendChannelsResource, func() error {
 			_, err := r.refresher.ForceRefresh(ctx, r.profile, fetcher, now, r.tz)
@@ -80,13 +107,22 @@ func (r *DocumentSendChannelRepository) List(ctx context.Context, opts ReadOptio
 			return nil, err
 		}
 	}
-
 	entities, err := decodeEntries[boardapi.DocumentSendChannelEntity](entries)
 	if err != nil {
 		return nil, err
 	}
+	entities = applyLimit(entities, readOpts.Limit)
+	return &boardapi.ListResult[boardapi.DocumentSendChannelEntity]{Items: entities}, nil
+}
 
-	return applyLimit(entities, opts.Limit), nil
+// ListEntities は List の items のみを返す薄いラッパ。
+// find 層（Phase L では *ListResult を扱わない）向け。
+func (r *DocumentSendChannelRepository) ListEntities(ctx context.Context, readOpts ReadOptions, filter boardapi.DocumentSendChannelListOptions) ([]boardapi.DocumentSendChannelEntity, error) {
+	result, err := r.List(ctx, readOpts, filter)
+	if err != nil {
+		return nil, err
+	}
+	return result.Items, nil
 }
 
 // GetByID returns the document send channel with the given ID from the cache.
@@ -118,13 +154,13 @@ func (r *DocumentSendChannelRepository) GetByID(ctx context.Context, id int, opt
 		return &entity, nil
 	}
 
-	// Cache miss → fetch single entity from API
-	entity, err := r.api.GetDocumentSendChannel(ctx, id)
+	// Cache miss -> fetch single entry from API
+	result, err := r.api.GetDocumentSendChannel(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 
-	raw, err := json.Marshal(entity)
+	raw, err := json.Marshal(result.Item)
 	if err != nil {
 		return nil, err
 	}
@@ -132,37 +168,12 @@ func (r *DocumentSendChannelRepository) GetByID(ctx context.Context, id int, opt
 		return nil, err
 	}
 
-	return entity, nil
+	return result.Item, nil
 }
 
-// Search returns document send channels filtered by the given parameters from the cache.
-func (r *DocumentSendChannelRepository) Search(ctx context.Context, params boardapi.DocumentSendChannelSearchParams, opts ReadOptions) ([]boardapi.DocumentSendChannelEntity, error) {
-	listOpts := opts
-	listOpts.Limit = 0
-	all, err := r.List(ctx, listOpts)
-	if err != nil {
-		return nil, err
-	}
-	return applyLimit(filterDocumentSendChannels(all, params), opts.Limit), nil
-}
-
-// filterDocumentSendChannels performs in-memory filtering.
-// UpdatedAtFrom is used as a delta fetch cursor and is not included in the filter.
-func filterDocumentSendChannels(entities []boardapi.DocumentSendChannelEntity, params boardapi.DocumentSendChannelSearchParams) []boardapi.DocumentSendChannelEntity {
-	var result []boardapi.DocumentSendChannelEntity
-	for _, e := range entities {
-		if params.Name != "" && !strings.Contains(e.Name, params.Name) {
-			continue
-		}
-		result = append(result, e)
-	}
-	return result
-}
-
-// ListPage retrieves a single page of DocumentSendChannelEntity directly from the API (cache bypass).
-// TODO(M57): PageResult は M57 で ListResult[T] に移行予定。
+// Search は find 層向けの薄いラッパ。ListEntities と機能的に同等。
 //
-//nolint:staticcheck
-func (r *DocumentSendChannelRepository) ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.DocumentSendChannelEntity], error) {
-	return r.api.ListDocumentSendChannelsPage(ctx, page, perPage)
+// find 層は *ListResult を扱わず []DocumentSendChannelEntity を維持する（Phase L の方針）。
+func (r *DocumentSendChannelRepository) Search(ctx context.Context, filter boardapi.DocumentSendChannelListOptions, opts ReadOptions) ([]boardapi.DocumentSendChannelEntity, error) {
+	return r.ListEntities(ctx, opts, filter)
 }

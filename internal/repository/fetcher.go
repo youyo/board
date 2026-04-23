@@ -408,20 +408,20 @@ type usersFetcher struct {
 func (f *usersFetcher) ResourceName() string { return "users" }
 
 func (f *usersFetcher) ListAll(ctx context.Context) ([]json.RawMessage, error) {
-	entities, err := f.api.ListUsers(ctx)
+	result, err := f.api.ListUsers(ctx, boardapi.UserListOptions{})
 	if err != nil {
 		return nil, err
 	}
-	return entitiesToRaw(entities)
+	return entitiesToRaw(result.Items)
 }
 
 func (f *usersFetcher) ListUpdatedSince(ctx context.Context, since string) ([]json.RawMessage, error) {
-	params := boardapi.UserSearchParams{UpdatedAtFrom: since}
-	entities, err := f.api.SearchUsers(ctx, params)
+	gteq := isoToBoardDateTime(since)
+	result, err := f.api.ListUsers(ctx, boardapi.UserListOptions{UpdatedAtGteq: gteq})
 	if err != nil {
 		return nil, err
 	}
-	return entitiesToRaw(entities)
+	return entitiesToRaw(result.Items)
 }
 
 // --- groups Fetcher ---
@@ -434,20 +434,20 @@ type groupsFetcher struct {
 func (f *groupsFetcher) ResourceName() string { return "groups" }
 
 func (f *groupsFetcher) ListAll(ctx context.Context) ([]json.RawMessage, error) {
-	entities, err := f.api.ListGroups(ctx)
+	result, err := f.api.ListGroups(ctx, boardapi.GroupListOptions{})
 	if err != nil {
 		return nil, err
 	}
-	return entitiesToRaw(entities)
+	return entitiesToRaw(result.Items)
 }
 
 func (f *groupsFetcher) ListUpdatedSince(ctx context.Context, since string) ([]json.RawMessage, error) {
-	params := boardapi.GroupSearchParams{UpdatedAtFrom: since}
-	entities, err := f.api.SearchGroups(ctx, params)
+	gteq := isoToBoardDateTime(since)
+	result, err := f.api.ListGroups(ctx, boardapi.GroupListOptions{UpdatedAtGteq: gteq})
 	if err != nil {
 		return nil, err
 	}
-	return entitiesToRaw(entities)
+	return entitiesToRaw(result.Items)
 }
 
 // --- payment_terms Fetcher ---
@@ -460,20 +460,20 @@ type paymentTermsFetcher struct {
 func (f *paymentTermsFetcher) ResourceName() string { return "payment_terms" }
 
 func (f *paymentTermsFetcher) ListAll(ctx context.Context) ([]json.RawMessage, error) {
-	entities, err := f.api.ListPaymentTerms(ctx)
+	result, err := f.api.ListPaymentTerms(ctx, boardapi.PaymentTermListOptions{})
 	if err != nil {
 		return nil, err
 	}
-	return entitiesToRaw(entities)
+	return entitiesToRaw(result.Items)
 }
 
 func (f *paymentTermsFetcher) ListUpdatedSince(ctx context.Context, since string) ([]json.RawMessage, error) {
-	params := boardapi.PaymentTermSearchParams{UpdatedAtFrom: since}
-	entities, err := f.api.SearchPaymentTerms(ctx, params)
+	gteq := isoToBoardDateTime(since)
+	result, err := f.api.ListPaymentTerms(ctx, boardapi.PaymentTermListOptions{UpdatedAtGteq: gteq})
 	if err != nil {
 		return nil, err
 	}
-	return entitiesToRaw(entities)
+	return entitiesToRaw(result.Items)
 }
 
 // --- project_types Fetcher ---
@@ -486,20 +486,20 @@ type projectTypesFetcher struct {
 func (f *projectTypesFetcher) ResourceName() string { return "project_types" }
 
 func (f *projectTypesFetcher) ListAll(ctx context.Context) ([]json.RawMessage, error) {
-	entities, err := f.api.ListProjectTypes(ctx)
+	result, err := f.api.ListProjectTypes(ctx, boardapi.ProjectTypeListOptions{})
 	if err != nil {
 		return nil, err
 	}
-	return entitiesToRaw(entities)
+	return entitiesToRaw(result.Items)
 }
 
 func (f *projectTypesFetcher) ListUpdatedSince(ctx context.Context, since string) ([]json.RawMessage, error) {
-	params := boardapi.ProjectTypeSearchParams{UpdatedAtFrom: since}
-	entities, err := f.api.SearchProjectTypes(ctx, params)
+	gteq := isoToBoardDateTime(since)
+	result, err := f.api.ListProjectTypes(ctx, boardapi.ProjectTypeListOptions{UpdatedAtGteq: gteq})
 	if err != nil {
 		return nil, err
 	}
-	return entitiesToRaw(entities)
+	return entitiesToRaw(result.Items)
 }
 
 // --- purchase_types Fetcher ---
@@ -512,20 +512,20 @@ type purchaseTypesFetcher struct {
 func (f *purchaseTypesFetcher) ResourceName() string { return "purchase_types" }
 
 func (f *purchaseTypesFetcher) ListAll(ctx context.Context) ([]json.RawMessage, error) {
-	entities, err := f.api.ListPurchaseTypes(ctx)
+	result, err := f.api.ListPurchaseTypes(ctx, boardapi.PurchaseTypeListOptions{})
 	if err != nil {
 		return nil, err
 	}
-	return entitiesToRaw(entities)
+	return entitiesToRaw(result.Items)
 }
 
 func (f *purchaseTypesFetcher) ListUpdatedSince(ctx context.Context, since string) ([]json.RawMessage, error) {
-	params := boardapi.PurchaseTypeSearchParams{UpdatedAtFrom: since}
-	entities, err := f.api.SearchPurchaseTypes(ctx, params)
+	gteq := isoToBoardDateTime(since)
+	result, err := f.api.ListPurchaseTypes(ctx, boardapi.PurchaseTypeListOptions{UpdatedAtGteq: gteq})
 	if err != nil {
 		return nil, err
 	}
-	return entitiesToRaw(entities)
+	return entitiesToRaw(result.Items)
 }
 
 // --- accounting_types Fetcher ---
@@ -538,20 +538,20 @@ type accountingTypesFetcher struct {
 func (f *accountingTypesFetcher) ResourceName() string { return "accounting_types" }
 
 func (f *accountingTypesFetcher) ListAll(ctx context.Context) ([]json.RawMessage, error) {
-	entities, err := f.api.ListAccountingTypes(ctx)
+	result, err := f.api.ListAccountingTypes(ctx, boardapi.AccountingTypeListOptions{})
 	if err != nil {
 		return nil, err
 	}
-	return entitiesToRaw(entities)
+	return entitiesToRaw(result.Items)
 }
 
 func (f *accountingTypesFetcher) ListUpdatedSince(ctx context.Context, since string) ([]json.RawMessage, error) {
-	params := boardapi.AccountingTypeSearchParams{UpdatedAtFrom: since}
-	entities, err := f.api.SearchAccountingTypes(ctx, params)
+	gteq := isoToBoardDateTime(since)
+	result, err := f.api.ListAccountingTypes(ctx, boardapi.AccountingTypeListOptions{UpdatedAtGteq: gteq})
 	if err != nil {
 		return nil, err
 	}
-	return entitiesToRaw(entities)
+	return entitiesToRaw(result.Items)
 }
 
 // --- document_send_channels Fetcher ---
@@ -564,20 +564,20 @@ type documentSendChannelsFetcher struct {
 func (f *documentSendChannelsFetcher) ResourceName() string { return "document_send_channels" }
 
 func (f *documentSendChannelsFetcher) ListAll(ctx context.Context) ([]json.RawMessage, error) {
-	entities, err := f.api.ListDocumentSendChannels(ctx)
+	result, err := f.api.ListDocumentSendChannels(ctx, boardapi.DocumentSendChannelListOptions{})
 	if err != nil {
 		return nil, err
 	}
-	return entitiesToRaw(entities)
+	return entitiesToRaw(result.Items)
 }
 
 func (f *documentSendChannelsFetcher) ListUpdatedSince(ctx context.Context, since string) ([]json.RawMessage, error) {
-	params := boardapi.DocumentSendChannelSearchParams{UpdatedAtFrom: since}
-	entities, err := f.api.SearchDocumentSendChannels(ctx, params)
+	gteq := isoToBoardDateTime(since)
+	result, err := f.api.ListDocumentSendChannels(ctx, boardapi.DocumentSendChannelListOptions{UpdatedAtGteq: gteq})
 	if err != nil {
 		return nil, err
 	}
-	return entitiesToRaw(entities)
+	return entitiesToRaw(result.Items)
 }
 
 // --- purchase_orders Fetcher ---

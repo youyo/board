@@ -256,162 +256,115 @@ func (s *stubPaymentRepo) GetByID(_ context.Context, _ int, _ repository.ReadOpt
 // --- Stubs: master ---
 
 type stubUserRepo struct {
-	listResult     []boardapi.UserEntity
-	getResult      *boardapi.UserEntity
-	searchResult   []boardapi.UserEntity
-	listPageResult *boardapi.PageResult[boardapi.UserEntity] //nolint:staticcheck
-	err            error
+	listResult *boardapi.ListResult[boardapi.UserEntity]
+	getResult  *boardapi.UserEntity
+	err        error
 }
 
-func (s *stubUserRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.UserEntity, error) {
-	return s.listResult, s.err
+func (s *stubUserRepo) List(_ context.Context, _ repository.ReadOptions, _ boardapi.UserListOptions) (*boardapi.ListResult[boardapi.UserEntity], error) {
+	if s.listResult != nil {
+		return s.listResult, s.err
+	}
+	return &boardapi.ListResult[boardapi.UserEntity]{}, s.err
 }
 func (s *stubUserRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.UserEntity, error) {
 	return s.getResult, s.err
 }
-func (s *stubUserRepo) Search(_ context.Context, _ boardapi.UserSearchParams, _ repository.ReadOptions) ([]boardapi.UserEntity, error) {
-	return s.searchResult, s.err
-}
-
-//nolint:staticcheck
-func (s *stubUserRepo) ListPage(_ context.Context, _, _ int) (*boardapi.PageResult[boardapi.UserEntity], error) {
-	return s.listPageResult, s.err
-}
 
 type stubGroupRepo struct {
-	listResult     []boardapi.GroupEntity
-	getResult      *boardapi.GroupEntity
-	searchResult   []boardapi.GroupEntity
-	listPageResult *boardapi.PageResult[boardapi.GroupEntity] //nolint:staticcheck
-	err            error
+	listResult *boardapi.ListResult[boardapi.GroupEntity]
+	getResult  *boardapi.GroupEntity
+	err        error
 }
 
-func (s *stubGroupRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.GroupEntity, error) {
-	return s.listResult, s.err
+func (s *stubGroupRepo) List(_ context.Context, _ repository.ReadOptions, _ boardapi.GroupListOptions) (*boardapi.ListResult[boardapi.GroupEntity], error) {
+	if s.listResult != nil {
+		return s.listResult, s.err
+	}
+	return &boardapi.ListResult[boardapi.GroupEntity]{}, s.err
 }
 func (s *stubGroupRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.GroupEntity, error) {
 	return s.getResult, s.err
 }
-func (s *stubGroupRepo) Search(_ context.Context, _ boardapi.GroupSearchParams, _ repository.ReadOptions) ([]boardapi.GroupEntity, error) {
-	return s.searchResult, s.err
-}
-
-//nolint:staticcheck
-func (s *stubGroupRepo) ListPage(_ context.Context, _, _ int) (*boardapi.PageResult[boardapi.GroupEntity], error) {
-	return s.listPageResult, s.err
-}
 
 type stubPaymentTermRepo struct {
-	listResult     []boardapi.PaymentTermEntity
-	getResult      *boardapi.PaymentTermEntity
-	searchResult   []boardapi.PaymentTermEntity
-	listPageResult *boardapi.PageResult[boardapi.PaymentTermEntity] //nolint:staticcheck
-	err            error
+	listResult *boardapi.ListResult[boardapi.PaymentTermEntity]
+	getResult  *boardapi.PaymentTermEntity
+	err        error
 }
 
-func (s *stubPaymentTermRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.PaymentTermEntity, error) {
-	return s.listResult, s.err
+func (s *stubPaymentTermRepo) List(_ context.Context, _ repository.ReadOptions, _ boardapi.PaymentTermListOptions) (*boardapi.ListResult[boardapi.PaymentTermEntity], error) {
+	if s.listResult != nil {
+		return s.listResult, s.err
+	}
+	return &boardapi.ListResult[boardapi.PaymentTermEntity]{}, s.err
 }
 func (s *stubPaymentTermRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.PaymentTermEntity, error) {
 	return s.getResult, s.err
 }
-func (s *stubPaymentTermRepo) Search(_ context.Context, _ boardapi.PaymentTermSearchParams, _ repository.ReadOptions) ([]boardapi.PaymentTermEntity, error) {
-	return s.searchResult, s.err
-}
-
-//nolint:staticcheck
-func (s *stubPaymentTermRepo) ListPage(_ context.Context, _, _ int) (*boardapi.PageResult[boardapi.PaymentTermEntity], error) {
-	return s.listPageResult, s.err
-}
 
 type stubProjectTypeRepo struct {
-	listResult   []boardapi.ProjectTypeEntity
-	getResult    *boardapi.ProjectTypeEntity
-	searchResult []boardapi.ProjectTypeEntity
-	err          error
+	listResult *boardapi.ListResult[boardapi.ProjectTypeEntity]
+	getResult  *boardapi.ProjectTypeEntity
+	err        error
 }
 
-func (s *stubProjectTypeRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.ProjectTypeEntity, error) {
-	return s.listResult, s.err
+func (s *stubProjectTypeRepo) List(_ context.Context, _ repository.ReadOptions, _ boardapi.ProjectTypeListOptions) (*boardapi.ListResult[boardapi.ProjectTypeEntity], error) {
+	if s.listResult != nil {
+		return s.listResult, s.err
+	}
+	return &boardapi.ListResult[boardapi.ProjectTypeEntity]{}, s.err
 }
 func (s *stubProjectTypeRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.ProjectTypeEntity, error) {
 	return s.getResult, s.err
 }
-func (s *stubProjectTypeRepo) Search(_ context.Context, _ boardapi.ProjectTypeSearchParams, _ repository.ReadOptions) ([]boardapi.ProjectTypeEntity, error) {
-	return s.searchResult, s.err
-}
-
-//nolint:staticcheck
-func (s *stubProjectTypeRepo) ListPage(_ context.Context, _, _ int) (*boardapi.PageResult[boardapi.ProjectTypeEntity], error) {
-	return nil, s.err
-}
 
 type stubPurchaseTypeRepo struct {
-	listResult   []boardapi.PurchaseTypeEntity
-	getResult    *boardapi.PurchaseTypeEntity
-	searchResult []boardapi.PurchaseTypeEntity
-	err          error
+	listResult *boardapi.ListResult[boardapi.PurchaseTypeEntity]
+	getResult  *boardapi.PurchaseTypeEntity
+	err        error
 }
 
-func (s *stubPurchaseTypeRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.PurchaseTypeEntity, error) {
-	return s.listResult, s.err
+func (s *stubPurchaseTypeRepo) List(_ context.Context, _ repository.ReadOptions, _ boardapi.PurchaseTypeListOptions) (*boardapi.ListResult[boardapi.PurchaseTypeEntity], error) {
+	if s.listResult != nil {
+		return s.listResult, s.err
+	}
+	return &boardapi.ListResult[boardapi.PurchaseTypeEntity]{}, s.err
 }
 func (s *stubPurchaseTypeRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.PurchaseTypeEntity, error) {
 	return s.getResult, s.err
 }
-func (s *stubPurchaseTypeRepo) Search(_ context.Context, _ boardapi.PurchaseTypeSearchParams, _ repository.ReadOptions) ([]boardapi.PurchaseTypeEntity, error) {
-	return s.searchResult, s.err
-}
-
-//nolint:staticcheck
-func (s *stubPurchaseTypeRepo) ListPage(_ context.Context, _, _ int) (*boardapi.PageResult[boardapi.PurchaseTypeEntity], error) {
-	return nil, s.err
-}
 
 type stubAccountingTypeRepo struct {
-	listResult     []boardapi.AccountingTypeEntity
-	getResult      *boardapi.AccountingTypeEntity
-	searchResult   []boardapi.AccountingTypeEntity
-	listPageResult *boardapi.PageResult[boardapi.AccountingTypeEntity] //nolint:staticcheck
-	err            error
+	listResult *boardapi.ListResult[boardapi.AccountingTypeEntity]
+	getResult  *boardapi.AccountingTypeEntity
+	err        error
 }
 
-func (s *stubAccountingTypeRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.AccountingTypeEntity, error) {
-	return s.listResult, s.err
+func (s *stubAccountingTypeRepo) List(_ context.Context, _ repository.ReadOptions, _ boardapi.AccountingTypeListOptions) (*boardapi.ListResult[boardapi.AccountingTypeEntity], error) {
+	if s.listResult != nil {
+		return s.listResult, s.err
+	}
+	return &boardapi.ListResult[boardapi.AccountingTypeEntity]{}, s.err
 }
 func (s *stubAccountingTypeRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.AccountingTypeEntity, error) {
 	return s.getResult, s.err
 }
-func (s *stubAccountingTypeRepo) Search(_ context.Context, _ boardapi.AccountingTypeSearchParams, _ repository.ReadOptions) ([]boardapi.AccountingTypeEntity, error) {
-	return s.searchResult, s.err
-}
-
-//nolint:staticcheck
-func (s *stubAccountingTypeRepo) ListPage(_ context.Context, _, _ int) (*boardapi.PageResult[boardapi.AccountingTypeEntity], error) {
-	return s.listPageResult, s.err
-}
 
 type stubDocumentSendChannelRepo struct {
-	listResult     []boardapi.DocumentSendChannelEntity
-	getResult      *boardapi.DocumentSendChannelEntity
-	searchResult   []boardapi.DocumentSendChannelEntity
-	listPageResult *boardapi.PageResult[boardapi.DocumentSendChannelEntity] //nolint:staticcheck
-	err            error
+	listResult *boardapi.ListResult[boardapi.DocumentSendChannelEntity]
+	getResult  *boardapi.DocumentSendChannelEntity
+	err        error
 }
 
-func (s *stubDocumentSendChannelRepo) List(_ context.Context, _ repository.ReadOptions) ([]boardapi.DocumentSendChannelEntity, error) {
-	return s.listResult, s.err
+func (s *stubDocumentSendChannelRepo) List(_ context.Context, _ repository.ReadOptions, _ boardapi.DocumentSendChannelListOptions) (*boardapi.ListResult[boardapi.DocumentSendChannelEntity], error) {
+	if s.listResult != nil {
+		return s.listResult, s.err
+	}
+	return &boardapi.ListResult[boardapi.DocumentSendChannelEntity]{}, s.err
 }
 func (s *stubDocumentSendChannelRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.DocumentSendChannelEntity, error) {
 	return s.getResult, s.err
-}
-func (s *stubDocumentSendChannelRepo) Search(_ context.Context, _ boardapi.DocumentSendChannelSearchParams, _ repository.ReadOptions) ([]boardapi.DocumentSendChannelEntity, error) {
-	return s.searchResult, s.err
-}
-
-//nolint:staticcheck
-func (s *stubDocumentSendChannelRepo) ListPage(_ context.Context, _, _ int) (*boardapi.PageResult[boardapi.DocumentSendChannelEntity], error) {
-	return s.listPageResult, s.err
 }
 
 // --- Zero-value Repos helper ---

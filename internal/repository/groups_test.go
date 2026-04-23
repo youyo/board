@@ -76,12 +76,12 @@ func TestGroupRepository_List_CacheHit(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeGroupRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{})
+	got, err := repo.List(context.Background(), repository.ReadOptions{}, boardapi.GroupListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(got) != len(sampleGroups) {
-		t.Errorf("len(got) = %d, want %d", len(got), len(sampleGroups))
+	if len(got.Items) != len(sampleGroups) {
+		t.Errorf("len(got.Items) = %d, want %d", len(got.Items), len(sampleGroups))
 	}
 }
 
@@ -93,12 +93,12 @@ func TestGroupRepository_List_InitialLoad(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeGroupRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{})
+	got, err := repo.List(context.Background(), repository.ReadOptions{}, boardapi.GroupListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(got) != len(sampleGroups) {
-		t.Errorf("len(got) = %d, want %d", len(got), len(sampleGroups))
+	if len(got.Items) != len(sampleGroups) {
+		t.Errorf("len(got.Items) = %d, want %d", len(got.Items), len(sampleGroups))
 	}
 }
 
@@ -161,17 +161,20 @@ func TestGroupRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	}
 }
 
-// T_GRP06: Search - Name filter -> returns matching items
+// T_GRP06: Search - Name filter -> bypasses cache, returns data from API
 func TestGroupRepository_Search_NameFilter(t *testing.T) {
 	db := newTestDB(t)
-	seedGroupCache(t, db, sampleGroups)
 	markSynced(t, db, "groups")
 
-	srv := newGroupAPIServer(t, nil)
+	// API サーバーは name_cont=GroupA に合致する 1 件を返すと想定
+	filtered := []boardapi.GroupEntity{
+		{ID: 1, Name: "GroupA", UpdatedAt: "2026-01-01T00:00:00Z"},
+	}
+	srv := newGroupAPIServer(t, filtered)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeGroupRepo(t, db, apiClient, false)
-	got, err := repo.Search(context.Background(), boardapi.GroupSearchParams{Name: "GroupA"}, repository.ReadOptions{})
+	got, err := repo.Search(context.Background(), boardapi.GroupListOptions{NameCont: "GroupA"}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
@@ -190,7 +193,7 @@ func TestGroupRepository_Search_NoFilter(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeGroupRepo(t, db, apiClient, false)
-	got, err := repo.Search(context.Background(), boardapi.GroupSearchParams{}, repository.ReadOptions{})
+	got, err := repo.Search(context.Background(), boardapi.GroupListOptions{}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}

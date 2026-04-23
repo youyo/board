@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 )
 
 // UserEntity is a BOARD API user entity.
@@ -42,49 +41,79 @@ func (u UserEntity) DisplayName() string {
 	}
 }
 
-// UserSearchParams is the parameter for SearchUsers.
-type UserSearchParams struct {
-	Name          string
-	Email         string
-	UpdatedAtFrom string
+// UserListOptions は GET /v1/users のクエリパラメータ（Ransack スタイル）。
+// ゼロ値は API に送信しない。UserListOptions{} はフィルタなしの全件取得を意味する。
+//
+// M56 で導入。旧 UserSearchParams を置き換える破壊的変更。
+type UserListOptions struct {
+	// 共通ページネーション（通常は ListAllWithResult が page を上書きする）
+	Page    int
+	PerPage int
+
+	// 全 List 共通
+	UpdatedAtGteq     string // "YYYY-MM-DD HH:MM:SS"
+	UpdatedAtLteq     string
+	IncludeArchiveFlg *bool // nil=送らない, true=1, false=0
+
+	// users 専用（Ransack 準拠）
+	NameCont  string // ユーザー名部分一致（Ransack _cont）
+	EmailCont string // メールアドレス部分一致（Ransack _cont）
 }
 
-// ListUsers retrieves all users.
-// Pagination is automatically handled by ListAll.
-func (c *Client) ListUsers(ctx context.Context) ([]UserEntity, error) {
-	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+// buildUsersQuery は GET /v1/users の Ransack スタイルクエリ文字列を組み立てる。
+func buildUsersQuery(opts UserListOptions, page, perPage int) string {
+	return NewQueryBuilder().
+		Page(page, perPage).
+		StrCont("name", opts.NameCont).
+		StrCont("email", opts.EmailCont).
+		DateGteq("updated_at", opts.UpdatedAtGteq).
+		DateLteq("updated_at", opts.UpdatedAtLteq).
+		Flg01("include_archive_flg", opts.IncludeArchiveFlg).
+		Encode()
+}
+
+// ListUsers は与えられたオプションでフィルタしたユーザーを取得する。
+// ページネーションは ListAllWithResult が内部で処理する。メタデータは
+// 返り値の *ListResult 経由で参照できる。
+//
+// フィルタなしの全件取得は UserListOptions{} を渡す。
+func (c *Client) ListUsers(ctx context.Context, opts UserListOptions) (*ListResult[UserEntity], error) {
+	perPage := opts.PerPage
+	makeReq := func(ctx context.Context, page, pp int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/users", nil)
 		if err != nil {
 			return nil, err
 		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		req.URL.RawQuery = q.Encode()
+		req.URL.RawQuery = buildUsersQuery(opts, page, pp)
 		return req, nil
 	}
-	items, err := c.ListAll(ctx, makeReq)
+	var listOpts []ListAllOption
+	if perPage > 0 {
+		listOpts = append(listOpts, WithPerPage(perPage))
+	}
+	raw, err := c.ListAllWithResult(ctx, makeReq, listOpts...)
 	if err != nil {
 		return nil, err
 	}
-	result := make([]UserEntity, 0, len(items))
-	for _, raw := range items {
+	items := make([]UserEntity, 0, len(raw.Items))
+	for _, b := range raw.Items {
 		var x UserEntity
-		if err := json.Unmarshal(raw, &x); err != nil {
+		if err := json.Unmarshal(b, &x); err != nil {
 			return nil, &APIError{Code: APIErrorUnknown, Message: "ListUsers: unmarshal: " + err.Error()}
 		}
-		result = append(result, x)
+		items = append(items, x)
 	}
-	return result, nil
+	return &ListResult[UserEntity]{Items: items, Meta: raw.Meta, Headers: raw.Headers}, nil
 }
 
-// GetUser retrieves the user with the specified ID.
-func (c *Client) GetUser(ctx context.Context, id int) (*UserEntity, error) {
+// GetUser は指定 ID のユーザーを取得する。
+// レスポンスメタデータ（ETag・レート制限・Last-Modified）は *ItemResult 経由で参照できる。
+func (c *Client) GetUser(ctx context.Context, id int) (*ItemResult[UserEntity], error) {
 	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/users/%d", id), nil)
 	if err != nil {
 		return nil, err
 	}
-	body, err := c.DoWithRetry(req)
+	body, headers, err := c.DoWithRetryFull(req)
 	if err != nil {
 		return nil, err
 	}
@@ -92,138 +121,47 @@ func (c *Client) GetUser(ctx context.Context, id int) (*UserEntity, error) {
 	if err := json.Unmarshal(body, &x); err != nil {
 		return nil, &APIError{Code: APIErrorUnknown, Message: "GetUser: unmarshal: " + err.Error()}
 	}
-	return &x, nil
+	return &ItemResult[UserEntity]{
+		Item:    &x,
+		Meta:    parseItemMeta(headers),
+		Headers: headers,
+	}, nil
 }
 
-// SearchUsers searches users with the given conditions.
-// Pagination is automatically handled by ListAll.
-func (c *Client) SearchUsers(ctx context.Context, params UserSearchParams) ([]UserEntity, error) {
-	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
+// ListUsersRaw は与えられたオプションでフィルタしたユーザーの生 JSON 配列と
+// 最終ページのレスポンスヘッダーを返す。バイト列は BOARD API が返したものをそのまま保持するため、
+// E2E の strict field diff に使用できる。通常の呼び出しには ListUsers を使うこと。
+func (c *Client) ListUsersRaw(ctx context.Context, opts UserListOptions) ([]byte, http.Header, error) {
+	perPage := opts.PerPage
+	makeReq := func(ctx context.Context, page, pp int) (*http.Request, error) {
 		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/users", nil)
 		if err != nil {
 			return nil, err
 		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		if params.Name != "" {
-			q.Set("name", params.Name)
-		}
-		if params.Email != "" {
-			q.Set("email", params.Email)
-		}
-		if params.UpdatedAtFrom != "" {
-			q.Set("updated_at_from", params.UpdatedAtFrom)
-		}
-		req.URL.RawQuery = q.Encode()
+		req.URL.RawQuery = buildUsersQuery(opts, page, pp)
 		return req, nil
 	}
-	items, err := c.ListAll(ctx, makeReq)
+	var listOpts []ListAllOption
+	if perPage > 0 {
+		listOpts = append(listOpts, WithPerPage(perPage))
+	}
+	raw, err := c.ListAllWithResult(ctx, makeReq, listOpts...)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	result := make([]UserEntity, 0, len(items))
-	for _, raw := range items {
-		var x UserEntity
-		if err := json.Unmarshal(raw, &x); err != nil {
-			return nil, &APIError{Code: APIErrorUnknown, Message: "SearchUsers: unmarshal: " + err.Error()}
-		}
-		result = append(result, x)
+	out, err := json.Marshal(raw.Items)
+	if err != nil {
+		return nil, nil, &APIError{Code: APIErrorUnknown, Message: "ListUsersRaw: marshal aggregate: " + err.Error()}
 	}
-	return result, nil
+	return out, raw.Headers, nil
 }
 
-// ListUsersPage retrieves a single page of users.
-func (c *Client) ListUsersPage(ctx context.Context, page, perPage int) (*PageResult[UserEntity], error) {
-	makeReq := func(ctx context.Context, p, pp int) (*http.Request, error) {
-		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/users", nil)
-		if err != nil {
-			return nil, err
-		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(p))
-		q.Set("per_page", strconv.Itoa(pp))
-		req.URL.RawQuery = q.Encode()
-		return req, nil
-	}
-	return ListPage[UserEntity](c, ctx, makeReq, page, perPage)
-}
-
-// ListUsersRaw retrieves all users and returns the raw HTTP response bodies
-// merged across pages as a single JSON array. Unlike ListUsers, the returned
-// bytes are byte-preserving: each element JSON is exactly what the BOARD API
-// emitted, enabling strict field diff in E2E tests to detect keys that are not
-// mapped to UserEntity.
-//
-// Intended for E2E strict field diff; regular callers should use ListUsers.
-func (c *Client) ListUsersRaw(ctx context.Context, opts ...ListAllOption) ([]byte, error) {
-	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
-		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/users", nil)
-		if err != nil {
-			return nil, err
-		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		req.URL.RawQuery = q.Encode()
-		return req, nil
-	}
-	items, err := c.ListAll(ctx, makeReq, opts...)
-	if err != nil {
-		return nil, err
-	}
-	out, err := json.Marshal(items)
-	if err != nil {
-		return nil, &APIError{Code: APIErrorUnknown, Message: "ListUsersRaw: marshal aggregate: " + err.Error()}
-	}
-	return out, nil
-}
-
-// GetUserRaw retrieves a single user and returns the raw HTTP response body
-// byte-for-byte.
-//
-// Intended for E2E strict field diff; regular callers should use GetUser.
-func (c *Client) GetUserRaw(ctx context.Context, id int) ([]byte, error) {
+// GetUserRaw は指定 ID のユーザーの生 HTTP レスポンスボディとヘッダーを返す。
+// E2E の strict field diff に使用できる。通常の呼び出しには GetUser を使うこと。
+func (c *Client) GetUserRaw(ctx context.Context, id int) ([]byte, http.Header, error) {
 	req, err := c.NewRequest(ctx, http.MethodGet, fmt.Sprintf("/v1/users/%d", id), nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return c.DoWithRetry(req)
-}
-
-// SearchUsersRaw retrieves users matching the given search parameters and
-// returns the raw HTTP response bodies merged across pages as a single JSON
-// array. Same byte-preserving guarantee as ListUsersRaw.
-//
-// Intended for E2E strict field diff; regular callers should use SearchUsers.
-func (c *Client) SearchUsersRaw(ctx context.Context, params UserSearchParams, opts ...ListAllOption) ([]byte, error) {
-	makeReq := func(ctx context.Context, page, perPage int) (*http.Request, error) {
-		req, err := c.NewRequest(ctx, http.MethodGet, "/v1/users", nil)
-		if err != nil {
-			return nil, err
-		}
-		q := req.URL.Query()
-		q.Set("page", strconv.Itoa(page))
-		q.Set("per_page", strconv.Itoa(perPage))
-		if params.Name != "" {
-			q.Set("name", params.Name)
-		}
-		if params.Email != "" {
-			q.Set("email", params.Email)
-		}
-		if params.UpdatedAtFrom != "" {
-			q.Set("updated_at_from", params.UpdatedAtFrom)
-		}
-		req.URL.RawQuery = q.Encode()
-		return req, nil
-	}
-	items, err := c.ListAll(ctx, makeReq, opts...)
-	if err != nil {
-		return nil, err
-	}
-	out, err := json.Marshal(items)
-	if err != nil {
-		return nil, &APIError{Code: APIErrorUnknown, Message: "SearchUsersRaw: marshal aggregate: " + err.Error()}
-	}
-	return out, nil
+	return c.DoWithRetryFull(req)
 }

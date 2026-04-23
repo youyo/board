@@ -491,7 +491,7 @@ func TestNewAPIPaymentsCmd(t *testing.T) {
 	}
 }
 
-func testMasterCmd(t *testing.T, cmd *cobra.Command, use string, searchFlags []string) {
+func testMasterCmd(t *testing.T, cmd *cobra.Command, use string, listFlags []string) {
 	t.Helper()
 	if cmd.Use != use {
 		t.Errorf("Use = %q, want %q", cmd.Use, use)
@@ -500,7 +500,7 @@ func testMasterCmd(t *testing.T, cmd *cobra.Command, use string, searchFlags []s
 	for _, sub := range cmd.Commands() {
 		subNames[sub.Use] = true
 	}
-	for _, name := range []string{"list", "get", "search"} {
+	for _, name := range []string{"list", "get"} {
 		if !subNames[name] {
 			t.Errorf("subcommand %q is not registered", name)
 		}
@@ -519,55 +519,55 @@ func testMasterCmd(t *testing.T, cmd *cobra.Command, use string, searchFlags []s
 		t.Error("get: --id flag is not defined")
 	}
 
-	var searchCmd *cobra.Command
+	var listCmd *cobra.Command
 	for _, sub := range cmd.Commands() {
-		if sub.Use == "search" {
-			searchCmd = sub
+		if sub.Use == "list" {
+			listCmd = sub
 		}
 	}
-	if searchCmd == nil {
-		t.Fatal("search command not found")
+	if listCmd == nil {
+		t.Fatal("list command not found")
 	}
-	for _, flagName := range searchFlags {
-		if f := searchCmd.Flags().Lookup(flagName); f == nil {
-			t.Errorf("search: --%s flag is not defined", flagName)
+	for _, flagName := range listFlags {
+		if f := listCmd.Flags().Lookup(flagName); f == nil {
+			t.Errorf("list: --%s flag is not defined", flagName)
 		}
 	}
 }
 
 func TestNewAPIUsersCmd(t *testing.T) {
 	testMasterCmd(t, cli.NewAPIUsersCmd(), "users",
-		[]string{"name", "email", "updated-at-from"})
+		[]string{"name-cont", "email-cont", "updated-at-gteq"})
 }
 
 func TestNewAPIGroupsCmd(t *testing.T) {
 	testMasterCmd(t, cli.NewAPIGroupsCmd(), "groups",
-		[]string{"name", "updated-at-from"})
+		[]string{"name-cont", "updated-at-gteq"})
 }
 
 func TestNewAPIPaymentTermsCmd(t *testing.T) {
 	testMasterCmd(t, cli.NewAPIPaymentTermsCmd(), "payment_terms",
-		[]string{"name", "updated-at-from"})
+		[]string{"name-cont", "updated-at-gteq"})
 }
 
 func TestNewAPIProjectTypesCmd(t *testing.T) {
 	testMasterCmd(t, cli.NewAPIProjectTypesCmd(), "project_types",
-		[]string{"name", "updated-at-from"})
+		[]string{"name-cont", "updated-at-gteq"})
 }
 
 func TestNewAPIPurchaseTypesCmd(t *testing.T) {
 	testMasterCmd(t, cli.NewAPIPurchaseTypesCmd(), "purchase_types",
-		[]string{"name", "updated-at-from"})
+		[]string{"name-cont", "updated-at-gteq"})
 }
 
 func TestNewAPIAccountingTypesCmd(t *testing.T) {
 	testMasterCmd(t, cli.NewAPIAccountingTypesCmd(), "accounting_types",
-		[]string{"name", "updated-at-from"})
+		[]string{"name-cont", "updated-at-gteq"})
 }
 
 func TestNewAPIDocumentSendChannelsCmd(t *testing.T) {
 	testMasterCmd(t, cli.NewAPIDocumentSendChannelsCmd(), "document_send_channels",
-		[]string{"name", "updated-at-from"})
+		[]string{"name-cont", "updated-at-gteq"})
 }
 
 func TestRootCmdHasAPISubcommand(t *testing.T) {

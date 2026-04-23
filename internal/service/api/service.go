@@ -139,59 +139,73 @@ type PaymentRepo interface {
 }
 
 // UserRepo is the interface for the users repository.
+//
+// M56 以降: List は (readOpts, filter) 二引数化されて *ListResult を返す。
+// 非ゼロ filter 時は cache バイパスで api.ListUsers を直接呼ぶ。
+// Search / ListPage は削除（破壊的変更）。
 type UserRepo interface {
-	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.UserEntity, error)
+	List(ctx context.Context, readOpts repository.ReadOptions, filter boardapi.UserListOptions) (*boardapi.ListResult[boardapi.UserEntity], error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.UserEntity, error)
-	Search(ctx context.Context, params boardapi.UserSearchParams, opts repository.ReadOptions) ([]boardapi.UserEntity, error)
-	ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.UserEntity], error) //nolint:staticcheck
 }
 
 // GroupRepo is the interface for the groups repository.
+//
+// M56 以降: List は (readOpts, filter) 二引数化されて *ListResult を返す。
+// 非ゼロ filter 時は cache バイパスで api.ListGroups を直接呼ぶ。
+// Search / ListPage は削除（破壊的変更）。
 type GroupRepo interface {
-	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.GroupEntity, error)
+	List(ctx context.Context, readOpts repository.ReadOptions, filter boardapi.GroupListOptions) (*boardapi.ListResult[boardapi.GroupEntity], error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.GroupEntity, error)
-	Search(ctx context.Context, params boardapi.GroupSearchParams, opts repository.ReadOptions) ([]boardapi.GroupEntity, error)
-	ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.GroupEntity], error) //nolint:staticcheck
 }
 
 // PaymentTermRepo is the interface for the payment_terms repository.
+//
+// M56 以降: List は (readOpts, filter) 二引数化されて *ListResult を返す。
+// 非ゼロ filter 時は cache バイパスで api.ListPaymentTerms を直接呼ぶ。
+// Search / ListPage は削除（破壊的変更）。
 type PaymentTermRepo interface {
-	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.PaymentTermEntity, error)
+	List(ctx context.Context, readOpts repository.ReadOptions, filter boardapi.PaymentTermListOptions) (*boardapi.ListResult[boardapi.PaymentTermEntity], error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.PaymentTermEntity, error)
-	Search(ctx context.Context, params boardapi.PaymentTermSearchParams, opts repository.ReadOptions) ([]boardapi.PaymentTermEntity, error)
-	ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.PaymentTermEntity], error) //nolint:staticcheck
 }
 
 // ProjectTypeRepo is the interface for the project_types repository.
+//
+// M56 以降: List は (readOpts, filter) 二引数化されて *ListResult を返す。
+// 非ゼロ filter 時は cache バイパスで api.ListProjectTypes を直接呼ぶ。
+// Search / ListPage は削除（破壊的変更）。
 type ProjectTypeRepo interface {
-	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.ProjectTypeEntity, error)
+	List(ctx context.Context, readOpts repository.ReadOptions, filter boardapi.ProjectTypeListOptions) (*boardapi.ListResult[boardapi.ProjectTypeEntity], error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.ProjectTypeEntity, error)
-	Search(ctx context.Context, params boardapi.ProjectTypeSearchParams, opts repository.ReadOptions) ([]boardapi.ProjectTypeEntity, error)
-	ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.ProjectTypeEntity], error) //nolint:staticcheck
 }
 
 // PurchaseTypeRepo is the interface for the purchase_types repository.
+//
+// M56 以降: List は (readOpts, filter) 二引数化されて *ListResult を返す。
+// 非ゼロ filter 時は cache バイパスで api.ListPurchaseTypes を直接呼ぶ。
+// Search / ListPage は削除（破壊的変更）。
 type PurchaseTypeRepo interface {
-	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.PurchaseTypeEntity, error)
+	List(ctx context.Context, readOpts repository.ReadOptions, filter boardapi.PurchaseTypeListOptions) (*boardapi.ListResult[boardapi.PurchaseTypeEntity], error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.PurchaseTypeEntity, error)
-	Search(ctx context.Context, params boardapi.PurchaseTypeSearchParams, opts repository.ReadOptions) ([]boardapi.PurchaseTypeEntity, error)
-	ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.PurchaseTypeEntity], error) //nolint:staticcheck
 }
 
 // AccountingTypeRepo is the interface for the accounting_types repository.
+//
+// M56 以降: List は (readOpts, filter) 二引数化されて *ListResult を返す。
+// 非ゼロ filter 時は cache バイパスで api.ListAccountingTypes を直接呼ぶ。
+// Search / ListPage は削除（破壊的変更）。
 type AccountingTypeRepo interface {
-	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.AccountingTypeEntity, error)
+	List(ctx context.Context, readOpts repository.ReadOptions, filter boardapi.AccountingTypeListOptions) (*boardapi.ListResult[boardapi.AccountingTypeEntity], error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.AccountingTypeEntity, error)
-	Search(ctx context.Context, params boardapi.AccountingTypeSearchParams, opts repository.ReadOptions) ([]boardapi.AccountingTypeEntity, error)
-	ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.AccountingTypeEntity], error) //nolint:staticcheck
 }
 
 // DocumentSendChannelRepo is the interface for the document_send_channels repository.
+//
+// M56 以降: List は (readOpts, filter) 二引数化されて *ListResult を返す。
+// 非ゼロ filter 時は cache バイパスで api.ListDocumentSendChannels を直接呼ぶ。
+// Search / ListPage は削除（破壊的変更）。
 type DocumentSendChannelRepo interface {
-	List(ctx context.Context, opts repository.ReadOptions) ([]boardapi.DocumentSendChannelEntity, error)
+	List(ctx context.Context, readOpts repository.ReadOptions, filter boardapi.DocumentSendChannelListOptions) (*boardapi.ListResult[boardapi.DocumentSendChannelEntity], error)
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.DocumentSendChannelEntity, error)
-	Search(ctx context.Context, params boardapi.DocumentSendChannelSearchParams, opts repository.ReadOptions) ([]boardapi.DocumentSendChannelEntity, error)
-	ListPage(ctx context.Context, page, perPage int) (*boardapi.PageResult[boardapi.DocumentSendChannelEntity], error) //nolint:staticcheck
 }
 
 // Service is the main service for the service/api layer.

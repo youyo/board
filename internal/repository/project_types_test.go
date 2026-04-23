@@ -76,12 +76,12 @@ func TestProjectTypeRepository_List_CacheHit(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeProjectTypeRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{})
+	got, err := repo.List(context.Background(), repository.ReadOptions{}, boardapi.ProjectTypeListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(got) != len(sampleProjectTypes) {
-		t.Errorf("len(got) = %d, want %d", len(got), len(sampleProjectTypes))
+	if len(got.Items) != len(sampleProjectTypes) {
+		t.Errorf("len(got.Items) = %d, want %d", len(got.Items), len(sampleProjectTypes))
 	}
 }
 
@@ -93,12 +93,12 @@ func TestProjectTypeRepository_List_InitialLoad(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeProjectTypeRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{})
+	got, err := repo.List(context.Background(), repository.ReadOptions{}, boardapi.ProjectTypeListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
-	if len(got) != len(sampleProjectTypes) {
-		t.Errorf("len(got) = %d, want %d", len(got), len(sampleProjectTypes))
+	if len(got.Items) != len(sampleProjectTypes) {
+		t.Errorf("len(got.Items) = %d, want %d", len(got.Items), len(sampleProjectTypes))
 	}
 }
 
@@ -161,17 +161,20 @@ func TestProjectTypeRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	}
 }
 
-// T_PRT06: Search - Name filter -> returns matching items
+// T_PRT06: Search - Name filter -> bypasses cache, returns data from API
 func TestProjectTypeRepository_Search_NameFilter(t *testing.T) {
 	db := newTestDB(t)
-	seedProjectTypeCache(t, db, sampleProjectTypes)
 	markSynced(t, db, "project_types")
 
-	srv := newProjectTypeAPIServer(t, nil)
+	// API サーバーは name_cont=Contract Development に合致する 1 件を返すと想定
+	filtered := []boardapi.ProjectTypeEntity{
+		{ID: 1, Name: "Contract Development", UpdatedAt: "2026-01-01T00:00:00Z"},
+	}
+	srv := newProjectTypeAPIServer(t, filtered)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeProjectTypeRepo(t, db, apiClient, false)
-	got, err := repo.Search(context.Background(), boardapi.ProjectTypeSearchParams{Name: "Contract Development"}, repository.ReadOptions{})
+	got, err := repo.Search(context.Background(), boardapi.ProjectTypeListOptions{NameCont: "Contract Development"}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
@@ -190,7 +193,7 @@ func TestProjectTypeRepository_Search_NoFilter(t *testing.T) {
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
 	repo := makeProjectTypeRepo(t, db, apiClient, false)
-	got, err := repo.Search(context.Background(), boardapi.ProjectTypeSearchParams{}, repository.ReadOptions{})
+	got, err := repo.Search(context.Background(), boardapi.ProjectTypeListOptions{}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
