@@ -4,7 +4,7 @@ project: "board"
 phase: "Phase N"
 milestone: "N01"
 created: "2026-04-24"
-status: "Draft — Step 7a ユーザー事実確認レビュー待ち"
+status: "Completed — B（ゼロベース再設計）採択、ADR-001 Accepted（2026-04-25）"
 related_adr: "docs/adr/ADR-001-find-layer.md"
 related_plan: "plans/pure-twirling-coral.md"
 ---

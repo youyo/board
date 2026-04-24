@@ -8,8 +8,8 @@
 | 制約 | Phase M 完了（v0.6.0）後に着手、調査中は既存 find 層は現状維持（機能欠落期間を作らない）、実装方針は N01 の意思決定結果に依存 |
 | 対象リポジトリ | /Users/youyo/src/github.com/youyo/board |
 | 作成日 | 2026-04-24 |
-| 最終更新 | 2026-04-24（N01 Step 1-6 完了） |
-| ステータス | N01 Step 1-6 完了、Step 7a（ユーザー事実確認）待ち |
+| 最終更新 | 2026-04-25（N01 全 Step 完了、B 採択確定） |
+| ステータス | N01 完了（B: ゼロベース再設計 採択）、N02 仕様策定へ移行 |
 | 親計画 | plans/groovy-churning-valley.md（plan-mode 集約プラン） |
 | 先行フェーズ | plans/board-phase-m-roadmap.md（Phase M: CLI/Docs 充実化、v0.6.0） |
 
@@ -32,9 +32,9 @@ Phase H（M25-M32、2026-04-21 完走）で `internal/service/find/` 層の 12 F
 全廃棄 + ゼロベース再構築を前提に、N01 で必要性を評価し、意思決定する。
 
 ## Current Focus
-- **マイルストーン**: N01（find 層必要性評価 + ADR）— Step 1-6 完了、Step 7a（ユーザー事実確認レビュー）待ち
-- **直近の完了**: 調査レポート初版 / ADR-001 Placeholder / 仕様書 3 節 Placeholder（2026-04-24）
-- **次のアクション**: ユーザーによる Step 7a 事実確認 → 別セッションで Step 7b（評価軸重み付け + A/B/C/D 選択）
+- **マイルストーン**: N02（新 find 層仕様策定）— 未着手
+- **直近の完了**: N01 全 Step 完了（B 採択・ADR-001 Accepted・2026-04-25）
+- **次のアクション**: N02 — 新 find 層仕様策定（5 件特化の Query/Result 型・FindXxx API 設計）
 
 ## Progress
 
@@ -52,12 +52,12 @@ Phase H（M25-M32、2026-04-21 完走）で `internal/service/find/` 層の 12 F
   - B: ゼロベース再設計（5 件特化層）
   - C: 数本に絞る（api 層で代替できないものだけ残す、AND 3 条件で選定）
   - D: 現状維持 + 負債解消（TODO(M25-M32) 8 箇所解消 + E2E SKIP 仕分け）
-- [ ] Step 7a: ユーザー事実確認レビュー（事実に誤りがないか、MCP 3 通り方針が妥当か）
-- [ ] Step 7b: 評価軸重み付け + A/B/C/D 選択（熟考期間 1 日以上後、別セッションで開始）
+- [x] Step 7a: ユーザー事実確認レビュー（事実に誤りなし確認済み、2026-04-25）
+- [x] Step 7b: 評価軸重み付け + A/B/C/D 選択 → **B 採択**（2026-04-25）
 - [x] `docs/adr/ADR-001-find-layer.md` Placeholder 作成（MADR 3.x、Status: Proposed）
-- [ ] Step 8: ADR-001 Decision Outcome 確定（Step 7b 後、選択結果で Accepted / Deferred / Rejected）
+- [x] Step 8: ADR-001 Decision Outcome 確定（B 採択・Status: Accepted、2026-04-25）
 - [x] `docs/specs/board_cli_mcp_ultra_detailed_design_ja.md` §7.9/§8.5/§22 に全選択肢共通 Placeholder 注記
-- [ ] Step 9: 仕様書最終化（選択肢別扱いマトリクスに従って更新、Step 8 後）
+- [x] Step 9: 仕様書最終化（B 採択に従って §7.9/§8.5/§22 の Placeholder 注記を更新、2026-04-25）
 - 📄 詳細計画: `plans/pure-twirling-coral.md`（弁証法レビュー反映改訂版、Step 0-11 定義）
 - 📝 groovy-churning-valley.md の N01 詳細セクションを参照
 

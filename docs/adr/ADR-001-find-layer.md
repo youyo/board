@@ -1,6 +1,6 @@
 ---
-status: "Proposed"
-date: 2026-04-24
+status: "Accepted"
+date: 2026-04-25
 deciders: [youyo]
 consulted: ["調査レポート plans/board-phase-n-m01-find-rationale.md"]
 informed: []
@@ -118,20 +118,34 @@ E2E SKIP の仕分けのみを実施する。新規削除・再設計は行わ�
 
 ## Decision Outcome
 
-（Placeholder — Step 7b のユーザーレビュー後に A / B / C / D のいずれかを採用し、理由を記述する）
+**採択**: B — ゼロベース再設計（2026-04-25 確定）
 
-**段階的合意の原則**: 本 N01 では「方向性の合意」まで。最終確定は N02 冒頭の「実装前レビュー」で再確認する。
+**理由**:
+- Phase L で api 層が成熟した今、find 層の本質的な付加価値は「api 層で実現困難な処理（逆引き・enrichment・free-text OR 等）を担う薄い抽象層」に絞られる。
+- 既存の 12 メソッドは api 層で代替可能なものを多数含んでおり、負債（TODO 8 箇所・SKIP 70 件）を抱えたまま維持するよりゼロベースで再設計する方が長期コストを下げられる。
+- D（現状維持）では存在意義問題が先送りになり追従コストが継続する。C（数本残す）では選定基準の説明責任と一貫性の喪失が生じる。A（全廃止）では MCP UX が後退し LLM エージェントの負担が増大する。
 
-**Status 遷移**:
-- `Proposed → Accepted`: Step 7b でユーザーが選択し、実装を開始する場合
-- `Proposed → Deferred`: 追加情報（PoC 等）が必要な場合、または意思決定を延期する場合
-- `Proposed → Rejected`: 本 ADR の枠組み自体を見直す場合（ADR-002 で上書き）
+**段階的合意の原則**: 方向性を B に確定。新 find 層の具体的な API 設計（Query/Result 型・5 件特化内容）は N02 で確定する。
 
 ## Consequences
 
-### Positive / Negative / Neutral
+### Positive
 
-（選択結果に応じて記述する。Step 7b のユーザー選択後に確定）
+- 不要なメソッドを削除し、付加価値が明確な処理（逆引き・enrichment・free-text OR・response_group 組み合わせ・複数 status post-filter）だけを提供する薄い層になる。
+- 既存の TODO/SKIP 負債を引き継がない。
+- api 層との責任分界が明確化する。
+
+### Negative
+
+- 実装コストが 4 選択肢中最大（推定 2-3 週）。
+- v0.7.0 は v0.8.0 以降送りになる可能性が高い。
+- 新設計書策定（N02）で追加工数が発生する。
+- 新規実装に伴うバグ混入リスクが生じる。
+
+### Neutral
+
+- 既存 `internal/service/find/` は N03-N07 実装完了後に削除（移行期間中は並存）。
+- MCP tool 数・シグネチャは N02 の設計で決定する。
 
 ### 再評価トリガ（後悔保険）
 
@@ -145,10 +159,7 @@ E2E SKIP の仕分けのみを実施する。新規削除・再設計は行わ�
 
 （選択結果に応じた次マイルストーンの骨子を箇条書き — Step 7b 後に確定）
 
-- A 採択: N02 = find 層削除 + MCP 方針(a)/(b)/(c) 選択と実装
-- B 採択: N02 = 新 find 層仕様策定（N03-N07 = 5 機能実装、N08 = MCP tools 刷新、N09 = E2E 再構築）
-- C 採択: N02 = 3-5 本選別確定 + 削除対象の廃止（N03-N04 = 残存 TODO 解消、N05 = MCP tools 整理）
-- D 採択: N02 = TODO(M25-M32) 8 箇所解消（N03 = E2E SKIP 仕分け + テストデータ整備）
+- **B 採択（確定）**: N02 = 新 find 層仕様策定（Query/Result 型・5 件特化 API 設計）→ N03-N07 = リソース別実装（client / project / document / vendor / master）→ N08 = MCP tools 刷新 → N09 = E2E テスト再構築 → N10 = v0.7.0 リリース
 
 ## References
 

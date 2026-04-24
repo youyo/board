@@ -399,7 +399,7 @@ board/
 - LLM 向けの便利検索
 - low-level service / repository を組み合わせる
 
-> ⚠️ ADR-001 参照。find 層の扱い方針は Phase N で評価中、決定後に本節を更新する。
+> **ADR-001 決定済み（2026-04-25）**: B — ゼロベース再設計。api 層で実現困難な 5 件（逆引き・enrichment・free-text OR・response_group 組み合わせ・複数 status post-filter）に特化した薄い層として再構築する。既存実装は N03-N07 完了後に削除。
 > 参照: [docs/adr/ADR-001-find-layer.md](../adr/ADR-001-find-layer.md)
 
 ### 7.10 `internal/mcpserver`
@@ -480,7 +480,7 @@ board api tickets search --assignee "youyo"
 
 ### 8.5 `find` high-level
 
-> ⚠️ ADR-001 参照。find 層の扱い方針は Phase N で評価中、決定後に本節を更新する。
+> **ADR-001 決定済み（2026-04-25）**: B — ゼロベース再設計。api 層で実現困難な 5 件（逆引き・enrichment・free-text OR・response_group 組み合わせ・複数 status post-filter）に特化した薄い層として再構築する。既存実装は N03-N07 完了後に削除。
 > 参照: [docs/adr/ADR-001-find-layer.md](../adr/ADR-001-find-layer.md)
 
 ```bash
@@ -1146,7 +1146,7 @@ resource ごとに変える。
 
 ## 22. `board find` high-level 設計
 
-> ⚠️ ADR-001 参照。find 層の扱い方針は Phase N で評価中、決定後に本節を更新する。
+> **ADR-001 決定済み（2026-04-25）**: B — ゼロベース再設計。api 層で実現困難な 5 件（逆引き・enrichment・free-text OR・response_group 組み合わせ・複数 status post-filter）に特化した薄い層として再構築する。既存実装は N03-N07 完了後に削除。
 > 参照: [docs/adr/ADR-001-find-layer.md](../adr/ADR-001-find-layer.md)
 
 ### 22.1 方針
