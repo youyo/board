@@ -69,12 +69,26 @@ Phase H（M25-M32、2026-04-21 完走）で `internal/service/find/` 層の 12 F
 - N04: MCP tools（`internal/mcpserver/tools.go`）を api 層直接呼び出しに書き換え
 - N05: v0.7.0 リリース（Breaking Change として CHANGELOG 強調）
 
-#### 選択肢 B（ゼロベース再設計）になった場合
-- N02: 新仕様策定（Query / Result 型、FindXxx API 設計）
-- N03-N07: リソース別に実装（client / project / document / vendor / master）
-- N08: MCP tools 刷新
-- N09: E2E テスト再構築（実 API 感応のみ、SKIP 理由は明示ログ）
-- N10: v0.7.0 リリース
+#### 選択肢 B（ゼロベース再設計）採択（2026-04-25 確定）
+
+詳細計画: `plans/wondrous-skipping-snowglobe.md`（N02 詳細設計書、弁証法レビュー反映済）
+
+- **N02**: 新仕様策定（Query / Result 型、FindXxx API 設計、PoC 含む）
+- **N03**: Document PoC + `find2/` パッケージ骨格 + 共通ヘルパー
+- **N04**: FindClient + FindVendor 実装
+- **N05**: FindProject 実装（逆引き + enrichment + 複数 status post-filter）
+- **N06**: Document 4 種実装（Estimate/Order/Delivery/Receipt）+ ADR-001 再評価トリガチェックポイント
+- **N07a**: FindInvoice/PurchaseOrder/Payment/User 実装
+- **N07b**: 旧 `internal/service/find/` 削除 + `find2/` → `find/` rename（独立 revertable 境界）
+- **N07c**: CLI 刷新（`board find_*` → `board find <sub>`）
+- **N08**: MCP tools 刷新（12 → 11 tool、find_groups 削除）
+- **N09**: E2E テスト再構築（33-41 代表ケース、実 API 感応のみ、SKIP 理由は明示ログ）
+- **N10**: v0.7.0 リリース準備
+
+**合計工数**: 25-34 日 ≒ 5-7 週（ADR-001 当初 2-3 週見積は下振れシナリオ、devils-advocate/advocate 修正後の実測寄り見積）
+
+#### 選択肢 B 以外の参考（採択済みのため非活性）
+~~A 全廃止 / C 数本残す / D 現状維持~~
 
 #### 選択肢 C（数本に絞る）になった場合
 - N02: 残すメソッドを確定（例: ClientName → Project 逆引きなど api 層で無理な機能）
