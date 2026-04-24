@@ -73,7 +73,17 @@ Phase H（M25-M32、2026-04-21 完走）で `internal/service/find/` 層の 12 F
 
 詳細計画: `plans/wondrous-skipping-snowglobe.md`（N02 詳細設計書、弁証法レビュー反映済）
 
-- **N02**: 新仕様策定（Query / Result 型、FindXxx API 設計、PoC 含む）
+**N02 完了チェックリスト**:
+- [x] 設計書初版作成（649 行、11 メソッド / 5 件特化 / N03-N10 マイルストーン定義）
+- [x] Document Entity 対応（案 A + C: Entity 変更なし、Result 構造体に ProjectID 保持）
+- [x] TDD テスト設計（Query→ListOptions 変換テスト例 / 正常・境界・異常系 / 逆マッピング unit test / Refactor 対象明示）
+- [x] E2E 再構築方針（193 ケース削除 → 30-41 代表ケース、SKIP 統一テンプレート 4 種）
+- [x] シーケンス図 2 種（FindProject 逆引き + enrichment 並列 / FindEstimate 逆マッピング）
+- [x] 弁証法レビュー（devils-advocate 13 指摘 → advocate Must 4 / Should 6 採用）
+- [x] Must 4 件反映（C1: N07 三分割 / C2: 逆マッピング scale 実測 / C3: ADR 再評価トリガ監視 / H6: Statuses[] 明文化）
+- [x] 設計書ステータス → **Ready for Review**（2026-04-25）
+
+- **N02**: 新仕様策定（Query / Result 型、FindXxx API 設計、PoC 含む）✅
 - **N03**: Document PoC + `find2/` パッケージ骨格 + 共通ヘルパー
 - **N04**: FindClient + FindVendor 実装
 - **N05**: FindProject 実装（逆引き + enrichment + 複数 status post-filter）
@@ -130,10 +140,13 @@ Phase H（M25-M32、2026-04-21 完走）で `internal/service/find/` 層の 12 F
 |------|------|------|
 | 2026-04-24 | 作成 | Phase N ロードマップ初版作成（N01 詳細 + N02+ 概要、v0.7.0 ターゲット） |
 | 2026-04-24 | 更新 | N01 Step 1-6 完了：調査レポート 520 行 / ADR-001 Placeholder / 仕様書 3 節 Placeholder。Step 7a（事実確認）待ちに遷移、選択肢に D（現状維持 + 負債解消）を追加して A/B/C/D 4 選択肢フラット評価に変更 |
+| 2026-04-25 | 完了 | N01 完走（B 採択・ADR-001 Accepted）。N02 設計書（wondrous-skipping-snowglobe.md）作成 + 弁証法レビュー（devils-advocate → advocate）反映・Ready for Review |
 
 ## Next Action
 
-1. Phase M（v0.6.0）完走を待つ
-2. Phase M 完了後、`plans/board-phase-n-m01-find-rationale.md` を `/devflow:plan` で詳細化
-3. N01 実施 → ユーザーレビュー → ADR 確定
+1. **N03 開始**（N02 完了）
+   - [ ] PoC 実施（§5.2）: `GET /v1/documents/{type}/{id}` の project_id 実在性確認 + `projects.Search(RG="estimate")` scale 実測
+   - [ ] `go get golang.org/x/sync/singleflight`（go.mod 追加）
+   - [ ] BOARD API 最新仕様 spot check（§10-10）
+   - [ ] `internal/service/find2/` パッケージ骨格 + 共通ヘルパー（text_match, filterByStatuses, resolveClientAndProject errgroup 版）
 4. ADR に従い N02+ を逐次実装
