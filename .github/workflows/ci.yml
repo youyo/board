@@ -21,6 +21,14 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Check docs sync
+        run: |
+          tmp=$(mktemp -d)
+          cp README.md "$tmp/README.md"
+          rsync -a --exclude=specs docs/ "$tmp/"
+          diff -r "$tmp" internal/docs/assets
+          rm -rf "$tmp"
+
       - name: Run go vet
         run: go vet ./...
 

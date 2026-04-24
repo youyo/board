@@ -9,7 +9,7 @@
 | 対象リポジトリ | /Users/youyo/src/github.com/youyo/board |
 | 作成日 | 2026-04-24 |
 | 最終更新 | 2026-04-24 |
-| ステータス | 未着手 |
+| ステータス | 完走（v0.6.0 リリース準備完了、タグ push はユーザー側で実施） |
 | 親計画 | plans/groovy-churning-valley.md（plan-mode 集約プラン） |
 | 先行フェーズ | plans/board-phase-l-roadmap.md（Phase L: api 層 BOARD API 完全準拠、v0.5.0 完走） |
 | 後続フェーズ | plans/board-phase-n-roadmap.md（Phase N: find 層必要性評価 → v0.7.0） |
@@ -37,9 +37,9 @@ Ransack 形式のクエリと `ListResult[T]{Items, Meta, Headers}` による統
 Phase M で上記 4 点を解消し、v0.6.0 としてリリースする。
 
 ## Current Focus
-- **マイルストーン**: M61（README / api-reference 拡充 + v0.6.0 リリース）
-- **直近の完了**: M60（/board:docs スキル作成、薄いラッパー）
-- **次のアクション**: M61 着手 → `docs/api-reference.md` 拡充 + CHANGELOG + v0.6.0 タグ
+- **マイルストーン**: Phase M 完走（M58 / M59 / M60 / M61 全完了）
+- **直近の完了**: M61（README / api-reference 拡充 + v0.6.0 リリース準備）
+- **次のアクション**: ユーザーによるタグ push → `git tag v0.6.0 && git push origin v0.6.0` → GoReleaser 自動配信。その後 Phase N（find 層必要性評価 → v0.7.0）着手
 
 ## Progress
 
@@ -69,13 +69,17 @@ Phase M で上記 4 点を解消し、v0.6.0 としてリリースする。
 - 📄 詳細: plans/board-phase-m-m60-docs-skill.md
 - 📝 M61 の v0.6.0 bump 時に `.claude-plugin/plugin.json` の version も `0.6.0` に更新すること
 
-### M61: README / api-reference 拡充 + v0.6.0 リリース
-- [ ] `docs/api-reference.md` にサンプル JSON / エラー応答例 / Ransack フィルタ完全表を追加
-- [ ] `README.md` / `README_ja.md` に completion / docs / LLM 連携セクションを追加
-- [ ] `CHANGELOG.md` に v0.6.0 エントリ
-- [ ] `git tag v0.6.0 && git push origin v0.6.0`（GoReleaser が自動配信）
-- [ ] `brew upgrade board` で新版取得確認
-- 📄 詳細: 着手時に `plans/board-phase-m-m61-readme-release.md` を `/devflow:plan` で生成（遅延生成）
+### M61: README / api-reference 拡充 + v0.6.0 リリース準備 ✅
+- [x] `docs/api-reference.md` にサンプル JSON / エラー応答例 / Ransack フィルタ完全表 / CLI 補完値一覧 / board docs サブコマンド仕様を追加（新設 5 節）
+- [x] `README.md` / `README_ja.md` に completion 値補完と docs の api-reference 導線を追加（M60 既存セクション整理）
+- [x] `CHANGELOG.md` に v0.6.0 エントリ追加（M58 + M59 + M60 + M61 まとめ、バイナリサイズ +138KB 言及）
+- [x] `.claude-plugin/plugin.json` version 0.5.0 → 0.6.0
+- [x] `mise run sync-docs` 相当を実行（`internal/docs/assets/` 再同期）
+- [x] `.github/workflows/ci.yml` に docs sync drift 検知ステップ追加（`rsync` + `diff -r` で依存最小化）
+- [x] `go test ./... -count=1` / `go vet ./...` 全 Green
+- [ ] ~~`git tag v0.6.0 && git push origin v0.6.0`~~ — **ユーザー側で実施**
+- [ ] ~~`brew upgrade board` で新版取得確認~~ — **ユーザー側で実施**
+- 📄 詳細: plans/board-phase-m-m61-readme-release.md
 - 📝 依存: M58 / M59 / M60 全完了
 
 ## Blockers
@@ -103,6 +107,7 @@ Phase M で上記 4 点を解消し、v0.6.0 としてリリースする。
 | 日時 | 種別 | 内容 |
 |------|------|------|
 | 2026-04-24 | 作成 | Phase M ロードマップ初版作成（M58-M61、v0.6.0 ターゲット） |
+| 2026-04-24 | 完走 | M61 完了、v0.6.0 リリース準備完了。タグ push / brew 確認はユーザー側で実施 |
 
 ## Next Action
 

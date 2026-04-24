@@ -530,6 +530,303 @@ board cache clear
 
 ---
 
+## サンプル JSON
+
+代表的な list / get コマンドのレスポンス例です。実 API dump から必須フィールドのみ抽出しています。
+
+### list（一覧取得）
+
+`--show-meta` を付けると `_meta` フィールドに X-Total-Count / Rate Limit / ETag などのヘッダー情報が含まれます。
+
+```sh
+board api clients list --limit 2 --show-meta --pretty
+```
+
+```json
+{
+  "items": [
+    {
+      "ID": 1001,
+      "Name": "株式会社サンプル",
+      "NameDisp": "サンプル",
+      "CustomNo": "C-001",
+      "Tags": ["重要顧客"],
+      "UpdatedAt": "2026-04-01T10:00:00+09:00"
+    },
+    {
+      "ID": 1002,
+      "Name": "株式会社テスト",
+      "NameDisp": "テスト",
+      "CustomNo": "C-002",
+      "Tags": [],
+      "UpdatedAt": "2026-04-02T11:30:00+09:00"
+    }
+  ],
+  "_meta": {
+    "total_count": 128,
+    "page": 1,
+    "per_page": 2,
+    "rate_limit_remaining": 2987,
+    "rate_limit_reset_at": "2026-04-24T09:00:00Z",
+    "etag": "W/\"abc123\""
+  }
+}
+```
+
+### get（ID 指定取得）
+
+`projects get` は `--response-group` を指定するとネストされたサブドキュメント（見積書・受注書・納品書・請求書・領収書）も取得できます。
+
+```sh
+board api projects get --id 42 --response-group all --pretty
+```
+
+```json
+{
+  "ID": 42,
+  "Name": "新規サイト構築案件",
+  "ProjectNo": "P-2026-042",
+  "Client": {
+    "ID": 1001,
+    "Name": "株式会社サンプル"
+  },
+  "OrderStatus": 4,
+  "DeliveryStatus": 2,
+  "InvoiceTimingKbn": 1,
+  "Estimates": [
+    { "ID": 501, "DocumentNo": "E-2026-042-01", "Total": 1000000 }
+  ],
+  "Orders": [
+    { "ID": 601, "DocumentNo": "O-2026-042-01", "Total": 1000000 }
+  ],
+  "Deliveries": [],
+  "Invoices": [],
+  "Receipts": [],
+  "UpdatedAt": "2026-04-20T14:00:00+09:00"
+}
+```
+
+### invoices list（請求書一覧）
+
+```sh
+board api invoices list --client-id-eq 1001 --limit 1 --pretty
+```
+
+```json
+{
+  "items": [
+    {
+      "ID": 7001,
+      "DocumentNo": "I-2026-001",
+      "ClientID": 1001,
+      "ProjectID": 42,
+      "InvoiceDate": "2026-04-15",
+      "Total": 1100000,
+      "Status": "sent",
+      "UpdatedAt": "2026-04-15T16:00:00+09:00"
+    }
+  ]
+}
+```
+
+---
+
+## エラー応答例
+
+### BOARD API から伝播するエラー
+
+BOARD API から 4xx / 5xx が返ると、`board` CLI は exit code 1 で stderr に JSON 形式のエラーを出力します。
+
+#### 401 Unauthorized（認証失敗）
+
+```json
+{
+  "error": true,
+  "message": "BOARD API error: 401 Unauthorized: invalid api_key or api_token",
+  "status": 401
+}
+```
+
+対処: `board configure show` で `api_key` と `api_token` を確認し、正しい値を設定してください。
+
+#### 404 Not Found（存在しない ID）
+
+```sh
+board api clients get --id 99999999
+```
+
+```json
+{
+  "error": true,
+  "message": "BOARD API error: 404 Not Found: client not found",
+  "status": 404
+}
+```
+
+#### 429 Too Many Requests（rate limit 超過）
+
+```json
+{
+  "error": true,
+  "message": "BOARD API error: 429 Too Many Requests",
+  "status": 429,
+  "retry_after_seconds": 1
+}
+```
+
+BOARD API は 3 req/sec、3000 req/day のレート制限があります。`board` 内蔵 SQLite キャッシュが自動で負荷を抑えるため通常は発生しませんが、`--force-refresh` 多用時などに発生しうる。
+
+### CLI 自体のエラー
+
+BOARD API を呼ばずに CLI 側で検知するエラー（不正フラグ、未知リソースなど）も同形式で stderr に出ます。
+
+```sh
+board docs foobar
+```
+
+```json
+{
+  "error": true,
+  "message": "docs: section not found: foobar"
+}
+```
+
+```sh
+board docs --format xml
+```
+
+```json
+{
+  "error": true,
+  "message": "unsupported format: xml (use text or json)"
+}
+```
+
+---
+
+## Ransack フィルタ完全表（オペレータ俯瞰）
+
+Phase L（v0.5.0）以降、すべての list フラグは Ransack 風命名規則に統一されています。
+以下はオペレータの俯瞰表です。リソースごとの利用可能フラグは [リソース一覧](#リソース一覧) の各セクションを参照してください。
+
+### サポートオペレータ
+
+| サフィックス | 意味 | 値の型 | 例 |
+|-------------|------|--------|-----|
+| `_eq` | 完全一致 | int / string | `--client-id-eq 1001` / `--project-no-eq "P-001"` |
+| `_cont` | 部分一致（contains） | string | `--name-cont "株式会社"` |
+| `_in` | いずれかに一致（OR） | カンマ区切り int | `--order-status-in 1,2,4` |
+| `_gteq` | 以上（>=） | date / datetime | `--updated-at-gteq 2024-01-01` |
+| `_lteq` | 以下（<=） | date / datetime | `--delivery-date-lteq 2026-12-31` |
+
+### リソース × オペレータの利用可能性（概要）
+
+全 22 リソースが `--updated-at-gteq` / `--updated-at-lteq` をサポート。それ以外はリソース別詳細セクションを参照。
+
+| リソースカテゴリ | `_eq` | `_cont` | `_in` | `_gteq` / `_lteq` |
+|------------------|:-----:|:------:|:-----:|:-----------------:|
+| コア（clients / projects など 5 種） | ○ | ○ | ○ (projects のみ) | ○ |
+| ドキュメント（invoices など） | ○ | — | — | ○ |
+| ベンダー（vendors など 5 種） | ○ | ○ | — | ○ |
+| マスタ（users など 7 種） | — | ○ (name のみ) | — | ○ |
+
+### 日付フォーマット
+
+`_gteq` / `_lteq` の値は以下を受け付けます:
+
+- 日付のみ: `2026-04-24` → 00:00:00+09:00 として扱われる
+- 日時: `2026-04-24T10:00:00+09:00`（ISO 8601）
+
+タイムゾーンは `config.toml` の `timezone` 設定に従います（デフォルト UTC）。
+
+### AND / OR
+
+同一フラグを複数指定した場合は AND で結合されます。OR が必要な場合は `_in` オペレータ（カンマ区切り）を使用してください。
+
+```sh
+# AND: 顧客 ID = 1001 かつ 更新日 >= 2024-01-01
+board api projects list --client-id-eq 1001 --updated-at-gteq 2024-01-01
+
+# OR: 受注ステータスが 1, 2, 4 のいずれか
+board api projects list --order-status-in 1,2,4
+```
+
+---
+
+## CLI 補完値一覧
+
+`board completion zsh`（または `bash` / `fish`）で生成される補完スクリプトは、以下の固定列挙フラグで値補完を提供します。TAB 押下で候補と日本語説明が表示されます（zsh のみ、bash は候補値のみ）。
+
+| フラグ | 対象コマンド | 補完候補 |
+|--------|------------|---------|
+| `--response-group` | `api clients list` | `small`, `large` |
+| `--response-group` | `api invoices list` | `small`, `large` |
+| `--response-group` | `api payments list` | `small`, `large` |
+| `--response-group` | `api purchase_orders list` | `small`, `large` |
+| `--response-group` | `api projects list` | `small`, `large`, `estimate`, `order`, `delivery`, `invoice`, `receipt`, `all`（8 値） |
+| `--response-group` | `api projects get` | `estimate`, `order`, `delivery`, `invoice`, `receipt`, `all`（6 値） |
+| `--order-status-in` | `api projects list` | `1`=見積中(高) / `2`=見積中(中) / `3`=見積中(低) / `4`=受注確定 / `5`=受注済 / `8`=見積中(除) |
+| `--delivery-status-in` | `api projects list` | `1`=未着手 / `2`=着手中 / `3`=納品済 / `4`=検収済 |
+| `--invoice-timing-kbn-in` | `api projects list` | `1`=一括請求 / `2`=定期請求 |
+| `--format` | `docs` | `text`, `json` |
+
+> **注意**: `--status-eq`（invoices / payments / purchase_orders）の補完値は BOARD API 仕様書に明示された列挙値がないため、現時点では補完対象外です。
+
+### 補完スクリプトの導入
+
+```sh
+# zsh
+board completion zsh | sudo tee /usr/local/share/zsh/site-functions/_board
+
+# bash
+board completion bash | sudo tee /etc/bash_completion.d/board
+
+# fish
+board completion fish > ~/.config/fish/completions/board.fish
+```
+
+---
+
+## board docs サブコマンド
+
+`board docs` はバイナリに埋め込まれたドキュメント（README / api-reference / installation / guides）を CLI から参照できるサブコマンドです。
+
+```sh
+board docs                          # README を表示
+board docs --list                   # 埋め込みドキュメント一覧
+board docs clients                  # api-reference.md から clients セクションを抽出
+board docs clients --format json    # JSON 形式で取得（LLM / MCP 向け）
+board docs --search "Ransack"       # 全文検索（大文字小文字無視、±2 行コンテキスト）
+```
+
+### `--format json` 出力スキーマ
+
+トップレベルは `{mode, query, results}` の 3 フィールド。`mode` に応じて `results[]` の形が変わります。
+
+| mode | query | results[].file | results[].section | results[].content | results[].line | results[].size |
+|------|-------|----------------|-------------------|-------------------|:--------------:|:--------------:|
+| `readme` | — | `"README.md"` | — | 全文 | — | — |
+| `list` | — | 各ファイルの相対パス | — | — | — | バイトサイズ |
+| `search` | キーワード | マッチしたファイル | 直近 `####` 見出し | ±2 行 context | マッチ行番号（1-based） | — |
+| `resource` | リソース名 | `"api-reference.md"` | リソース名 | 抽出本文 | — | — |
+
+### 例（search モード）
+
+```sh
+board docs --search "Ransack" --format json | jq '.results[0]'
+```
+
+```json
+{
+  "file": "api-reference.md",
+  "line": 27,
+  "section": "共通フラグ（list）",
+  "content": "... Ransack 風フィルタの共通フラグ ..."
+}
+```
+
+---
+
 ## find コマンドとの使い分け
 
 | 用途 | コマンド |

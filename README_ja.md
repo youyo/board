@@ -33,6 +33,10 @@ board docs clients --format json    # LLM 向け機械可読出力
 board docs --search "Ransack"       # 全文検索
 ```
 
+`--format json` の出力スキーマと埋め込みドキュメント一覧は
+[API コマンドリファレンス › board docs サブコマンド](docs/api-reference.md#board-docs-サブコマンド)
+を参照してください。
+
 ### `/board:docs` Claude Code スキル
 
 上記コマンドを LLM が呼び出しやすいようにラップした Claude Code スキルを同梱しています
@@ -149,12 +153,17 @@ board mcp serve --host 0.0.0.0 --port 8080
 
 ### `board completion`
 
-シェル補完スクリプトを生成します。
+シェル補完スクリプトを生成します。固定列挙フラグ（`--response-group`、`--order-status-in`、
+`--delivery-status-in`、`--invoice-timing-kbn-in`、`--format`）は値の補完にも対応しており、
+`<TAB>` 押下で候補が表示されます（zsh では日本語説明付き）。
 
 ```sh
 board completion zsh  | sudo tee /usr/local/share/zsh/site-functions/_board
 board completion bash > /etc/bash_completion.d/board
 ```
+
+補完候補の全一覧は [API コマンドリファレンス › CLI 補完値一覧](docs/api-reference.md#cli-補完値一覧)
+を参照してください。
 
 ## グローバルフラグ
 

@@ -33,6 +33,9 @@ board docs clients --format json    # machine-readable output for LLMs
 board docs --search "Ransack"       # full-text search
 ```
 
+For the full `--format json` schema and the complete list of embedded docs,
+see [API Reference › board docs subcommand](docs/api-reference.md#board-docs-サブコマンド).
+
 ### `/board:docs` Claude Code skill
 
 A thin Claude Code skill (`skills/docs/SKILL.md`) wraps the commands above so
@@ -149,12 +152,17 @@ board mcp serve --host 0.0.0.0 --port 8080
 
 ### `board completion`
 
-Generate shell completion scripts.
+Generate shell completion scripts. Fixed-enum flags (`--response-group`, `--order-status-in`,
+`--delivery-status-in`, `--invoice-timing-kbn-in`, `--format`) ship with value completion — press
+`<TAB>` after the flag to see candidates (with Japanese descriptions in zsh).
 
 ```sh
 board completion zsh  | sudo tee /usr/local/share/zsh/site-functions/_board
 board completion bash > /etc/bash_completion.d/board
 ```
+
+See [API Reference › CLI 補完値一覧](docs/api-reference.md#cli-補完値一覧) for the full list of
+completion values.
 
 ## Global Flags
 
