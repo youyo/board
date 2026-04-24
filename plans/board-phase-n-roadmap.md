@@ -8,8 +8,8 @@
 | 制約 | Phase M 完了（v0.6.0）後に着手、調査中は既存 find 層は現状維持（機能欠落期間を作らない）、実装方針は N01 の意思決定結果に依存 |
 | 対象リポジトリ | /Users/youyo/src/github.com/youyo/board |
 | 作成日 | 2026-04-24 |
-| 最終更新 | 2026-04-24 |
-| ステータス | 未着手（Phase M 完了待ち） |
+| 最終更新 | 2026-04-24（N01 Step 1-6 完了） |
+| ステータス | N01 Step 1-6 完了、Step 7a（ユーザー事実確認）待ち |
 | 親計画 | plans/groovy-churning-valley.md（plan-mode 集約プラン） |
 | 先行フェーズ | plans/board-phase-m-roadmap.md（Phase M: CLI/Docs 充実化、v0.6.0） |
 
@@ -32,29 +32,33 @@ Phase H（M25-M32、2026-04-21 完走）で `internal/service/find/` 層の 12 F
 全廃棄 + ゼロベース再構築を前提に、N01 で必要性を評価し、意思決定する。
 
 ## Current Focus
-- **マイルストーン**: N01（find 層必要性評価 + ADR）
-- **直近の完了**: なし（Phase N 起票時点）
-- **次のアクション**: Phase M 完了後に N01 着手
+- **マイルストーン**: N01（find 層必要性評価 + ADR）— Step 1-6 完了、Step 7a（ユーザー事実確認レビュー）待ち
+- **直近の完了**: 調査レポート初版 / ADR-001 Placeholder / 仕様書 3 節 Placeholder（2026-04-24）
+- **次のアクション**: ユーザーによる Step 7a 事実確認 → 別セッションで Step 7b（評価軸重み付け + A/B/C/D 選択）
 
 ## Progress
 
 ### N01: find 層必要性評価 + 設計方針案 + ADR
-- [ ] `plans/board-phase-n-m01-find-rationale.md` 雛形作成
-- [ ] 観点 1-5 のデータ収集（grep / Read / 既存ドキュメント精読）
-  - 観点 1: find 層の付加価値棚卸し
-  - 観点 2: api 層 Ransack での代替可能性
-  - 観点 3: BOARD 本体サイト機能とのギャップ
-  - 観点 4: 既存利用実績（git blame / 実 MCP コール）
-  - 観点 5: 現状の技術的負債（TODO / SKIP / timeout）
-- [ ] 「12 Find メソッド × api 層代替可否」の大表作成
-- [ ] 選択肢 A/B/C の trade-off 分析
+- [x] `plans/board-phase-n-m01-find-rationale.md` 雛形作成 + 本文（520 行、§1-§10 完成）
+- [x] 観点 1-5 のデータ収集（grep / Read / 既存ドキュメント精読）
+  - 観点 1: find 層の付加価値棚卸し（12 メソッド台帳）
+  - 観点 2: api 層 Ransack での代替可能性（18 リソース × 主要フィルタ）
+  - 観点 3: api 層の限界 5 件（find でしか困難な処理、§4 限界注記付き）
+  - 観点 4: E2E SKIP 実態（70 件内訳 × 4 カテゴリ）
+  - 観点 5: MCP 12 tool 現状 + 3 通り方針 (a)/(b)/(c) マトリクス
+- [x] 「12 Find メソッド × 4 選択肢」の 48 セル大表作成（§8）
+- [x] 選択肢 A/B/C/**D** の trade-off 分析（6 評価軸 × 4 列、弁証法レビューで D 追加）
   - A: 全廃止（MCP を api 層直接呼び出しに）
-  - B: ゼロベース再設計
-  - C: 数本に絞る（api 層で代替できないものだけ残す）
-- [ ] ユーザーレビュー → 意思決定
-- [ ] `docs/adr/ADR-001-find-layer.md` に最終決定記録
-- [ ] `docs/specs/board_cli_mcp_ultra_detailed_design_ja.md` の関連節に補記
-- 📄 詳細: Phase N 着手時に `plans/board-phase-n-m01-find-rationale.md` を `/devflow:plan` で詳細化（遅延生成）
+  - B: ゼロベース再設計（5 件特化層）
+  - C: 数本に絞る（api 層で代替できないものだけ残す、AND 3 条件で選定）
+  - D: 現状維持 + 負債解消（TODO(M25-M32) 8 箇所解消 + E2E SKIP 仕分け）
+- [ ] Step 7a: ユーザー事実確認レビュー（事実に誤りがないか、MCP 3 通り方針が妥当か）
+- [ ] Step 7b: 評価軸重み付け + A/B/C/D 選択（熟考期間 1 日以上後、別セッションで開始）
+- [x] `docs/adr/ADR-001-find-layer.md` Placeholder 作成（MADR 3.x、Status: Proposed）
+- [ ] Step 8: ADR-001 Decision Outcome 確定（Step 7b 後、選択結果で Accepted / Deferred / Rejected）
+- [x] `docs/specs/board_cli_mcp_ultra_detailed_design_ja.md` §7.9/§8.5/§22 に全選択肢共通 Placeholder 注記
+- [ ] Step 9: 仕様書最終化（選択肢別扱いマトリクスに従って更新、Step 8 後）
+- 📄 詳細計画: `plans/pure-twirling-coral.md`（弁証法レビュー反映改訂版、Step 0-11 定義）
 - 📝 groovy-churning-valley.md の N01 詳細セクションを参照
 
 ### N02+（N01 意思決定結果による分岐、概要のみ）
@@ -111,6 +115,7 @@ Phase H（M25-M32、2026-04-21 完走）で `internal/service/find/` 層の 12 F
 | 日時 | 種別 | 内容 |
 |------|------|------|
 | 2026-04-24 | 作成 | Phase N ロードマップ初版作成（N01 詳細 + N02+ 概要、v0.7.0 ターゲット） |
+| 2026-04-24 | 更新 | N01 Step 1-6 完了：調査レポート 520 行 / ADR-001 Placeholder / 仕様書 3 節 Placeholder。Step 7a（事実確認）待ちに遷移、選択肢に D（現状維持 + 負債解消）を追加して A/B/C/D 4 選択肢フラット評価に変更 |
 
 ## Next Action
 
