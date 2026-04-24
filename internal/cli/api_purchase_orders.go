@@ -90,6 +90,7 @@ limits, ETag, last_modified) derived from response headers. Use
 	cmd.Flags().String("updated-at-lteq", "", `updated_at <= (YYYY-MM-DD HH:MM:SS)`)
 	cmd.Flags().Bool("include-archive-flg", false, "Include archived purchase orders (send include_archive_flg=1)")
 	cmd.Flags().Bool("show-meta", true, "Include _meta (pagination / rate limit / ETag) in JSON output")
+	_ = cmd.RegisterFlagCompletionFunc("response-group", staticCompletion(responseGroupCommon))
 	return cmd
 }
 

@@ -32,3 +32,23 @@ run = "golangci-lint run"
 [tasks.clean]
 description = "Remove build artifacts"
 run = "rm -f board"
+
+[tasks.sync-docs]
+description = "Sync docs/ + README.md to internal/docs/assets/ for go:embed"
+run = """
+rm -rf internal/docs/assets
+mkdir -p internal/docs/assets
+cp README.md internal/docs/assets/README.md
+rsync -a --exclude=specs docs/ internal/docs/assets/
+"""
+
+[tasks.check-docs-sync]
+description = "Verify internal/docs/assets/ is in sync with docs/ + README.md (fails if drift detected)"
+run = """
+set -e
+tmp=$(mktemp -d)
+cp README.md "$tmp/README.md"
+rsync -a --exclude=specs docs/ "$tmp/"
+diff -r "$tmp" internal/docs/assets
+rm -rf "$tmp"
+"""

@@ -132,6 +132,10 @@ limits, ETag, last_modified) derived from response headers. Use
 	cmd.Flags().Bool("include-archive-flg", false, "Include archived projects (send include_archive_flg=1)")
 	cmd.Flags().Bool("include-lost-flg", false, "Include lost projects (send include_lost_flg=1)")
 	cmd.Flags().Bool("show-meta", true, "Include _meta (pagination / rate limit / ETag) in JSON output")
+	_ = cmd.RegisterFlagCompletionFunc("response-group", staticCompletion(responseGroupProjectsList))
+	_ = cmd.RegisterFlagCompletionFunc("order-status-in", intMapCompletion(orderStatusMap))
+	_ = cmd.RegisterFlagCompletionFunc("delivery-status-in", intMapCompletion(deliveryStatusMap))
+	_ = cmd.RegisterFlagCompletionFunc("invoice-timing-kbn-in", intMapCompletion(invoiceTimingKbnMap))
 	return cmd
 }
 
@@ -166,5 +170,6 @@ func newAPIProjectsGetCmd() *cobra.Command {
 	}
 	cmd.Flags().IntVar(&id, "id", 0, "Project ID (required)")
 	cmd.Flags().StringVar(&responseGroup, "response-group", "", `Response group: "estimate" / "order" / "delivery" / "invoice" / "receipt" / "all"`)
+	_ = cmd.RegisterFlagCompletionFunc("response-group", staticCompletion(responseGroupProjectsGet))
 	return cmd
 }
