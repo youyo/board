@@ -399,6 +399,9 @@ board/
 - LLM 向けの便利検索
 - low-level service / repository を組み合わせる
 
+> ⚠️ ADR-001 参照。find 層の扱い方針は Phase N で評価中、決定後に本節を更新する。
+> 参照: [docs/adr/ADR-001-find-layer.md](../adr/ADR-001-find-layer.md)
+
 ### 7.10 `internal/mcpserver`
 
 - ローカル HTTP MCP サーバー
@@ -476,6 +479,9 @@ board api tickets search --assignee "youyo"
 ```
 
 ### 8.5 `find` high-level
+
+> ⚠️ ADR-001 参照。find 層の扱い方針は Phase N で評価中、決定後に本節を更新する。
+> 参照: [docs/adr/ADR-001-find-layer.md](../adr/ADR-001-find-layer.md)
 
 ```bash
 board find deal --id 123
@@ -1139,6 +1145,9 @@ resource ごとに変える。
 ---
 
 ## 22. `board find` high-level 設計
+
+> ⚠️ ADR-001 参照。find 層の扱い方針は Phase N で評価中、決定後に本節を更新する。
+> 参照: [docs/adr/ADR-001-find-layer.md](../adr/ADR-001-find-layer.md)
 
 ### 22.1 方針
 
