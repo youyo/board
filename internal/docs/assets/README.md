@@ -19,6 +19,28 @@ CLI tool and local MCP server for the [BOARD API](https://api.the-board.jp/v1/).
 - [MCP Server Guide](docs/guides/mcp-server.md)
 - [API Reference](docs/api-reference.md)
 
+## Agent / LLM integration
+
+### Embedded `board docs` subcommand
+
+The `board` binary ships with embedded documentation — no network required:
+
+```sh
+board docs                          # show README
+board docs --list                   # list all embedded docs
+board docs clients                  # extract a resource reference
+board docs clients --format json    # machine-readable output for LLMs
+board docs --search "Ransack"       # full-text search
+```
+
+### `/board:docs` Claude Code skill
+
+A thin Claude Code skill (`skills/docs/SKILL.md`) wraps the commands above so
+AI agents can look up BOARD CLI usage on demand. Register this repository as a
+Claude Code plugin (it ships a `.claude-plugin/plugin.json`) to expose the
+skill as `/board:docs`. The skill stays minimal by design — it only points the
+agent at `board docs`, and the binary remains the single source of truth.
+
 ## Installation
 
 ### Homebrew (macOS / Linux)

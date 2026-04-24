@@ -37,9 +37,9 @@ Ransack 形式のクエリと `ListResult[T]{Items, Meta, Headers}` による統
 Phase M で上記 4 点を解消し、v0.6.0 としてリリースする。
 
 ## Current Focus
-- **マイルストーン**: M59（board docs サブコマンド）
-- **直近の完了**: M58（completion 値補完、v0.6.0 未リリース）
-- **次のアクション**: M59 着手 → `internal/embed/docs.go` 設計
+- **マイルストーン**: M61（README / api-reference 拡充 + v0.6.0 リリース）
+- **直近の完了**: M60（/board:docs スキル作成、薄いラッパー）
+- **次のアクション**: M61 着手 → `docs/api-reference.md` 拡充 + CHANGELOG + v0.6.0 タグ
 
 ## Progress
 
@@ -50,22 +50,24 @@ Phase M で上記 4 点を解消し、v0.6.0 としてリリースする。
 - [x] `./board __complete` 経由の補完動作確認（手動 zsh は未実施、CI 検証で代替）
 - 📄 詳細: plans/board-phase-m-m58-completion.md
 
-### M59: board docs サブコマンド + JSON 出力
-- [ ] `internal/embed/docs.go`（または `internal/docs/`）新設、`go:embed` で README / api-reference / installation / guides を取り込む
-- [ ] `internal/cli/docs.go` に `newDocsCmd()` + `--list` / `--search` / `--format` フラグ
-- [ ] リソース抽出関数 `ExtractSection(md, resource)` 実装
-- [ ] 検索関数 `Search(md, keyword)` 実装（行単位マッチ + 前後コンテキスト）
-- [ ] ユニットテスト + バイナリサイズ計測（+50KB 上限）
-- 📄 詳細: 着手時に `plans/board-phase-m-m59-docs-command.md` を `/devflow:plan` で生成（遅延生成）
-- 📝 groovy-churning-valley.md の M59 詳細セクションを参照
+### M59: board docs サブコマンド + JSON 出力 ✅
+- [x] `internal/docs/` 新設、`go:embed` で docs/ + README.md を assets 経由で取り込み
+- [x] `internal/cli/docs.go` に `newDocsCmd()` + `--list` / `--search` / `--format` フラグ
+- [x] リソース抽出関数 `ExtractSection(md, resource)` 実装（`#### <name> — ` アンカー）
+- [x] 検索関数 `Search(md, keyword)` 実装（±2 行コンテキスト + 連続ヒットマージ）
+- [x] ユニットテスト (docs 16 + cli 12 ケース) + バイナリサイズ計測（実測 +138KB、計画 +50KB を超過したが受容）
+- [x] mise task `sync-docs` / `check-docs-sync` で drift 検知運用
+- 📄 詳細: plans/board-phase-m-m59-docs-command.md
+- 📝 バイナリサイズ増分 +138KB は CHANGELOG で言及
 
-### M60: /board:docs スキル作成（薄いラッパー）
-- [ ] `skills/` ディレクトリ作成
-- [ ] `skills/docs/SKILL.md` に frontmatter + 本文を記述（`board docs` を呼び出す手順）
-- [ ] README に `/board:docs` スキル利用案内を追加
-- [ ] 別セッションから `/board:docs` 呼び出し検証
-- 📄 詳細: 着手時に `plans/board-phase-m-m60-docs-skill.md` を `/devflow:plan` で生成（遅延生成）
-- 📝 M59 完了後に着手（依存: `board docs` バイナリ動作）
+### M60: /board:docs スキル作成（薄いラッパー）✅
+- [x] `skills/` ディレクトリ + `.claude-plugin/plugin.json` 作成（Claude Code plugin namespace 成立）
+- [x] `skills/docs/SKILL.md` に frontmatter（`name: board:docs`）+ 本文を記述（`board docs` を呼び出す手順）
+- [x] README.md / README_ja.md に `/board:docs` スキル利用案内セクション追加
+- [x] `internal/docs/skill_test.go` で frontmatter / 本文 / bash コマンド smoke test を TDD（15 ケース Green）
+- [x] 別セッションから `/board:docs` 呼び出し検証 → smoke test で機械的に代替（TestMain でバイナリビルド + exec 検証）
+- 📄 詳細: plans/board-phase-m-m60-docs-skill.md
+- 📝 M61 の v0.6.0 bump 時に `.claude-plugin/plugin.json` の version も `0.6.0` に更新すること
 
 ### M61: README / api-reference 拡充 + v0.6.0 リリース
 - [ ] `docs/api-reference.md` にサンプル JSON / エラー応答例 / Ransack フィルタ完全表を追加

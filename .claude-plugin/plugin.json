@@ -1,0 +1,10 @@
+{
+  "name": "board",
+  "description": "BOARD API CLI and local MCP server — includes an embedded documentation skill (/board:docs) that lets AI agents look up board command usage, flags, and resource schemas offline.",
+  "version": "0.5.0",
+  "author": {
+    "name": "youyo"
+  },
+  "homepage": "https://github.com/youyo/board",
+  "license": "MIT"
+}
