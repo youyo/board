@@ -112,4 +112,3 @@ func TestE2E_Orders_M53_ItemMetaParsed(t *testing.T) {
 		t.Errorf("ItemMeta.RateLimitLimit should be >= 0, got %d", result.Meta.RateLimitLimit)
 	}
 }
-
