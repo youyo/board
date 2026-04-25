@@ -45,7 +45,7 @@ func TestE2E_Users_List(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
 
-	raw, err := client.ListUsersRaw(ctx)
+	raw, _, err := client.ListUsersRaw(ctx, boardapi.UserListOptions{})
 	if err != nil {
 		// Roadmap rule: 403/429 must NOT be skipped, they must fail the test.
 		t.Fatalf("ListUsersRaw: %v", err)
@@ -71,7 +71,7 @@ func TestE2E_Users_Get(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
 
-	listRaw, err := client.ListUsersRaw(ctx)
+	listRaw, _, err := client.ListUsersRaw(ctx, boardapi.UserListOptions{})
 	if err != nil {
 		t.Fatalf("ListUsersRaw (discovery): %v", err)
 	}
@@ -92,7 +92,7 @@ func TestE2E_Users_Get(t *testing.T) {
 		t.Fatalf("first user has non-positive ID: %d", id)
 	}
 
-	getRaw, err := client.GetUserRaw(ctx, id)
+	getRaw, _, err := client.GetUserRaw(ctx, id)
 	if err != nil {
 		t.Fatalf("GetUserRaw(%d): %v", id, err)
 	}
@@ -125,11 +125,11 @@ func TestE2E_Users_Search(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
 
-	raw, err := client.SearchUsersRaw(ctx, boardapi.UserSearchParams{
-		Name: "zzz_nonexistent_keyword_for_e2e",
+	raw, _, err := client.ListUsersRaw(ctx, boardapi.UserListOptions{
+		NameCont: "zzz_nonexistent_keyword_for_e2e",
 	})
 	if err != nil {
-		t.Fatalf("SearchUsersRaw: %v", err)
+		t.Fatalf("ListUsersRaw (search): %v", err)
 	}
 
 	dumpJSON(t, "users_search", 0, raw)

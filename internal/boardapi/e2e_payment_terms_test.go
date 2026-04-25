@@ -41,7 +41,7 @@ func TestE2E_PaymentTerms_List(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
 
-	raw, err := client.ListPaymentTermsRaw(ctx)
+	raw, _, err := client.ListPaymentTermsRaw(ctx, boardapi.PaymentTermListOptions{})
 	if err != nil {
 		// Roadmap rule: 403/429 must NOT be skipped, they must fail the test.
 		t.Fatalf("ListPaymentTermsRaw: %v", err)
@@ -67,7 +67,7 @@ func TestE2E_PaymentTerms_Get(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
 
-	listRaw, err := client.ListPaymentTermsRaw(ctx)
+	listRaw, _, err := client.ListPaymentTermsRaw(ctx, boardapi.PaymentTermListOptions{})
 	if err != nil {
 		t.Fatalf("ListPaymentTermsRaw (discovery): %v", err)
 	}
@@ -88,7 +88,7 @@ func TestE2E_PaymentTerms_Get(t *testing.T) {
 		t.Fatalf("first payment_term has non-positive ID: %d", id)
 	}
 
-	getRaw, err := client.GetPaymentTermRaw(ctx, id)
+	getRaw, _, err := client.GetPaymentTermRaw(ctx, id)
 	if err != nil {
 		t.Fatalf("GetPaymentTermRaw(%d): %v", id, err)
 	}
@@ -117,11 +117,11 @@ func TestE2E_PaymentTerms_Search(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
 
-	raw, err := client.SearchPaymentTermsRaw(ctx, boardapi.PaymentTermSearchParams{
-		Name: "zzz_nonexistent_keyword_for_e2e",
+	raw, _, err := client.ListPaymentTermsRaw(ctx, boardapi.PaymentTermListOptions{
+		NameCont: "zzz_nonexistent_keyword_for_e2e",
 	})
 	if err != nil {
-		t.Fatalf("SearchPaymentTermsRaw: %v", err)
+		t.Fatalf("ListPaymentTermsRaw (search): %v", err)
 	}
 
 	dumpJSON(t, "payment_terms_search", 0, raw)

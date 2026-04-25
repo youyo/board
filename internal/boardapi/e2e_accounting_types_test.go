@@ -37,7 +37,7 @@ func TestE2E_AccountingTypes_List(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
 
-	raw, err := client.ListAccountingTypesRaw(ctx)
+	raw, _, err := client.ListAccountingTypesRaw(ctx, boardapi.AccountingTypeListOptions{})
 	if err != nil {
 		// Roadmap rule: 403/429 must NOT be skipped, they must fail the test.
 		t.Fatalf("ListAccountingTypesRaw: %v", err)
@@ -63,7 +63,7 @@ func TestE2E_AccountingTypes_Get(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
 
-	listRaw, err := client.ListAccountingTypesRaw(ctx)
+	listRaw, _, err := client.ListAccountingTypesRaw(ctx, boardapi.AccountingTypeListOptions{})
 	if err != nil {
 		t.Fatalf("ListAccountingTypesRaw (discovery): %v", err)
 	}
@@ -84,7 +84,7 @@ func TestE2E_AccountingTypes_Get(t *testing.T) {
 		t.Fatalf("first accounting_type has non-positive ID: %d", id)
 	}
 
-	getRaw, err := client.GetAccountingTypeRaw(ctx, id)
+	getRaw, _, err := client.GetAccountingTypeRaw(ctx, id)
 	if err != nil {
 		t.Fatalf("GetAccountingTypeRaw(%d): %v", id, err)
 	}
@@ -113,11 +113,11 @@ func TestE2E_AccountingTypes_Search(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
 
-	raw, err := client.SearchAccountingTypesRaw(ctx, boardapi.AccountingTypeSearchParams{
-		Name: "zzz_nonexistent_keyword_for_e2e",
+	raw, _, err := client.ListAccountingTypesRaw(ctx, boardapi.AccountingTypeListOptions{
+		NameCont: "zzz_nonexistent_keyword_for_e2e",
 	})
 	if err != nil {
-		t.Fatalf("SearchAccountingTypesRaw: %v", err)
+		t.Fatalf("ListAccountingTypesRaw (search): %v", err)
 	}
 
 	dumpJSON(t, "accounting_types_search", 0, raw)

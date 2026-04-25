@@ -42,7 +42,7 @@ func TestE2E_PurchaseTypes_List(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
 
-	raw, err := client.ListPurchaseTypesRaw(ctx)
+	raw, _, err := client.ListPurchaseTypesRaw(ctx, boardapi.PurchaseTypeListOptions{})
 	if err != nil {
 		// Roadmap rule: 403/429 must NOT be skipped, they must fail the test.
 		t.Fatalf("ListPurchaseTypesRaw: %v", err)
@@ -68,7 +68,7 @@ func TestE2E_PurchaseTypes_Get(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
 
-	listRaw, err := client.ListPurchaseTypesRaw(ctx)
+	listRaw, _, err := client.ListPurchaseTypesRaw(ctx, boardapi.PurchaseTypeListOptions{})
 	if err != nil {
 		t.Fatalf("ListPurchaseTypesRaw (discovery): %v", err)
 	}
@@ -89,7 +89,7 @@ func TestE2E_PurchaseTypes_Get(t *testing.T) {
 		t.Fatalf("first purchase_type has non-positive ID: %d", id)
 	}
 
-	getRaw, err := client.GetPurchaseTypeRaw(ctx, id)
+	getRaw, _, err := client.GetPurchaseTypeRaw(ctx, id)
 	if err != nil {
 		t.Fatalf("GetPurchaseTypeRaw(%d): %v", id, err)
 	}
@@ -118,11 +118,11 @@ func TestE2E_PurchaseTypes_Search(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
 
-	raw, err := client.SearchPurchaseTypesRaw(ctx, boardapi.PurchaseTypeSearchParams{
-		Name: "zzz_nonexistent_keyword_for_e2e",
+	raw, _, err := client.ListPurchaseTypesRaw(ctx, boardapi.PurchaseTypeListOptions{
+		NameCont: "zzz_nonexistent_keyword_for_e2e",
 	})
 	if err != nil {
-		t.Fatalf("SearchPurchaseTypesRaw: %v", err)
+		t.Fatalf("ListPurchaseTypesRaw (search): %v", err)
 	}
 
 	dumpJSON(t, "purchase_types_search", 0, raw)

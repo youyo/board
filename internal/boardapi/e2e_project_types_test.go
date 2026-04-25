@@ -41,7 +41,7 @@ func TestE2E_ProjectTypes_List(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
 
-	raw, err := client.ListProjectTypesRaw(ctx)
+	raw, _, err := client.ListProjectTypesRaw(ctx, boardapi.ProjectTypeListOptions{})
 	if err != nil {
 		// Roadmap rule: 403/429 must NOT be skipped, they must fail the test.
 		t.Fatalf("ListProjectTypesRaw: %v", err)
@@ -67,7 +67,7 @@ func TestE2E_ProjectTypes_Get(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
 
-	listRaw, err := client.ListProjectTypesRaw(ctx)
+	listRaw, _, err := client.ListProjectTypesRaw(ctx, boardapi.ProjectTypeListOptions{})
 	if err != nil {
 		t.Fatalf("ListProjectTypesRaw (discovery): %v", err)
 	}
@@ -88,7 +88,7 @@ func TestE2E_ProjectTypes_Get(t *testing.T) {
 		t.Fatalf("first project_type has non-positive ID: %d", id)
 	}
 
-	getRaw, err := client.GetProjectTypeRaw(ctx, id)
+	getRaw, _, err := client.GetProjectTypeRaw(ctx, id)
 	if err != nil {
 		t.Fatalf("GetProjectTypeRaw(%d): %v", id, err)
 	}
@@ -117,11 +117,11 @@ func TestE2E_ProjectTypes_Search(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
 
-	raw, err := client.SearchProjectTypesRaw(ctx, boardapi.ProjectTypeSearchParams{
-		Name: "zzz_nonexistent_keyword_for_e2e",
+	raw, _, err := client.ListProjectTypesRaw(ctx, boardapi.ProjectTypeListOptions{
+		NameCont: "zzz_nonexistent_keyword_for_e2e",
 	})
 	if err != nil {
-		t.Fatalf("SearchProjectTypesRaw: %v", err)
+		t.Fatalf("ListProjectTypesRaw (search): %v", err)
 	}
 
 	dumpJSON(t, "project_types_search", 0, raw)

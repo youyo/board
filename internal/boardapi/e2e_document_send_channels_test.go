@@ -42,7 +42,7 @@ func TestE2E_DocumentSendChannels_List(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
 
-	raw, err := client.ListDocumentSendChannelsRaw(ctx)
+	raw, _, err := client.ListDocumentSendChannelsRaw(ctx, boardapi.DocumentSendChannelListOptions{})
 	if err != nil {
 		// Roadmap rule: 403/429 must NOT be skipped, they must fail the test.
 		t.Fatalf("ListDocumentSendChannelsRaw: %v", err)
@@ -69,7 +69,7 @@ func TestE2E_DocumentSendChannels_Get(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
 
-	listRaw, err := client.ListDocumentSendChannelsRaw(ctx)
+	listRaw, _, err := client.ListDocumentSendChannelsRaw(ctx, boardapi.DocumentSendChannelListOptions{})
 	if err != nil {
 		t.Fatalf("ListDocumentSendChannelsRaw (discovery): %v", err)
 	}
@@ -90,7 +90,7 @@ func TestE2E_DocumentSendChannels_Get(t *testing.T) {
 		t.Fatalf("first document_send_channel has non-positive ID: %d", id)
 	}
 
-	getRaw, err := client.GetDocumentSendChannelRaw(ctx, id)
+	getRaw, _, err := client.GetDocumentSendChannelRaw(ctx, id)
 	if err != nil {
 		t.Fatalf("GetDocumentSendChannelRaw(%d): %v", id, err)
 	}
@@ -119,11 +119,11 @@ func TestE2E_DocumentSendChannels_Search(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
 
-	raw, err := client.SearchDocumentSendChannelsRaw(ctx, boardapi.DocumentSendChannelSearchParams{
-		Name: "zzz_nonexistent_keyword_for_e2e",
+	raw, _, err := client.ListDocumentSendChannelsRaw(ctx, boardapi.DocumentSendChannelListOptions{
+		NameCont: "zzz_nonexistent_keyword_for_e2e",
 	})
 	if err != nil {
-		t.Fatalf("SearchDocumentSendChannelsRaw: %v", err)
+		t.Fatalf("ListDocumentSendChannelsRaw (search): %v", err)
 	}
 
 	dumpJSON(t, "document_send_channels_search", 0, raw)

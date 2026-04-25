@@ -44,7 +44,7 @@ func TestE2E_Groups_List(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
 
-	raw, err := client.ListGroupsRaw(ctx)
+	raw, _, err := client.ListGroupsRaw(ctx, boardapi.GroupListOptions{})
 	if err != nil {
 		// Roadmap rule: 403/429 must NOT be skipped, they must fail the test.
 		t.Fatalf("ListGroupsRaw: %v", err)
@@ -70,7 +70,7 @@ func TestE2E_Groups_Get(t *testing.T) {
 	client := newE2EClient(t)
 	ctx := context.Background()
 
-	listRaw, err := client.ListGroupsRaw(ctx)
+	listRaw, _, err := client.ListGroupsRaw(ctx, boardapi.GroupListOptions{})
 	if err != nil {
 		t.Fatalf("ListGroupsRaw (discovery): %v", err)
 	}
@@ -91,7 +91,7 @@ func TestE2E_Groups_Get(t *testing.T) {
 		t.Fatalf("first group has non-positive ID: %d", id)
 	}
 
-	getRaw, err := client.GetGroupRaw(ctx, id)
+	getRaw, _, err := client.GetGroupRaw(ctx, id)
 	if err != nil {
 		t.Fatalf("GetGroupRaw(%d): %v", id, err)
 	}
