@@ -9,6 +9,10 @@ run = "go build -ldflags \"-X main.version=dev\" -o board ./cmd/board"
 description = "Run all tests"
 run = "go test ./..."
 
+[tasks."test:race"]
+description = "Run unit tests with race detector (excludes e2e)"
+run = "go test -race -count=1 ./..."
+
 [tasks.vet]
 description = "Run go vet"
 run = "go vet ./..."
