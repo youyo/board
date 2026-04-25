@@ -10,6 +10,7 @@ import (
 	"github.com/youyo/board/internal/cache"
 	"github.com/youyo/board/internal/config"
 	"github.com/youyo/board/internal/refresh"
+	"github.com/youyo/board/internal/service/find2"
 )
 
 // App is the DI container for the board CLI.
@@ -113,6 +114,30 @@ func New(profileName string) (*App, error) {
 		APIClient:     apiClient,
 		Repos:         repos,
 	}, nil
+}
+
+// FindService2 returns a high-level find service backed by find2 (Phase N の新 find 層).
+//
+// N07b rename 時に既存の find 層を置き換え、本メソッドは削除する暫定アクセサ。
+// Groups は除外（N02 §2 決定、api_groups_list で代替）。
+func (a *App) FindService2() *find2.Service {
+	return find2.New(find2.Repos{
+		Clients:        a.Repos.Clients,
+		ClientBranches: a.Repos.ClientBranches,
+		Contacts:       a.Repos.Contacts,
+		Projects:       a.Repos.Projects,
+		Estimates:      a.Repos.Estimates,
+		Orders:         a.Repos.Orders,
+		Deliveries:     a.Repos.Deliveries,
+		Receipts:       a.Repos.Receipts,
+		Invoices:       a.Repos.Invoices,
+		Vendors:        a.Repos.Vendors,
+		VendorBranches: a.Repos.VendorBranches,
+		VendorContacts: a.Repos.VendorContacts,
+		PurchaseOrders: a.Repos.PurchaseOrders,
+		Payments:       a.Repos.Payments,
+		Users:          a.Repos.Users,
+	})
 }
 
 // Close closes the DB connection.
