@@ -71,6 +71,7 @@ func (c *Client) DoWithRetry(req *http.Request) ([]byte, error) {
 		if !isRetryable(err) {
 			return nil, err
 		}
+		recordRetryAttempt(req.Context())
 		if attempt == c.retryMax {
 			break
 		}
@@ -110,6 +111,7 @@ func (c *Client) DoWithRetryFull(req *http.Request) ([]byte, http.Header, error)
 		if !isRetryable(err) {
 			return nil, nil, err
 		}
+		recordRetryAttempt(req.Context())
 		if attempt == c.retryMax {
 			break
 		}
