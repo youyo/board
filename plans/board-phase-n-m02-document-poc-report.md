@@ -176,11 +176,39 @@ N/A 案 A 確定（§1 dump 検証により根拠成立、§4 参照）
 
 ## §6 N07b rename 事前検証
 
-*Step 8 drill 結果をここに追記する（placeholder）。*
+**実施日時**: 2026-04-25（N03 Step 8）
+**実施手順**: drill モード（実 rename はせず、git grep のみで影響範囲を列挙）
 
-- 対象: `internal/service/find/` → `internal/service/find2/` への段階的移行
-- 検証予定: シンボル衝突チェック、import パス変更影響、IDE/ツール互換性
-- 実施タイミング: N03 Step 8
+### 外部参照数（find2/ パッケージ自身を除いた **実コード** 利用側の数）
+
+実コード対象範囲: `internal/` 配下から `internal/service/find2/` を除外。`plans/`・`.claude/handover/` 等の文書言及は drill 計測対象外。
+
+| 項目 | 件数 | 備考 |
+|---|---|---|
+| `find2.` トークン参照（外部ファイル） | 2 | `internal/app/app.go:123-124`（`find2.Service` 戻り型 + `find2.New(find2.Repos{...})` 呼び出し）。`find2.New` と `find2.Repos` は同一行 |
+| `import "github.com/youyo/board/internal/service/find2"` | 1 | `internal/app/app.go:13` のみ |
+| `FindService2` 参照 | 1 | `internal/app/app.go:123` の定義のみ。利用側はまだ存在しない（N07c で CLI 結合予定） |
+| `internal/service/find2/*.go` ファイル数 | 12 | 実装 6（service/types/text_match/filter/resolver/reverse_map）+ テスト 6 |
+| `internal/service/find2/` LOC | 1728 | 合計（実装 706 + テスト 1022） |
+
+### N07b 移行手順（drill 結論）
+
+1. 旧 `internal/service/find/` ディレクトリ削除
+2. `internal/service/find2/` → `internal/service/find/` に rename（`git mv` 推奨、シンボル衝突は事前削除でゼロ）
+3. import パスを `internal/service/find2` → `internal/service/find` に sed 機械置換（外部参照件数は上記の通り少数のため低リスク）
+4. 暫定メソッド `App.FindService2()` を `App.FindService()` に rename（または旧 `findServiceFromCmd` を find2 バックエンドに切替）
+5. パッケージ宣言を `package find2` → `package find` に変更
+6. `go build ./...` + `go test ./...` + `go vet ./...` で健全性確認
+
+### 推奨ツール
+
+- **gopls rename**: シンボル単位の安全 rename（IDE 経由）。LSP 対応済の Go プロジェクトでは第一選択。
+- **`golang.org/x/tools/cmd/gorename`**: コマンドライン rename ツール（gopls の前身、CI 化容易）。
+- **sed 機械置換**: パッケージ名と import パスの単純置換（外部参照件数が少数のため可、ただし build 確認必須）。
+
+### 結論
+
+外部参照は実コード上 `internal/app/app.go` の 1 ファイル（FindService2 定義 1 箇所 + import 1 箇所 + find2 シンボル 2 箇所のみ）にとどまり、N07b rename は **極めて低リスクで実施可能**。CLI 側の利用は N07c で初めて発生するため、N07b 段階では app.go の差替え + パッケージ rename + 旧 find/ 削除で機械的に完了する見込み。drill は実変更なしで完了。
 
 ---
 

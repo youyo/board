@@ -32,9 +32,9 @@ Phase H（M25-M32、2026-04-21 完走）で `internal/service/find/` 層の 12 F
 全廃棄 + ゼロベース再構築を前提に、N01 で必要性を評価し、意思決定する。
 
 ## Current Focus
-- **マイルストーン**: N03（Document PoC + find2/ パッケージ骨格 + 共通ヘルパー）— Step 1+2 完了、Step 3-8 残り
-- **直近の完了**: N03 Step 1（PoC 実 API 4 種 retry=0、案 A 確定）+ Step 2（go.mod に golang.org/x/sync v0.20.0）（2026-04-25）
-- **次のアクション**: N03 Step 3（find2/ 骨格 service.go + types.go）→ Step 4（共通ヘルパー、ctx timeout フォールバック追加実装含む）→ Step 5-8
+- **マイルストーン**: N04（FindClient + FindVendor 実装）— N03 完走済、次の具象 Find メソッド実装フェーズへ
+- **直近の完了**: N03 全 8 Step 完走（2026-04-25）。find2/ パッケージ 12 ファイル / 1728 LOC、35 unit test 関数（race pass）、ctx timeout 10s フォールバック実装済、code-reviewer APPROVED（Major M1 修正済）
+- **次のアクション**: N04 — `FindClient`（ID + Name + Text 検索 + branches/contacts enrichment）と `FindVendor` の具象実装。`/devflow:plan` で N04 詳細計画から開始
 
 ## Progress
 
@@ -84,15 +84,15 @@ Phase H（M25-M32、2026-04-21 完走）で `internal/service/find/` 層の 12 F
 - [x] 設計書ステータス → **Ready for Review**（2026-04-25）
 
 - **N02**: 新仕様策定（Query / Result 型、FindXxx API 設計、PoC 含む）✅
-- **N03**: Document PoC + `find2/` パッケージ骨格 + 共通ヘルパー — Step 1+2 完了 / Step 3-8 残り
+- **N03**: Document PoC + `find2/` パッケージ骨格 + 共通ヘルパー — ✅ 完了（2026-04-25）
   - [x] Step 1: PoC test + retry instrumentation + PoC レポート（案 A 確定、4 種 retry=0、cold_latency >10s で ctx timeout フォールバック追加要件確定）
   - [x] Step 2: go.mod / go.sum に `golang.org/x/sync v0.20.0`
-  - [ ] Step 3: find2/service.go + types.go（11 Query+Result、Document 4 種は ProjectID/ClientID 追加）
-  - [ ] Step 4: text_match.go + filter.go + resolver.go + reverse_map.go（**ctx timeout フォールバック追加実装、user 承認済**）
-  - [ ] Step 5: helpers_test + 各 helper unit test（T01-T24 + timeout フォールバック test、`-race` pass）
-  - [ ] Step 6: app.go に `FindService2()` 暫定追加
-  - [ ] Step 7: mise.toml に `test:race` タスク
-  - [ ] Step 8: N07b rename drill（grep のみ、PoC レポート §6 追記）
+  - [x] Step 3: find2/service.go + types.go（11 Query+Result、Document 4 種は ProjectID/ClientID 追加、15 repo interface、Groups 除外）
+  - [x] Step 4: text_match.go + filter.go + resolver.go + reverse_map.go（**ctx timeout 10s フォールバック実装済**、`context.DeadlineExceeded`/`Canceled` 検知時 `(0, false, nil)` + `slog.Warn`）
+  - [x] Step 5: helpers_test + 各 helper unit test（T01-T24 + timeout フォールバック test、35 関数、`-race` pass）
+  - [x] Step 6: app.go に `FindService2()` 暫定追加（15 repo 配線、Groups 除外）
+  - [x] Step 7: mise.toml に `[tasks."test:race"]` タスク追加
+  - [x] Step 8: N07b rename drill（実コード参照: find2.=2/import=1/FindService2=1、極めて低リスク確認、PoC レポート §6 追記）
 - **N04**: FindClient + FindVendor 実装
 - **N05**: FindProject 実装（逆引き + enrichment + 複数 status post-filter）
 - **N06**: Document 4 種実装（Estimate/Order/Delivery/Receipt）+ ADR-001 再評価トリガチェックポイント
@@ -150,6 +150,7 @@ Phase H（M25-M32、2026-04-21 完走）で `internal/service/find/` 層の 12 F
 | 2026-04-24 | 更新 | N01 Step 1-6 完了：調査レポート 520 行 / ADR-001 Placeholder / 仕様書 3 節 Placeholder。Step 7a（事実確認）待ちに遷移、選択肢に D（現状維持 + 負債解消）を追加して A/B/C/D 4 選択肢フラット評価に変更 |
 | 2026-04-25 | 完了 | N01 完走（B 採択・ADR-001 Accepted）。N02 設計書（wondrous-skipping-snowglobe.md）作成 + 弁証法レビュー（devils-advocate → advocate）反映・Ready for Review |
 | 2026-04-25 | 進行 | N03 計画書（witty-sauteeing-kurzweil.md）Ready for Review。Step 1 完了（PoC 4 種 retry=0、案 A 確定、PoC レポート Ready）+ Step 2 完了（go.mod に golang.org/x/sync v0.20.0）。Step 3-8 は次セッションへ |
+| 2026-04-25 | 完了 | N03 全 8 Step 完走。find2/ パッケージ 12 ファイル新規作成、ctx timeout 10s フォールバック実装、35 unit test 関数（race pass）。app.go に `FindService2()` 暫定追加、mise.toml に `test:race` タスク追加、PoC レポート §6 に rename drill 結果記録（実コード参照: find2.=2/import=1/FindService2=1、低リスク）。code-reviewer 独立レビュー APPROVED（Major M1: T20/T21 ctx 伝播テストの空回り → ctx-aware stub に修正済）。次は N04（FindClient + FindVendor 具象実装） |
 
 ## Next Action
 
