@@ -32,9 +32,9 @@ Phase H（M25-M32、2026-04-21 完走）で `internal/service/find/` 層の 12 F
 全廃棄 + ゼロベース再構築を前提に、N01 で必要性を評価し、意思決定する。
 
 ## Current Focus
-- **マイルストーン**: N04（FindClient + FindVendor 実装）— N03 完走済、次の具象 Find メソッド実装フェーズへ
-- **直近の完了**: N03 全 8 Step 完走（2026-04-25）。find2/ パッケージ 12 ファイル / 1728 LOC、35 unit test 関数（race pass）、ctx timeout 10s フォールバック実装済、code-reviewer APPROVED（Major M1 修正済）
-- **次のアクション**: N04 — `FindClient`（ID + Name + Text 検索 + branches/contacts enrichment）と `FindVendor` の具象実装。`/devflow:plan` で N04 詳細計画から開始
+- **マイルストーン**: N05（FindProject 実装）— N04 完走済、reverseMapper 初実用フェーズへ
+- **直近の完了**: N04 完走（2026-04-25, commit 07e6643）。find2/ に FindClient + FindVendor 実装（5 ファイル新規/更新、+983 LOC、29 unit test 関数追加）。non-fatal enrichment ポリシー確立、`validateQuery` 規約確定、PayeeIDEq による Vendor enrichment、handshake 並列検証パターン導入。code-reviewer APPROVED
+- **次のアクション**: N05 — `FindProject`（ID/Name/ClientID/Text/Status/Statuses 検索 + Project enrichment）。reverseMapper は不使用（Document Result の ProjectID/ClientID 用途は N06 で初使用）。`/devflow:plan` または `/devflow:cycle` で詳細計画から開始
 
 ## Progress
 
@@ -93,7 +93,7 @@ Phase H（M25-M32、2026-04-21 完走）で `internal/service/find/` 層の 12 F
   - [x] Step 6: app.go に `FindService2()` 暫定追加（15 repo 配線、Groups 除外）
   - [x] Step 7: mise.toml に `[tasks."test:race"]` タスク追加
   - [x] Step 8: N07b rename drill（実コード参照: find2.=2/import=1/FindService2=1、極めて低リスク確認、PoC レポート §6 追記）
-- **N04**: FindClient + FindVendor 実装
+- **N04**: FindClient + FindVendor 実装 — ✅ 完了（2026-04-25, commit 07e6643）。non-fatal enrichment / `validateQuery` 規約 / PayeeIDEq / handshake 並列検証を確立。code-reviewer APPROVED（Major 4 件は N05/N07c で吸収）
 - **N05**: FindProject 実装（逆引き + enrichment + 複数 status post-filter）
 - **N06**: Document 4 種実装（Estimate/Order/Delivery/Receipt）+ ADR-001 再評価トリガチェックポイント
 - **N07a**: FindInvoice/PurchaseOrder/Payment/User 実装
@@ -151,15 +151,15 @@ Phase H（M25-M32、2026-04-21 完走）で `internal/service/find/` 層の 12 F
 | 2026-04-25 | 完了 | N01 完走（B 採択・ADR-001 Accepted）。N02 設計書（wondrous-skipping-snowglobe.md）作成 + 弁証法レビュー（devils-advocate → advocate）反映・Ready for Review |
 | 2026-04-25 | 進行 | N03 計画書（witty-sauteeing-kurzweil.md）Ready for Review。Step 1 完了（PoC 4 種 retry=0、案 A 確定、PoC レポート Ready）+ Step 2 完了（go.mod に golang.org/x/sync v0.20.0）。Step 3-8 は次セッションへ |
 | 2026-04-25 | 完了 | N03 全 8 Step 完走。find2/ パッケージ 12 ファイル新規作成、ctx timeout 10s フォールバック実装、35 unit test 関数（race pass）。app.go に `FindService2()` 暫定追加、mise.toml に `test:race` タスク追加、PoC レポート §6 に rename drill 結果記録（実コード参照: find2.=2/import=1/FindService2=1、低リスク）。code-reviewer 独立レビュー APPROVED（Major M1: T20/T21 ctx 伝播テストの空回り → ctx-aware stub に修正済）。次は N04（FindClient + FindVendor 具象実装） |
+| 2026-04-25 | 完了 | N04 完走（commit 07e6643）。`FindClient` + `FindVendor` 具象実装、find2/ に 5 ファイル新規/更新（+983 LOC、29 unit test 関数追加）。**non-fatal enrichment ポリシー / `validateQuery(q.FindCommonOpts, q)` 規約 / PayeeIDEq による Vendor enrichment / handshake チャネル方式での並列検証** を確立（advisor 反映の N04 計画書に基づく）。`go test -race` pass、code-reviewer APPROVED（Major 4 件はいずれも N04 動作に非影響、N05/N07c で吸収予定）。次は N05（FindProject 実装） |
 
 ## Next Action
 
-1. **N03 Step 3 から再開**（Step 1+2 完了済）
-   - [ ] Step 3: `internal/service/find2/service.go` + `types.go`（11 Query/Result、`FindCommonOpts.validate()`、`validatable` ヘルパー、Document 4 種 Result の ProjectID/ClientID）
-   - [ ] Step 4: `text_match.go` + `filter.go` + `resolver.go` + `reverse_map.go`（**ctx timeout フォールバック追加実装が必須**: cold > 10s 確定のため ProjectID=0 フォールバック + slog.Warn）
-   - [ ] Step 5: `helpers_test.go` + 各 helper unit test（T01-T24 + timeout test、`go test -race` で race なし pass）
-   - [ ] Step 6: `internal/app/app.go` に `FindService2()` 暫定メソッド追加
-   - [ ] Step 7: `mise.toml` に `[tasks."test:race"]` タスク
-   - [ ] Step 8: N07b rename drill（git grep のみ、`board-phase-n-m02-document-poc-report.md` §6 追記）
-   - [ ] code-reviewer 独立レビュー → 修正 → commit-agent
-2. ADR に従い N04+ を逐次実装
+1. **N05 詳細計画作成**（`/devflow:plan` または `/devflow:cycle`）
+   - 対象: FindProject（ID/Name/ClientID/Text/Status/Statuses 検索 + Project enrichment）
+   - 確立済み規約: `validateQuery` / non-fatal enrichment / errgroup 並列パターン / handshake 並列検証 を踏襲
+   - 注意: reverseMapper は N06（Document 4 種）で初実用、N05 では不使用
+   - 任意改善（N04 code-reviewer Major M3 引継）: `helpers_test.go` に `slog.Warn` 観測ヘルパー（recordingHandler）追加検討
+2. **N07c 計画作成時の追加タスク**（N04 code-reviewer Major M1 引継）
+   - enrichment 失敗時の non-fatal セマンティクス変更を CLI/MCP/CHANGELOG/docs/api-reference に breaking change として告知
+3. ADR に従い N05-N10 を順次実装
