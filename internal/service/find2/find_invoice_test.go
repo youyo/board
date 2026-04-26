@@ -260,7 +260,7 @@ func TestService_FindInvoice_EmptyQuery_Error(t *testing.T) {
 	}
 }
 
-// I12: Statuses-only → "Statuses requires at least one of..."（D2 reject）
+// I12: Statuses-only → "Statuses requires one of ..."（D2 reject）
 func TestService_FindInvoice_StatusesOnly_RejectedByValidate(t *testing.T) {
 	invoices := &stubInvoiceRepo{
 		searchResult: []boardapi.InvoiceEntity{{ID: 1}},
@@ -271,7 +271,7 @@ func TestService_FindInvoice_StatusesOnly_RejectedByValidate(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
-	if !strings.Contains(err.Error(), "Statuses requires at least one of") {
+	if !strings.Contains(err.Error(), "Statuses requires one of") {
 		t.Errorf("unexpected error message: %v", err)
 	}
 	// Search は呼ばれない
@@ -289,6 +289,37 @@ func TestService_FindInvoice_GetByIDError_Bubbles(t *testing.T) {
 	_, err := svc.FindInvoice(testCtx, FindInvoiceQuery{ID: 100})
 	if !errors.Is(err, fakeErr) {
 		t.Errorf("expected fakeErr, got %v", err)
+	}
+}
+
+// I13b: ByText + Statuses — Text branch で Title マッチした 3 件のうち
+// Statuses post-filter で 2 件残る（advisor 指摘の Text+Statuses コンボ穴埋め）
+func TestService_FindInvoice_ByTextAndStatuses_PostFiltersTextMatched(t *testing.T) {
+	invoices := &stubInvoiceRepo{
+		searchResult: []boardapi.InvoiceEntity{
+			{ID: 1, Title: "Acme A", Status: "sent"},
+			{ID: 2, Title: "Acme B", Status: "draft"},
+			{ID: 3, Title: "Acme C", Status: "approved"},
+			{ID: 4, Title: "Beta", Status: "sent"}, // Text マッチしない
+		},
+	}
+	svc := newInvoiceTestService(invoices, &stubClientRepo{}, &stubProjectRepo{})
+
+	results, err := svc.FindInvoice(testCtx, FindInvoiceQuery{
+		Text:     "acme",
+		Statuses: []string{"sent", "approved"},
+	})
+	assertNoError(t, err)
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results (Text=acme ∩ Statuses={sent,approved}), got %d", len(results))
+	}
+	for _, r := range results {
+		if r.Invoice.Status != "sent" && r.Invoice.Status != "approved" {
+			t.Errorf("unexpected status passed through filter: %q", r.Invoice.Status)
+		}
+		if !strings.Contains(strings.ToLower(r.Invoice.Title), "acme") {
+			t.Errorf("unexpected title passed through Text filter: %q", r.Invoice.Title)
+		}
 	}
 }
 

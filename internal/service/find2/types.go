@@ -188,9 +188,10 @@ func (q FindInvoiceQuery) validate() error {
 	}
 	// N07a D2: Statuses (multi) only は API delegation 不可で full-scan を要するため reject。
 	// Status (single) は StatusEq で API delegation 可のため allow。
-	hasNarrow := q.ID != 0 || q.ClientID != 0 || q.Text != "" || q.Status != ""
+	// Status は validateStatusFields で Statuses と相互排他 → narrowing オプションとして列挙しない。
+	hasNarrow := q.ID != 0 || q.ClientID != 0 || q.Text != ""
 	if len(q.Statuses) > 0 && !hasNarrow {
-		return errors.New("Statuses requires at least one of ID, ClientID, Text, or Status to narrow results")
+		return errors.New("Statuses requires one of ID, ClientID, or Text to narrow results")
 	}
 	return nil
 }
@@ -230,9 +231,10 @@ func (q FindPurchaseOrderQuery) validate() error {
 	}
 	// N07a D2: Statuses (multi) only は API delegation 不可で full-scan を要するため reject。
 	// Status (single) は StatusEq で API delegation 可のため allow。
-	hasNarrow := q.ID != 0 || q.VendorID != 0 || q.Text != "" || q.Status != ""
+	// Status は validateStatusFields で Statuses と相互排他 → narrowing オプションとして列挙しない。
+	hasNarrow := q.ID != 0 || q.VendorID != 0 || q.Text != ""
 	if len(q.Statuses) > 0 && !hasNarrow {
-		return errors.New("Statuses requires at least one of ID, VendorID, Text, or Status to narrow results")
+		return errors.New("Statuses requires one of ID, VendorID, or Text to narrow results")
 	}
 	return nil
 }
@@ -257,9 +259,10 @@ func (q FindPaymentQuery) validate() error {
 	}
 	// N07a D2: Statuses (multi) only は API delegation 不可で full-scan を要するため reject。
 	// Status (single) は StatusEq で API delegation 可のため allow。
-	hasNarrow := q.ID != 0 || q.VendorID != 0 || q.Text != "" || q.Status != ""
+	// Status は validateStatusFields で Statuses と相互排他 → narrowing オプションとして列挙しない。
+	hasNarrow := q.ID != 0 || q.VendorID != 0 || q.Text != ""
 	if len(q.Statuses) > 0 && !hasNarrow {
-		return errors.New("Statuses requires at least one of ID, VendorID, Text, or Status to narrow results")
+		return errors.New("Statuses requires one of ID, VendorID, or Text to narrow results")
 	}
 	return nil
 }

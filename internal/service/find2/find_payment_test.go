@@ -217,11 +217,33 @@ func TestService_FindPayment_StatusesOnly_RejectedByValidate(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
-	if !strings.Contains(err.Error(), "Statuses requires at least one of") {
+	if !strings.Contains(err.Error(), "Statuses requires one of") {
 		t.Errorf("unexpected error message: %v", err)
 	}
 	if payments.searchCount != 0 {
 		t.Errorf("Search should not be called on validation error, got %d", payments.searchCount)
+	}
+}
+
+// M06b: ByText + Statuses — Text マッチしたサブセットに Statuses post-filter
+func TestService_FindPayment_ByTextAndStatuses_PostFiltersTextMatched(t *testing.T) {
+	payments := &stubPaymentRepo{
+		searchResult: []boardapi.PaymentEntity{
+			{ID: 1, Memo: "urgent A", Status: "paid"},
+			{ID: 2, Memo: "urgent B", Status: "pending"},
+			{ID: 3, Memo: "urgent C", Status: "failed"},
+			{ID: 4, Memo: "regular", Status: "paid"},
+		},
+	}
+	svc := newPaymentTestService(payments, &stubVendorRepo{})
+
+	results, err := svc.FindPayment(testCtx, FindPaymentQuery{
+		Text:     "urgent",
+		Statuses: []string{"paid", "failed"},
+	})
+	assertNoError(t, err)
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results (Text=urgent ∩ Statuses={paid,failed}), got %d", len(results))
 	}
 }
 

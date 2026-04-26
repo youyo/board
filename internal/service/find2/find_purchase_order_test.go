@@ -264,11 +264,33 @@ func TestService_FindPurchaseOrder_StatusesOnly_RejectedByValidate(t *testing.T)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
-	if !strings.Contains(err.Error(), "Statuses requires at least one of") {
+	if !strings.Contains(err.Error(), "Statuses requires one of") {
 		t.Errorf("unexpected error message: %v", err)
 	}
 	if pos.searchCount != 0 {
 		t.Errorf("Search should not be called on validation error, got %d", pos.searchCount)
+	}
+}
+
+// P09b: ByText + Statuses — Text マッチしたサブセットに Statuses post-filter
+func TestService_FindPurchaseOrder_ByTextAndStatuses_PostFiltersTextMatched(t *testing.T) {
+	pos := &stubPurchaseOrderRepo{
+		searchResult: []boardapi.PurchaseOrderEntity{
+			{ID: 1, Title: "Urgent A", Status: "sent"},
+			{ID: 2, Title: "Urgent B", Status: "draft"},
+			{ID: 3, Title: "Urgent C", Status: "approved"},
+			{ID: 4, Title: "Normal", Status: "sent"},
+		},
+	}
+	svc := newPOTestService(pos, &stubVendorRepo{}, &stubProjectRepo{})
+
+	results, err := svc.FindPurchaseOrder(testCtx, FindPurchaseOrderQuery{
+		Text:     "urgent",
+		Statuses: []string{"sent", "approved"},
+	})
+	assertNoError(t, err)
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results (Text=urgent ∩ Statuses={sent,approved}), got %d", len(results))
 	}
 }
 
