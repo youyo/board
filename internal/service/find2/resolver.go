@@ -92,3 +92,75 @@ func (s *Service) resolveVendorAndProject(
 	_ = g.Wait()
 	return vendor, project
 }
+
+// resolveClientDetails は単一クライアントの branches と contacts を errgroup で 2 並列取得し、
+// ClientResult を返す。
+//
+// # enrichment ポリシー（N02 §4.3 / N03 resolveClientAndProject と整合）
+//
+//   - 「Result の必須フィールドを満たすための主体取得」 → fail-fast（呼び出し元に error 伝播）
+//   - 「主体に対する補助情報（branches / contacts 等）の enrichment」 → non-fatal（slog.Warn + nil/空で Result 返却）
+//
+// ctx cancel / deadline 由来の error も non-fatal として同様に扱う（呼び出し元への error 伝播なし）。
+func (s *Service) resolveClientDetails(ctx context.Context, client boardapi.ClientEntity, opts repository.ReadOptions) ClientResult {
+	var branches []boardapi.ClientBranchEntity
+	var contacts []boardapi.ContactEntity
+	g, gctx := errgroup.WithContext(ctx)
+	g.Go(func() error {
+		b, err := s.clientBranches.Search(gctx, boardapi.ClientBranchListOptions{ClientIDEq: client.ID}, opts)
+		if err != nil {
+			slog.Warn("find2.resolveClientDetails: branches enrichment failed",
+				"client_id", client.ID, "error", err)
+			return nil // non-fatal: error は swallow
+		}
+		branches = b
+		return nil
+	})
+	g.Go(func() error {
+		c, err := s.contacts.Search(gctx, boardapi.ContactListOptions{ClientIDEq: client.ID}, opts)
+		if err != nil {
+			slog.Warn("find2.resolveClientDetails: contacts enrichment failed",
+				"client_id", client.ID, "error", err)
+			return nil // non-fatal: error は swallow
+		}
+		contacts = c
+		return nil
+	})
+	_ = g.Wait()
+	return ClientResult{Client: client, Branches: branches, Contacts: contacts}
+}
+
+// resolveVendorDetails は単一仕入先の branches と contacts を errgroup で 2 並列取得し、
+// VendorResult を返す。
+//
+// enrichment ポリシーは resolveClientDetails と同一（non-fatal + slog.Warn）。
+//
+// 注意: VendorBranch / VendorContact のフィルタキーは PayeeIDEq（ClientIDEq ではない）。
+// BOARD API の /v1/payees エンドポイント仕様に基づく（リスク R2）。
+func (s *Service) resolveVendorDetails(ctx context.Context, vendor boardapi.VendorEntity, opts repository.ReadOptions) VendorResult {
+	var branches []boardapi.VendorBranchEntity
+	var contacts []boardapi.VendorContactEntity
+	g, gctx := errgroup.WithContext(ctx)
+	g.Go(func() error {
+		b, err := s.vendorBranches.Search(gctx, boardapi.VendorBranchListOptions{PayeeIDEq: vendor.ID}, opts)
+		if err != nil {
+			slog.Warn("find2.resolveVendorDetails: branches enrichment failed",
+				"vendor_id", vendor.ID, "error", err)
+			return nil // non-fatal: error は swallow
+		}
+		branches = b
+		return nil
+	})
+	g.Go(func() error {
+		c, err := s.vendorContacts.Search(gctx, boardapi.VendorContactListOptions{PayeeIDEq: vendor.ID}, opts)
+		if err != nil {
+			slog.Warn("find2.resolveVendorDetails: contacts enrichment failed",
+				"vendor_id", vendor.ID, "error", err)
+			return nil // non-fatal: error は swallow
+		}
+		contacts = c
+		return nil
+	})
+	_ = g.Wait()
+	return VendorResult{Vendor: vendor, Branches: branches, Contacts: contacts}
+}

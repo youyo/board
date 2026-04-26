@@ -39,8 +39,12 @@ type stubClientRepo struct {
 	getResult    *boardapi.ClientEntity
 	searchResult []boardapi.ClientEntity
 	err          error
+	searchErr    error // Search 専用エラー（GetByID は err を使い、Search は searchErr を使う）
+	searchCount  int   // Search 呼び出し回数カウンター（T06 で使用）
 	// getFunc が非 nil の場合、GetByID はこの関数を呼ぶ（ctx-aware テスト用）。
 	getFunc func(ctx context.Context) (*boardapi.ClientEntity, error)
+	// searchFunc が非 nil の場合、Search はこの関数を呼ぶ（ctx-aware テスト用）。
+	searchFunc func(ctx context.Context, filter boardapi.ClientListOptions, opts repository.ReadOptions) ([]boardapi.ClientEntity, error)
 }
 
 func (s *stubClientRepo) GetByID(ctx context.Context, _ int, _ repository.ReadOptions) (*boardapi.ClientEntity, error) {
@@ -49,25 +53,42 @@ func (s *stubClientRepo) GetByID(ctx context.Context, _ int, _ repository.ReadOp
 	}
 	return s.getResult, s.err
 }
-func (s *stubClientRepo) Search(_ context.Context, _ boardapi.ClientListOptions, _ repository.ReadOptions) ([]boardapi.ClientEntity, error) {
+func (s *stubClientRepo) Search(ctx context.Context, filter boardapi.ClientListOptions, opts repository.ReadOptions) ([]boardapi.ClientEntity, error) {
+	s.searchCount++
+	if s.searchFunc != nil {
+		return s.searchFunc(ctx, filter, opts)
+	}
+	if s.searchErr != nil {
+		return nil, s.searchErr
+	}
 	return s.searchResult, s.err
 }
 
 type stubClientBranchRepo struct {
 	searchResult []boardapi.ClientBranchEntity
 	err          error
+	// searchFunc が非 nil の場合、Search はこの関数を呼ぶ（ctx-aware / handshake テスト用）。
+	searchFunc func(ctx context.Context, filter boardapi.ClientBranchListOptions, opts repository.ReadOptions) ([]boardapi.ClientBranchEntity, error)
 }
 
-func (s *stubClientBranchRepo) Search(_ context.Context, _ boardapi.ClientBranchListOptions, _ repository.ReadOptions) ([]boardapi.ClientBranchEntity, error) {
+func (s *stubClientBranchRepo) Search(ctx context.Context, filter boardapi.ClientBranchListOptions, opts repository.ReadOptions) ([]boardapi.ClientBranchEntity, error) {
+	if s.searchFunc != nil {
+		return s.searchFunc(ctx, filter, opts)
+	}
 	return s.searchResult, s.err
 }
 
 type stubContactRepo struct {
 	searchResult []boardapi.ContactEntity
 	err          error
+	// searchFunc が非 nil の場合、Search はこの関数を呼ぶ（ctx-aware / handshake テスト用）。
+	searchFunc func(ctx context.Context, filter boardapi.ContactListOptions, opts repository.ReadOptions) ([]boardapi.ContactEntity, error)
 }
 
-func (s *stubContactRepo) Search(_ context.Context, _ boardapi.ContactListOptions, _ repository.ReadOptions) ([]boardapi.ContactEntity, error) {
+func (s *stubContactRepo) Search(ctx context.Context, filter boardapi.ContactListOptions, opts repository.ReadOptions) ([]boardapi.ContactEntity, error) {
+	if s.searchFunc != nil {
+		return s.searchFunc(ctx, filter, opts)
+	}
 	return s.searchResult, s.err
 }
 
@@ -158,30 +179,51 @@ type stubVendorRepo struct {
 	getResult    *boardapi.VendorEntity
 	searchResult []boardapi.VendorEntity
 	err          error
+	searchErr    error // Search 専用エラー（GetByID は err を使い、Search は searchErr を使う）
+	searchCount  int   // Search 呼び出し回数カウンター（FindVendor T16 相当で使用）
+	// searchFunc が非 nil の場合、Search はこの関数を呼ぶ（ctx-aware テスト用）。
+	searchFunc func(ctx context.Context, filter boardapi.VendorListOptions, opts repository.ReadOptions) ([]boardapi.VendorEntity, error)
 }
 
 func (s *stubVendorRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.VendorEntity, error) {
 	return s.getResult, s.err
 }
-func (s *stubVendorRepo) Search(_ context.Context, _ boardapi.VendorListOptions, _ repository.ReadOptions) ([]boardapi.VendorEntity, error) {
+func (s *stubVendorRepo) Search(ctx context.Context, filter boardapi.VendorListOptions, opts repository.ReadOptions) ([]boardapi.VendorEntity, error) {
+	s.searchCount++
+	if s.searchFunc != nil {
+		return s.searchFunc(ctx, filter, opts)
+	}
+	if s.searchErr != nil {
+		return nil, s.searchErr
+	}
 	return s.searchResult, s.err
 }
 
 type stubVendorBranchRepo struct {
 	searchResult []boardapi.VendorBranchEntity
 	err          error
+	// searchFunc が非 nil の場合、Search はこの関数を呼ぶ（ctx-aware / handshake テスト用）。
+	searchFunc func(ctx context.Context, filter boardapi.VendorBranchListOptions, opts repository.ReadOptions) ([]boardapi.VendorBranchEntity, error)
 }
 
-func (s *stubVendorBranchRepo) Search(_ context.Context, _ boardapi.VendorBranchListOptions, _ repository.ReadOptions) ([]boardapi.VendorBranchEntity, error) {
+func (s *stubVendorBranchRepo) Search(ctx context.Context, filter boardapi.VendorBranchListOptions, opts repository.ReadOptions) ([]boardapi.VendorBranchEntity, error) {
+	if s.searchFunc != nil {
+		return s.searchFunc(ctx, filter, opts)
+	}
 	return s.searchResult, s.err
 }
 
 type stubVendorContactRepo struct {
 	searchResult []boardapi.VendorContactEntity
 	err          error
+	// searchFunc が非 nil の場合、Search はこの関数を呼ぶ（ctx-aware / handshake テスト用）。
+	searchFunc func(ctx context.Context, filter boardapi.VendorContactListOptions, opts repository.ReadOptions) ([]boardapi.VendorContactEntity, error)
 }
 
-func (s *stubVendorContactRepo) Search(_ context.Context, _ boardapi.VendorContactListOptions, _ repository.ReadOptions) ([]boardapi.VendorContactEntity, error) {
+func (s *stubVendorContactRepo) Search(ctx context.Context, filter boardapi.VendorContactListOptions, opts repository.ReadOptions) ([]boardapi.VendorContactEntity, error) {
+	if s.searchFunc != nil {
+		return s.searchFunc(ctx, filter, opts)
+	}
 	return s.searchResult, s.err
 }
 
