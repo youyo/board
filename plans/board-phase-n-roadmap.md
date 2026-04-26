@@ -32,9 +32,9 @@ Phase H（M25-M32、2026-04-21 完走）で `internal/service/find/` 層の 12 F
 全廃棄 + ゼロベース再構築を前提に、N01 で必要性を評価し、意思決定する。
 
 ## Current Focus
-- **マイルストーン**: N05（FindProject 実装）— N04 完走済、reverseMapper 初実用フェーズへ
-- **直近の完了**: N04 完走（2026-04-25, commit 07e6643）。find2/ に FindClient + FindVendor 実装（5 ファイル新規/更新、+983 LOC、29 unit test 関数追加）。non-fatal enrichment ポリシー確立、`validateQuery` 規約確定、PayeeIDEq による Vendor enrichment、handshake 並列検証パターン導入。code-reviewer APPROVED
-- **次のアクション**: N05 — `FindProject`（ID/Name/ClientID/Text/Status/Statuses 検索 + Project enrichment）。reverseMapper は不使用（Document Result の ProjectID/ClientID 用途は N06 で初使用）。`/devflow:plan` または `/devflow:cycle` で詳細計画から開始
+- **マイルストーン**: N06（Document 4 種実装、reverseMapper 初実用）— N05 完走済
+- **直近の完了**: N05 完走（2026-04-26, commits 6762420 / bd3218c / 7411161）。`FindProject` 具象実装、+627 LOC / 22 unit test 関数追加。**Status/Statuses-only クエリは validate で reject**（advisor 指摘 R3 (a)、API delegation 不可のため narrowing 必須）。`filterProjectsByStatuses`（OrderStatusName / DeliveryStatusName の OR 評価）、`resolveProjectClient`（単一 enrichment、逐次）を確立。`recordingHandler` を helpers_test.go に追加（slog.Warn 観測、N06+ で reuse）。code-reviewer APPROVED
+- **次のアクション**: N06 — Document 4 種（Estimate/Order/Delivery/Receipt）の `FindXxx` 実装。**reverseMapper を初実用**（projects RG → documentID to projectID）+ `resolveClientAndProject` 既存 errgroup ヘルパー再利用 + Status/Statuses post-filter（types.go 設計上 4 種は Status/Statuses 不所持、注意）。complexity H
 
 ## Progress
 
@@ -94,7 +94,7 @@ Phase H（M25-M32、2026-04-21 完走）で `internal/service/find/` 層の 12 F
   - [x] Step 7: mise.toml に `[tasks."test:race"]` タスク追加
   - [x] Step 8: N07b rename drill（実コード参照: find2.=2/import=1/FindService2=1、極めて低リスク確認、PoC レポート §6 追記）
 - **N04**: FindClient + FindVendor 実装 — ✅ 完了（2026-04-25, commit 07e6643）。non-fatal enrichment / `validateQuery` 規約 / PayeeIDEq / handshake 並列検証を確立。code-reviewer APPROVED（Major 4 件は N05/N07c で吸収）
-- **N05**: FindProject 実装（逆引き + enrichment + 複数 status post-filter）
+- **N05**: FindProject 実装 — ✅ 完了（2026-04-26, commits 6762420 / bd3218c / 7411161）。Status/Statuses-only クエリの validation reject 導入（API delegation 不可のため narrowing 必須）、OrderStatusName/DeliveryStatusName の OR 評価 post-filter、recordingHandler 追加。code-reviewer APPROVED
 - **N06**: Document 4 種実装（Estimate/Order/Delivery/Receipt）+ ADR-001 再評価トリガチェックポイント
 - **N07a**: FindInvoice/PurchaseOrder/Payment/User 実装
 - **N07b**: 旧 `internal/service/find/` 削除 + `find2/` → `find/` rename（独立 revertable 境界）
@@ -152,14 +152,17 @@ Phase H（M25-M32、2026-04-21 完走）で `internal/service/find/` 層の 12 F
 | 2026-04-25 | 進行 | N03 計画書（witty-sauteeing-kurzweil.md）Ready for Review。Step 1 完了（PoC 4 種 retry=0、案 A 確定、PoC レポート Ready）+ Step 2 完了（go.mod に golang.org/x/sync v0.20.0）。Step 3-8 は次セッションへ |
 | 2026-04-25 | 完了 | N03 全 8 Step 完走。find2/ パッケージ 12 ファイル新規作成、ctx timeout 10s フォールバック実装、35 unit test 関数（race pass）。app.go に `FindService2()` 暫定追加、mise.toml に `test:race` タスク追加、PoC レポート §6 に rename drill 結果記録（実コード参照: find2.=2/import=1/FindService2=1、低リスク）。code-reviewer 独立レビュー APPROVED（Major M1: T20/T21 ctx 伝播テストの空回り → ctx-aware stub に修正済）。次は N04（FindClient + FindVendor 具象実装） |
 | 2026-04-25 | 完了 | N04 完走（commit 07e6643）。`FindClient` + `FindVendor` 具象実装、find2/ に 5 ファイル新規/更新（+983 LOC、29 unit test 関数追加）。**non-fatal enrichment ポリシー / `validateQuery(q.FindCommonOpts, q)` 規約 / PayeeIDEq による Vendor enrichment / handshake チャネル方式での並列検証** を確立（advisor 反映の N04 計画書に基づく）。`go test -race` pass、code-reviewer APPROVED（Major 4 件はいずれも N04 動作に非影響、N05/N07c で吸収予定）。次は N05（FindProject 実装） |
+| 2026-04-26 | 完了 | N05 完走（commits 6762420 / bd3218c / 7411161）。`FindProject` 具象実装、+627 LOC / 22 unit test 関数追加。**Status/Statuses-only クエリの validation reject**（advisor R3 (a)、API delegation 不可のため narrowing 必須）、**`filterProjectsByStatuses`**（OrderStatusName/DeliveryStatusName OR 評価）、**`resolveProjectClient`**（単一 enrichment 逐次）、**`recordingHandler`**（slog.Warn 観測、N06+ で reuse）を確立。code-reviewer APPROVED（Critical/Major 0、Minor 4 件は将来注意点）。次は N06（Document 4 種、reverseMapper 初実用） |
 
 ## Next Action
 
-1. **N05 詳細計画作成**（`/devflow:plan` または `/devflow:cycle`）
-   - 対象: FindProject（ID/Name/ClientID/Text/Status/Statuses 検索 + Project enrichment）
-   - 確立済み規約: `validateQuery` / non-fatal enrichment / errgroup 並列パターン / handshake 並列検証 を踏襲
-   - 注意: reverseMapper は N06（Document 4 種）で初実用、N05 では不使用
-   - 任意改善（N04 code-reviewer Major M3 引継）: `helpers_test.go` に `slog.Warn` 観測ヘルパー（recordingHandler）追加検討
+1. **N06 詳細計画作成**（`/devflow:plan` または `/devflow:cycle`）
+   - 対象: FindEstimate / FindOrder / FindDelivery / FindReceipt（Document 4 種）
+   - 確立済み規約: validateQuery / non-fatal enrichment / errgroup 並列 / handshake 検証 / recordingHandler / discriminator を踏襲
+   - **新規重要要素**: reverseMapper（N03 実装済、cold > 10s で ctx timeout 10s フォールバック）を初実用。projects RG → documentID to projectID マッピングで ProjectID/ClientID を埋める
+   - Document Entity の Status/Statuses は types.go:90-162 で **持たない**（4 種とも ID/ProjectID/ClientName/ProjectName/Text のみ）→ filter は不要、直接 reverseMapper + enrichment
+   - **complexity H**（reverseMapper 初実用 + 4 メソッド × 各 ProjectID/ClientID 逆引き）
 2. **N07c 計画作成時の追加タスク**（N04 code-reviewer Major M1 引継）
    - enrichment 失敗時の non-fatal セマンティクス変更を CLI/MCP/CHANGELOG/docs/api-reference に breaking change として告知
-3. ADR に従い N05-N10 を順次実装
+3. ADR-001 の N06 再評価トリガチェックポイントの実施（N02 §9.1）
+4. N07a-N10 を順次実装
