@@ -32,9 +32,9 @@ Phase H（M25-M32、2026-04-21 完走）で `internal/service/find/` 層の 12 F
 全廃棄 + ゼロベース再構築を前提に、N01 で必要性を評価し、意思決定する。
 
 ## Current Focus
-- **マイルストーン**: N07a（FindInvoice/PurchaseOrder/Payment/User 実装）— N06 完走済
-- **直近の完了**: N06 完走（2026-04-26）。`FindEstimate` / `FindOrder` / `FindDelivery` / `FindReceipt` 具象実装、+58 unit test 関数追加（find2 累計 143 関数）。**reverseMapper 初実用**（ID branch で documentID → projectID 逆引き、cold > 10s で ProjectID=0 部分結果フォールバック）。**二重 fetch 回避**: `resolveClientAndProject` を使わず `lookupClient` 新規 helper + 既存 `p` 再利用（advisor R1 反映）。**Delivery/Receipt 配列対応**: `p.Deliveries`/`p.Receipts` 全要素ループ（N02 §4.4、旧 [0] のみは廃止）。**ClientName branch outer client 再利用**（advisor R2、`c2 := c; &c2`）。ADR-001 N06 再評価トリガは N08+2 週間後に deferred（plans/board-phase-n-m06-adr-trigger-review.md）
-- **次のアクション**: N07a — `FindInvoice` / `FindPurchaseOrder` / `FindPayment` / `FindUser` 実装。Invoice/PO/Payment は Status/Statuses post-filter 機能を持つため N05 の filter パターン再利用 + Vendor 逆引き（FindPurchaseOrder/Payment）。complexity M-H
+- **マイルストーン**: N07b（旧 `internal/service/find/` 削除 + `find2/` → `find/` rename、独立 revertable 境界）— N07a 完走済
+- **直近の完了**: N07a 完走（2026-04-27）。`FindInvoice` / `FindPurchaseOrder` / `FindPayment` / `FindUser` 具象実装、4 find_*.go + 4 find_*_test.go 新規（49 unit test 関数追加、find2 累計 192 PASS）。**Status/Statuses 非対称 validation reject**（D2: `Status` 単独 allow / `Statuses[]` 単独 reject、API delegation 可否で判別、N05 と整合）、**filterByStatuses[T] ジェネリック初使用**（N06 までは OR 評価専用 `filterProjectsByStatuses` のみ）、**Payment.Project = nil 固定方針**（D1: PaymentEntity に ProjectID 不在 + E2E dump 0 件 → 3-hop 検証不可、N09 で再検討）、**helpers_test.go stub 4 種拡張**（searchFunc/getFunc/searchCount/getCount を Invoice/PO/Payment/User に追加、N04 stubVendorRepo 同等）。go test -race / go vet / gofmt 全 pass
+- **次のアクション**: N07b — 旧 `internal/service/find/` 削除 + `find2/` → `find/` rename。N03 Step 8 rename drill 結果（実コード参照: find2.=2/import=1/FindService2=1）が極めて低リスクと既に確認済。1 コミット完結で revertable
 
 ## Progress
 
@@ -96,7 +96,7 @@ Phase H（M25-M32、2026-04-21 完走）で `internal/service/find/` 層の 12 F
 - **N04**: FindClient + FindVendor 実装 — ✅ 完了（2026-04-25, commit 07e6643）。non-fatal enrichment / `validateQuery` 規約 / PayeeIDEq / handshake 並列検証を確立。code-reviewer APPROVED（Major 4 件は N05/N07c で吸収）
 - **N05**: FindProject 実装 — ✅ 完了（2026-04-26, commits 6762420 / bd3218c / 7411161）。Status/Statuses-only クエリの validation reject 導入（API delegation 不可のため narrowing 必須）、OrderStatusName/DeliveryStatusName の OR 評価 post-filter、recordingHandler 追加。code-reviewer APPROVED
 - **N06**: Document 4 種実装（Estimate/Order/Delivery/Receipt）+ ADR-001 再評価トリガチェックポイント — ✅ 完了（2026-04-26）。reverseMapper 初実用（ID branch 3 hop、cold timeout フォールバック）、二重 fetch 回避（lookupClient helper + p 再利用）、Delivery/Receipt 配列全件ループ。+58 unit tests、ADR トリガは N08+2 週間後に deferred
-- **N07a**: FindInvoice/PurchaseOrder/Payment/User 実装
+- **N07a**: FindInvoice/PurchaseOrder/Payment/User 実装 — ✅ 完了（2026-04-27）。4 find_*.go + 4 find_*_test.go 新規（49 unit test 関数、find2 累計 192 PASS）。**Status (single) は API delegation で allow / Statuses[] (multi) は narrowing 必須 reject**（D2、N05 と判別軸（API delegation 可否）が同じ非対称適用）、**`filterByStatuses[T]` ジェネリック初実用**、**Payment.Project = nil 固定**（D1、PaymentEntity に ProjectID 不在 + E2E dump 0 件）。code-reviewer は self-execute + advisor() で代替（N06 と同様の環境制約）
 - **N07b**: 旧 `internal/service/find/` 削除 + `find2/` → `find/` rename（独立 revertable 境界）
 - **N07c**: CLI 刷新（`board find_*` → `board find <sub>`）
 - **N08**: MCP tools 刷新（12 → 11 tool、find_groups 削除）
@@ -154,15 +154,17 @@ Phase H（M25-M32、2026-04-21 完走）で `internal/service/find/` 層の 12 F
 | 2026-04-25 | 完了 | N04 完走（commit 07e6643）。`FindClient` + `FindVendor` 具象実装、find2/ に 5 ファイル新規/更新（+983 LOC、29 unit test 関数追加）。**non-fatal enrichment ポリシー / `validateQuery(q.FindCommonOpts, q)` 規約 / PayeeIDEq による Vendor enrichment / handshake チャネル方式での並列検証** を確立（advisor 反映の N04 計画書に基づく）。`go test -race` pass、code-reviewer APPROVED（Major 4 件はいずれも N04 動作に非影響、N05/N07c で吸収予定）。次は N05（FindProject 実装） |
 | 2026-04-26 | 完了 | N05 完走（commits 6762420 / bd3218c / 7411161）。`FindProject` 具象実装、+627 LOC / 22 unit test 関数追加。**Status/Statuses-only クエリの validation reject**（advisor R3 (a)、API delegation 不可のため narrowing 必須）、**`filterProjectsByStatuses`**（OrderStatusName/DeliveryStatusName OR 評価）、**`resolveProjectClient`**（単一 enrichment 逐次）、**`recordingHandler`**（slog.Warn 観測、N06+ で reuse）を確立。code-reviewer APPROVED（Critical/Major 0、Minor 4 件は将来注意点）。次は N06（Document 4 種、reverseMapper 初実用） |
 | 2026-04-26 | 完了 | N06 完走（self-execute、Agent tool 環境制約）。`FindEstimate` / `FindOrder` / `FindDelivery` / `FindReceipt` 具象実装、+58 unit test 関数追加（find2 累計 143 関数）。**reverseMapper 初実用**（ID branch documentID → projectID 逆引き、cold > 10s フォールバック既実装）。**二重 fetch 回避**: `lookupClient` 新規 + 既存 `p` 再利用（advisor R1）、ClientName branch outer client 再利用（advisor R2）。**Delivery/Receipt 配列全件ループ**（N02 §4.4、旧 [0] 廃止）。Document Entity は Status/Statuses 不所持のため filter/validation reject なし。go test -race pass、go vet pass、gofmt 差分なし。ADR-001 N06 再評価トリガは MCP 未配線のため N08+2 週間後に deferred（plans/board-phase-n-m06-adr-trigger-review.md）。次は N07a（FindInvoice/PO/Payment/User） |
+| 2026-04-27 | 完了 | N07a 完走（self-execute、Agent tool 環境制約）。`FindInvoice` / `FindPurchaseOrder` / `FindPayment` / `FindUser` 具象実装、4 find_*.go + 4 find_*_test.go 新規（49 unit test 関数追加、find2 累計 192 PASS）。**Status/Statuses 非対称 validation reject** を確立（D2、advisor 確認済）: `Status` 単独は `StatusEq` で API delegation 可のため allow、`Statuses[]` 単独は `StatusIn[]` 不在で full-scan 必須のため narrowing 強制 reject。判別軸（API delegation 可否）は N05 と同じだが reject 範囲が非対称。**`filterByStatuses[T]` ジェネリック初実用**（N06 までは OR 評価専用 `filterProjectsByStatuses` のみ）。**Payment.Project = nil 固定方針**（D1、PaymentEntity トップレベルに ProjectID 不在 + E2E dump 0 件で 3-hop 安全性検証不可、N09 E2E 再構築時に再検討）。**helpers_test.go stub 4 種拡張**（searchFunc/getFunc/searchCount/getCount を Invoice/PO/Payment/User に追加、N04 stubVendorRepo 同等）。go test -race ./... pass（全 14 パッケージ）、go vet pass、gofmt 差分なし。次は N07b（旧 find/ 削除 + find2/ → find/ rename） |
 
 ## Next Action
 
-1. **N07a 詳細計画作成**（`/devflow:plan` または `/devflow:cycle`）
-   - 対象: FindInvoice / FindPurchaseOrder / FindPayment / FindUser
-   - 確立済み規約: validateQuery / non-fatal enrichment / errgroup 並列（N04）/ Status post-filter（N05 確立）/ reverseMapper（N06 確立、Invoice/PO/Payment では不要）/ recordingHandler を踏襲
-   - **新規要素**: Vendor 逆引き（FindPurchaseOrder/Payment は VendorID/VendorName 経由）、複数 status post-filter（Invoice/PO/Payment は API 対応の有無に応じて post-filter）
-   - Status/Statuses-only validation reject の波及（Invoice/PO/Payment にも同パターン適用、N05 と整合）
-2. **N07c 計画作成時の追加タスク**（N04 code-reviewer Major M1 引継）
+1. **N07b 詳細計画作成**（`/devflow:plan` または `/devflow:cycle`）
+   - 対象: 旧 `internal/service/find/` 削除 + `find2/` → `find/` rename（独立 revertable 境界）
+   - 既知の影響範囲: N03 Step 8 rename drill 結果（実コード参照: `find2.`=2 / import=1 / `FindService2`=1）が極めて低リスクと既に確認済（PoC レポート §6 記録）
+   - 既存 find/ パッケージは Phase H 産物で 12 メソッド（N02 で 11 メソッドに整理、Group 削除確定）。CLI/MCP は依然旧 find/ を経由 → N07b では service 層のみスイッチし、CLI/MCP は N07c/N08 で順次切替（1 コミット完結 revertable 維持）
+   - app.go の `FindService()` を新サービスに差し替え、`FindService2()` 削除
+2. **N07c 計画作成時の追加タスク**（N04 code-reviewer Major M1 + N07a D2 引継）
    - enrichment 失敗時の non-fatal セマンティクス変更を CLI/MCP/CHANGELOG/docs/api-reference に breaking change として告知
+   - N07a の Statuses-only narrowing 必須エラーメッセージを CLI flag 説明に反映
 3. ADR-001 N06 再評価トリガは N08 完了 + 2 週間後に実施（`plans/board-phase-n-m06-adr-trigger-review.md` に記録）
-4. N07a → N07b → N07c → N08 → N09 → N10 を順次実装
+4. N07b → N07c → N08 → N09 → N10 を順次実装
