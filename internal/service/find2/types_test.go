@@ -50,13 +50,13 @@ func TestQueryValidate_ElevenStatuses_Error(t *testing.T) {
 	assertError(t, err)
 }
 
-// 追加: Statuses が 10 要素は OK
+// 追加: Statuses が 10 要素は OK（N05 advisor R3: Status/Statuses は narrowing 必須のため Name を添える）
 func TestQueryValidate_TenStatuses_OK(t *testing.T) {
 	statuses := make([]string, 10)
 	for i := range statuses {
 		statuses[i] = "x"
 	}
-	q := FindProjectQuery{Statuses: statuses}
+	q := FindProjectQuery{Name: "proj", Statuses: statuses}
 	err := q.validate()
 	assertNoError(t, err)
 }

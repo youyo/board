@@ -84,6 +84,13 @@ func (q FindProjectQuery) validate() error {
 		q.Status == "" && len(q.Statuses) == 0 {
 		return errors.New("at least one field required")
 	}
+	// advisor R3: Status/Statuses-only は API delegation 不可で全件取得を要するため reject。
+	// Status/Statuses を使う場合は ID/Name/ClientID/Text のいずれかによる narrowing が必須。
+	hasNarrow := q.ID != 0 || q.Name != "" || q.ClientID != 0 || q.Text != ""
+	hasStatus := q.Status != "" || len(q.Statuses) > 0
+	if hasStatus && !hasNarrow {
+		return errors.New("Status/Statuses requires at least one of ID, Name, ClientID, or Text to narrow results")
+	}
 	return nil
 }
 
