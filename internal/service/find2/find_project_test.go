@@ -285,8 +285,18 @@ func TestService_FindProject_Statuses_MultipleMatch(t *testing.T) {
 }
 
 // N05-T13: Status-only（他フィールドゼロ）は validate で reject される
+// Search / GetByID は呼ばれてはならない（searchCount==0 を failOnCall で保証）。
 func TestService_FindProject_StatusOnly_RejectedByValidate(t *testing.T) {
-	pr := &stubProjectRepo{}
+	pr := &stubProjectRepo{
+		searchFunc: func(_ context.Context, _ boardapi.ProjectListOptions, _ repository.ReadOptions) ([]boardapi.ProjectEntity, error) {
+			t.Fatal("Search must not be called when validate rejects")
+			return nil, nil
+		},
+		getFunc: func(_ context.Context) (*boardapi.ProjectEntity, error) {
+			t.Fatal("GetByID must not be called when validate rejects")
+			return nil, nil
+		},
+	}
 	cr := &stubClientRepo{}
 	svc := newProjectTestService(pr, cr)
 
