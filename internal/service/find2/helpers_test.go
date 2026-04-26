@@ -2,6 +2,7 @@ package find2
 
 import (
 	"context"
+	"log/slog"
 	"testing"
 
 	"github.com/youyo/board/internal/boardapi"
@@ -41,6 +42,7 @@ type stubClientRepo struct {
 	err          error
 	searchErr    error // Search 専用エラー（GetByID は err を使い、Search は searchErr を使う）
 	searchCount  int   // Search 呼び出し回数カウンター（T06 で使用）
+	getCount     int   // GetByID 呼び出し回数カウンター（N05-T02/T08 で使用）
 	// getFunc が非 nil の場合、GetByID はこの関数を呼ぶ（ctx-aware テスト用）。
 	getFunc func(ctx context.Context) (*boardapi.ClientEntity, error)
 	// searchFunc が非 nil の場合、Search はこの関数を呼ぶ（ctx-aware テスト用）。
@@ -48,6 +50,7 @@ type stubClientRepo struct {
 }
 
 func (s *stubClientRepo) GetByID(ctx context.Context, _ int, _ repository.ReadOptions) (*boardapi.ClientEntity, error) {
+	s.getCount++
 	if s.getFunc != nil {
 		return s.getFunc(ctx)
 	}
@@ -285,6 +288,33 @@ func newTestRepos() Repos {
 		Payments:       &stubPaymentRepo{},
 		Users:          &stubUserRepo{},
 	}
+}
+
+// recordingHandler は slog.Warn 等を観測するためのテスト用 slog.Handler。
+// withRecordedSlog(t) で slog default handler をテスト中だけ差し替える。
+// N05 T22 / N06+ で reuse 可能。
+type recordingHandler struct {
+	records []slog.Record
+}
+
+func (h *recordingHandler) Enabled(_ context.Context, _ slog.Level) bool { return true }
+func (h *recordingHandler) Handle(_ context.Context, r slog.Record) error {
+	h.records = append(h.records, r)
+	return nil
+}
+func (h *recordingHandler) WithAttrs(_ []slog.Attr) slog.Handler { return h }
+func (h *recordingHandler) WithGroup(_ string) slog.Handler      { return h }
+
+// withRecordedSlog は slog default handler を recordingHandler に差し替え、
+// t.Cleanup で元に戻す。返値の *recordingHandler に記録されたログを参照できる。
+// 注意: t.Parallel() と組み合わせると slog default が競合するため使用不可。
+func withRecordedSlog(t *testing.T) *recordingHandler {
+	t.Helper()
+	h := &recordingHandler{}
+	orig := slog.Default()
+	slog.SetDefault(slog.New(h))
+	t.Cleanup(func() { slog.SetDefault(orig) })
+	return h
 }
 
 // --- インターフェース適合の静的検証（コンパイル時チェック）---

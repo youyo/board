@@ -93,6 +93,30 @@ func (s *Service) resolveVendorAndProject(
 	return vendor, project
 }
 
+// resolveProjectClient は Project に紐づく Client を取得し ProjectResult を返す。
+// nested Client が nil または ClientID == 0 の場合は enrichment をスキップし、
+// Client=nil で Result を返す。
+//
+// enrichment ポリシー（resolver.go top doc の discriminator に従う）:
+//   - 補助情報（Client）取得失敗は non-fatal（slog.Warn + Client=nil で Result 返却）
+//   - ctx cancel / deadline 由来も同様の扱い
+//
+// 並列化は不要（補助情報が 1 件のみ）。N06 Document 4 種では再び
+// resolveClientAndProject（errgroup 並列版）を使用する。
+func (s *Service) resolveProjectClient(ctx context.Context, project boardapi.ProjectEntity, opts repository.ReadOptions) ProjectResult {
+	cid := projectClientIDPtr(&project)
+	if cid == 0 {
+		return ProjectResult{Project: project, Client: nil}
+	}
+	c, err := s.clients.GetByID(ctx, cid, opts)
+	if err != nil {
+		slog.Warn("find2.resolveProjectClient: client enrichment failed",
+			"project_id", project.ID, "client_id", cid, "error", err)
+		return ProjectResult{Project: project, Client: nil}
+	}
+	return ProjectResult{Project: project, Client: c}
+}
+
 // resolveClientDetails は単一クライアントの branches と contacts を errgroup で 2 並列取得し、
 // ClientResult を返す。
 //
