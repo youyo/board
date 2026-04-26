@@ -28,6 +28,9 @@ func NewFindPurchaseOrderCmd() *cobra.Command {
 			if id == 0 && vendorName == "" && projectName == "" && text == "" && status == "" {
 				return fmt.Errorf("at least one of --id, --vendor-name, --project-name, --text, or --status must be specified")
 			}
+			if vendorName != "" || projectName != "" {
+				return fmt.Errorf("--vendor-name / --project-name are not supported in v0.7.0 service rename (N07b); will be wired in N07c")
+			}
 
 			svc, err := findServiceFromCmd(cmd)
 			if err != nil {
@@ -36,16 +39,16 @@ func NewFindPurchaseOrderCmd() *cobra.Command {
 
 			opts := readOptionsFromCmd(cmd)
 			q := find.FindPurchaseOrderQuery{
-				ID:          id,
-				VendorName:  vendorName,
-				ProjectName: projectName,
-				Text:        text,
-				Status:      status,
-				Limit:       opts.Limit,
-				Opts: repository.ReadOptions{
-					Refresh:      opts.Refresh,
-					ForceRefresh: opts.ForceRefresh,
+				FindCommonOpts: find.FindCommonOpts{
+					Limit: opts.Limit,
+					Opts: repository.ReadOptions{
+						Refresh:      opts.Refresh,
+						ForceRefresh: opts.ForceRefresh,
+					},
 				},
+				ID:     id,
+				Text:   text,
+				Status: status,
 			}
 
 			results, err := svc.FindPurchaseOrder(cmd.Context(), q)

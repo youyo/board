@@ -10,7 +10,7 @@ import (
 	"github.com/youyo/board/internal/cache"
 	"github.com/youyo/board/internal/config"
 	"github.com/youyo/board/internal/refresh"
-	"github.com/youyo/board/internal/service/find2"
+	"github.com/youyo/board/internal/service/find"
 )
 
 // App is the DI container for the board CLI.
@@ -116,12 +116,11 @@ func New(profileName string) (*App, error) {
 	}, nil
 }
 
-// FindService2 returns a high-level find service backed by find2 (Phase N の新 find 層).
+// FindService returns a high-level find service (Phase N ゼロベース再設計版).
 //
-// N07b rename 時に既存の find 層を置き換え、本メソッドは削除する暫定アクセサ。
-// Groups は除外（N02 §2 決定、api_groups_list で代替）。
-func (a *App) FindService2() *find2.Service {
-	return find2.New(find2.Repos{
+// Groups は除外（ADR-001 Group 削除確定、api_groups_list で代替）。
+func (a *App) FindService() *find.Service {
+	return find.New(find.Repos{
 		Clients:        a.Repos.Clients,
 		ClientBranches: a.Repos.ClientBranches,
 		Contacts:       a.Repos.Contacts,

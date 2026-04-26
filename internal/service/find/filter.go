@@ -1,4 +1,4 @@
-package find2
+package find
 
 import "github.com/youyo/board/internal/boardapi"
 

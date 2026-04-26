@@ -2,109 +2,79 @@ package find
 
 import (
 	"context"
-	"errors"
 
 	"github.com/youyo/board/internal/boardapi"
 )
 
-// FindInvoice performs a cross-resource search for invoices, returning
-// invoices with their associated client and project.
-// Field priority: ID > ClientName > ProjectName > Text > Status(standalone).
+// FindInvoice は ID / ClientID / Status / Text による請求書横断検索を行う。
+// 検索フィールド優先順位: ID > ClientID > Status > Text。
+//
+// Status / Statuses の扱い:
+//   - Status (single) は StatusEq で API delegation 可（full-scan 不要）
+//   - ClientID branch / Text branch でも q.Status を Search filter に同梱して narrowing
+//   - Statuses (multi) は API 側 StatusIn[] が不在のため post-filter（filterByStatuses）
+//   - Statuses-only クエリは validate() で reject 済（N07a D2）
+//
+// enrichment ポリシー（N04/N05/N06 規約踏襲）:
+//   - 主検索（invoices.GetByID / Search）失敗は fail-fast
+//   - resolveClientAndProject の失敗は non-fatal（slog.Warn + nil でフィールド埋め）
+//
+// Text マッチ対象: Title, Memo（非ポインタ string、derefString 不要）。
+// ID 検索時は Status post-filter を skip（N05 踏襲、UX 配慮）。
 func (s *Service) FindInvoice(ctx context.Context, q FindInvoiceQuery) ([]InvoiceResult, error) {
-	if q.ID == 0 && q.ClientName == "" && q.ProjectName == "" && q.Text == "" && q.Status == "" {
-		return nil, errors.New("at least one of ID, ClientName, ProjectName, Text, or Status must be set")
+	if err := validateQuery(q.FindCommonOpts, q); err != nil {
+		return nil, err
 	}
-
-	opts := repoOpts(q.Opts)
+	opts := repoOpts(q.FindCommonOpts)
 
 	var invoices []boardapi.InvoiceEntity
-
 	switch {
 	case q.ID != 0:
-		inv, err := s.invoices.GetByID(ctx, q.ID, opts)
+		i, err := s.invoices.GetByID(ctx, q.ID, opts)
 		if err != nil {
 			return nil, err
 		}
-		invoices = []boardapi.InvoiceEntity{*inv}
-
-	case q.ClientName != "":
-		clients, err := s.clients.Search(ctx, boardapi.ClientListOptions{NameCont: q.ClientName}, opts)
+		invoices = []boardapi.InvoiceEntity{*i}
+	case q.ClientID != 0:
+		list, err := s.invoices.Search(ctx, boardapi.InvoiceListOptions{
+			ClientIDEq: q.ClientID,
+			StatusEq:   q.Status,
+		}, opts)
 		if err != nil {
 			return nil, err
 		}
-		for _, c := range clients {
-			is, err := s.invoices.Search(ctx, boardapi.InvoiceListOptions{ClientIDEq: c.ID}, opts)
-			if err != nil {
-				return nil, err
-			}
-			invoices = append(invoices, is...)
-		}
-
-	case q.ProjectName != "":
-		projects, err := s.projects.Search(ctx, boardapi.ProjectListOptions{NameCont: q.ProjectName}, opts)
-		if err != nil {
-			return nil, err
-		}
-		for _, p := range projects {
-			is, err := s.invoices.Search(ctx, boardapi.InvoiceListOptions{ProjectIDEq: p.ID}, opts)
-			if err != nil {
-				return nil, err
-			}
-			invoices = append(invoices, is...)
-		}
-
-	case q.Text != "":
-		all, err := s.invoices.Search(ctx, boardapi.InvoiceListOptions{}, opts)
-		if err != nil {
-			return nil, err
-		}
-		for _, inv := range all {
-			if containsText(q.Text, inv.Title, inv.Memo) {
-				invoices = append(invoices, inv)
-			}
-		}
-
+		invoices = list
 	case q.Status != "":
-		all, err := s.invoices.Search(ctx, boardapi.InvoiceListOptions{}, opts)
+		list, err := s.invoices.Search(ctx, boardapi.InvoiceListOptions{StatusEq: q.Status}, opts)
 		if err != nil {
 			return nil, err
 		}
-		for _, inv := range all {
-			if inv.Status == q.Status {
-				invoices = append(invoices, inv)
+		invoices = list
+	case q.Text != "":
+		all, err := s.invoices.Search(ctx, boardapi.InvoiceListOptions{StatusEq: q.Status}, opts)
+		if err != nil {
+			return nil, err
+		}
+		for _, x := range all {
+			if containsText(q.Text, x.Title, x.Memo) {
+				invoices = append(invoices, x)
 			}
 		}
 	}
 
-	// Apply status post-filter for non-status-only search modes
-	if q.Status != "" && q.ID == 0 && (q.ClientName != "" || q.ProjectName != "" || q.Text != "") {
-		invoices = filterInvoicesByStatus(invoices, q.Status)
+	// post-filter: Statuses (multi) のみ。Status (single) は API delegation 済。
+	// ID 検索時は skip（N05 踏襲、UX 配慮）。
+	if q.ID == 0 && len(q.Statuses) > 0 {
+		invoices = filterByStatuses(invoices, func(i boardapi.InvoiceEntity) string { return i.Status }, q.Statuses)
 	}
 
 	results := make([]InvoiceResult, 0, len(invoices))
-	for _, inv := range invoices {
-		client, project := s.resolveClientAndProject(ctx, inv.ClientID, inv.ProjectID, opts)
-		results = append(results, InvoiceResult{
-			Invoice: inv,
-			Client:  client,
-			Project: project,
-		})
-
+	for _, x := range invoices {
+		client, project := s.resolveClientAndProject(ctx, x.ClientID, x.ProjectID, opts)
+		results = append(results, InvoiceResult{Invoice: x, Client: client, Project: project})
 		if q.Limit > 0 && len(results) >= q.Limit {
 			break
 		}
 	}
-
 	return results, nil
-}
-
-// filterInvoicesByStatus filters invoices by status.
-func filterInvoicesByStatus(invoices []boardapi.InvoiceEntity, status string) []boardapi.InvoiceEntity {
-	filtered := make([]boardapi.InvoiceEntity, 0, len(invoices))
-	for _, inv := range invoices {
-		if inv.Status == status {
-			filtered = append(filtered, inv)
-		}
-	}
-	return filtered
 }

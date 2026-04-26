@@ -2,135 +2,145 @@ package find
 
 import (
 	"context"
-	"errors"
+	"log/slog"
 
 	"github.com/youyo/board/internal/boardapi"
 )
 
-// FindReceipt performs a cross-resource search for receipts, returning
-// receipts with their associated client and project.
-// Uses project response_group API to discover document IDs, then fetches via GetByDocumentID.
-// Field priority: ID > ProjectID > ClientName > ProjectName.
+// FindReceipt は ID / ProjectID / ClientName / ProjectName による領収書横断検索を行う。
+// 構造は FindDelivery と同形（p.Receipts は配列、全要素ループ実行）。
 //
-// M38 NOTE: ReceiptEntity は実 API 準拠に再設計されたため、Status/ClientID/ProjectID
-// フィールドは存在しない。ReceiptDate は実在するため引き続き利用可能。
-// Status post-filter および client/project enrichment は各ブランチのコンテキスト情報から復元する。
-// ID lookup では client/project を特定できないため nil を返す。
-// TODO(M25-M32): find 層の全体再設計で enrichment を復元する。
-//
-// M29 FIX: BOARD API は response_group=receipt で "receipts" 複数形配列を返す。
-// ProjectEntity.Receipts ([]DocumentSummary) を参照するよう修正。
+// 詳細仕様は find_estimate.go の docstring 参照（reverseMapper / 二重 fetch 回避 / non-fatal enrichment）。
 func (s *Service) FindReceipt(ctx context.Context, q FindReceiptQuery) ([]ReceiptResult, error) {
-	if q.ID == 0 && q.ProjectID == 0 && q.ClientName == "" && q.ProjectName == "" {
-		return nil, errors.New("at least one of ID, ProjectID, ClientName, or ProjectName must be set")
+	if err := validateQuery(q.FindCommonOpts, q); err != nil {
+		return nil, err
 	}
-
-	opts := repoOpts(q.Opts)
-
-	// results を直接ブランチ内で構築する。
-	// Status post-filter は ReceiptEntity に Status フィールドが無いため無効化。
-	// TODO(M25-M32): Status post-filter を再設計で復元する。
+	opts := repoOpts(q.FindCommonOpts)
 	results := make([]ReceiptResult, 0)
 
 	switch {
 	case q.ID != 0:
-		// Direct lookup by document ID.
-		// client/project は特定できないため nil。
 		r, err := s.receipts.GetByDocumentID(ctx, q.ID, opts)
 		if err != nil {
 			return nil, err
 		}
+		pid, ok, lerr := s.reverseMappers["receipt"].Lookup(ctx, q.ID, opts)
+		if lerr != nil {
+			slog.Warn("find.FindReceipt: reverseMap build failed",
+				"doc_id", q.ID, "error", lerr)
+		}
+		if !ok || pid == 0 {
+			results = append(results, ReceiptResult{Receipt: *r})
+			return results, nil
+		}
+		p, perr := s.projects.GetByID(ctx, pid, opts)
+		if perr != nil {
+			slog.Warn("find.FindReceipt: project enrichment failed",
+				"project_id", pid, "error", perr)
+			results = append(results, ReceiptResult{Receipt: *r, ProjectID: pid})
+			return results, nil
+		}
+		cid := projectClientIDPtr(p)
+		client := s.lookupClient(ctx, cid, p.ID, opts)
 		results = append(results, ReceiptResult{
-			Receipt: *r,
-			Client:  nil,
-			Project: nil,
+			Receipt:   *r,
+			ProjectID: pid,
+			ClientID:  cid,
+			Project:   p,
+			Client:    client,
 		})
 
 	case q.ProjectID != 0:
-		// Lookup project with receipt group, then fetch document.
-		// project コンテキストから client/project を解決。
-		// NOTE: BOARD API は response_group=receipt で "receipts" 複数形配列を返す。
-		// ProjectEntity.Receipts ([]DocumentSummary) を参照し、先頭要素を使用する。
 		p, err := s.projects.GetByIDWithGroup(ctx, q.ProjectID, "receipt")
 		if err != nil {
 			return nil, err
 		}
-		if len(p.Receipts) > 0 {
-			r, err := s.receipts.GetByDocumentID(ctx, p.Receipts[0].ID, opts)
-			if err != nil && !boardapi.IsNotFound(err) {
-				return nil, err
-			}
-			if err == nil {
-				// p は *ProjectEntity (GetByIDWithGroup の戻り値)
-				client, project := s.resolveClientAndProject(ctx, projectClientIDPtr(p), p.ID, opts)
-				results = append(results, ReceiptResult{
-					Receipt: *r,
-					Client:  client,
-					Project: project,
-				})
-			}
-		}
-
-	case q.ClientName != "":
-		// Resolve client name → search projects with receipt group → hydrate.
-		clients, err := s.clients.Search(ctx, boardapi.ClientListOptions{NameCont: q.ClientName}, opts)
-		if err != nil {
-			return nil, err
-		}
-		for _, c := range clients {
-			projects, err := s.projects.Search(ctx, boardapi.ProjectListOptions{ClientIDEq: c.ID, ResponseGroup: "receipt"}, opts)
-			if err != nil {
-				return nil, err
-			}
-			for _, p := range projects {
-				if len(p.Receipts) == 0 {
-					continue
-				}
-				r, err := s.receipts.GetByDocumentID(ctx, p.Receipts[0].ID, opts)
-				if boardapi.IsNotFound(err) {
-					continue
-				}
-				if err != nil {
-					return nil, err
-				}
-				client, project := s.resolveClientAndProject(ctx, projectClientID(p), p.ID, opts)
-				results = append(results, ReceiptResult{
-					Receipt: *r,
-					Client:  client,
-					Project: project,
-				})
-			}
-		}
-
-	case q.ProjectName != "":
-		// Search projects by name with receipt group → hydrate.
-		projects, err := s.projects.Search(ctx, boardapi.ProjectListOptions{NameCont: q.ProjectName, ResponseGroup: "receipt"}, opts)
-		if err != nil {
-			return nil, err
-		}
-		for _, p := range projects {
-			if len(p.Receipts) == 0 {
-				continue
-			}
-			r, err := s.receipts.GetByDocumentID(ctx, p.Receipts[0].ID, opts)
+		cid := projectClientIDPtr(p)
+		client := s.lookupClient(ctx, cid, p.ID, opts)
+		for _, rs := range p.Receipts {
+			doc, err := s.receipts.GetByDocumentID(ctx, rs.ID, opts)
 			if boardapi.IsNotFound(err) {
 				continue
 			}
 			if err != nil {
 				return nil, err
 			}
-			client, project := s.resolveClientAndProject(ctx, projectClientID(p), p.ID, opts)
 			results = append(results, ReceiptResult{
-				Receipt: *r,
-				Client:  client,
-				Project: project,
+				Receipt:   *doc,
+				ProjectID: p.ID,
+				ClientID:  cid,
+				Project:   p,
+				Client:    client,
 			})
+			if q.Limit > 0 && len(results) >= q.Limit {
+				return results, nil
+			}
 		}
-	}
 
-	// Limit 適用
-	if q.Limit > 0 && len(results) > q.Limit {
-		results = results[:q.Limit]
+	case q.ClientName != "":
+		clients, err := s.clients.Search(ctx, boardapi.ClientListOptions{NameCont: q.ClientName}, opts)
+		if err != nil {
+			return nil, err
+		}
+		for _, c := range clients {
+			c2 := c
+			projects, err := s.projects.Search(ctx, boardapi.ProjectListOptions{ClientIDEq: c.ID, ResponseGroup: "receipt"}, opts)
+			if err != nil {
+				return nil, err
+			}
+			for _, p := range projects {
+				p2 := p
+				for _, rs := range p.Receipts {
+					doc, err := s.receipts.GetByDocumentID(ctx, rs.ID, opts)
+					if boardapi.IsNotFound(err) {
+						continue
+					}
+					if err != nil {
+						return nil, err
+					}
+					results = append(results, ReceiptResult{
+						Receipt:   *doc,
+						ProjectID: p.ID,
+						ClientID:  c.ID,
+						Project:   &p2,
+						Client:    &c2,
+					})
+					if q.Limit > 0 && len(results) >= q.Limit {
+						return results, nil
+					}
+				}
+			}
+		}
+
+	case q.ProjectName != "":
+		projects, err := s.projects.Search(ctx, boardapi.ProjectListOptions{NameCont: q.ProjectName, ResponseGroup: "receipt"}, opts)
+		if err != nil {
+			return nil, err
+		}
+		for _, p := range projects {
+			p2 := p
+			cid := projectClientID(p)
+			client := s.lookupClient(ctx, cid, p.ID, opts)
+			for _, rs := range p.Receipts {
+				doc, err := s.receipts.GetByDocumentID(ctx, rs.ID, opts)
+				if boardapi.IsNotFound(err) {
+					continue
+				}
+				if err != nil {
+					return nil, err
+				}
+				results = append(results, ReceiptResult{
+					Receipt:   *doc,
+					ProjectID: p.ID,
+					ClientID:  cid,
+					Project:   &p2,
+					Client:    client,
+				})
+				if q.Limit > 0 && len(results) >= q.Limit {
+					return results, nil
+				}
+			}
+		}
 	}
 
 	return results, nil

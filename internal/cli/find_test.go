@@ -19,7 +19,7 @@ func TestNewFindCmd(t *testing.T) {
 		subNames[sub.Use] = true
 	}
 
-	for _, name := range []string{"client", "project", "estimate", "invoice", "order", "delivery", "receipt", "vendor", "purchase-order", "payment", "user", "group"} {
+	for _, name := range []string{"client", "project", "estimate", "invoice", "order", "delivery", "receipt", "vendor", "purchase-order", "payment", "user"} {
 		if !subNames[name] {
 			t.Errorf("subcommand %q not registered", name)
 		}
@@ -316,27 +316,5 @@ func TestFindUserCmdRequiresAtLeastOneFlag(t *testing.T) {
 	}
 }
 
-func TestNewFindGroupCmd(t *testing.T) {
-	cmd := cli.NewFindGroupCmd()
-	if cmd.Use != "group" {
-		t.Errorf("Use = %q, want %q", cmd.Use, "group")
-	}
-
-	for _, flagName := range []string{"id", "name", "text"} {
-		if f := cmd.Flags().Lookup(flagName); f == nil {
-			t.Errorf("--%s flag not defined", flagName)
-		}
-	}
-}
-
-func TestFindGroupCmdRequiresAtLeastOneFlag(t *testing.T) {
-	cmd := cli.NewFindGroupCmd()
-	root := &cobra.Command{Use: "board"}
-	root.AddCommand(cmd)
-
-	root.SetArgs([]string{"group"})
-	err := root.Execute()
-	if err == nil {
-		t.Error("expected error when no flags provided, got nil")
-	}
-}
+// TestNewFindGroupCmd / TestFindGroupCmdRequiresAtLeastOneFlag are removed in N07b
+// because the find_group command is removed (ADR-001 Group 削除確定、find2 では FindGroup なし)。

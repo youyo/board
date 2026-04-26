@@ -2,111 +2,79 @@ package find
 
 import (
 	"context"
-	"errors"
 
 	"github.com/youyo/board/internal/boardapi"
 )
 
-// FindPurchaseOrder performs a cross-resource search for purchase orders, returning
-// purchase orders with their associated vendor and project.
-// Field priority: ID > VendorName > ProjectName > Text > Status(standalone).
-// Status also acts as a post-filter when combined with other criteria.
+// FindPurchaseOrder は ID / VendorID / Status / Text による発注書横断検索を行う。
+// 検索フィールド優先順位: ID > VendorID > Status > Text。
+//
+// Status / Statuses の扱い:
+//   - Status (single) は StatusEq で API delegation 可（full-scan 不要）
+//   - VendorID branch / Text branch でも q.Status を Search filter に同梱して narrowing
+//   - Statuses (multi) は API 側 StatusIn[] が不在のため post-filter（filterByStatuses）
+//   - Statuses-only クエリは validate() で reject 済（N07a D2）
+//
+// enrichment ポリシー（N04/N05/N06 規約踏襲）:
+//   - 主検索（purchaseOrders.GetByID / Search）失敗は fail-fast
+//   - resolveVendorAndProject の失敗は non-fatal（slog.Warn + nil でフィールド埋め）
+//
+// Text マッチ対象: Title, Memo（非ポインタ string、derefString 不要）。
+// ID 検索時は Status post-filter を skip（N05 踏襲、UX 配慮）。
 func (s *Service) FindPurchaseOrder(ctx context.Context, q FindPurchaseOrderQuery) ([]PurchaseOrderResult, error) {
-	if q.ID == 0 && q.VendorName == "" && q.ProjectName == "" && q.Text == "" && q.Status == "" {
-		return nil, errors.New("at least one of ID, VendorName, ProjectName, Text, or Status must be set")
+	if err := validateQuery(q.FindCommonOpts, q); err != nil {
+		return nil, err
 	}
+	opts := repoOpts(q.FindCommonOpts)
 
-	opts := repoOpts(q.Opts)
-
-	var purchaseOrders []boardapi.PurchaseOrderEntity
-
+	var pos []boardapi.PurchaseOrderEntity
 	switch {
 	case q.ID != 0:
 		po, err := s.purchaseOrders.GetByID(ctx, q.ID, opts)
 		if err != nil {
 			return nil, err
 		}
-		purchaseOrders = []boardapi.PurchaseOrderEntity{*po}
-
-	case q.VendorName != "":
-		vendors, err := s.vendors.Search(ctx, boardapi.VendorListOptions{NameCont: q.VendorName}, opts)
+		pos = []boardapi.PurchaseOrderEntity{*po}
+	case q.VendorID != 0:
+		list, err := s.purchaseOrders.Search(ctx, boardapi.PurchaseOrderListOptions{
+			VendorIDEq: q.VendorID,
+			StatusEq:   q.Status,
+		}, opts)
 		if err != nil {
 			return nil, err
 		}
-		for _, v := range vendors {
-			pos, err := s.purchaseOrders.Search(ctx, boardapi.PurchaseOrderListOptions{VendorIDEq: v.ID}, opts)
-			if err != nil {
-				return nil, err
-			}
-			purchaseOrders = append(purchaseOrders, pos...)
-		}
-
-	case q.ProjectName != "":
-		projects, err := s.projects.Search(ctx, boardapi.ProjectListOptions{NameCont: q.ProjectName}, opts)
-		if err != nil {
-			return nil, err
-		}
-		for _, p := range projects {
-			pos, err := s.purchaseOrders.Search(ctx, boardapi.PurchaseOrderListOptions{ProjectIDEq: p.ID}, opts)
-			if err != nil {
-				return nil, err
-			}
-			purchaseOrders = append(purchaseOrders, pos...)
-		}
-
-	case q.Text != "":
-		all, err := s.purchaseOrders.Search(ctx, boardapi.PurchaseOrderListOptions{}, opts)
-		if err != nil {
-			return nil, err
-		}
-		for _, po := range all {
-			if containsText(q.Text, po.Title, po.Memo) {
-				purchaseOrders = append(purchaseOrders, po)
-			}
-		}
-
+		pos = list
 	case q.Status != "":
-		all, err := s.purchaseOrders.Search(ctx, boardapi.PurchaseOrderListOptions{}, opts)
+		list, err := s.purchaseOrders.Search(ctx, boardapi.PurchaseOrderListOptions{StatusEq: q.Status}, opts)
 		if err != nil {
 			return nil, err
 		}
-		for _, po := range all {
-			if po.Status == q.Status {
-				purchaseOrders = append(purchaseOrders, po)
+		pos = list
+	case q.Text != "":
+		all, err := s.purchaseOrders.Search(ctx, boardapi.PurchaseOrderListOptions{StatusEq: q.Status}, opts)
+		if err != nil {
+			return nil, err
+		}
+		for _, x := range all {
+			if containsText(q.Text, x.Title, x.Memo) {
+				pos = append(pos, x)
 			}
 		}
 	}
 
-	// Apply status post-filter for non-status-only search modes
-	if q.Status != "" && q.ID == 0 && (q.VendorName != "" || q.ProjectName != "" || q.Text != "") {
-		purchaseOrders = filterPurchaseOrdersByStatus(purchaseOrders, q.Status)
+	// post-filter: Statuses (multi) のみ。Status (single) は API delegation 済。
+	// ID 検索時は skip（N05 踏襲、UX 配慮）。
+	if q.ID == 0 && len(q.Statuses) > 0 {
+		pos = filterByStatuses(pos, func(p boardapi.PurchaseOrderEntity) string { return p.Status }, q.Statuses)
 	}
 
-	// Build results with vendor/project resolution
-	results := make([]PurchaseOrderResult, 0, len(purchaseOrders))
-	for _, po := range purchaseOrders {
-		vendor, project := s.resolveVendorAndProject(ctx, po.VendorID, po.ProjectID, opts)
-		results = append(results, PurchaseOrderResult{
-			PurchaseOrder: po,
-			Vendor:        vendor,
-			Project:       project,
-		})
-
+	results := make([]PurchaseOrderResult, 0, len(pos))
+	for _, x := range pos {
+		vendor, project := s.resolveVendorAndProject(ctx, x.VendorID, x.ProjectID, opts)
+		results = append(results, PurchaseOrderResult{PurchaseOrder: x, Vendor: vendor, Project: project})
 		if q.Limit > 0 && len(results) >= q.Limit {
 			break
 		}
 	}
-
 	return results, nil
-}
-
-// filterPurchaseOrdersByStatus filters purchase orders by status.
-func filterPurchaseOrdersByStatus(pos []boardapi.PurchaseOrderEntity, status string) []boardapi.PurchaseOrderEntity {
-	filtered := make([]boardapi.PurchaseOrderEntity, 0, len(pos))
-	for _, po := range pos {
-		if po.Status == status {
-			filtered = append(filtered, po)
-		}
-	}
-	return filtered
 }

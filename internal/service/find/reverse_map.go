@@ -1,4 +1,4 @@
-package find2
+package find
 
 import (
 	"context"
@@ -82,7 +82,7 @@ func (m *reverseMapper) ensureBuilt(ctx context.Context, opts repository.ReadOpt
 		if err != nil {
 			// ctx timeout / cancel はフォールバック（エラーを上位に返さない）
 			if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
-				slog.Warn("find2.reverseMapper: build timed out, falling back to ProjectID=0",
+				slog.Warn("find.reverseMapper: build timed out, falling back to ProjectID=0",
 					"response_group", m.responseGroup)
 				return nil, nil // フォールバック: エラーとして扱わない
 			}

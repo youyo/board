@@ -1,229 +1,368 @@
 package find
 
 import (
+	"errors"
+
 	"github.com/youyo/board/internal/boardapi"
 	"github.com/youyo/board/internal/repository"
 )
 
-// FindClientQuery holds parameters for FindClient.
-// Field priority: ID > Name > Text. If ID is set, Name and Text are ignored.
-// If Name is set, Text is ignored. At least one field must be set.
+// FindCommonOpts は全 Find クエリ共通のオプション。
+type FindCommonOpts struct {
+	// Limit は返却件数上限。0 は無制限（エラーなし）。負数は validation error。
+	Limit int
+	// Opts はリポジトリへ渡す読取オプション（Refresh/ForceRefresh 等）。
+	Opts repository.ReadOptions
+}
+
+// validate は共通オプションを検証する。
+// Limit=0 は無制限として許容する（T15a）。Limit<0 は error（T15b）。
+func (o FindCommonOpts) validate() error {
+	if o.Limit < 0 {
+		return errors.New("limit must be >= 0")
+	}
+	return nil
+}
+
+// validatable は validate を持つ型の制約インターフェース。
+type validatable interface {
+	validate() error
+}
+
+// validateQuery は共通 opts + クエリ固有の validate をまとめて実行する。
+func validateQuery(common FindCommonOpts, specific validatable) error {
+	if err := common.validate(); err != nil {
+		return err
+	}
+	return specific.validate()
+}
+
+// validateStatusFields は Status/Statuses 排他チェックと Statuses 上限チェックを行う。
+func validateStatusFields(status string, statuses []string) error {
+	if status != "" && len(statuses) > 0 {
+		return errors.New("Status and Statuses are mutually exclusive")
+	}
+	if len(statuses) > 10 {
+		return errors.New("at most 10 statuses allowed")
+	}
+	return nil
+}
+
+// ========== Query 型 ==========
+
+// FindClientQuery はクライアント検索クエリ。
 type FindClientQuery struct {
-	ID    int    // Direct lookup by ID (highest priority, ignores Name/Text)
-	Name  string // Substring match on client name (ignores Text)
-	Text  string // Free-text search across name, code, memo (lowest priority)
-	Limit int    // Max results to return (0 = unlimited). Applied at find layer.
-	Opts  repository.ReadOptions
+	FindCommonOpts
+	ID   int
+	Name string
+	Text string
 }
 
-// FindProjectQuery holds parameters for FindProject.
-// Field priority: ID > ClientName > Name > Text. Higher priority fields
-// override lower ones. Status is an additional filter applied on top.
+func (q FindClientQuery) validate() error {
+	if q.ID == 0 && q.Name == "" && q.Text == "" {
+		return errors.New("at least one field required")
+	}
+	return nil
+}
+
+// FindProjectQuery はプロジェクト検索クエリ。
 type FindProjectQuery struct {
-	ID         int    // Direct lookup by ID (highest priority)
-	ClientName string // Resolve client name -> client IDs -> filter projects
-	Name       string // Project name substring search
-	Text       string // Free-text search across name, code, memo (lowest priority)
-	Status     string // Additional filter (applied on top of any search mode)
-	Limit      int    // Max results to return (0 = unlimited). Applied at find layer.
-	Opts       repository.ReadOptions
+	FindCommonOpts
+	ID       int
+	Name     string
+	ClientID int
+	Text     string
+	Status   string
+	Statuses []string
 }
 
-// ClientResult is the aggregated result for a client search.
-type ClientResult struct {
-	Client   boardapi.ClientEntity         `json:"client"`
-	Branches []boardapi.ClientBranchEntity `json:"branches"`
-	Contacts []boardapi.ContactEntity      `json:"contacts"`
+func (q FindProjectQuery) validate() error {
+	if err := validateStatusFields(q.Status, q.Statuses); err != nil {
+		return err
+	}
+	if q.ID == 0 && q.Name == "" && q.ClientID == 0 && q.Text == "" &&
+		q.Status == "" && len(q.Statuses) == 0 {
+		return errors.New("at least one field required")
+	}
+	// advisor R3: Status/Statuses-only は API delegation 不可で全件取得を要するため reject。
+	// Status/Statuses を使う場合は ID/Name/ClientID/Text のいずれかによる narrowing が必須。
+	hasNarrow := q.ID != 0 || q.Name != "" || q.ClientID != 0 || q.Text != ""
+	hasStatus := q.Status != "" || len(q.Statuses) > 0
+	if hasStatus && !hasNarrow {
+		return errors.New("Status/Statuses requires at least one of ID, Name, ClientID, or Text to narrow results")
+	}
+	return nil
 }
 
-// ProjectResult is the aggregated result for a project search.
-type ProjectResult struct {
-	Project  boardapi.ProjectEntity   `json:"project"`
-	Client   *boardapi.ClientEntity   `json:"client,omitempty"`
-	Estimate *boardapi.EstimateEntity `json:"estimate,omitempty"`
-}
-
-// FindEstimateQuery holds parameters for FindEstimate.
-// Field priority: ID > ProjectID > ClientName > ProjectName.
-// Status acts as a post-filter. At least one of ID, ProjectID, ClientName, ProjectName must be set.
+// FindEstimateQuery は見積書検索クエリ。
+// EstimateEntity には Status フィールドがないため、SealApprovalStatus による絞り込みを想定。
+// Status/Statuses は N04 以降の実装時に要否を再評価する（N03 では形 only）。
 type FindEstimateQuery struct {
-	ID          int    // Direct lookup by document ID (highest priority)
-	ProjectID   int    // Lookup by project ID → GetByIDWithGroup("estimate") → hydrate
-	ClientName  string // Resolve client name → projects.Search(ResponseGroup="estimate") → hydrate
-	ProjectName string // Resolve project name → projects.Search(ResponseGroup="estimate") → hydrate
-	Status      string // Post-filter only (requires at least one of ID/ProjectID/ClientName/ProjectName)
-	Limit       int    // Max results to return (0 = unlimited). Applied at find layer.
-	Opts        repository.ReadOptions
-}
-
-// EstimateResult is the aggregated result for an estimate search.
-type EstimateResult struct {
-	Estimate boardapi.EstimateEntity `json:"estimate"`
-	Client   *boardapi.ClientEntity  `json:"client,omitempty"`
-	Project  *boardapi.ProjectEntity `json:"project,omitempty"`
-}
-
-// FindInvoiceQuery holds parameters for FindInvoice.
-// Field priority: ID > ClientName > ProjectName > Text > Status(standalone).
-type FindInvoiceQuery struct {
+	FindCommonOpts
 	ID          int
+	ProjectID   int
 	ClientName  string
 	ProjectName string
 	Text        string
-	Status      string
-	Limit       int
-	Opts        repository.ReadOptions
 }
 
-// InvoiceResult is the aggregated result for an invoice search.
-type InvoiceResult struct {
-	Invoice boardapi.InvoiceEntity  `json:"invoice"`
-	Client  *boardapi.ClientEntity  `json:"client,omitempty"`
-	Project *boardapi.ProjectEntity `json:"project,omitempty"`
+func (q FindEstimateQuery) validate() error {
+	if q.ID == 0 && q.ProjectID == 0 && q.ClientName == "" &&
+		q.ProjectName == "" && q.Text == "" {
+		return errors.New("at least one field required")
+	}
+	return nil
 }
 
-// FindOrderQuery holds parameters for FindOrder.
-// Field priority: ID > ProjectID > ClientName > ProjectName.
-// Status acts as a post-filter. At least one of ID, ProjectID, ClientName, ProjectName must be set.
+// FindOrderQuery は注文書検索クエリ。
 type FindOrderQuery struct {
-	ID          int    // Direct lookup by document ID (highest priority)
-	ProjectID   int    // Lookup by project ID → GetByIDWithGroup("order") → hydrate
-	ClientName  string // Resolve client name → projects.Search(ResponseGroup="order") → hydrate
-	ProjectName string // Resolve project name → projects.Search(ResponseGroup="order") → hydrate
-	Status      string // Post-filter only (requires at least one of ID/ProjectID/ClientName/ProjectName)
-	Limit       int    // Max results to return (0 = unlimited). Applied at find layer.
-	Opts        repository.ReadOptions
+	FindCommonOpts
+	ID          int
+	ProjectID   int
+	ClientName  string
+	ProjectName string
+	Text        string
 }
 
-// OrderResult is the aggregated result for an order search.
-type OrderResult struct {
-	Order   boardapi.OrderEntity    `json:"order"`
-	Client  *boardapi.ClientEntity  `json:"client,omitempty"`
-	Project *boardapi.ProjectEntity `json:"project,omitempty"`
+func (q FindOrderQuery) validate() error {
+	if q.ID == 0 && q.ProjectID == 0 && q.ClientName == "" &&
+		q.ProjectName == "" && q.Text == "" {
+		return errors.New("at least one field required")
+	}
+	return nil
 }
 
-// FindDeliveryQuery holds parameters for FindDelivery.
-// Field priority: ID > ProjectID > ClientName > ProjectName.
-// Status acts as a post-filter. At least one of ID, ProjectID, ClientName, ProjectName must be set.
+// FindDeliveryQuery は納品書検索クエリ。
 type FindDeliveryQuery struct {
-	ID          int    // Direct lookup by document ID (highest priority)
-	ProjectID   int    // Lookup by project ID → GetByIDWithGroup("delivery") → hydrate
-	ClientName  string // Resolve client name → projects.Search(ResponseGroup="delivery") → hydrate
-	ProjectName string // Resolve project name → projects.Search(ResponseGroup="delivery") → hydrate
-	Status      string // Post-filter only (requires at least one of ID/ProjectID/ClientName/ProjectName)
-	Limit       int    // Max results to return (0 = unlimited). Applied at find layer.
-	Opts        repository.ReadOptions
+	FindCommonOpts
+	ID          int
+	ProjectID   int
+	ClientName  string
+	ProjectName string
+	Text        string
 }
 
-// DeliveryResult is the aggregated result for a delivery search.
-type DeliveryResult struct {
-	Delivery boardapi.DeliveryEntity `json:"delivery"`
-	Client   *boardapi.ClientEntity  `json:"client,omitempty"`
-	Project  *boardapi.ProjectEntity `json:"project,omitempty"`
+func (q FindDeliveryQuery) validate() error {
+	if q.ID == 0 && q.ProjectID == 0 && q.ClientName == "" &&
+		q.ProjectName == "" && q.Text == "" {
+		return errors.New("at least one field required")
+	}
+	return nil
 }
 
-// FindReceiptQuery holds parameters for FindReceipt.
-// Field priority: ID > ProjectID > ClientName > ProjectName.
-// Status acts as a post-filter. At least one of ID, ProjectID, ClientName, ProjectName must be set.
+// FindReceiptQuery は領収書検索クエリ。
 type FindReceiptQuery struct {
-	ID          int    // Direct lookup by document ID (highest priority)
-	ProjectID   int    // Lookup by project ID → GetByIDWithGroup("receipt") → hydrate
-	ClientName  string // Resolve client name → projects.Search(ResponseGroup="receipt") → hydrate
-	ProjectName string // Resolve project name → projects.Search(ResponseGroup="receipt") → hydrate
-	Status      string // Post-filter only (requires at least one of ID/ProjectID/ClientName/ProjectName)
-	Limit       int    // Max results to return (0 = unlimited). Applied at find layer.
-	Opts        repository.ReadOptions
+	FindCommonOpts
+	ID          int
+	ProjectID   int
+	ClientName  string
+	ProjectName string
+	Text        string
 }
 
-// ReceiptResult is the aggregated result for a receipt search.
-type ReceiptResult struct {
-	Receipt boardapi.ReceiptEntity  `json:"receipt"`
-	Client  *boardapi.ClientEntity  `json:"client,omitempty"`
-	Project *boardapi.ProjectEntity `json:"project,omitempty"`
+func (q FindReceiptQuery) validate() error {
+	if q.ID == 0 && q.ProjectID == 0 && q.ClientName == "" &&
+		q.ProjectName == "" && q.Text == "" {
+		return errors.New("at least one field required")
+	}
+	return nil
 }
 
-// FindVendorQuery holds parameters for FindVendor.
-// Field priority: ID > Name > Text. If ID is set, Name and Text are ignored.
+// FindInvoiceQuery は請求書検索クエリ。
+type FindInvoiceQuery struct {
+	FindCommonOpts
+	ID       int
+	ClientID int
+	Text     string
+	Status   string
+	Statuses []string
+}
+
+func (q FindInvoiceQuery) validate() error {
+	if err := validateStatusFields(q.Status, q.Statuses); err != nil {
+		return err
+	}
+	if q.ID == 0 && q.ClientID == 0 && q.Text == "" &&
+		q.Status == "" && len(q.Statuses) == 0 {
+		return errors.New("at least one field required")
+	}
+	// N07a D2: Statuses (multi) only は API delegation 不可で full-scan を要するため reject。
+	// Status (single) は StatusEq で API delegation 可のため allow。
+	// Status は validateStatusFields で Statuses と相互排他 → narrowing オプションとして列挙しない。
+	hasNarrow := q.ID != 0 || q.ClientID != 0 || q.Text != ""
+	if len(q.Statuses) > 0 && !hasNarrow {
+		return errors.New("Statuses requires one of ID, ClientID, or Text to narrow results")
+	}
+	return nil
+}
+
+// FindVendorQuery は仕入先検索クエリ。
 type FindVendorQuery struct {
-	ID    int    // Direct lookup by ID (highest priority, ignores Name/Text)
-	Name  string // Substring match on vendor name (ignores Text)
-	Text  string // Free-text search across name, code, memo (lowest priority)
-	Limit int    // Max results to return (0 = unlimited). Applied at find layer.
-	Opts  repository.ReadOptions
+	FindCommonOpts
+	ID   int
+	Name string
+	Text string
 }
 
-// VendorResult is the aggregated result for a vendor search.
-type VendorResult struct {
-	Vendor   boardapi.VendorEntity          `json:"vendor"`
-	Branches []boardapi.VendorBranchEntity  `json:"branches"`
-	Contacts []boardapi.VendorContactEntity `json:"contacts"`
+func (q FindVendorQuery) validate() error {
+	if q.ID == 0 && q.Name == "" && q.Text == "" {
+		return errors.New("at least one field required")
+	}
+	return nil
 }
 
-// FindPurchaseOrderQuery holds parameters for FindPurchaseOrder.
-// Field priority: ID > VendorName > ProjectName > Text > Status(standalone).
-// Status also acts as a post-filter when combined with other criteria.
+// FindPurchaseOrderQuery は発注書検索クエリ。
 type FindPurchaseOrderQuery struct {
-	ID          int    // Direct lookup by ID (highest priority)
-	VendorName  string // Resolve vendor name -> vendor IDs -> search purchase orders
-	ProjectName string // Resolve project name -> project IDs -> search purchase orders
-	Text        string // Free-text search across title, memo
-	Status      string // Standalone filter or post-filter on top of other modes
-	Limit       int    // Max results to return (0 = unlimited). Applied at find layer.
-	Opts        repository.ReadOptions
+	FindCommonOpts
+	ID       int
+	VendorID int
+	Text     string
+	Status   string
+	Statuses []string
 }
 
-// PurchaseOrderResult is the aggregated result for a purchase order search.
-type PurchaseOrderResult struct {
-	PurchaseOrder boardapi.PurchaseOrderEntity `json:"purchase_order"`
-	Vendor        *boardapi.VendorEntity       `json:"vendor,omitempty"`
-	Project       *boardapi.ProjectEntity      `json:"project,omitempty"`
+func (q FindPurchaseOrderQuery) validate() error {
+	if err := validateStatusFields(q.Status, q.Statuses); err != nil {
+		return err
+	}
+	if q.ID == 0 && q.VendorID == 0 && q.Text == "" &&
+		q.Status == "" && len(q.Statuses) == 0 {
+		return errors.New("at least one field required")
+	}
+	// N07a D2: Statuses (multi) only は API delegation 不可で full-scan を要するため reject。
+	// Status (single) は StatusEq で API delegation 可のため allow。
+	// Status は validateStatusFields で Statuses と相互排他 → narrowing オプションとして列挙しない。
+	hasNarrow := q.ID != 0 || q.VendorID != 0 || q.Text != ""
+	if len(q.Statuses) > 0 && !hasNarrow {
+		return errors.New("Statuses requires one of ID, VendorID, or Text to narrow results")
+	}
+	return nil
 }
 
-// FindPaymentQuery holds parameters for FindPayment.
-// Field priority: ID > VendorName > PurchaseOrderID > Text > Status(standalone).
-// Status also acts as a post-filter when combined with other criteria.
+// FindPaymentQuery は支払検索クエリ。
 type FindPaymentQuery struct {
-	ID              int    // Direct lookup by ID (highest priority)
-	VendorName      string // Resolve vendor name -> vendor IDs -> search payments
-	PurchaseOrderID int    // Search payments by purchase order ID
-	Text            string // Free-text search across memo
-	Status          string // Standalone filter or post-filter on top of other modes
-	Limit           int    // Max results to return (0 = unlimited). Applied at find layer.
-	Opts            repository.ReadOptions
+	FindCommonOpts
+	ID       int
+	VendorID int
+	Text     string
+	Status   string
+	Statuses []string
 }
 
-// PaymentResult is the aggregated result for a payment search.
-type PaymentResult struct {
-	Payment boardapi.PaymentEntity `json:"payment"`
-	Vendor  *boardapi.VendorEntity `json:"vendor,omitempty"`
+func (q FindPaymentQuery) validate() error {
+	if err := validateStatusFields(q.Status, q.Statuses); err != nil {
+		return err
+	}
+	if q.ID == 0 && q.VendorID == 0 && q.Text == "" &&
+		q.Status == "" && len(q.Statuses) == 0 {
+		return errors.New("at least one field required")
+	}
+	// N07a D2: Statuses (multi) only は API delegation 不可で full-scan を要するため reject。
+	// Status (single) は StatusEq で API delegation 可のため allow。
+	// Status は validateStatusFields で Statuses と相互排他 → narrowing オプションとして列挙しない。
+	hasNarrow := q.ID != 0 || q.VendorID != 0 || q.Text != ""
+	if len(q.Statuses) > 0 && !hasNarrow {
+		return errors.New("Statuses requires one of ID, VendorID, or Text to narrow results")
+	}
+	return nil
 }
 
-// FindUserQuery holds parameters for FindUser.
-// Field priority: ID > Name > Text.
+// FindUserQuery はユーザー検索クエリ。
 type FindUserQuery struct {
-	ID    int    // Direct lookup by ID (highest priority, ignores Name/Text)
-	Name  string // Substring match on user name (ignores Text)
-	Text  string // Free-text search across name, email (lowest priority)
-	Limit int    // Max results to return (0 = unlimited). Applied at find layer.
-	Opts  repository.ReadOptions
+	FindCommonOpts
+	ID   int
+	Name string
+	Text string
 }
 
-// UserResult is the result for a user search.
+func (q FindUserQuery) validate() error {
+	if q.ID == 0 && q.Name == "" && q.Text == "" {
+		return errors.New("at least one field required")
+	}
+	return nil
+}
+
+// ========== Result 型 ==========
+
+// ClientResult はクライアント検索結果。
+type ClientResult struct {
+	Client   boardapi.ClientEntity
+	Branches []boardapi.ClientBranchEntity
+	Contacts []boardapi.ContactEntity
+}
+
+// ProjectResult はプロジェクト検索結果。
+type ProjectResult struct {
+	Project boardapi.ProjectEntity
+	Client  *boardapi.ClientEntity
+}
+
+// EstimateResult は見積書検索結果。
+// ProjectID/ClientID は逆マッピング（reverseMapper）で解決される。
+type EstimateResult struct {
+	Estimate  boardapi.EstimateEntity
+	ProjectID int
+	ClientID  int
+	Project   *boardapi.ProjectEntity
+	Client    *boardapi.ClientEntity
+}
+
+// OrderResult は注文書検索結果。
+type OrderResult struct {
+	Order     boardapi.OrderEntity
+	ProjectID int
+	ClientID  int
+	Project   *boardapi.ProjectEntity
+	Client    *boardapi.ClientEntity
+}
+
+// DeliveryResult は納品書検索結果。
+type DeliveryResult struct {
+	Delivery  boardapi.DeliveryEntity
+	ProjectID int
+	ClientID  int
+	Project   *boardapi.ProjectEntity
+	Client    *boardapi.ClientEntity
+}
+
+// ReceiptResult は領収書検索結果。
+type ReceiptResult struct {
+	Receipt   boardapi.ReceiptEntity
+	ProjectID int
+	ClientID  int
+	Project   *boardapi.ProjectEntity
+	Client    *boardapi.ClientEntity
+}
+
+// InvoiceResult は請求書検索結果。
+type InvoiceResult struct {
+	Invoice boardapi.InvoiceEntity
+	Project *boardapi.ProjectEntity
+	Client  *boardapi.ClientEntity
+}
+
+// VendorResult は仕入先検索結果。
+type VendorResult struct {
+	Vendor   boardapi.VendorEntity
+	Branches []boardapi.VendorBranchEntity
+	Contacts []boardapi.VendorContactEntity
+}
+
+// PurchaseOrderResult は発注書検索結果。
+type PurchaseOrderResult struct {
+	PurchaseOrder boardapi.PurchaseOrderEntity
+	Vendor        *boardapi.VendorEntity
+	Project       *boardapi.ProjectEntity
+}
+
+// PaymentResult は支払検索結果。
+type PaymentResult struct {
+	Payment boardapi.PaymentEntity
+	Vendor  *boardapi.VendorEntity
+	Project *boardapi.ProjectEntity
+}
+
+// UserResult はユーザー検索結果。
 type UserResult struct {
-	User boardapi.UserEntity `json:"user"`
-}
-
-// FindGroupQuery holds parameters for FindGroup.
-// Field priority: ID > Name > Text.
-type FindGroupQuery struct {
-	ID    int    // Direct lookup by ID (highest priority, ignores Name/Text)
-	Name  string // Substring match on group name (ignores Text)
-	Text  string // Free-text search across name, memo (lowest priority)
-	Limit int    // Max results to return (0 = unlimited). Applied at find layer.
-	Opts  repository.ReadOptions
-}
-
-// GroupResult is the result for a group search.
-type GroupResult struct {
-	Group boardapi.GroupEntity `json:"group"`
+	User boardapi.UserEntity
 }

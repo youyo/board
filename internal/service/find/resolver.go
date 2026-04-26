@@ -1,4 +1,4 @@
-package find2
+package find
 
 import (
 	"context"
@@ -27,7 +27,7 @@ func (s *Service) resolveClientAndProject(
 		g.Go(func() error {
 			c, err := s.clients.GetByID(gctx, clientID, opts)
 			if err != nil {
-				slog.Warn("find2.resolveClientAndProject: client enrichment failed",
+				slog.Warn("find.resolveClientAndProject: client enrichment failed",
 					"client_id", clientID, "error", err)
 				return nil // 非致命: error は swallow
 			}
@@ -39,7 +39,7 @@ func (s *Service) resolveClientAndProject(
 		g.Go(func() error {
 			p, err := s.projects.GetByID(gctx, projectID, opts)
 			if err != nil {
-				slog.Warn("find2.resolveClientAndProject: project enrichment failed",
+				slog.Warn("find.resolveClientAndProject: project enrichment failed",
 					"project_id", projectID, "error", err)
 				return nil // 非致命: error は swallow
 			}
@@ -69,7 +69,7 @@ func (s *Service) resolveVendorAndProject(
 		g.Go(func() error {
 			v, err := s.vendors.GetByID(gctx, vendorID, opts)
 			if err != nil {
-				slog.Warn("find2.resolveVendorAndProject: vendor enrichment failed",
+				slog.Warn("find.resolveVendorAndProject: vendor enrichment failed",
 					"vendor_id", vendorID, "error", err)
 				return nil // 非致命: error は swallow
 			}
@@ -81,7 +81,7 @@ func (s *Service) resolveVendorAndProject(
 		g.Go(func() error {
 			p, err := s.projects.GetByID(gctx, projectID, opts)
 			if err != nil {
-				slog.Warn("find2.resolveVendorAndProject: project enrichment failed",
+				slog.Warn("find.resolveVendorAndProject: project enrichment failed",
 					"project_id", projectID, "error", err)
 				return nil // 非致命: error は swallow
 			}
@@ -110,7 +110,7 @@ func (s *Service) resolveProjectClient(ctx context.Context, project boardapi.Pro
 	}
 	c, err := s.clients.GetByID(ctx, cid, opts)
 	if err != nil {
-		slog.Warn("find2.resolveProjectClient: client enrichment failed",
+		slog.Warn("find.resolveProjectClient: client enrichment failed",
 			"project_id", project.ID, "client_id", cid, "error", err)
 		return ProjectResult{Project: project, Client: nil}
 	}
@@ -133,7 +133,7 @@ func (s *Service) resolveClientDetails(ctx context.Context, client boardapi.Clie
 	g.Go(func() error {
 		b, err := s.clientBranches.Search(gctx, boardapi.ClientBranchListOptions{ClientIDEq: client.ID}, opts)
 		if err != nil {
-			slog.Warn("find2.resolveClientDetails: branches enrichment failed",
+			slog.Warn("find.resolveClientDetails: branches enrichment failed",
 				"client_id", client.ID, "error", err)
 			return nil // non-fatal: error は swallow
 		}
@@ -143,7 +143,7 @@ func (s *Service) resolveClientDetails(ctx context.Context, client boardapi.Clie
 	g.Go(func() error {
 		c, err := s.contacts.Search(gctx, boardapi.ContactListOptions{ClientIDEq: client.ID}, opts)
 		if err != nil {
-			slog.Warn("find2.resolveClientDetails: contacts enrichment failed",
+			slog.Warn("find.resolveClientDetails: contacts enrichment failed",
 				"client_id", client.ID, "error", err)
 			return nil // non-fatal: error は swallow
 		}
@@ -168,7 +168,7 @@ func (s *Service) resolveVendorDetails(ctx context.Context, vendor boardapi.Vend
 	g.Go(func() error {
 		b, err := s.vendorBranches.Search(gctx, boardapi.VendorBranchListOptions{PayeeIDEq: vendor.ID}, opts)
 		if err != nil {
-			slog.Warn("find2.resolveVendorDetails: branches enrichment failed",
+			slog.Warn("find.resolveVendorDetails: branches enrichment failed",
 				"vendor_id", vendor.ID, "error", err)
 			return nil // non-fatal: error は swallow
 		}
@@ -178,7 +178,7 @@ func (s *Service) resolveVendorDetails(ctx context.Context, vendor boardapi.Vend
 	g.Go(func() error {
 		c, err := s.vendorContacts.Search(gctx, boardapi.VendorContactListOptions{PayeeIDEq: vendor.ID}, opts)
 		if err != nil {
-			slog.Warn("find2.resolveVendorDetails: contacts enrichment failed",
+			slog.Warn("find.resolveVendorDetails: contacts enrichment failed",
 				"vendor_id", vendor.ID, "error", err)
 			return nil // non-fatal: error は swallow
 		}

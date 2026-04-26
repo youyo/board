@@ -2,77 +2,86 @@ package find
 
 import (
 	"context"
-	"errors"
+	"log/slog"
 
 	"github.com/youyo/board/internal/boardapi"
 )
 
-// FindOrder performs a cross-resource search for orders, returning
-// orders with their associated client and project.
-// Uses project response_group API to discover document IDs, then fetches via GetByDocumentID.
-// Field priority: ID > ProjectID > ClientName > ProjectName.
+// FindOrder は ID / ProjectID / ClientName / ProjectName による注文書横断検索を行う。
+// 構造は FindEstimate と同形（Order は単数 *DocumentSummary）。
 //
-// M36 NOTE: OrderEntity は実 API 準拠に再設計されたため、Status/ClientID/ProjectID
-// フィールドは存在しない。Status post-filter および client/project enrichment は
-// 各ブランチのコンテキスト情報から復元する。
-// ID lookup では client/project を特定できないため nil を返す。
-// TODO(M25-M32): find 層の全体再設計で enrichment を復元する。
+// 詳細仕様は find_estimate.go の docstring 参照（reverseMapper / 二重 fetch 回避 / non-fatal enrichment）。
 func (s *Service) FindOrder(ctx context.Context, q FindOrderQuery) ([]OrderResult, error) {
-	if q.ID == 0 && q.ProjectID == 0 && q.ClientName == "" && q.ProjectName == "" {
-		return nil, errors.New("at least one of ID, ProjectID, ClientName, or ProjectName must be set")
+	if err := validateQuery(q.FindCommonOpts, q); err != nil {
+		return nil, err
 	}
-
-	opts := repoOpts(q.Opts)
-
-	// results を直接ブランチ内で構築する。
-	// Status post-filter は OrderEntity に Status フィールドが無いため無効化。
-	// TODO(M25-M32): Status post-filter を再設計で復元する。
+	opts := repoOpts(q.FindCommonOpts)
 	results := make([]OrderResult, 0)
 
 	switch {
 	case q.ID != 0:
-		// Direct lookup by document ID.
-		// client/project は特定できないため nil。
 		o, err := s.orders.GetByDocumentID(ctx, q.ID, opts)
 		if err != nil {
 			return nil, err
 		}
+		pid, ok, lerr := s.reverseMappers["order"].Lookup(ctx, q.ID, opts)
+		if lerr != nil {
+			slog.Warn("find.FindOrder: reverseMap build failed",
+				"doc_id", q.ID, "error", lerr)
+		}
+		if !ok || pid == 0 {
+			results = append(results, OrderResult{Order: *o})
+			return results, nil
+		}
+		p, perr := s.projects.GetByID(ctx, pid, opts)
+		if perr != nil {
+			slog.Warn("find.FindOrder: project enrichment failed",
+				"project_id", pid, "error", perr)
+			results = append(results, OrderResult{Order: *o, ProjectID: pid})
+			return results, nil
+		}
+		cid := projectClientIDPtr(p)
+		client := s.lookupClient(ctx, cid, p.ID, opts)
 		results = append(results, OrderResult{
-			Order:   *o,
-			Client:  nil,
-			Project: nil,
+			Order:     *o,
+			ProjectID: pid,
+			ClientID:  cid,
+			Project:   p,
+			Client:    client,
 		})
 
 	case q.ProjectID != 0:
-		// Lookup project with order group, then fetch document.
-		// project コンテキストから client/project を解決。
 		p, err := s.projects.GetByIDWithGroup(ctx, q.ProjectID, "order")
 		if err != nil {
 			return nil, err
 		}
-		if p.Order != nil {
-			o, err := s.orders.GetByDocumentID(ctx, p.Order.ID, opts)
-			if err != nil && !boardapi.IsNotFound(err) {
-				return nil, err
-			}
-			if err == nil {
-				// p は *ProjectEntity (GetByIDWithGroup の戻り値)
-				client, project := s.resolveClientAndProject(ctx, projectClientIDPtr(p), p.ID, opts)
-				results = append(results, OrderResult{
-					Order:   *o,
-					Client:  client,
-					Project: project,
-				})
-			}
+		if p.Order == nil {
+			return results, nil
 		}
+		o, err := s.orders.GetByDocumentID(ctx, p.Order.ID, opts)
+		if boardapi.IsNotFound(err) {
+			return results, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		cid := projectClientIDPtr(p)
+		client := s.lookupClient(ctx, cid, p.ID, opts)
+		results = append(results, OrderResult{
+			Order:     *o,
+			ProjectID: p.ID,
+			ClientID:  cid,
+			Project:   p,
+			Client:    client,
+		})
 
 	case q.ClientName != "":
-		// Resolve client name → search projects with order group → hydrate.
 		clients, err := s.clients.Search(ctx, boardapi.ClientListOptions{NameCont: q.ClientName}, opts)
 		if err != nil {
 			return nil, err
 		}
 		for _, c := range clients {
+			c2 := c
 			projects, err := s.projects.Search(ctx, boardapi.ProjectListOptions{ClientIDEq: c.ID, ResponseGroup: "order"}, opts)
 			if err != nil {
 				return nil, err
@@ -88,17 +97,21 @@ func (s *Service) FindOrder(ctx context.Context, q FindOrderQuery) ([]OrderResul
 				if err != nil {
 					return nil, err
 				}
-				client, project := s.resolveClientAndProject(ctx, projectClientID(p), p.ID, opts)
+				p2 := p
 				results = append(results, OrderResult{
-					Order:   *o,
-					Client:  client,
-					Project: project,
+					Order:     *o,
+					ProjectID: p.ID,
+					ClientID:  c.ID,
+					Project:   &p2,
+					Client:    &c2,
 				})
+				if q.Limit > 0 && len(results) >= q.Limit {
+					return results, nil
+				}
 			}
 		}
 
 	case q.ProjectName != "":
-		// Search projects by name with order group → hydrate.
 		projects, err := s.projects.Search(ctx, boardapi.ProjectListOptions{NameCont: q.ProjectName, ResponseGroup: "order"}, opts)
 		if err != nil {
 			return nil, err
@@ -114,18 +127,20 @@ func (s *Service) FindOrder(ctx context.Context, q FindOrderQuery) ([]OrderResul
 			if err != nil {
 				return nil, err
 			}
-			client, project := s.resolveClientAndProject(ctx, projectClientID(p), p.ID, opts)
+			p2 := p
+			cid := projectClientID(p)
+			client := s.lookupClient(ctx, cid, p.ID, opts)
 			results = append(results, OrderResult{
-				Order:   *o,
-				Client:  client,
-				Project: project,
+				Order:     *o,
+				ProjectID: p.ID,
+				ClientID:  cid,
+				Project:   &p2,
+				Client:    client,
 			})
+			if q.Limit > 0 && len(results) >= q.Limit {
+				return results, nil
+			}
 		}
-	}
-
-	// Limit 適用
-	if q.Limit > 0 && len(results) > q.Limit {
-		results = results[:q.Limit]
 	}
 
 	return results, nil

@@ -2,29 +2,38 @@ package find
 
 import "testing"
 
-func TestContainsText(t *testing.T) {
-	tests := []struct {
-		name   string
-		text   string
-		fields []string
-		want   bool
-	}{
-		{"exact match", "hello", []string{"hello"}, true},
-		{"case insensitive", "HELLO", []string{"hello world"}, true},
-		{"substring", "ell", []string{"hello"}, true},
-		{"no match", "xyz", []string{"hello", "world"}, false},
-		{"match in second field", "world", []string{"hello", "world"}, true},
-		{"empty text", "", []string{"hello"}, true},
-		{"empty fields", "hello", []string{""}, false},
-		{"both empty", "", []string{""}, true},
-		{"japanese text", "株式", []string{"株式会社ABC"}, true},
+// T01: 大文字小文字を区別せずマッチする
+func TestContainsText_CaseInsensitiveMatch(t *testing.T) {
+	if !containsText("abc", "ABC Corp") {
+		t.Fatal("want true, got false")
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := containsText(tt.text, tt.fields...)
-			if got != tt.want {
-				t.Errorf("containsText(%q, %v) = %v, want %v", tt.text, tt.fields, got, tt.want)
-			}
-		})
+}
+
+// T02: fields が空の場合は false
+func TestContainsText_EmptyFields_ReturnsFalse(t *testing.T) {
+	if containsText("x") {
+		t.Fatal("want false, got true")
+	}
+}
+
+// T03: nil 相当（空文字）の *string は "" を返す
+func TestDerefString_NilInput_ReturnsEmpty(t *testing.T) {
+	if got := derefString(nil); got != "" {
+		t.Fatalf("want \"\", got %q", got)
+	}
+}
+
+// 追加: TrimSpace により空白のみの text は false
+func TestContainsText_WhitespaceOnly_ReturnsFalse(t *testing.T) {
+	if containsText("   ", "hello") {
+		t.Fatal("want false for whitespace-only text")
+	}
+}
+
+// 追加: derefString は非 nil の *string を正しく返す
+func TestDerefString_NonNil_ReturnsValue(t *testing.T) {
+	s := "hello"
+	if got := derefString(&s); got != "hello" {
+		t.Fatalf("want \"hello\", got %q", got)
 	}
 }

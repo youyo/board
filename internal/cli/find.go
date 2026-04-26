@@ -26,7 +26,6 @@ func NewFindCmd() *cobra.Command {
 		NewFindPurchaseOrderCmd(),
 		NewFindPaymentCmd(),
 		NewFindUserCmd(),
-		NewFindGroupCmd(),
 	)
 
 	return cmd
@@ -38,24 +37,5 @@ func findServiceFromCmd(cmd *cobra.Command) (*find.Service, error) {
 	if !ok {
 		return nil, errNoApp
 	}
-	repos := a.Repos
-	svc := find.New(find.Repos{
-		Clients:        repos.Clients,
-		ClientBranches: repos.ClientBranches,
-		Contacts:       repos.Contacts,
-		Projects:       repos.Projects,
-		Estimates:      repos.Estimates,
-		Invoices:       repos.Invoices,
-		Orders:         repos.Orders,
-		Deliveries:     repos.Deliveries,
-		Receipts:       repos.Receipts,
-		Vendors:        repos.Vendors,
-		VendorBranches: repos.VendorBranches,
-		VendorContacts: repos.VendorContacts,
-		PurchaseOrders: repos.PurchaseOrders,
-		Payments:       repos.Payments,
-		Users:          repos.Users,
-		Groups:         repos.Groups,
-	})
-	return svc, nil
+	return a.FindService(), nil
 }

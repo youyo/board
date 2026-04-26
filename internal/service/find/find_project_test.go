@@ -1,245 +1,455 @@
-package find_test
+package find
 
 import (
+	"context"
 	"errors"
+	"log/slog"
+	"strings"
 	"testing"
 
 	"github.com/youyo/board/internal/boardapi"
-	"github.com/youyo/board/internal/service/find"
+	"github.com/youyo/board/internal/repository"
 )
 
-// --- FindProject: Normal Cases ---
+// --- ヘルパー ---
 
-func TestFindProject_ByID(t *testing.T) {
-	project := &boardapi.ProjectEntity{ID: 1, Client: &boardapi.ClientRef{ID: 10}, Name: "Project A"}
-	client := &boardapi.ClientEntity{ID: 10, Name: "Client X"}
-
-	svc := newServiceWith(
-		&stubClientRepo{getResult: client},
-		nil, nil,
-		&stubProjectRepo{getResult: project},
-	)
-
-	got, err := svc.FindProject(testCtx, find.FindProjectQuery{ID: 1})
-	assertNoError(t, err)
-	assertProjectResultLen(t, got, 1)
-
-	if got[0].Project.ID != 1 {
-		t.Errorf("project ID = %d, want 1", got[0].Project.ID)
-	}
-	if got[0].Client == nil {
-		t.Fatal("client is nil, want non-nil")
-	}
-	if got[0].Client.ID != 10 {
-		t.Errorf("client ID = %d, want 10", got[0].Client.ID)
-	}
+func newProjectTestService(pr *stubProjectRepo, cr *stubClientRepo) *Service {
+	repos := newTestRepos()
+	repos.Projects = pr
+	repos.Clients = cr
+	return New(repos)
 }
 
-func TestFindProject_ByClientName(t *testing.T) {
-	clients := []boardapi.ClientEntity{
-		{ID: 10, Name: "ABC Corp"},
-		{ID: 11, Name: "ABC Inc"},
-	}
-	projects10 := []boardapi.ProjectEntity{
-		{ID: 1, Client: &boardapi.ClientRef{ID: 10}, Name: "P1"},
-		{ID: 2, Client: &boardapi.ClientRef{ID: 10}, Name: "P2"},
-	}
-	projects11 := []boardapi.ProjectEntity{
-		{ID: 3, Client: &boardapi.ClientRef{ID: 11}, Name: "P3"},
-	}
+// --- 正常系 T01-T08 ---
 
-	clientRepo := &stubClientRepo{searchResult: clients}
-	// For client resolution in resolveProjectClient, GetByID needs to work
-	clientRepo.getResult = &boardapi.ClientEntity{ID: 10, Name: "ABC Corp"}
-
-	projectRepo := &stubProjectRepo{}
-	// Since stub returns the same result for all Search calls, combine
-	allProjects := append(projects10, projects11...)
-	projectRepo.searchResult = allProjects
-
-	// Use a more specific approach: the stub returns all projects for any search.
-	// In practice, the stub can't differentiate by ClientID, so we test the flow.
-	svc := newServiceWith(clientRepo, nil, nil, projectRepo)
-
-	got, err := svc.FindProject(testCtx, find.FindProjectQuery{ClientName: "ABC"})
-	assertNoError(t, err)
-	// 2 clients * same stub result = 6, but we're testing the flow works
-	// The stub returns allProjects for each client search call
-	if len(got) < 1 {
-		t.Fatal("expected at least 1 result")
-	}
-}
-
-func TestFindProject_ByName(t *testing.T) {
-	projects := []boardapi.ProjectEntity{
-		{ID: 1, Client: &boardapi.ClientRef{ID: 10}, Name: "Dev Project"},
-	}
-	client := &boardapi.ClientEntity{ID: 10, Name: "Client X"}
-
-	svc := newServiceWith(
-		&stubClientRepo{getResult: client},
-		nil, nil,
-		&stubProjectRepo{searchResult: projects},
-	)
-
-	got, err := svc.FindProject(testCtx, find.FindProjectQuery{Name: "Dev"})
-	assertNoError(t, err)
-	assertProjectResultLen(t, got, 1)
-}
-
-func TestFindProject_ByClientNameWithStatus(t *testing.T) {
-	clients := []boardapi.ClientEntity{{ID: 10, Name: "ABC"}}
-	projects := []boardapi.ProjectEntity{
-		{ID: 1, Client: &boardapi.ClientRef{ID: 10}, Name: "P1", OrderStatusName: "active"},
-		{ID: 2, Client: &boardapi.ClientRef{ID: 10}, Name: "P2", OrderStatusName: "closed"},
-	}
-	client := &boardapi.ClientEntity{ID: 10, Name: "ABC"}
-
-	svc := newServiceWith(
-		&stubClientRepo{searchResult: clients, getResult: client},
-		nil, nil,
-		&stubProjectRepo{searchResult: projects},
-	)
-
-	got, err := svc.FindProject(testCtx, find.FindProjectQuery{ClientName: "ABC", Status: "active"})
-	assertNoError(t, err)
-	assertProjectResultLen(t, got, 1)
-	// M44: Status フィールド廃止。OrderStatusName で代替。
-	if got[0].Project.OrderStatusName != "active" {
-		t.Errorf("order_status_name = %q, want active", got[0].Project.OrderStatusName)
-	}
-}
-
-func TestFindProject_ByText(t *testing.T) {
-	allProjects := []boardapi.ProjectEntity{
-		{ID: 1, Client: &boardapi.ClientRef{ID: 10}, Name: "Web App", ManagementNo: strPtr("WA"), InHouseMemo: strPtr("search target")},
-		{ID: 2, Client: &boardapi.ClientRef{ID: 10}, Name: "API", ManagementNo: strPtr("API"), InHouseMemo: strPtr("normal")},
-	}
-	client := &boardapi.ClientEntity{ID: 10, Name: "Client X"}
-
-	svc := newServiceWith(
-		&stubClientRepo{getResult: client},
-		nil, nil,
-		&stubProjectRepo{listResult: allProjects},
-	)
-
-	got, err := svc.FindProject(testCtx, find.FindProjectQuery{Text: "search"})
-	assertNoError(t, err)
-	assertProjectResultLen(t, got, 1)
-	if got[0].Project.ID != 1 {
-		t.Errorf("project ID = %d, want 1", got[0].Project.ID)
-	}
-}
-
-// --- FindProject: Error/Edge Cases ---
-
-func TestFindProject_NotFoundByID(t *testing.T) {
-	svc := newServiceWith(
-		nil, nil, nil,
-		&stubProjectRepo{err: errors.New("not found")},
-	)
-
-	_, err := svc.FindProject(testCtx, find.FindProjectQuery{ID: 999})
-	assertError(t, err)
-}
-
-func TestFindProject_NoMatchByClientName(t *testing.T) {
-	svc := newServiceWith(
-		&stubClientRepo{searchResult: nil},
-		nil, nil,
-		&stubProjectRepo{},
-	)
-
-	got, err := svc.FindProject(testCtx, find.FindProjectQuery{ClientName: "nonexistent"})
-	assertNoError(t, err)
-	assertProjectResultLen(t, got, 0)
-}
-
-func TestFindProject_EmptyQuery(t *testing.T) {
-	svc := find.New(zeroRepos())
-
-	_, err := svc.FindProject(testCtx, find.FindProjectQuery{})
-	assertError(t, err)
-}
-
-func TestFindProject_ClientSearchOK_ProjectSearchFails(t *testing.T) {
-	clients := []boardapi.ClientEntity{{ID: 10, Name: "ABC"}}
-
-	svc := newServiceWith(
-		&stubClientRepo{searchResult: clients},
-		nil, nil,
-		&stubProjectRepo{err: errors.New("project repo error")},
-	)
-
-	_, err := svc.FindProject(testCtx, find.FindProjectQuery{ClientName: "ABC"})
-	assertError(t, err)
-}
-
-// --- FindProject: Priority Cases ---
-
-func TestFindProject_IDPriorityOverClientName(t *testing.T) {
-	project := &boardapi.ProjectEntity{ID: 1, Client: &boardapi.ClientRef{ID: 10}, Name: "By ID"}
-	client := &boardapi.ClientEntity{ID: 10, Name: "Client"}
-
-	svc := newServiceWith(
-		&stubClientRepo{
-			getResult:    client,
-			searchResult: []boardapi.ClientEntity{{ID: 20, Name: "Other"}},
+// N05-T01: ID 指定で 1 件取得、Client enrichment あり
+func TestService_FindProject_ByID_Success(t *testing.T) {
+	clientEntity := &boardapi.ClientEntity{ID: 5, Name: "C"}
+	pr := &stubProjectRepo{
+		getResult: &boardapi.ProjectEntity{
+			ID:     10,
+			Name:   "P",
+			Client: &boardapi.ClientRef{ID: 5},
 		},
-		nil, nil,
-		&stubProjectRepo{
-			getResult:    project,
-			searchResult: []boardapi.ProjectEntity{{ID: 99, Name: "By Search"}},
+	}
+	cr := &stubClientRepo{getResult: clientEntity}
+	svc := newProjectTestService(pr, cr)
+
+	results, err := svc.FindProject(testCtx, FindProjectQuery{ID: 10})
+	assertNoError(t, err)
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if results[0].Project.ID != 10 {
+		t.Errorf("expected Project.ID=10, got %d", results[0].Project.ID)
+	}
+	if results[0].Client == nil || results[0].Client.ID != 5 {
+		t.Errorf("expected Client.ID=5, got %v", results[0].Client)
+	}
+}
+
+// N05-T02: ID 指定、Client が nil → enrichment スキップ（getCount==0）
+func TestService_FindProject_ByID_ClientNil_NoEnrichment(t *testing.T) {
+	pr := &stubProjectRepo{
+		getResult: &boardapi.ProjectEntity{ID: 10, Name: "P", Client: nil},
+	}
+	cr := &stubClientRepo{}
+	svc := newProjectTestService(pr, cr)
+
+	results, err := svc.FindProject(testCtx, FindProjectQuery{ID: 10})
+	assertNoError(t, err)
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if results[0].Client != nil {
+		t.Errorf("expected Client=nil, got %v", results[0].Client)
+	}
+	if cr.getCount != 0 {
+		t.Errorf("expected getCount=0, got %d", cr.getCount)
+	}
+}
+
+// N05-T03: ClientID 指定で Search に ClientIDEq が渡されることを assert
+func TestService_FindProject_ByClientID_DelegatesClientIDEq(t *testing.T) {
+	var capturedFilter boardapi.ProjectListOptions
+	pr := &stubProjectRepo{
+		searchFunc: func(ctx context.Context, filter boardapi.ProjectListOptions, opts repository.ReadOptions) ([]boardapi.ProjectEntity, error) {
+			capturedFilter = filter
+			return []boardapi.ProjectEntity{
+				{ID: 1, Name: "P1", Client: &boardapi.ClientRef{ID: 5}},
+				{ID: 2, Name: "P2", Client: &boardapi.ClientRef{ID: 5}},
+			}, nil
 		},
-	)
+	}
+	cr := &stubClientRepo{getResult: &boardapi.ClientEntity{ID: 5}}
+	svc := newProjectTestService(pr, cr)
 
-	got, err := svc.FindProject(testCtx, find.FindProjectQuery{ID: 1, ClientName: "Other"})
+	results, err := svc.FindProject(testCtx, FindProjectQuery{ClientID: 5})
 	assertNoError(t, err)
-	assertProjectResultLen(t, got, 1)
-	if got[0].Project.ID != 1 {
-		t.Errorf("expected ID lookup (1), got %d", got[0].Project.ID)
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+	if capturedFilter.ClientIDEq != 5 {
+		t.Errorf("expected ClientIDEq=5, got %d", capturedFilter.ClientIDEq)
 	}
 }
 
-// --- FindProject: Limit Cases ---
-
-func TestFindProject_Limit(t *testing.T) {
-	projects := []boardapi.ProjectEntity{
-		{ID: 1, Client: &boardapi.ClientRef{ID: 10}, Name: "P1"},
-		{ID: 2, Client: &boardapi.ClientRef{ID: 10}, Name: "P2"},
-		{ID: 3, Client: &boardapi.ClientRef{ID: 10}, Name: "P3"},
+// N05-T04: Name 指定で Search に NameCont が渡されることを assert
+func TestService_FindProject_ByName_DelegatesNameCont(t *testing.T) {
+	var capturedFilter boardapi.ProjectListOptions
+	pr := &stubProjectRepo{
+		searchFunc: func(ctx context.Context, filter boardapi.ProjectListOptions, opts repository.ReadOptions) ([]boardapi.ProjectEntity, error) {
+			capturedFilter = filter
+			return []boardapi.ProjectEntity{{ID: 1, Name: "Acme Project"}}, nil
+		},
 	}
-	client := &boardapi.ClientEntity{ID: 10, Name: "Client"}
+	cr := &stubClientRepo{}
+	svc := newProjectTestService(pr, cr)
 
-	svc := newServiceWith(
-		&stubClientRepo{getResult: client},
-		nil, nil,
-		&stubProjectRepo{searchResult: projects},
-	)
-
-	got, err := svc.FindProject(testCtx, find.FindProjectQuery{Name: "P", Limit: 1})
+	results, err := svc.FindProject(testCtx, FindProjectQuery{Name: "Acme"})
 	assertNoError(t, err)
-	assertProjectResultLen(t, got, 1)
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if capturedFilter.NameCont != "Acme" {
+		t.Errorf("expected NameCont=Acme, got %q", capturedFilter.NameCont)
+	}
 }
 
-// --- FindProject: Status-only ---
-
-func TestFindProject_StatusOnly(t *testing.T) {
-	allProjects := []boardapi.ProjectEntity{
-		{ID: 1, Client: &boardapi.ClientRef{ID: 10}, Name: "P1", OrderStatusName: "active"},
-		{ID: 2, Client: &boardapi.ClientRef{ID: 10}, Name: "P2", OrderStatusName: "closed"},
-		{ID: 3, Client: &boardapi.ClientRef{ID: 10}, Name: "P3", OrderStatusName: "active"},
+// N05-T05: Text 指定、Name/ManagementNo のいずれかにマッチする件を返す
+func TestService_FindProject_ByText_FiltersInProcess(t *testing.T) {
+	pr := &stubProjectRepo{
+		searchResult: []boardapi.ProjectEntity{
+			{ID: 1, Name: "Alpha P"},
+			{ID: 2, Name: "Beta"},
+			{ID: 3, Name: "Gamma", ManagementNo: strPtr("ALPHA-1")},
+		},
 	}
-	client := &boardapi.ClientEntity{ID: 10, Name: "Client"}
+	cr := &stubClientRepo{}
+	svc := newProjectTestService(pr, cr)
 
-	svc := newServiceWith(
-		&stubClientRepo{getResult: client},
-		nil, nil,
-		&stubProjectRepo{listResult: allProjects},
-	)
-
-	// FindProjectQuery.Status は order_status_name / delivery_status_name で in-memory フィルタ
-	got, err := svc.FindProject(testCtx, find.FindProjectQuery{Status: "active"})
+	results, err := svc.FindProject(testCtx, FindProjectQuery{Text: "alpha"})
 	assertNoError(t, err)
-	assertProjectResultLen(t, got, 2)
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+}
+
+// N05-T06: Text 指定、InHouseMemo にマッチ
+func TestService_FindProject_ByText_MatchesInHouseMemo(t *testing.T) {
+	pr := &stubProjectRepo{
+		searchResult: []boardapi.ProjectEntity{
+			{ID: 1, Name: "P1", InHouseMemo: strPtr("urgent customer")},
+			{ID: 2, Name: "P2"},
+		},
+	}
+	cr := &stubClientRepo{}
+	svc := newProjectTestService(pr, cr)
+
+	results, err := svc.FindProject(testCtx, FindProjectQuery{Text: "urgent"})
+	assertNoError(t, err)
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if results[0].Project.ID != 1 {
+		t.Errorf("expected ID=1, got %d", results[0].Project.ID)
+	}
+}
+
+// N05-T07: ID 優先 — ClientID/Name があっても Search は呼ばれない
+func TestService_FindProject_PriorityIDOverridesOthers(t *testing.T) {
+	pr := &stubProjectRepo{
+		getResult: &boardapi.ProjectEntity{ID: 10},
+		searchFunc: func(_ context.Context, _ boardapi.ProjectListOptions, _ repository.ReadOptions) ([]boardapi.ProjectEntity, error) {
+			return nil, errors.New("Search must not be called")
+		},
+	}
+	cr := &stubClientRepo{}
+	svc := newProjectTestService(pr, cr)
+
+	results, err := svc.FindProject(testCtx, FindProjectQuery{ID: 10, ClientID: 5, Name: "X"})
+	assertNoError(t, err)
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+}
+
+// N05-T08: Limit=2 で enrichment が 2 件目で停止（3 件目の getCount が増えない）
+func TestService_FindProject_LimitTwo_StopsEnrichment(t *testing.T) {
+	pr := &stubProjectRepo{
+		searchResult: []boardapi.ProjectEntity{
+			{ID: 1, Name: "P1", Client: &boardapi.ClientRef{ID: 1}},
+			{ID: 2, Name: "P2", Client: &boardapi.ClientRef{ID: 2}},
+			{ID: 3, Name: "P3", Client: &boardapi.ClientRef{ID: 3}},
+		},
+	}
+	cr := &stubClientRepo{getResult: &boardapi.ClientEntity{ID: 1}}
+	svc := newProjectTestService(pr, cr)
+
+	results, err := svc.FindProject(testCtx, FindProjectQuery{
+		Name:           "x",
+		FindCommonOpts: FindCommonOpts{Limit: 2},
+	})
+	assertNoError(t, err)
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+	if cr.getCount != 2 {
+		t.Errorf("expected getCount=2, got %d", cr.getCount)
+	}
+}
+
+// --- Status post-filter ケース T09-T13 ---
+
+// N05-T09: Status で OrderStatusName をフィルタ
+func TestService_FindProject_StatusFiltersByOrderStatusName(t *testing.T) {
+	pr := &stubProjectRepo{
+		searchResult: []boardapi.ProjectEntity{
+			{ID: 1, Name: "P1", OrderStatusName: "見積中(中)"},
+			{ID: 2, Name: "P2", OrderStatusName: "完了"},
+		},
+	}
+	cr := &stubClientRepo{}
+	svc := newProjectTestService(pr, cr)
+
+	results, err := svc.FindProject(testCtx, FindProjectQuery{Name: "x", Status: "見積中(中)"})
+	assertNoError(t, err)
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if results[0].Project.ID != 1 {
+		t.Errorf("expected ID=1, got %d", results[0].Project.ID)
+	}
+}
+
+// N05-T10: Status で DeliveryStatusName をフィルタ
+func TestService_FindProject_StatusFiltersByDeliveryStatusName(t *testing.T) {
+	pr := &stubProjectRepo{
+		searchResult: []boardapi.ProjectEntity{
+			{ID: 1, Name: "P1", DeliveryStatusName: "未着手"},
+			{ID: 2, Name: "P2", DeliveryStatusName: "納品済"},
+		},
+	}
+	cr := &stubClientRepo{}
+	svc := newProjectTestService(pr, cr)
+
+	results, err := svc.FindProject(testCtx, FindProjectQuery{Name: "x", Status: "未着手"})
+	assertNoError(t, err)
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if results[0].Project.ID != 1 {
+		t.Errorf("expected ID=1, got %d", results[0].Project.ID)
+	}
+}
+
+// N05-T11: Status="完了"、OrderStatusName または DeliveryStatusName のどちらかが一致すれば採用（OR）
+func TestService_FindProject_StatusOR_OrderOrDelivery(t *testing.T) {
+	pr := &stubProjectRepo{
+		searchResult: []boardapi.ProjectEntity{
+			{ID: 1, Name: "P1", OrderStatusName: "完了", DeliveryStatusName: "未着手"},  // OrderStatus 一致 → 採用
+			{ID: 2, Name: "P2", OrderStatusName: "見積中", DeliveryStatusName: "完了"},  // DeliveryStatus 一致 → 採用
+			{ID: 3, Name: "P3", OrderStatusName: "見積中", DeliveryStatusName: "未着手"}, // どちらも不一致 → 除外
+		},
+	}
+	cr := &stubClientRepo{}
+	svc := newProjectTestService(pr, cr)
+
+	results, err := svc.FindProject(testCtx, FindProjectQuery{Name: "x", Status: "完了"})
+	assertNoError(t, err)
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+}
+
+// N05-T12: Statuses=["完了","納品済"] で複数ステータスにマッチ
+func TestService_FindProject_Statuses_MultipleMatch(t *testing.T) {
+	pr := &stubProjectRepo{
+		searchResult: []boardapi.ProjectEntity{
+			{ID: 1, Name: "P1", OrderStatusName: "完了"},
+			{ID: 2, Name: "P2", DeliveryStatusName: "納品済"},
+			{ID: 3, Name: "P3", OrderStatusName: "見積中"},
+		},
+	}
+	cr := &stubClientRepo{}
+	svc := newProjectTestService(pr, cr)
+
+	results, err := svc.FindProject(testCtx, FindProjectQuery{
+		Name:     "x",
+		Statuses: []string{"完了", "納品済"},
+	})
+	assertNoError(t, err)
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+}
+
+// N05-T13: Status-only（他フィールドゼロ）は validate で reject される
+// Search / GetByID は呼ばれてはならない（searchCount==0 を failOnCall で保証）。
+func TestService_FindProject_StatusOnly_RejectedByValidate(t *testing.T) {
+	pr := &stubProjectRepo{
+		searchFunc: func(_ context.Context, _ boardapi.ProjectListOptions, _ repository.ReadOptions) ([]boardapi.ProjectEntity, error) {
+			t.Fatal("Search must not be called when validate rejects")
+			return nil, nil
+		},
+		getFunc: func(_ context.Context) (*boardapi.ProjectEntity, error) {
+			t.Fatal("GetByID must not be called when validate rejects")
+			return nil, nil
+		},
+	}
+	cr := &stubClientRepo{}
+	svc := newProjectTestService(pr, cr)
+
+	_, err := svc.FindProject(testCtx, FindProjectQuery{Status: "完了"})
+	assertError(t, err)
+	if !strings.Contains(err.Error(), "Status/Statuses requires at least one of") {
+		t.Errorf("expected Status/Statuses-only error, got: %v", err)
+	}
+}
+
+// --- 境界値ケース T14-T19 ---
+
+// N05-T14: 空クエリは error
+func TestService_FindProject_EmptyQuery_Error(t *testing.T) {
+	svc := newProjectTestService(&stubProjectRepo{}, &stubClientRepo{})
+	_, err := svc.FindProject(testCtx, FindProjectQuery{})
+	assertError(t, err)
+	if !strings.Contains(err.Error(), "at least one field required") {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+// N05-T15: Limit < 0 は error
+func TestService_FindProject_LimitNegative_Error(t *testing.T) {
+	svc := newProjectTestService(&stubProjectRepo{}, &stubClientRepo{})
+	_, err := svc.FindProject(testCtx, FindProjectQuery{
+		ID:             10,
+		FindCommonOpts: FindCommonOpts{Limit: -1},
+	})
+	assertError(t, err)
+	if !strings.Contains(err.Error(), "limit must be >= 0") {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+// N05-T16: Status と Statuses 両方セットは error
+func TestService_FindProject_StatusAndStatusesBothSet_Error(t *testing.T) {
+	svc := newProjectTestService(&stubProjectRepo{}, &stubClientRepo{})
+	_, err := svc.FindProject(testCtx, FindProjectQuery{
+		Name:     "x",
+		Status:   "A",
+		Statuses: []string{"B"},
+	})
+	assertError(t, err)
+	if !strings.Contains(err.Error(), "mutually exclusive") {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+// N05-T17: Statuses 10 件はバリデーション通過
+func TestService_FindProject_StatusesExactlyTen_Allowed(t *testing.T) {
+	pr := &stubProjectRepo{searchResult: []boardapi.ProjectEntity{}}
+	cr := &stubClientRepo{}
+	svc := newProjectTestService(pr, cr)
+
+	statuses := make([]string, 10)
+	for i := range statuses {
+		statuses[i] = "s"
+	}
+	_, err := svc.FindProject(testCtx, FindProjectQuery{Name: "x", Statuses: statuses})
+	assertNoError(t, err)
+}
+
+// N05-T18: Statuses 11 件は error
+func TestService_FindProject_StatusesEleven_Rejected(t *testing.T) {
+	svc := newProjectTestService(&stubProjectRepo{}, &stubClientRepo{})
+	statuses := make([]string, 11)
+	for i := range statuses {
+		statuses[i] = "s"
+	}
+	_, err := svc.FindProject(testCtx, FindProjectQuery{Name: "x", Statuses: statuses})
+	assertError(t, err)
+	if !strings.Contains(err.Error(), "at most 10 statuses") {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+// N05-T19: ID 検索時は Status post-filter をスキップ（Status="不一致" でも 1 件返却）
+func TestService_FindProject_IDWithStatus_StatusFilterSkipped(t *testing.T) {
+	pr := &stubProjectRepo{
+		getResult: &boardapi.ProjectEntity{ID: 10, OrderStatusName: "見積中"},
+	}
+	cr := &stubClientRepo{}
+	svc := newProjectTestService(pr, cr)
+
+	results, err := svc.FindProject(testCtx, FindProjectQuery{ID: 10, Status: "不一致"})
+	assertNoError(t, err)
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result (ID search skips status filter), got %d", len(results))
+	}
+}
+
+// --- 異常系ケース T20-T22 ---
+
+// N05-T20: GetByID failure は致命的エラーとして伝播
+func TestService_FindProject_GetByIDError_Bubbles(t *testing.T) {
+	fakeErr := errors.New("db error")
+	pr := &stubProjectRepo{err: fakeErr}
+	cr := &stubClientRepo{}
+	svc := newProjectTestService(pr, cr)
+
+	_, err := svc.FindProject(testCtx, FindProjectQuery{ID: 10})
+	assertError(t, err)
+	if !errors.Is(err, fakeErr) {
+		t.Errorf("expected fakeErr, got %v", err)
+	}
+}
+
+// N05-T21: Search failure は致命的エラーとして伝播
+func TestService_FindProject_SearchError_Bubbles(t *testing.T) {
+	fakeErr := errors.New("search error")
+	pr := &stubProjectRepo{err: fakeErr}
+	cr := &stubClientRepo{}
+	svc := newProjectTestService(pr, cr)
+
+	_, err := svc.FindProject(testCtx, FindProjectQuery{Name: "x"})
+	assertError(t, err)
+	if !errors.Is(err, fakeErr) {
+		t.Errorf("expected fakeErr, got %v", err)
+	}
+}
+
+// N05-T22: client enrichment 失敗は non-fatal — 1 件返却 + slog.Warn 1 回
+func TestService_FindProject_ClientEnrichmentFails_NonFatal_LogsWarn(t *testing.T) {
+	h := withRecordedSlog(t)
+	fakeErr := errors.New("client fetch error")
+
+	pr := &stubProjectRepo{
+		getResult: &boardapi.ProjectEntity{
+			ID:     10,
+			Client: &boardapi.ClientRef{ID: 5},
+		},
+	}
+	cr := &stubClientRepo{err: fakeErr}
+	svc := newProjectTestService(pr, cr)
+
+	results, err := svc.FindProject(testCtx, FindProjectQuery{ID: 10})
+	assertNoError(t, err)
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if results[0].Client != nil {
+		t.Errorf("expected Client=nil, got %v", results[0].Client)
+	}
+
+	// slog.Warn が 1 回記録されていることを確認
+	warnCount := 0
+	for _, r := range h.records {
+		if r.Level == slog.LevelWarn {
+			warnCount++
+		}
+	}
+	if warnCount != 1 {
+		t.Errorf("expected 1 slog.Warn record, got %d", warnCount)
+	}
 }

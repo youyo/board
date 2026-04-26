@@ -10,14 +10,14 @@ import (
 	"github.com/youyo/board/internal/service/find"
 )
 
-// RegisterTools registers all 12 MCP tool definitions with real handlers.
+// RegisterTools registers all 11 MCP tool definitions with real handlers.
+// find_groups は ADR-001 (Group 削除確定) により削除（N07b）。
 func RegisterTools(s *Server) {
 	s.MCPServer().AddTools(
 		// --- Simple tools (id, name, text, limit) ---
 		findClientsTool(s),
 		findVendorsTool(s),
 		findUsersTool(s),
-		findGroupsTool(s),
 
 		// --- Project tool (id, client_name, name, text, status, limit) ---
 		findProjectsTool(s),
@@ -121,10 +121,10 @@ func findClientsTool(srv *Server) server.ServerTool {
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			results, err := srv.FindService().FindClient(ctx, find.FindClientQuery{
-				ID:    getIntArg(req, "id"),
-				Name:  getStringArg(req, "name"),
-				Text:  getStringArg(req, "text"),
-				Limit: getIntArg(req, "limit"),
+				FindCommonOpts: find.FindCommonOpts{Limit: getIntArg(req, "limit")},
+				ID:             getIntArg(req, "id"),
+				Name:           getStringArg(req, "name"),
+				Text:           getStringArg(req, "text"),
 			})
 			if err != nil {
 				return errorResult(err), nil
@@ -146,10 +146,10 @@ func findVendorsTool(srv *Server) server.ServerTool {
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			results, err := srv.FindService().FindVendor(ctx, find.FindVendorQuery{
-				ID:    getIntArg(req, "id"),
-				Name:  getStringArg(req, "name"),
-				Text:  getStringArg(req, "text"),
-				Limit: getIntArg(req, "limit"),
+				FindCommonOpts: find.FindCommonOpts{Limit: getIntArg(req, "limit")},
+				ID:             getIntArg(req, "id"),
+				Name:           getStringArg(req, "name"),
+				Text:           getStringArg(req, "text"),
 			})
 			if err != nil {
 				return errorResult(err), nil
@@ -171,35 +171,10 @@ func findUsersTool(srv *Server) server.ServerTool {
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			results, err := srv.FindService().FindUser(ctx, find.FindUserQuery{
-				ID:    getIntArg(req, "id"),
-				Name:  getStringArg(req, "name"),
-				Text:  getStringArg(req, "text"),
-				Limit: getIntArg(req, "limit"),
-			})
-			if err != nil {
-				return errorResult(err), nil
-			}
-			return marshalResult(results)
-		},
-	}
-}
-
-func findGroupsTool(srv *Server) server.ServerTool {
-	return server.ServerTool{
-		Tool: mcp.NewTool("find_groups",
-			mcp.WithDescription("Search for groups by ID, name, or free text. Returns group details."),
-			mcp.WithNumber("id", mcp.Description("Group ID for direct lookup (highest priority, ignores name/text)")),
-			mcp.WithString("name", mcp.Description("Substring match on group name (ignores text)")),
-			mcp.WithString("text", mcp.Description("Free-text search across name, memo (lowest priority)")),
-			mcp.WithNumber("limit", mcp.Description("Max results to return (default: unlimited)")),
-			readOnlyAnnotation(),
-		),
-		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			results, err := srv.FindService().FindGroup(ctx, find.FindGroupQuery{
-				ID:    getIntArg(req, "id"),
-				Name:  getStringArg(req, "name"),
-				Text:  getStringArg(req, "text"),
-				Limit: getIntArg(req, "limit"),
+				FindCommonOpts: find.FindCommonOpts{Limit: getIntArg(req, "limit")},
+				ID:             getIntArg(req, "id"),
+				Name:           getStringArg(req, "name"),
+				Text:           getStringArg(req, "text"),
 			})
 			if err != nil {
 				return errorResult(err), nil
@@ -222,13 +197,15 @@ func findProjectsTool(srv *Server) server.ServerTool {
 			readOnlyAnnotation(),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			if getStringArg(req, "client_name") != "" {
+				return errorResult(fmt.Errorf("client_name is not supported in v0.7.0 service rename (N07b); will be wired in N07c")), nil
+			}
 			results, err := srv.FindService().FindProject(ctx, find.FindProjectQuery{
-				ID:         getIntArg(req, "id"),
-				ClientName: getStringArg(req, "client_name"),
-				Name:       getStringArg(req, "name"),
-				Text:       getStringArg(req, "text"),
-				Status:     getStringArg(req, "status"),
-				Limit:      getIntArg(req, "limit"),
+				FindCommonOpts: find.FindCommonOpts{Limit: getIntArg(req, "limit")},
+				ID:             getIntArg(req, "id"),
+				Name:           getStringArg(req, "name"),
+				Text:           getStringArg(req, "text"),
+				Status:         getStringArg(req, "status"),
 			})
 			if err != nil {
 				return errorResult(err), nil
@@ -251,13 +228,13 @@ func findEstimatesTool(srv *Server) server.ServerTool {
 			readOnlyAnnotation(),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			if getStringArg(req, "client_name") != "" || getStringArg(req, "project_name") != "" || getStringArg(req, "status") != "" {
+				return errorResult(fmt.Errorf("client_name / project_name / status are not supported in v0.7.0 service rename (N07b); will be wired in N07c")), nil
+			}
 			results, err := srv.FindService().FindEstimate(ctx, find.FindEstimateQuery{
-				ID:          getIntArg(req, "id"),
-				ProjectID:   getIntArg(req, "project_id"),
-				ClientName:  getStringArg(req, "client_name"),
-				ProjectName: getStringArg(req, "project_name"),
-				Status:      getStringArg(req, "status"),
-				Limit:       getIntArg(req, "limit"),
+				FindCommonOpts: find.FindCommonOpts{Limit: getIntArg(req, "limit")},
+				ID:             getIntArg(req, "id"),
+				ProjectID:      getIntArg(req, "project_id"),
 			})
 			if err != nil {
 				return errorResult(err), nil
@@ -280,13 +257,14 @@ func findInvoicesTool(srv *Server) server.ServerTool {
 			readOnlyAnnotation(),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			if getStringArg(req, "client_name") != "" || getStringArg(req, "project_name") != "" {
+				return errorResult(fmt.Errorf("client_name / project_name are not supported in v0.7.0 service rename (N07b); will be wired in N07c")), nil
+			}
 			results, err := srv.FindService().FindInvoice(ctx, find.FindInvoiceQuery{
-				ID:          getIntArg(req, "id"),
-				ClientName:  getStringArg(req, "client_name"),
-				ProjectName: getStringArg(req, "project_name"),
-				Text:        getStringArg(req, "text"),
-				Status:      getStringArg(req, "status"),
-				Limit:       getIntArg(req, "limit"),
+				FindCommonOpts: find.FindCommonOpts{Limit: getIntArg(req, "limit")},
+				ID:             getIntArg(req, "id"),
+				Text:           getStringArg(req, "text"),
+				Status:         getStringArg(req, "status"),
 			})
 			if err != nil {
 				return errorResult(err), nil
@@ -309,13 +287,13 @@ func findOrdersTool(srv *Server) server.ServerTool {
 			readOnlyAnnotation(),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			if getStringArg(req, "client_name") != "" || getStringArg(req, "project_name") != "" || getStringArg(req, "status") != "" {
+				return errorResult(fmt.Errorf("client_name / project_name / status are not supported in v0.7.0 service rename (N07b); will be wired in N07c")), nil
+			}
 			results, err := srv.FindService().FindOrder(ctx, find.FindOrderQuery{
-				ID:          getIntArg(req, "id"),
-				ProjectID:   getIntArg(req, "project_id"),
-				ClientName:  getStringArg(req, "client_name"),
-				ProjectName: getStringArg(req, "project_name"),
-				Status:      getStringArg(req, "status"),
-				Limit:       getIntArg(req, "limit"),
+				FindCommonOpts: find.FindCommonOpts{Limit: getIntArg(req, "limit")},
+				ID:             getIntArg(req, "id"),
+				ProjectID:      getIntArg(req, "project_id"),
 			})
 			if err != nil {
 				return errorResult(err), nil
@@ -338,13 +316,13 @@ func findDeliveriesTool(srv *Server) server.ServerTool {
 			readOnlyAnnotation(),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			if getStringArg(req, "client_name") != "" || getStringArg(req, "project_name") != "" || getStringArg(req, "status") != "" {
+				return errorResult(fmt.Errorf("client_name / project_name / status are not supported in v0.7.0 service rename (N07b); will be wired in N07c")), nil
+			}
 			results, err := srv.FindService().FindDelivery(ctx, find.FindDeliveryQuery{
-				ID:          getIntArg(req, "id"),
-				ProjectID:   getIntArg(req, "project_id"),
-				ClientName:  getStringArg(req, "client_name"),
-				ProjectName: getStringArg(req, "project_name"),
-				Status:      getStringArg(req, "status"),
-				Limit:       getIntArg(req, "limit"),
+				FindCommonOpts: find.FindCommonOpts{Limit: getIntArg(req, "limit")},
+				ID:             getIntArg(req, "id"),
+				ProjectID:      getIntArg(req, "project_id"),
 			})
 			if err != nil {
 				return errorResult(err), nil
@@ -367,13 +345,13 @@ func findReceiptsTool(srv *Server) server.ServerTool {
 			readOnlyAnnotation(),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			if getStringArg(req, "client_name") != "" || getStringArg(req, "project_name") != "" || getStringArg(req, "status") != "" {
+				return errorResult(fmt.Errorf("client_name / project_name / status are not supported in v0.7.0 service rename (N07b); will be wired in N07c")), nil
+			}
 			results, err := srv.FindService().FindReceipt(ctx, find.FindReceiptQuery{
-				ID:          getIntArg(req, "id"),
-				ProjectID:   getIntArg(req, "project_id"),
-				ClientName:  getStringArg(req, "client_name"),
-				ProjectName: getStringArg(req, "project_name"),
-				Status:      getStringArg(req, "status"),
-				Limit:       getIntArg(req, "limit"),
+				FindCommonOpts: find.FindCommonOpts{Limit: getIntArg(req, "limit")},
+				ID:             getIntArg(req, "id"),
+				ProjectID:      getIntArg(req, "project_id"),
 			})
 			if err != nil {
 				return errorResult(err), nil
@@ -396,13 +374,14 @@ func findPurchaseOrdersTool(srv *Server) server.ServerTool {
 			readOnlyAnnotation(),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			if getStringArg(req, "vendor_name") != "" || getStringArg(req, "project_name") != "" {
+				return errorResult(fmt.Errorf("vendor_name / project_name are not supported in v0.7.0 service rename (N07b); will be wired in N07c")), nil
+			}
 			results, err := srv.FindService().FindPurchaseOrder(ctx, find.FindPurchaseOrderQuery{
-				ID:          getIntArg(req, "id"),
-				VendorName:  getStringArg(req, "vendor_name"),
-				ProjectName: getStringArg(req, "project_name"),
-				Text:        getStringArg(req, "text"),
-				Status:      getStringArg(req, "status"),
-				Limit:       getIntArg(req, "limit"),
+				FindCommonOpts: find.FindCommonOpts{Limit: getIntArg(req, "limit")},
+				ID:             getIntArg(req, "id"),
+				Text:           getStringArg(req, "text"),
+				Status:         getStringArg(req, "status"),
 			})
 			if err != nil {
 				return errorResult(err), nil
@@ -425,13 +404,14 @@ func findPaymentsTool(srv *Server) server.ServerTool {
 			readOnlyAnnotation(),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			if getStringArg(req, "vendor_name") != "" || getIntArg(req, "purchase_order_id") != 0 {
+				return errorResult(fmt.Errorf("vendor_name / purchase_order_id are not supported in v0.7.0 service rename (N07b); will be wired in N07c")), nil
+			}
 			results, err := srv.FindService().FindPayment(ctx, find.FindPaymentQuery{
-				ID:              getIntArg(req, "id"),
-				VendorName:      getStringArg(req, "vendor_name"),
-				PurchaseOrderID: getIntArg(req, "purchase_order_id"),
-				Text:            getStringArg(req, "text"),
-				Status:          getStringArg(req, "status"),
-				Limit:           getIntArg(req, "limit"),
+				FindCommonOpts: find.FindCommonOpts{Limit: getIntArg(req, "limit")},
+				ID:             getIntArg(req, "id"),
+				Text:           getStringArg(req, "text"),
+				Status:         getStringArg(req, "status"),
 			})
 			if err != nil {
 				return errorResult(err), nil

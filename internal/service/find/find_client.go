@@ -2,44 +2,38 @@ package find
 
 import (
 	"context"
-	"errors"
 
 	"github.com/youyo/board/internal/boardapi"
-	"github.com/youyo/board/internal/repository"
 )
 
-// FindClient performs a cross-resource search for clients, returning
-// clients with their associated branches and contacts.
-// Field priority: ID > Name > Text.
+// FindClient はクライアントを検索し、enrichment 済みの結果を返す。
+//
+// 検索優先順位: ID > Name > Text（排他、上位が設定されていれば下位は使用しない）。
+// Limit > 0 の場合、enrichment 後の件数が Limit に達したらループを打ち切る。
+// enrichment（branches / contacts 取得）の失敗は non-fatal（resolveClientDetails 参照）。
 func (s *Service) FindClient(ctx context.Context, q FindClientQuery) ([]ClientResult, error) {
-	if q.ID == 0 && q.Name == "" && q.Text == "" {
-		return nil, errors.New("at least one of ID, Name, or Text must be set")
+	// 規約: 全 Find メソッドは validateQuery(q.FindCommonOpts, q) を最初に呼ぶ。
+	// q.validate() 単体では FindCommonOpts.validate が走らないため。
+	if err := validateQuery(q.FindCommonOpts, q); err != nil {
+		return nil, err
 	}
-
-	opts := repoOpts(q.Opts)
+	opts := repoOpts(q.FindCommonOpts)
 
 	var clients []boardapi.ClientEntity
-
 	switch {
 	case q.ID != 0:
-		// ID has highest priority: direct lookup
 		c, err := s.clients.GetByID(ctx, q.ID, opts)
 		if err != nil {
 			return nil, err
 		}
 		clients = []boardapi.ClientEntity{*c}
-
 	case q.Name != "":
-		// Name search: delegate to repo using Ransack-style _cont filter.
-		result, err := s.clients.Search(ctx, boardapi.ClientListOptions{NameCont: q.Name}, opts)
+		list, err := s.clients.Search(ctx, boardapi.ClientListOptions{NameCont: q.Name}, opts)
 		if err != nil {
 			return nil, err
 		}
-		clients = result
-
+		clients = list
 	case q.Text != "":
-		// Text search: list all (zero filter = cache-backed), then filter by
-		// name / custom_no / note in-process.
 		all, err := s.clients.Search(ctx, boardapi.ClientListOptions{}, opts)
 		if err != nil {
 			return nil, err
@@ -51,39 +45,13 @@ func (s *Service) FindClient(ctx context.Context, q FindClientQuery) ([]ClientRe
 		}
 	}
 
-	// Resolve branches and contacts for each client
 	results := make([]ClientResult, 0, len(clients))
 	for _, c := range clients {
-		r, err := s.resolveClientDetails(ctx, c, opts)
-		if err != nil {
-			return nil, err
-		}
-		results = append(results, r)
-
-		// Apply limit
+		// resolveClientDetails は non-fatal: err を返さない
+		results = append(results, s.resolveClientDetails(ctx, c, opts))
 		if q.Limit > 0 && len(results) >= q.Limit {
 			break
 		}
 	}
-
 	return results, nil
-}
-
-// resolveClientDetails fetches branches and contacts for a single client.
-func (s *Service) resolveClientDetails(ctx context.Context, client boardapi.ClientEntity, opts repository.ReadOptions) (ClientResult, error) {
-	branches, err := s.clientBranches.Search(ctx, boardapi.ClientBranchListOptions{ClientIDEq: client.ID}, opts)
-	if err != nil {
-		return ClientResult{}, err
-	}
-
-	contacts, err := s.contacts.Search(ctx, boardapi.ContactListOptions{ClientIDEq: client.ID}, opts)
-	if err != nil {
-		return ClientResult{}, err
-	}
-
-	return ClientResult{
-		Client:   client,
-		Branches: branches,
-		Contacts: contacts,
-	}, nil
 }

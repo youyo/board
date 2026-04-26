@@ -2,135 +2,147 @@ package find
 
 import (
 	"context"
-	"errors"
+	"log/slog"
 
 	"github.com/youyo/board/internal/boardapi"
 )
 
-// FindDelivery performs a cross-resource search for deliveries, returning
-// deliveries with their associated client and project.
-// Uses project response_group API to discover document IDs, then fetches via GetByDocumentID.
-// Field priority: ID > ProjectID > ClientName > ProjectName.
+// FindDelivery は ID / ProjectID / ClientName / ProjectName による納品書横断検索を行う。
+// 構造は FindEstimate / FindOrder と類似だが、Delivery は複数 Document が project に紐づくため
+// p.Deliveries 配列を全要素ループ実行する点が異なる（N02 §4.4）。
 //
-// M37 NOTE: DeliveryEntity は実 API 準拠に再設計されたため、Status/ClientID/ProjectID
-// フィールドは存在しない。DeliveryDate は実在するため引き続き利用可能。
-// Status post-filter および client/project enrichment は各ブランチのコンテキスト情報から復元する。
-// ID lookup では client/project を特定できないため nil を返す。
-// TODO(M25-M32): find 層の全体再設計で enrichment を復元する。
-//
-// M28 FIX: BOARD API は response_group=delivery で "deliveries" 複数形配列を返す。
-// ProjectEntity.Deliveries ([]DocumentSummary) を参照するよう修正。
+// 詳細仕様は find_estimate.go の docstring 参照（reverseMapper / 二重 fetch 回避 / non-fatal enrichment）。
 func (s *Service) FindDelivery(ctx context.Context, q FindDeliveryQuery) ([]DeliveryResult, error) {
-	if q.ID == 0 && q.ProjectID == 0 && q.ClientName == "" && q.ProjectName == "" {
-		return nil, errors.New("at least one of ID, ProjectID, ClientName, or ProjectName must be set")
+	if err := validateQuery(q.FindCommonOpts, q); err != nil {
+		return nil, err
 	}
-
-	opts := repoOpts(q.Opts)
-
-	// results を直接ブランチ内で構築する。
-	// Status post-filter は DeliveryEntity に Status フィールドが無いため無効化。
-	// TODO(M25-M32): Status post-filter を再設計で復元する。
+	opts := repoOpts(q.FindCommonOpts)
 	results := make([]DeliveryResult, 0)
 
 	switch {
 	case q.ID != 0:
-		// Direct lookup by document ID.
-		// client/project は特定できないため nil。
 		d, err := s.deliveries.GetByDocumentID(ctx, q.ID, opts)
 		if err != nil {
 			return nil, err
 		}
+		pid, ok, lerr := s.reverseMappers["delivery"].Lookup(ctx, q.ID, opts)
+		if lerr != nil {
+			slog.Warn("find.FindDelivery: reverseMap build failed",
+				"doc_id", q.ID, "error", lerr)
+		}
+		if !ok || pid == 0 {
+			results = append(results, DeliveryResult{Delivery: *d})
+			return results, nil
+		}
+		p, perr := s.projects.GetByID(ctx, pid, opts)
+		if perr != nil {
+			slog.Warn("find.FindDelivery: project enrichment failed",
+				"project_id", pid, "error", perr)
+			results = append(results, DeliveryResult{Delivery: *d, ProjectID: pid})
+			return results, nil
+		}
+		cid := projectClientIDPtr(p)
+		client := s.lookupClient(ctx, cid, p.ID, opts)
 		results = append(results, DeliveryResult{
-			Delivery: *d,
-			Client:   nil,
-			Project:  nil,
+			Delivery:  *d,
+			ProjectID: pid,
+			ClientID:  cid,
+			Project:   p,
+			Client:    client,
 		})
 
 	case q.ProjectID != 0:
-		// Lookup project with delivery group, then fetch document.
-		// project コンテキストから client/project を解決。
-		// NOTE: BOARD API は response_group=delivery で "deliveries" 複数形配列を返す。
-		// ProjectEntity.Deliveries ([]DocumentSummary) を参照し、先頭要素を使用する。
 		p, err := s.projects.GetByIDWithGroup(ctx, q.ProjectID, "delivery")
 		if err != nil {
 			return nil, err
 		}
-		if len(p.Deliveries) > 0 {
-			d, err := s.deliveries.GetByDocumentID(ctx, p.Deliveries[0].ID, opts)
-			if err != nil && !boardapi.IsNotFound(err) {
-				return nil, err
-			}
-			if err == nil {
-				// p は *ProjectEntity (GetByIDWithGroup の戻り値)
-				client, project := s.resolveClientAndProject(ctx, projectClientIDPtr(p), p.ID, opts)
-				results = append(results, DeliveryResult{
-					Delivery: *d,
-					Client:   client,
-					Project:  project,
-				})
-			}
-		}
-
-	case q.ClientName != "":
-		// Resolve client name → search projects with delivery group → hydrate.
-		clients, err := s.clients.Search(ctx, boardapi.ClientListOptions{NameCont: q.ClientName}, opts)
-		if err != nil {
-			return nil, err
-		}
-		for _, c := range clients {
-			projects, err := s.projects.Search(ctx, boardapi.ProjectListOptions{ClientIDEq: c.ID, ResponseGroup: "delivery"}, opts)
-			if err != nil {
-				return nil, err
-			}
-			for _, p := range projects {
-				if len(p.Deliveries) == 0 {
-					continue
-				}
-				d, err := s.deliveries.GetByDocumentID(ctx, p.Deliveries[0].ID, opts)
-				if boardapi.IsNotFound(err) {
-					continue
-				}
-				if err != nil {
-					return nil, err
-				}
-				client, project := s.resolveClientAndProject(ctx, projectClientID(p), p.ID, opts)
-				results = append(results, DeliveryResult{
-					Delivery: *d,
-					Client:   client,
-					Project:  project,
-				})
-			}
-		}
-
-	case q.ProjectName != "":
-		// Search projects by name with delivery group → hydrate.
-		projects, err := s.projects.Search(ctx, boardapi.ProjectListOptions{NameCont: q.ProjectName, ResponseGroup: "delivery"}, opts)
-		if err != nil {
-			return nil, err
-		}
-		for _, p := range projects {
-			if len(p.Deliveries) == 0 {
-				continue
-			}
-			d, err := s.deliveries.GetByDocumentID(ctx, p.Deliveries[0].ID, opts)
+		// project 内の全 Deliveries をループ。client 取得は project ごとに 1 回のみ集約。
+		cid := projectClientIDPtr(p)
+		client := s.lookupClient(ctx, cid, p.ID, opts)
+		for _, ds := range p.Deliveries {
+			doc, err := s.deliveries.GetByDocumentID(ctx, ds.ID, opts)
 			if boardapi.IsNotFound(err) {
 				continue
 			}
 			if err != nil {
 				return nil, err
 			}
-			client, project := s.resolveClientAndProject(ctx, projectClientID(p), p.ID, opts)
 			results = append(results, DeliveryResult{
-				Delivery: *d,
-				Client:   client,
-				Project:  project,
+				Delivery:  *doc,
+				ProjectID: p.ID,
+				ClientID:  cid,
+				Project:   p,
+				Client:    client,
 			})
+			if q.Limit > 0 && len(results) >= q.Limit {
+				return results, nil
+			}
 		}
-	}
 
-	// Limit 適用
-	if q.Limit > 0 && len(results) > q.Limit {
-		results = results[:q.Limit]
+	case q.ClientName != "":
+		clients, err := s.clients.Search(ctx, boardapi.ClientListOptions{NameCont: q.ClientName}, opts)
+		if err != nil {
+			return nil, err
+		}
+		for _, c := range clients {
+			c2 := c
+			projects, err := s.projects.Search(ctx, boardapi.ProjectListOptions{ClientIDEq: c.ID, ResponseGroup: "delivery"}, opts)
+			if err != nil {
+				return nil, err
+			}
+			for _, p := range projects {
+				p2 := p
+				for _, ds := range p.Deliveries {
+					doc, err := s.deliveries.GetByDocumentID(ctx, ds.ID, opts)
+					if boardapi.IsNotFound(err) {
+						continue
+					}
+					if err != nil {
+						return nil, err
+					}
+					results = append(results, DeliveryResult{
+						Delivery:  *doc,
+						ProjectID: p.ID,
+						ClientID:  c.ID,
+						Project:   &p2,
+						Client:    &c2,
+					})
+					if q.Limit > 0 && len(results) >= q.Limit {
+						return results, nil
+					}
+				}
+			}
+		}
+
+	case q.ProjectName != "":
+		projects, err := s.projects.Search(ctx, boardapi.ProjectListOptions{NameCont: q.ProjectName, ResponseGroup: "delivery"}, opts)
+		if err != nil {
+			return nil, err
+		}
+		for _, p := range projects {
+			p2 := p
+			cid := projectClientID(p)
+			client := s.lookupClient(ctx, cid, p.ID, opts)
+			for _, ds := range p.Deliveries {
+				doc, err := s.deliveries.GetByDocumentID(ctx, ds.ID, opts)
+				if boardapi.IsNotFound(err) {
+					continue
+				}
+				if err != nil {
+					return nil, err
+				}
+				results = append(results, DeliveryResult{
+					Delivery:  *doc,
+					ProjectID: p.ID,
+					ClientID:  cid,
+					Project:   &p2,
+					Client:    client,
+				})
+				if q.Limit > 0 && len(results) >= q.Limit {
+					return results, nil
+				}
+			}
+		}
 	}
 
 	return results, nil

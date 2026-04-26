@@ -1,3 +1,6 @@
+// Package find は BOARD API の高レベル横断検索サービスを提供する。
+// find パッケージのゼロベース再設計版（ADR-001 B 採択）。
+// 具象 Find メソッドは N04 以降で追加される。
 package find
 
 import (
@@ -7,253 +10,163 @@ import (
 	"github.com/youyo/board/internal/repository"
 )
 
-// ClientRepo is the repository interface for clients used by service/find.
-// Defined independently from service/api (Go interface segregation).
-//
-// M50: Search now receives ClientListOptions (Ransack-style) instead of the
-// legacy ClientSearchParams. "List all entities" is expressed as
-// Search(ctx, boardapi.ClientListOptions{}, opts) — this avoids a redundant
-// List method while keeping the find layer agnostic of *ListResult.
+// ClientRepo はクライアントリポジトリインターフェース。
 type ClientRepo interface {
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.ClientEntity, error)
 	Search(ctx context.Context, filter boardapi.ClientListOptions, opts repository.ReadOptions) ([]boardapi.ClientEntity, error)
 }
 
-// ClientBranchRepo is the repository interface for client branches.
-//
-// M52: Search now receives ClientBranchListOptions (Ransack-style) instead of the
-// legacy ClientBranchSearchParams. "List all entities" is expressed as
-// Search(ctx, boardapi.ClientBranchListOptions{}, opts).
+// ClientBranchRepo はクライアント拠点リポジトリインターフェース（enrichment 専用）。
 type ClientBranchRepo interface {
-	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.ClientBranchEntity, error)
 	Search(ctx context.Context, filter boardapi.ClientBranchListOptions, opts repository.ReadOptions) ([]boardapi.ClientBranchEntity, error)
 }
 
-// ContactRepo is the repository interface for contacts.
-//
-// M52: Search now receives ContactListOptions (Ransack-style) instead of the
-// legacy ContactSearchParams. "List all entities" is expressed as
-// Search(ctx, boardapi.ContactListOptions{}, opts).
+// ContactRepo は担当者リポジトリインターフェース（enrichment 専用）。
 type ContactRepo interface {
-	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.ContactEntity, error)
 	Search(ctx context.Context, filter boardapi.ContactListOptions, opts repository.ReadOptions) ([]boardapi.ContactEntity, error)
 }
 
-// ProjectRepo is the repository interface for projects used by service/find.
-//
-// M51: Search now receives ProjectListOptions (Ransack-style) instead of the
-// legacy ProjectSearchParams. "List all entities" is expressed as
-// Search(ctx, boardapi.ProjectListOptions{}, opts) — this avoids a redundant
-// List method while keeping the find layer agnostic of *ListResult.
+// ProjectRepo はプロジェクトリポジトリインターフェース。
+// reverseMapper の内部 build でも Search を使用する。
 type ProjectRepo interface {
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.ProjectEntity, error)
 	Search(ctx context.Context, filter boardapi.ProjectListOptions, opts repository.ReadOptions) ([]boardapi.ProjectEntity, error)
 	GetByIDWithGroup(ctx context.Context, id int, responseGroup string) (*boardapi.ProjectEntity, error)
 }
 
-// EstimateRepo is the repository interface for estimates used by service/find.
+// EstimateRepo は見積リポジトリインターフェース。
+// Document 系は reverseMapper で project_id を解決するため GetByDocumentID のみ。
 type EstimateRepo interface {
 	GetByDocumentID(ctx context.Context, documentID int, opts repository.ReadOptions) (*boardapi.EstimateEntity, error)
 }
 
-// InvoiceRepo is the repository interface for invoices used by service/find.
-//
-// M54: Search now receives InvoiceListOptions (Ransack-style) instead of the
-// legacy InvoiceSearchParams. "List all entities" is expressed as
-// Search(ctx, boardapi.InvoiceListOptions{}, opts).
+// OrderRepo は注文リポジトリインターフェース。
+type OrderRepo interface {
+	GetByDocumentID(ctx context.Context, documentID int, opts repository.ReadOptions) (*boardapi.OrderEntity, error)
+}
+
+// DeliveryRepo は納品リポジトリインターフェース。
+type DeliveryRepo interface {
+	GetByDocumentID(ctx context.Context, documentID int, opts repository.ReadOptions) (*boardapi.DeliveryEntity, error)
+}
+
+// ReceiptRepo は領収リポジトリインターフェース。
+type ReceiptRepo interface {
+	GetByDocumentID(ctx context.Context, documentID int, opts repository.ReadOptions) (*boardapi.ReceiptEntity, error)
+}
+
+// InvoiceRepo は請求書リポジトリインターフェース。
 type InvoiceRepo interface {
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.InvoiceEntity, error)
 	Search(ctx context.Context, filter boardapi.InvoiceListOptions, opts repository.ReadOptions) ([]boardapi.InvoiceEntity, error)
 }
 
-// OrderRepo is the repository interface for orders used by service/find.
-type OrderRepo interface {
-	GetByDocumentID(ctx context.Context, documentID int, opts repository.ReadOptions) (*boardapi.OrderEntity, error)
+// VendorRepo は仕入先リポジトリインターフェース。
+// find では ListEntities は不使用（N02 §2 決定）。
+type VendorRepo interface {
+	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.VendorEntity, error)
+	Search(ctx context.Context, filter boardapi.VendorListOptions, opts repository.ReadOptions) ([]boardapi.VendorEntity, error)
 }
 
-// DeliveryRepo is the repository interface for deliveries used by service/find.
-type DeliveryRepo interface {
-	GetByDocumentID(ctx context.Context, documentID int, opts repository.ReadOptions) (*boardapi.DeliveryEntity, error)
+// VendorBranchRepo は仕入先拠点リポジトリインターフェース（enrichment 専用）。
+type VendorBranchRepo interface {
+	Search(ctx context.Context, filter boardapi.VendorBranchListOptions, opts repository.ReadOptions) ([]boardapi.VendorBranchEntity, error)
 }
 
-// ReceiptRepo is the repository interface for receipts used by service/find.
-type ReceiptRepo interface {
-	GetByDocumentID(ctx context.Context, documentID int, opts repository.ReadOptions) (*boardapi.ReceiptEntity, error)
+// VendorContactRepo は仕入先担当者リポジトリインターフェース（enrichment 専用）。
+type VendorContactRepo interface {
+	Search(ctx context.Context, filter boardapi.VendorContactListOptions, opts repository.ReadOptions) ([]boardapi.VendorContactEntity, error)
 }
 
-// PurchaseOrderRepo is the repository interface for purchase orders used by service/find.
-//
-// M54: Search now receives PurchaseOrderListOptions (Ransack-style) instead of the
-// legacy PurchaseOrderSearchParams. "List all entities" is expressed as
-// Search(ctx, boardapi.PurchaseOrderListOptions{}, opts).
+// PurchaseOrderRepo は発注書リポジトリインターフェース。
 type PurchaseOrderRepo interface {
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.PurchaseOrderEntity, error)
 	Search(ctx context.Context, filter boardapi.PurchaseOrderListOptions, opts repository.ReadOptions) ([]boardapi.PurchaseOrderEntity, error)
 }
 
-// PaymentRepo is the repository interface for payments used by service/find.
-//
-// M54: Search now receives PaymentListOptions (Ransack-style) instead of the
-// legacy PaymentSearchParams. "List all entities" is expressed as
-// Search(ctx, boardapi.PaymentListOptions{}, opts).
+// PaymentRepo は支払リポジトリインターフェース。
 type PaymentRepo interface {
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.PaymentEntity, error)
 	Search(ctx context.Context, filter boardapi.PaymentListOptions, opts repository.ReadOptions) ([]boardapi.PaymentEntity, error)
 }
 
-// VendorRepo is the repository interface for vendors used by service/find.
-//
-// M55 以降: Search は VendorListOptions（Ransack スタイル）を受け取る。
-// 旧 VendorSearchParams は削除。List は ListEntities 経由で廃止。
-type VendorRepo interface {
-	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.VendorEntity, error)
-	Search(ctx context.Context, filter boardapi.VendorListOptions, opts repository.ReadOptions) ([]boardapi.VendorEntity, error)
-	ListEntities(ctx context.Context, readOpts repository.ReadOptions, filter boardapi.VendorListOptions) ([]boardapi.VendorEntity, error)
-}
-
-// VendorBranchRepo is the repository interface for vendor branches.
-//
-// M55 以降: Search は VendorBranchListOptions（Ransack スタイル）を受け取る。
-// 旧 VendorBranchSearchParams は削除。
-type VendorBranchRepo interface {
-	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.VendorBranchEntity, error)
-	Search(ctx context.Context, filter boardapi.VendorBranchListOptions, opts repository.ReadOptions) ([]boardapi.VendorBranchEntity, error)
-}
-
-// VendorContactRepo is the repository interface for vendor contacts.
-//
-// M55 以降: Search は VendorContactListOptions（Ransack スタイル）を受け取る。
-// 旧 VendorContactSearchParams は削除。
-type VendorContactRepo interface {
-	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.VendorContactEntity, error)
-	Search(ctx context.Context, filter boardapi.VendorContactListOptions, opts repository.ReadOptions) ([]boardapi.VendorContactEntity, error)
-}
-
-// UserRepo is the repository interface for users.
-//
-// M56 以降: Search は UserListOptions（Ransack スタイル）を受け取る。
-// 旧 UserSearchParams は削除。
+// UserRepo はユーザーリポジトリインターフェース。
+// GroupRepo は N02 §2 の決定により削除（api_groups_list で代替）。
 type UserRepo interface {
 	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.UserEntity, error)
 	Search(ctx context.Context, filter boardapi.UserListOptions, opts repository.ReadOptions) ([]boardapi.UserEntity, error)
 }
 
-// GroupRepo is the repository interface for groups.
-//
-// M56 以降: Search は GroupListOptions（Ransack スタイル）を受け取る。
-// 旧 GroupSearchParams は削除。
-type GroupRepo interface {
-	GetByID(ctx context.Context, id int, opts repository.ReadOptions) (*boardapi.GroupEntity, error)
-	Search(ctx context.Context, filter boardapi.GroupListOptions, opts repository.ReadOptions) ([]boardapi.GroupEntity, error)
-}
-
-// Repos holds all repository dependencies for the find service.
+// Repos は find Service が依存するリポジトリ群を集約する。
 type Repos struct {
 	Clients        ClientRepo
 	ClientBranches ClientBranchRepo
 	Contacts       ContactRepo
 	Projects       ProjectRepo
 	Estimates      EstimateRepo
-	Invoices       InvoiceRepo
 	Orders         OrderRepo
 	Deliveries     DeliveryRepo
 	Receipts       ReceiptRepo
+	Invoices       InvoiceRepo
 	Vendors        VendorRepo
 	VendorBranches VendorBranchRepo
 	VendorContacts VendorContactRepo
 	PurchaseOrders PurchaseOrderRepo
 	Payments       PaymentRepo
 	Users          UserRepo
-	Groups         GroupRepo
 }
 
-// Service is the high-level find service for cross-resource searches.
+// Service は横断検索サービス。具象 Find メソッドは N04 以降で追加される。
 type Service struct {
 	clients        ClientRepo
 	clientBranches ClientBranchRepo
 	contacts       ContactRepo
 	projects       ProjectRepo
 	estimates      EstimateRepo
-	invoices       InvoiceRepo
 	orders         OrderRepo
 	deliveries     DeliveryRepo
 	receipts       ReceiptRepo
+	invoices       InvoiceRepo
 	vendors        VendorRepo
 	vendorBranches VendorBranchRepo
 	vendorContacts VendorContactRepo
 	purchaseOrders PurchaseOrderRepo
 	payments       PaymentRepo
 	users          UserRepo
-	groups         GroupRepo
+
+	// Document 4 種の逆マッピングキャッシュ（lazy build、N04 以降で registration）
+	reverseMappers map[string]*reverseMapper
 }
 
-// New creates a new find Service.
-func New(repos Repos) *Service {
+// New は新しい find Service を生成する。
+func New(r Repos) *Service {
 	return &Service{
-		clients:        repos.Clients,
-		clientBranches: repos.ClientBranches,
-		contacts:       repos.Contacts,
-		projects:       repos.Projects,
-		estimates:      repos.Estimates,
-		invoices:       repos.Invoices,
-		orders:         repos.Orders,
-		deliveries:     repos.Deliveries,
-		receipts:       repos.Receipts,
-		vendors:        repos.Vendors,
-		vendorBranches: repos.VendorBranches,
-		vendorContacts: repos.VendorContacts,
-		purchaseOrders: repos.PurchaseOrders,
-		payments:       repos.Payments,
-		users:          repos.Users,
-		groups:         repos.Groups,
+		clients:        r.Clients,
+		clientBranches: r.ClientBranches,
+		contacts:       r.Contacts,
+		projects:       r.Projects,
+		estimates:      r.Estimates,
+		orders:         r.Orders,
+		deliveries:     r.Deliveries,
+		receipts:       r.Receipts,
+		invoices:       r.Invoices,
+		vendors:        r.Vendors,
+		vendorBranches: r.VendorBranches,
+		vendorContacts: r.VendorContacts,
+		purchaseOrders: r.PurchaseOrders,
+		payments:       r.Payments,
+		users:          r.Users,
+		reverseMappers: map[string]*reverseMapper{
+			"estimate": newReverseMapper(r.Projects, "estimate", extractEstimateIDs),
+			"order":    newReverseMapper(r.Projects, "order", extractOrderIDs),
+			"delivery": newReverseMapper(r.Projects, "delivery", extractDeliveryIDs),
+			"receipt":  newReverseMapper(r.Projects, "receipt", extractReceiptIDs),
+		},
 	}
 }
 
-// resolveClientAndProject resolves the client and project for a document.
-// Both resolutions are non-fatal: nil is returned on lookup error.
-func (s *Service) resolveClientAndProject(ctx context.Context, clientID, projectID int, opts repository.ReadOptions) (*boardapi.ClientEntity, *boardapi.ProjectEntity) {
-	var client *boardapi.ClientEntity
-	var project *boardapi.ProjectEntity
-	if clientID != 0 {
-		c, err := s.clients.GetByID(ctx, clientID, opts)
-		if err == nil {
-			client = c
-		}
-	}
-	if projectID != 0 {
-		p, err := s.projects.GetByID(ctx, projectID, opts)
-		if err == nil {
-			project = p
-		}
-	}
-	return client, project
-}
-
-// resolveVendorAndProject resolves the vendor and project for a vendor document.
-// Both resolutions are non-fatal: nil is returned on lookup error.
-func (s *Service) resolveVendorAndProject(ctx context.Context, vendorID, projectID int, opts repository.ReadOptions) (*boardapi.VendorEntity, *boardapi.ProjectEntity) {
-	var vendor *boardapi.VendorEntity
-	var project *boardapi.ProjectEntity
-	if vendorID != 0 {
-		v, err := s.vendors.GetByID(ctx, vendorID, opts)
-		if err == nil {
-			vendor = v
-		}
-	}
-	if projectID != 0 {
-		p, err := s.projects.GetByID(ctx, projectID, opts)
-		if err == nil {
-			project = p
-		}
-	}
-	return vendor, project
-}
-
-// repoOpts returns ReadOptions suitable for passing to repositories.
-// Limit is stripped because the find layer applies its own limit on aggregated results.
-func repoOpts(opts repository.ReadOptions) repository.ReadOptions {
-	return repository.ReadOptions{
-		Refresh:      opts.Refresh,
-		ForceRefresh: opts.ForceRefresh,
-	}
+// repoOpts は FindCommonOpts から repository.ReadOptions を取り出すヘルパー。
+// N04-N07a で各 FindXxx メソッドが使用する。
+func repoOpts(o FindCommonOpts) repository.ReadOptions {
+	return o.Opts
 }

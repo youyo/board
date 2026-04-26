@@ -1,223 +1,338 @@
-package find_test
+package find
 
 import (
+	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/youyo/board/internal/boardapi"
-	"github.com/youyo/board/internal/service/find"
+	"github.com/youyo/board/internal/repository"
 )
 
-// --- FindInvoice: Normal Cases ---
+// newInvoiceTestService は FindInvoice テスト用の Service を生成するヘルパー。
+func newInvoiceTestService(
+	invoices *stubInvoiceRepo,
+	clients *stubClientRepo,
+	projects *stubProjectRepo,
+) *Service {
+	r := newTestRepos()
+	r.Invoices = invoices
+	r.Clients = clients
+	r.Projects = projects
+	return New(r)
+}
 
-func TestFindInvoice_ByID(t *testing.T) {
-	inv := &boardapi.InvoiceEntity{ID: 1, ClientID: 10, ProjectID: 100, Title: "Invoice A"}
-	client := &boardapi.ClientEntity{ID: 10, Name: "Client X"}
-	project := &boardapi.ProjectEntity{ID: 100, Name: "Project Y"}
-
-	svc := newServiceWith(
-		&stubClientRepo{getResult: client},
-		nil, nil,
-		&stubProjectRepo{getResult: project},
-		&stubInvoiceRepo{getResult: inv},
-	)
-
-	got, err := svc.FindInvoice(testCtx, find.FindInvoiceQuery{ID: 1})
-	assertNoError(t, err)
-	assertInvoiceResultLen(t, got, 1)
-
-	if got[0].Invoice.ID != 1 {
-		t.Errorf("invoice ID = %d, want 1", got[0].Invoice.ID)
+// I01: ByID HappyPath（ClientID/ProjectID enrichment 成功）
+func TestService_FindInvoice_ByID_HappyPath(t *testing.T) {
+	invoices := &stubInvoiceRepo{
+		getResult: &boardapi.InvoiceEntity{ID: 100, ClientID: 5, ProjectID: 7, Title: "Inv-100"},
 	}
-	if got[0].Client == nil || got[0].Client.ID != 10 {
-		t.Error("client not resolved correctly")
+	clients := &stubClientRepo{getResult: &boardapi.ClientEntity{ID: 5, Name: "C"}}
+	projects := &stubProjectRepo{getResult: &boardapi.ProjectEntity{ID: 7, Name: "P"}}
+	svc := newInvoiceTestService(invoices, clients, projects)
+
+	results, err := svc.FindInvoice(testCtx, FindInvoiceQuery{ID: 100})
+	assertNoError(t, err)
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
 	}
-	if got[0].Project == nil || got[0].Project.ID != 100 {
-		t.Error("project not resolved correctly")
+	r := results[0]
+	if r.Invoice.ID != 100 {
+		t.Errorf("Invoice.ID=%d, want 100", r.Invoice.ID)
 	}
-}
-
-func TestFindInvoice_ByClientName(t *testing.T) {
-	clients := []boardapi.ClientEntity{{ID: 10, Name: "ABC Corp"}}
-	invoices := []boardapi.InvoiceEntity{
-		{ID: 1, ClientID: 10, Title: "I1"},
-		{ID: 2, ClientID: 10, Title: "I2"},
+	if r.Client == nil || r.Client.ID != 5 {
+		t.Errorf("Client mismatch: %+v", r.Client)
 	}
-
-	svc := newServiceWith(
-		&stubClientRepo{searchResult: clients, getResult: &boardapi.ClientEntity{ID: 10}},
-		nil, nil,
-		&stubProjectRepo{},
-		&stubInvoiceRepo{searchResult: invoices},
-	)
-
-	got, err := svc.FindInvoice(testCtx, find.FindInvoiceQuery{ClientName: "ABC"})
-	assertNoError(t, err)
-	assertInvoiceResultLen(t, got, 2)
-}
-
-func TestFindInvoice_ByProjectName(t *testing.T) {
-	// M44: ClientID 廃止、Client nested に統合
-	projects := []boardapi.ProjectEntity{{ID: 100, Client: &boardapi.ClientRef{ID: 10}, Name: "Web Dev"}}
-	invoices := []boardapi.InvoiceEntity{{ID: 1, ClientID: 10, ProjectID: 100, Title: "I1"}}
-
-	svc := newServiceWith(
-		&stubClientRepo{getResult: &boardapi.ClientEntity{ID: 10}},
-		nil, nil,
-		&stubProjectRepo{searchResult: projects, getResult: &boardapi.ProjectEntity{ID: 100}},
-		&stubInvoiceRepo{searchResult: invoices},
-	)
-
-	got, err := svc.FindInvoice(testCtx, find.FindInvoiceQuery{ProjectName: "Web"})
-	assertNoError(t, err)
-	assertInvoiceResultLen(t, got, 1)
-}
-
-func TestFindInvoice_ByText(t *testing.T) {
-	allInvoices := []boardapi.InvoiceEntity{
-		{ID: 1, ClientID: 10, Title: "Monthly Invoice", Memo: "important"},
-		{ID: 2, ClientID: 10, Title: "Quarterly", Memo: "normal"},
-	}
-
-	svc := newServiceWith(
-		&stubClientRepo{getResult: &boardapi.ClientEntity{ID: 10}},
-		nil, nil,
-		&stubProjectRepo{},
-		&stubInvoiceRepo{listResult: allInvoices},
-	)
-
-	got, err := svc.FindInvoice(testCtx, find.FindInvoiceQuery{Text: "Monthly"})
-	assertNoError(t, err)
-	assertInvoiceResultLen(t, got, 1)
-}
-
-func TestFindInvoice_ByStatus(t *testing.T) {
-	allInvoices := []boardapi.InvoiceEntity{
-		{ID: 1, Status: "sent"},
-		{ID: 2, Status: "draft"},
-		{ID: 3, Status: "sent"},
-	}
-
-	svc := newServiceWith(
-		&stubClientRepo{}, nil, nil,
-		&stubProjectRepo{},
-		&stubInvoiceRepo{listResult: allInvoices},
-	)
-
-	got, err := svc.FindInvoice(testCtx, find.FindInvoiceQuery{Status: "sent"})
-	assertNoError(t, err)
-	assertInvoiceResultLen(t, got, 2)
-}
-
-func TestFindInvoice_ByClientNameWithStatus(t *testing.T) {
-	clients := []boardapi.ClientEntity{{ID: 10, Name: "ABC"}}
-	invoices := []boardapi.InvoiceEntity{
-		{ID: 1, ClientID: 10, Status: "sent", Title: "I1"},
-		{ID: 2, ClientID: 10, Status: "draft", Title: "I2"},
-	}
-
-	svc := newServiceWith(
-		&stubClientRepo{searchResult: clients, getResult: &boardapi.ClientEntity{ID: 10}},
-		nil, nil,
-		&stubProjectRepo{},
-		&stubInvoiceRepo{searchResult: invoices},
-	)
-
-	got, err := svc.FindInvoice(testCtx, find.FindInvoiceQuery{ClientName: "ABC", Status: "sent"})
-	assertNoError(t, err)
-	assertInvoiceResultLen(t, got, 1)
-}
-
-// --- FindInvoice: Error/Edge Cases ---
-
-func TestFindInvoice_EmptyQuery(t *testing.T) {
-	svc := find.New(zeroRepos())
-	_, err := svc.FindInvoice(testCtx, find.FindInvoiceQuery{})
-	assertError(t, err)
-}
-
-func TestFindInvoice_NotFoundByID(t *testing.T) {
-	svc := newServiceWith(nil, nil, nil, nil,
-		&stubInvoiceRepo{err: errors.New("not found")},
-	)
-	_, err := svc.FindInvoice(testCtx, find.FindInvoiceQuery{ID: 999})
-	assertError(t, err)
-}
-
-func TestFindInvoice_NoMatchByClientName(t *testing.T) {
-	svc := newServiceWith(
-		&stubClientRepo{searchResult: nil}, nil, nil, nil,
-		&stubInvoiceRepo{},
-	)
-	got, err := svc.FindInvoice(testCtx, find.FindInvoiceQuery{ClientName: "nonexistent"})
-	assertNoError(t, err)
-	assertInvoiceResultLen(t, got, 0)
-}
-
-func TestFindInvoice_ClientResolutionFailure(t *testing.T) {
-	inv := &boardapi.InvoiceEntity{ID: 1, ClientID: 10, ProjectID: 100}
-	svc := newServiceWith(
-		&stubClientRepo{err: errors.New("client error")}, nil, nil,
-		&stubProjectRepo{getResult: &boardapi.ProjectEntity{ID: 100}},
-		&stubInvoiceRepo{getResult: inv},
-	)
-
-	got, err := svc.FindInvoice(testCtx, find.FindInvoiceQuery{ID: 1})
-	assertNoError(t, err)
-	assertInvoiceResultLen(t, got, 1)
-	if got[0].Client != nil {
-		t.Error("expected nil client on resolution failure")
+	if r.Project == nil || r.Project.ID != 7 {
+		t.Errorf("Project mismatch: %+v", r.Project)
 	}
 }
 
-func TestFindInvoice_ProjectResolutionFailure(t *testing.T) {
-	inv := &boardapi.InvoiceEntity{ID: 1, ClientID: 10, ProjectID: 100}
-	svc := newServiceWith(
-		&stubClientRepo{getResult: &boardapi.ClientEntity{ID: 10}}, nil, nil,
-		&stubProjectRepo{err: errors.New("project error")},
-		&stubInvoiceRepo{getResult: inv},
-	)
+// I02: ByID — Project enrichment 失敗 → non-fatal（Project=nil + slog.Warn）
+func TestService_FindInvoice_ByID_ProjectEnrichmentFails_NonFatal(t *testing.T) {
+	rec := withRecordedSlog(t)
+	invoices := &stubInvoiceRepo{
+		getResult: &boardapi.InvoiceEntity{ID: 100, ClientID: 5, ProjectID: 7},
+	}
+	clients := &stubClientRepo{getResult: &boardapi.ClientEntity{ID: 5}}
+	projects := &stubProjectRepo{
+		getFunc: func(_ context.Context) (*boardapi.ProjectEntity, error) {
+			return nil, errors.New("project fetch failed")
+		},
+	}
+	svc := newInvoiceTestService(invoices, clients, projects)
 
-	got, err := svc.FindInvoice(testCtx, find.FindInvoiceQuery{ID: 1})
+	results, err := svc.FindInvoice(testCtx, FindInvoiceQuery{ID: 100})
 	assertNoError(t, err)
-	assertInvoiceResultLen(t, got, 1)
-	if got[0].Project != nil {
-		t.Error("expected nil project on resolution failure")
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if results[0].Project != nil {
+		t.Errorf("Project should be nil after fail, got %+v", results[0].Project)
+	}
+	if results[0].Client == nil || results[0].Client.ID != 5 {
+		t.Errorf("Client should succeed: %+v", results[0].Client)
+	}
+	warns := filterWarn(rec.records)
+	if len(warns) != 1 {
+		t.Fatalf("expected 1 warn record, got %d", len(warns))
+	}
+	if !strings.Contains(warns[0].Message, "project enrichment failed") {
+		t.Errorf("unexpected slog message: %q", warns[0].Message)
 	}
 }
 
-// --- FindInvoice: Priority ---
+// I03: ByID — Statuses post-filter は ID 検索時 skip（旧 find_project.go 踏襲）
+func TestService_FindInvoice_ByID_StatusesPostFilterSkipped(t *testing.T) {
+	invoices := &stubInvoiceRepo{
+		// status=archived だが Statuses=[sent] 指定でも返却される（ID 検索時 skip）
+		getResult: &boardapi.InvoiceEntity{ID: 100, Status: "archived"},
+	}
+	svc := newInvoiceTestService(invoices, &stubClientRepo{}, &stubProjectRepo{})
 
-func TestFindInvoice_IDPriorityOverClientName(t *testing.T) {
-	inv := &boardapi.InvoiceEntity{ID: 1, ClientID: 10, Title: "By ID"}
-	svc := newServiceWith(
-		&stubClientRepo{getResult: &boardapi.ClientEntity{ID: 10}, searchResult: []boardapi.ClientEntity{{ID: 20}}},
-		nil, nil,
-		&stubProjectRepo{},
-		&stubInvoiceRepo{getResult: inv, searchResult: []boardapi.InvoiceEntity{{ID: 99}}},
-	)
-
-	got, err := svc.FindInvoice(testCtx, find.FindInvoiceQuery{ID: 1, ClientName: "ABC"})
+	results, err := svc.FindInvoice(testCtx, FindInvoiceQuery{ID: 100, Statuses: []string{"sent"}})
 	assertNoError(t, err)
-	assertInvoiceResultLen(t, got, 1)
-	if got[0].Invoice.ID != 1 {
-		t.Errorf("expected ID lookup (1), got %d", got[0].Invoice.ID)
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result (status filter skipped on ID), got %d", len(results))
 	}
 }
 
-// --- FindInvoice: Limit ---
-
-func TestFindInvoice_Limit(t *testing.T) {
-	invoices := []boardapi.InvoiceEntity{
-		{ID: 1, Title: "I1"}, {ID: 2, Title: "I2"}, {ID: 3, Title: "I3"},
+// I04: ByClientID — ClientIDEq が API に渡る、Status="" の場合 StatusEq も ""
+func TestService_FindInvoice_ByClientID_DelegatesFilter(t *testing.T) {
+	var captured boardapi.InvoiceListOptions
+	invoices := &stubInvoiceRepo{
+		searchFunc: func(_ context.Context, f boardapi.InvoiceListOptions, _ repository.ReadOptions) ([]boardapi.InvoiceEntity, error) {
+			captured = f
+			return []boardapi.InvoiceEntity{{ID: 1}, {ID: 2}}, nil
+		},
 	}
-	svc := newServiceWith(
-		&stubClientRepo{}, nil, nil,
-		&stubProjectRepo{},
-		&stubInvoiceRepo{listResult: invoices},
-	)
+	svc := newInvoiceTestService(invoices, &stubClientRepo{}, &stubProjectRepo{})
 
-	got, err := svc.FindInvoice(testCtx, find.FindInvoiceQuery{Text: "I", Limit: 2})
+	results, err := svc.FindInvoice(testCtx, FindInvoiceQuery{ClientID: 5})
 	assertNoError(t, err)
-	assertInvoiceResultLen(t, got, 2)
+	if len(results) != 2 {
+		t.Errorf("expected 2 results, got %d", len(results))
+	}
+	if captured.ClientIDEq != 5 {
+		t.Errorf("ClientIDEq=%d, want 5", captured.ClientIDEq)
+	}
+	if captured.StatusEq != "" {
+		t.Errorf("StatusEq=%q, want empty", captured.StatusEq)
+	}
+}
+
+// I05: ByClientID + Status — ClientIDEq + StatusEq 両方 API 委譲
+func TestService_FindInvoice_ByClientIDAndStatus_DelegatesBoth(t *testing.T) {
+	var captured boardapi.InvoiceListOptions
+	invoices := &stubInvoiceRepo{
+		searchFunc: func(_ context.Context, f boardapi.InvoiceListOptions, _ repository.ReadOptions) ([]boardapi.InvoiceEntity, error) {
+			captured = f
+			return []boardapi.InvoiceEntity{{ID: 1}}, nil
+		},
+	}
+	svc := newInvoiceTestService(invoices, &stubClientRepo{}, &stubProjectRepo{})
+
+	_, err := svc.FindInvoice(testCtx, FindInvoiceQuery{ClientID: 5, Status: "sent"})
+	assertNoError(t, err)
+	if captured.ClientIDEq != 5 || captured.StatusEq != "sent" {
+		t.Errorf("filter mismatch: %+v", captured)
+	}
+}
+
+// I06: ByStatus（単独）— Status only は allow、StatusEq が API に渡る
+func TestService_FindInvoice_ByStatus_Only_AllowedAndDelegated(t *testing.T) {
+	var captured boardapi.InvoiceListOptions
+	invoices := &stubInvoiceRepo{
+		searchFunc: func(_ context.Context, f boardapi.InvoiceListOptions, _ repository.ReadOptions) ([]boardapi.InvoiceEntity, error) {
+			captured = f
+			return []boardapi.InvoiceEntity{{ID: 1, Status: "sent"}}, nil
+		},
+	}
+	svc := newInvoiceTestService(invoices, &stubClientRepo{}, &stubProjectRepo{})
+
+	results, err := svc.FindInvoice(testCtx, FindInvoiceQuery{Status: "sent"})
+	assertNoError(t, err)
+	if len(results) != 1 {
+		t.Errorf("expected 1 result, got %d", len(results))
+	}
+	if captured.StatusEq != "sent" {
+		t.Errorf("StatusEq=%q, want 'sent'", captured.StatusEq)
+	}
+	if captured.ClientIDEq != 0 {
+		t.Errorf("ClientIDEq should be 0, got %d", captured.ClientIDEq)
+	}
+}
+
+// I07: ByText — Title マッチ
+func TestService_FindInvoice_ByText_MatchesTitle(t *testing.T) {
+	invoices := &stubInvoiceRepo{
+		searchResult: []boardapi.InvoiceEntity{
+			{ID: 1, Title: "Acme Invoice"},
+			{ID: 2, Title: "Beta Receipt"},
+		},
+	}
+	svc := newInvoiceTestService(invoices, &stubClientRepo{}, &stubProjectRepo{})
+
+	results, err := svc.FindInvoice(testCtx, FindInvoiceQuery{Text: "acme"})
+	assertNoError(t, err)
+	if len(results) != 1 {
+		t.Errorf("expected 1 result, got %d", len(results))
+	}
+	if results[0].Invoice.Title != "Acme Invoice" {
+		t.Errorf("wrong invoice: %+v", results[0].Invoice)
+	}
+}
+
+// I08: ByText — Memo マッチ
+func TestService_FindInvoice_ByText_MatchesMemo(t *testing.T) {
+	invoices := &stubInvoiceRepo{
+		searchResult: []boardapi.InvoiceEntity{
+			{ID: 1, Title: "x", Memo: "important payment"},
+			{ID: 2, Title: "y", Memo: "other"},
+		},
+	}
+	svc := newInvoiceTestService(invoices, &stubClientRepo{}, &stubProjectRepo{})
+
+	results, err := svc.FindInvoice(testCtx, FindInvoiceQuery{Text: "important"})
+	assertNoError(t, err)
+	if len(results) != 1 {
+		t.Errorf("expected 1 result, got %d", len(results))
+	}
+}
+
+// I09: ByStatuses (multi) + ClientID — post-filter で 2/3 残る
+func TestService_FindInvoice_ByStatuses_PostFilters(t *testing.T) {
+	invoices := &stubInvoiceRepo{
+		searchResult: []boardapi.InvoiceEntity{
+			{ID: 1, Status: "sent"},
+			{ID: 2, Status: "draft"},
+			{ID: 3, Status: "approved"},
+		},
+	}
+	svc := newInvoiceTestService(invoices, &stubClientRepo{}, &stubProjectRepo{})
+
+	results, err := svc.FindInvoice(testCtx, FindInvoiceQuery{
+		ClientID: 5,
+		Statuses: []string{"sent", "approved"},
+	})
+	assertNoError(t, err)
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+}
+
+// I10: Limit=2 — 3 件中 2 件で打ち切り（resolveClientAndProject の呼び出しも 2 回）
+func TestService_FindInvoice_LimitTwo_StopsEnrichment(t *testing.T) {
+	invoices := &stubInvoiceRepo{
+		searchResult: []boardapi.InvoiceEntity{
+			{ID: 1, ClientID: 5},
+			{ID: 2, ClientID: 5},
+			{ID: 3, ClientID: 5},
+		},
+	}
+	clients := &stubClientRepo{getResult: &boardapi.ClientEntity{ID: 5}}
+	svc := newInvoiceTestService(invoices, clients, &stubProjectRepo{})
+
+	results, err := svc.FindInvoice(testCtx, FindInvoiceQuery{
+		ClientID:       5,
+		FindCommonOpts: FindCommonOpts{Limit: 2},
+	})
+	assertNoError(t, err)
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+	if clients.getCount != 2 {
+		t.Errorf("expected 2 client GetByID calls (Limit=2), got %d", clients.getCount)
+	}
+}
+
+// I11: Empty query → "at least one field required"
+func TestService_FindInvoice_EmptyQuery_Error(t *testing.T) {
+	svc := newInvoiceTestService(&stubInvoiceRepo{}, &stubClientRepo{}, &stubProjectRepo{})
+
+	_, err := svc.FindInvoice(testCtx, FindInvoiceQuery{})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "at least one field required") {
+		t.Errorf("unexpected error message: %v", err)
+	}
+}
+
+// I12: Statuses-only → "Statuses requires one of ..."（D2 reject）
+func TestService_FindInvoice_StatusesOnly_RejectedByValidate(t *testing.T) {
+	invoices := &stubInvoiceRepo{
+		searchResult: []boardapi.InvoiceEntity{{ID: 1}},
+	}
+	svc := newInvoiceTestService(invoices, &stubClientRepo{}, &stubProjectRepo{})
+
+	_, err := svc.FindInvoice(testCtx, FindInvoiceQuery{Statuses: []string{"sent"}})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "Statuses requires one of") {
+		t.Errorf("unexpected error message: %v", err)
+	}
+	// Search は呼ばれない
+	if invoices.searchCount != 0 {
+		t.Errorf("Search should not be called on validation error, got %d", invoices.searchCount)
+	}
+}
+
+// I13: GetByID error → fail-fast 伝播
+func TestService_FindInvoice_GetByIDError_Bubbles(t *testing.T) {
+	fakeErr := errors.New("invoice API error")
+	invoices := &stubInvoiceRepo{err: fakeErr}
+	svc := newInvoiceTestService(invoices, &stubClientRepo{}, &stubProjectRepo{})
+
+	_, err := svc.FindInvoice(testCtx, FindInvoiceQuery{ID: 100})
+	if !errors.Is(err, fakeErr) {
+		t.Errorf("expected fakeErr, got %v", err)
+	}
+}
+
+// I13b: ByText + Statuses — Text branch で Title マッチした 3 件のうち
+// Statuses post-filter で 2 件残る（advisor 指摘の Text+Statuses コンボ穴埋め）
+func TestService_FindInvoice_ByTextAndStatuses_PostFiltersTextMatched(t *testing.T) {
+	invoices := &stubInvoiceRepo{
+		searchResult: []boardapi.InvoiceEntity{
+			{ID: 1, Title: "Acme A", Status: "sent"},
+			{ID: 2, Title: "Acme B", Status: "draft"},
+			{ID: 3, Title: "Acme C", Status: "approved"},
+			{ID: 4, Title: "Beta", Status: "sent"}, // Text マッチしない
+		},
+	}
+	svc := newInvoiceTestService(invoices, &stubClientRepo{}, &stubProjectRepo{})
+
+	results, err := svc.FindInvoice(testCtx, FindInvoiceQuery{
+		Text:     "acme",
+		Statuses: []string{"sent", "approved"},
+	})
+	assertNoError(t, err)
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results (Text=acme ∩ Statuses={sent,approved}), got %d", len(results))
+	}
+	for _, r := range results {
+		if r.Invoice.Status != "sent" && r.Invoice.Status != "approved" {
+			t.Errorf("unexpected status passed through filter: %q", r.Invoice.Status)
+		}
+		if !strings.Contains(strings.ToLower(r.Invoice.Title), "acme") {
+			t.Errorf("unexpected title passed through Text filter: %q", r.Invoice.Title)
+		}
+	}
+}
+
+// I14: PriorityIDOverridesClientID — ID が優先されると Search は呼ばれない
+func TestService_FindInvoice_Priority_IDOverridesClientID(t *testing.T) {
+	invoices := &stubInvoiceRepo{
+		getResult: &boardapi.InvoiceEntity{ID: 100},
+	}
+	svc := newInvoiceTestService(invoices, &stubClientRepo{}, &stubProjectRepo{})
+
+	_, err := svc.FindInvoice(testCtx, FindInvoiceQuery{ID: 100, ClientID: 5})
+	assertNoError(t, err)
+	if invoices.searchCount != 0 {
+		t.Errorf("Search should not be called when ID is set, got %d", invoices.searchCount)
+	}
 }

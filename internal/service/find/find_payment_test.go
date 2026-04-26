@@ -1,221 +1,260 @@
-package find_test
+package find
 
 import (
+	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/youyo/board/internal/boardapi"
-	"github.com/youyo/board/internal/service/find"
+	"github.com/youyo/board/internal/repository"
 )
 
-// --- FindPayment: Normal Cases ---
+// newPaymentTestService は FindPayment テスト用の Service を生成するヘルパー。
+func newPaymentTestService(
+	payments *stubPaymentRepo,
+	vendors *stubVendorRepo,
+) *Service {
+	r := newTestRepos()
+	r.Payments = payments
+	r.Vendors = vendors
+	return New(r)
+}
 
-func TestFindPayment_ByID(t *testing.T) {
-	payment := &boardapi.PaymentEntity{ID: 1, VendorID: 10, PurchaseOrderID: 100, Memo: "Payment A"}
-	vendor := &boardapi.VendorEntity{ID: 10, Name: "Vendor X"}
+// M01: ByID HappyPath — Vendor enrichment 成功、Project は nil（D1）
+func TestService_FindPayment_ByID_HappyPath_ProjectAlwaysNil(t *testing.T) {
+	payments := &stubPaymentRepo{
+		getResult: &boardapi.PaymentEntity{ID: 100, VendorID: 5, PurchaseOrderID: 99, Memo: "x"},
+	}
+	vendors := &stubVendorRepo{getResult: &boardapi.VendorEntity{ID: 5, Name: "V"}}
+	svc := newPaymentTestService(payments, vendors)
 
-	svc := newServiceWith(
-		nil, nil, nil, nil,
-		&stubVendorRepo{getResult: vendor},
-		&stubPaymentRepo{getResult: payment},
-	)
-
-	got, err := svc.FindPayment(testCtx, find.FindPaymentQuery{ID: 1})
+	results, err := svc.FindPayment(testCtx, FindPaymentQuery{ID: 100})
 	assertNoError(t, err)
-	assertPaymentResultLen(t, got, 1)
-
-	if got[0].Payment.ID != 1 {
-		t.Errorf("payment ID = %d, want 1", got[0].Payment.ID)
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
 	}
-	if got[0].Vendor == nil || got[0].Vendor.ID != 10 {
-		t.Errorf("vendor not resolved correctly")
+	r := results[0]
+	if r.Payment.ID != 100 {
+		t.Errorf("Payment.ID=%d, want 100", r.Payment.ID)
+	}
+	if r.Vendor == nil || r.Vendor.ID != 5 {
+		t.Errorf("Vendor mismatch: %+v", r.Vendor)
+	}
+	// D1: Project は常に nil
+	if r.Project != nil {
+		t.Errorf("Project must always be nil (D1), got %+v", r.Project)
 	}
 }
 
-func TestFindPayment_ByVendorName(t *testing.T) {
-	vendors := []boardapi.VendorEntity{{ID: 10, Name: "ABC Corp"}}
-	payments := []boardapi.PaymentEntity{
-		{ID: 1, VendorID: 10, Memo: "P1"},
-		{ID: 2, VendorID: 10, Memo: "P2"},
+// M02: ByID — Vendor enrichment 失敗 → non-fatal + slog.Warn
+func TestService_FindPayment_ByID_VendorEnrichmentFails_NonFatal(t *testing.T) {
+	rec := withRecordedSlog(t)
+	payments := &stubPaymentRepo{
+		getResult: &boardapi.PaymentEntity{ID: 100, VendorID: 5},
 	}
+	vendors := &stubVendorRepo{err: errors.New("vendor fetch failed")}
+	svc := newPaymentTestService(payments, vendors)
 
-	svc := newServiceWith(
-		nil, nil, nil, nil,
-		&stubVendorRepo{searchResult: vendors, getResult: &boardapi.VendorEntity{ID: 10, Name: "ABC Corp"}},
-		&stubPaymentRepo{searchResult: payments},
-	)
-
-	got, err := svc.FindPayment(testCtx, find.FindPaymentQuery{VendorName: "ABC"})
+	results, err := svc.FindPayment(testCtx, FindPaymentQuery{ID: 100})
 	assertNoError(t, err)
-	assertPaymentResultLen(t, got, 2)
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if results[0].Vendor != nil {
+		t.Errorf("Vendor should be nil after fail, got %+v", results[0].Vendor)
+	}
+	warns := filterWarn(rec.records)
+	if len(warns) != 1 {
+		t.Fatalf("expected 1 warn record, got %d", len(warns))
+	}
+	if !strings.Contains(warns[0].Message, "vendor enrichment failed") {
+		t.Errorf("unexpected slog message: %q", warns[0].Message)
+	}
 }
 
-func TestFindPayment_ByPurchaseOrderID(t *testing.T) {
-	payments := []boardapi.PaymentEntity{
-		{ID: 1, VendorID: 10, PurchaseOrderID: 100, Memo: "P1"},
+// M02b: VendorID=0 のとき vendors.GetByID は呼ばれない
+func TestService_FindPayment_NoVendorID_SkipsEnrichment(t *testing.T) {
+	payments := &stubPaymentRepo{
+		getResult: &boardapi.PaymentEntity{ID: 100, VendorID: 0},
 	}
+	vendors := &stubVendorRepo{}
+	svc := newPaymentTestService(payments, vendors)
 
-	svc := newServiceWith(
-		nil, nil, nil, nil,
-		&stubVendorRepo{getResult: &boardapi.VendorEntity{ID: 10}},
-		&stubPaymentRepo{searchResult: payments},
-	)
-
-	got, err := svc.FindPayment(testCtx, find.FindPaymentQuery{PurchaseOrderID: 100})
+	results, err := svc.FindPayment(testCtx, FindPaymentQuery{ID: 100})
 	assertNoError(t, err)
-	assertPaymentResultLen(t, got, 1)
-	if got[0].Payment.PurchaseOrderID != 100 {
-		t.Errorf("purchase order ID = %d, want 100", got[0].Payment.PurchaseOrderID)
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if results[0].Vendor != nil {
+		t.Errorf("Vendor should be nil when VendorID=0, got %+v", results[0].Vendor)
 	}
 }
 
-func TestFindPayment_ByText(t *testing.T) {
-	allPayments := []boardapi.PaymentEntity{
-		{ID: 1, VendorID: 10, Memo: "important payment"},
-		{ID: 2, VendorID: 10, Memo: "normal"},
-	}
-
-	svc := newServiceWith(
-		nil, nil, nil, nil,
-		&stubVendorRepo{getResult: &boardapi.VendorEntity{ID: 10}},
-		&stubPaymentRepo{listResult: allPayments},
-	)
-
-	got, err := svc.FindPayment(testCtx, find.FindPaymentQuery{Text: "important"})
-	assertNoError(t, err)
-	assertPaymentResultLen(t, got, 1)
-	if got[0].Payment.ID != 1 {
-		t.Errorf("payment ID = %d, want 1", got[0].Payment.ID)
-	}
-}
-
-func TestFindPayment_ByStatus(t *testing.T) {
-	allPayments := []boardapi.PaymentEntity{
-		{ID: 1, VendorID: 10, Status: "paid"},
-		{ID: 2, VendorID: 10, Status: "pending"},
-		{ID: 3, VendorID: 10, Status: "paid"},
-	}
-
-	svc := newServiceWith(
-		nil, nil, nil, nil,
-		&stubVendorRepo{getResult: &boardapi.VendorEntity{ID: 10}},
-		&stubPaymentRepo{listResult: allPayments},
-	)
-
-	got, err := svc.FindPayment(testCtx, find.FindPaymentQuery{Status: "paid"})
-	assertNoError(t, err)
-	assertPaymentResultLen(t, got, 2)
-}
-
-func TestFindPayment_ByVendorNameWithStatus(t *testing.T) {
-	vendors := []boardapi.VendorEntity{{ID: 10, Name: "ABC"}}
-	payments := []boardapi.PaymentEntity{
-		{ID: 1, VendorID: 10, Status: "paid", Memo: "P1"},
-		{ID: 2, VendorID: 10, Status: "pending", Memo: "P2"},
-	}
-
-	svc := newServiceWith(
-		nil, nil, nil, nil,
-		&stubVendorRepo{searchResult: vendors, getResult: &boardapi.VendorEntity{ID: 10, Name: "ABC"}},
-		&stubPaymentRepo{searchResult: payments},
-	)
-
-	got, err := svc.FindPayment(testCtx, find.FindPaymentQuery{VendorName: "ABC", Status: "paid"})
-	assertNoError(t, err)
-	assertPaymentResultLen(t, got, 1)
-	if got[0].Payment.Status != "paid" {
-		t.Errorf("status = %q, want paid", got[0].Payment.Status)
-	}
-}
-
-// --- FindPayment: Error/Edge Cases ---
-
-func TestFindPayment_EmptyQuery(t *testing.T) {
-	svc := find.New(zeroRepos())
-	_, err := svc.FindPayment(testCtx, find.FindPaymentQuery{})
-	assertError(t, err)
-}
-
-func TestFindPayment_NotFoundByID(t *testing.T) {
-	svc := newServiceWith(
-		nil, nil, nil, nil,
-		&stubPaymentRepo{err: errors.New("not found")},
-	)
-
-	_, err := svc.FindPayment(testCtx, find.FindPaymentQuery{ID: 999})
-	assertError(t, err)
-}
-
-func TestFindPayment_NoMatchByVendorName(t *testing.T) {
-	svc := newServiceWith(
-		nil, nil, nil, nil,
-		&stubVendorRepo{searchResult: nil},
-		&stubPaymentRepo{},
-	)
-
-	got, err := svc.FindPayment(testCtx, find.FindPaymentQuery{VendorName: "nonexistent"})
-	assertNoError(t, err)
-	assertPaymentResultLen(t, got, 0)
-}
-
-func TestFindPayment_VendorResolutionFailure(t *testing.T) {
-	payment := &boardapi.PaymentEntity{ID: 1, VendorID: 10}
-
-	svc := newServiceWith(
-		nil, nil, nil, nil,
-		&stubVendorRepo{err: errors.New("vendor error")},
-		&stubPaymentRepo{getResult: payment},
-	)
-
-	got, err := svc.FindPayment(testCtx, find.FindPaymentQuery{ID: 1})
-	assertNoError(t, err)
-	assertPaymentResultLen(t, got, 1)
-	if got[0].Vendor != nil {
-		t.Error("expected nil vendor on resolution failure")
-	}
-}
-
-// --- FindPayment: Priority Cases ---
-
-func TestFindPayment_IDPriorityOverVendorName(t *testing.T) {
-	payment := &boardapi.PaymentEntity{ID: 1, VendorID: 10, Memo: "By ID"}
-
-	svc := newServiceWith(
-		nil, nil, nil, nil,
-		&stubVendorRepo{
-			getResult:    &boardapi.VendorEntity{ID: 10},
-			searchResult: []boardapi.VendorEntity{{ID: 20}},
+// M03: ByVendorID — VendorIDEq が API に渡る
+func TestService_FindPayment_ByVendorID_DelegatesFilter(t *testing.T) {
+	var captured boardapi.PaymentListOptions
+	payments := &stubPaymentRepo{
+		searchFunc: func(_ context.Context, f boardapi.PaymentListOptions, _ repository.ReadOptions) ([]boardapi.PaymentEntity, error) {
+			captured = f
+			return []boardapi.PaymentEntity{{ID: 1}, {ID: 2}}, nil
 		},
-		&stubPaymentRepo{
-			getResult:    payment,
-			searchResult: []boardapi.PaymentEntity{{ID: 99, Memo: "By Search"}},
-		},
-	)
+	}
+	svc := newPaymentTestService(payments, &stubVendorRepo{})
 
-	got, err := svc.FindPayment(testCtx, find.FindPaymentQuery{ID: 1, VendorName: "ABC"})
+	results, err := svc.FindPayment(testCtx, FindPaymentQuery{VendorID: 5})
 	assertNoError(t, err)
-	assertPaymentResultLen(t, got, 1)
-	if got[0].Payment.ID != 1 {
-		t.Errorf("expected ID lookup (1), got %d", got[0].Payment.ID)
+	if len(results) != 2 {
+		t.Errorf("expected 2 results, got %d", len(results))
+	}
+	if captured.VendorIDEq != 5 {
+		t.Errorf("VendorIDEq=%d, want 5", captured.VendorIDEq)
 	}
 }
 
-// --- FindPayment: Limit Cases ---
-
-func TestFindPayment_Limit(t *testing.T) {
-	payments := []boardapi.PaymentEntity{
-		{ID: 1, VendorID: 10, Memo: "P1"},
-		{ID: 2, VendorID: 10, Memo: "P2"},
-		{ID: 3, VendorID: 10, Memo: "P3"},
+// M04: ByStatus — StatusEq API 委譲
+func TestService_FindPayment_ByStatus_Only_AllowedAndDelegated(t *testing.T) {
+	var captured boardapi.PaymentListOptions
+	payments := &stubPaymentRepo{
+		searchFunc: func(_ context.Context, f boardapi.PaymentListOptions, _ repository.ReadOptions) ([]boardapi.PaymentEntity, error) {
+			captured = f
+			return []boardapi.PaymentEntity{{ID: 1, Status: "paid"}}, nil
+		},
 	}
+	svc := newPaymentTestService(payments, &stubVendorRepo{})
 
-	svc := newServiceWith(
-		nil, nil, nil, nil,
-		&stubVendorRepo{getResult: &boardapi.VendorEntity{ID: 10}},
-		&stubPaymentRepo{listResult: payments},
-	)
-
-	got, err := svc.FindPayment(testCtx, find.FindPaymentQuery{Text: "P", Limit: 2})
+	results, err := svc.FindPayment(testCtx, FindPaymentQuery{Status: "paid"})
 	assertNoError(t, err)
-	assertPaymentResultLen(t, got, 2)
+	if len(results) != 1 {
+		t.Errorf("expected 1 result, got %d", len(results))
+	}
+	if captured.StatusEq != "paid" {
+		t.Errorf("StatusEq=%q, want 'paid'", captured.StatusEq)
+	}
+}
+
+// M05: ByText — Memo マッチ（Title 無し）
+func TestService_FindPayment_ByText_MatchesMemo(t *testing.T) {
+	payments := &stubPaymentRepo{
+		searchResult: []boardapi.PaymentEntity{
+			{ID: 1, Memo: "urgent payment"},
+			{ID: 2, Memo: "regular"},
+		},
+	}
+	svc := newPaymentTestService(payments, &stubVendorRepo{})
+
+	results, err := svc.FindPayment(testCtx, FindPaymentQuery{Text: "urgent"})
+	assertNoError(t, err)
+	if len(results) != 1 {
+		t.Errorf("expected 1 result, got %d", len(results))
+	}
+}
+
+// M06: ByStatuses + VendorID — post-filter
+func TestService_FindPayment_ByStatuses_PostFilters(t *testing.T) {
+	payments := &stubPaymentRepo{
+		searchResult: []boardapi.PaymentEntity{
+			{ID: 1, Status: "paid"},
+			{ID: 2, Status: "pending"},
+			{ID: 3, Status: "failed"},
+		},
+	}
+	svc := newPaymentTestService(payments, &stubVendorRepo{})
+
+	results, err := svc.FindPayment(testCtx, FindPaymentQuery{
+		VendorID: 5,
+		Statuses: []string{"paid", "failed"},
+	})
+	assertNoError(t, err)
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+}
+
+// M07: Limit=2
+func TestService_FindPayment_LimitTwo_StopsEnrichment(t *testing.T) {
+	payments := &stubPaymentRepo{
+		searchResult: []boardapi.PaymentEntity{
+			{ID: 1, VendorID: 5},
+			{ID: 2, VendorID: 5},
+			{ID: 3, VendorID: 5},
+		},
+	}
+	vendors := &stubVendorRepo{getResult: &boardapi.VendorEntity{ID: 5}}
+	svc := newPaymentTestService(payments, vendors)
+
+	results, err := svc.FindPayment(testCtx, FindPaymentQuery{
+		VendorID:       5,
+		FindCommonOpts: FindCommonOpts{Limit: 2},
+	})
+	assertNoError(t, err)
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+}
+
+// M08: Empty query → error
+func TestService_FindPayment_EmptyQuery_Error(t *testing.T) {
+	svc := newPaymentTestService(&stubPaymentRepo{}, &stubVendorRepo{})
+
+	_, err := svc.FindPayment(testCtx, FindPaymentQuery{})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "at least one field required") {
+		t.Errorf("unexpected error message: %v", err)
+	}
+}
+
+// M09: Statuses-only → reject
+func TestService_FindPayment_StatusesOnly_RejectedByValidate(t *testing.T) {
+	payments := &stubPaymentRepo{
+		searchResult: []boardapi.PaymentEntity{{ID: 1}},
+	}
+	svc := newPaymentTestService(payments, &stubVendorRepo{})
+
+	_, err := svc.FindPayment(testCtx, FindPaymentQuery{Statuses: []string{"paid"}})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "Statuses requires one of") {
+		t.Errorf("unexpected error message: %v", err)
+	}
+	if payments.searchCount != 0 {
+		t.Errorf("Search should not be called on validation error, got %d", payments.searchCount)
+	}
+}
+
+// M06b: ByText + Statuses — Text マッチしたサブセットに Statuses post-filter
+func TestService_FindPayment_ByTextAndStatuses_PostFiltersTextMatched(t *testing.T) {
+	payments := &stubPaymentRepo{
+		searchResult: []boardapi.PaymentEntity{
+			{ID: 1, Memo: "urgent A", Status: "paid"},
+			{ID: 2, Memo: "urgent B", Status: "pending"},
+			{ID: 3, Memo: "urgent C", Status: "failed"},
+			{ID: 4, Memo: "regular", Status: "paid"},
+		},
+	}
+	svc := newPaymentTestService(payments, &stubVendorRepo{})
+
+	results, err := svc.FindPayment(testCtx, FindPaymentQuery{
+		Text:     "urgent",
+		Statuses: []string{"paid", "failed"},
+	})
+	assertNoError(t, err)
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results (Text=urgent ∩ Statuses={paid,failed}), got %d", len(results))
+	}
+}
+
+// M10: GetByID error → fail-fast
+func TestService_FindPayment_GetByIDError_Bubbles(t *testing.T) {
+	fakeErr := errors.New("payment API error")
+	payments := &stubPaymentRepo{err: fakeErr}
+	svc := newPaymentTestService(payments, &stubVendorRepo{})
+
+	_, err := svc.FindPayment(testCtx, FindPaymentQuery{ID: 100})
+	if !errors.Is(err, fakeErr) {
+		t.Errorf("expected fakeErr, got %v", err)
+	}
 }

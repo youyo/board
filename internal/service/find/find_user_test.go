@@ -1,171 +1,200 @@
-package find_test
+package find
 
 import (
+	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/youyo/board/internal/boardapi"
-	"github.com/youyo/board/internal/service/find"
+	"github.com/youyo/board/internal/repository"
 )
 
-// --- FindUser: Normal Cases ---
+// newUserTestService は FindUser テスト用の Service を生成するヘルパー。
+func newUserTestService(users *stubUserRepo) *Service {
+	r := newTestRepos()
+	r.Users = users
+	return New(r)
+}
 
-func TestFindUser_ByID(t *testing.T) {
-	user := &boardapi.UserEntity{ID: 1, Name: "User A", Email: "a@example.com"}
+// U01: ByID HappyPath
+func TestService_FindUser_ByID_HappyPath(t *testing.T) {
+	users := &stubUserRepo{
+		getResult: &boardapi.UserEntity{ID: 10, Name: "Alice", Email: "alice@example.com"},
+	}
+	svc := newUserTestService(users)
 
-	svc := newServiceWith(
-		nil, nil, nil, nil,
-		&stubUserRepo{getResult: user},
-	)
-
-	got, err := svc.FindUser(testCtx, find.FindUserQuery{ID: 1})
+	results, err := svc.FindUser(testCtx, FindUserQuery{ID: 10})
 	assertNoError(t, err)
-	assertUserResultLen(t, got, 1)
-
-	if got[0].User.ID != 1 {
-		t.Errorf("user ID = %d, want 1", got[0].User.ID)
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
 	}
-	if got[0].User.Name != "User A" {
-		t.Errorf("user name = %q, want User A", got[0].User.Name)
+	if results[0].User.ID != 10 || results[0].User.Name != "Alice" {
+		t.Errorf("user mismatch: %+v", results[0].User)
 	}
 }
 
-func TestFindUser_ByName(t *testing.T) {
-	users := []boardapi.UserEntity{
-		{ID: 1, Name: "Alice Smith"},
-		{ID: 2, Name: "Alice Jones"},
-	}
-
-	svc := newServiceWith(
-		nil, nil, nil, nil,
-		&stubUserRepo{searchResult: users},
-	)
-
-	got, err := svc.FindUser(testCtx, find.FindUserQuery{Name: "Alice"})
-	assertNoError(t, err)
-	assertUserResultLen(t, got, 2)
-}
-
-func TestFindUser_ByText(t *testing.T) {
-	allUsers := []boardapi.UserEntity{
-		{ID: 1, Name: "Alice", Email: "alice@example.com"},
-		{ID: 2, Name: "Bob", Email: "bob@example.com"},
-		{ID: 3, Name: "Charlie", Email: "alice-friend@example.com"},
-	}
-
-	svc := newServiceWith(
-		nil, nil, nil, nil,
-		&stubUserRepo{searchResult: allUsers},
-	)
-
-	got, err := svc.FindUser(testCtx, find.FindUserQuery{Text: "alice"})
-	assertNoError(t, err)
-	// Should match User 1 (name) and User 3 (email)
-	assertUserResultLen(t, got, 2)
-}
-
-func TestFindUser_ByText_LastNameFirstName(t *testing.T) {
-	allUsers := []boardapi.UserEntity{
-		{ID: 1, LastName: "立花", FirstName: "拓也", Email: "tachibana@example.com"},
-		{ID: 2, LastName: "佐藤", FirstName: "花子", Email: "sato@example.com"},
-		{ID: 3, LastName: "田中", FirstName: "太郎", Email: "tanaka@example.com"},
-	}
-
-	svc := newServiceWith(
-		nil, nil, nil, nil,
-		&stubUserRepo{searchResult: allUsers},
-	)
-
-	got, err := svc.FindUser(testCtx, find.FindUserQuery{Text: "立花"})
-	assertNoError(t, err)
-	assertUserResultLen(t, got, 1)
-	if got[0].User.ID != 1 {
-		t.Errorf("user ID = %d, want 1", got[0].User.ID)
-	}
-}
-
-// --- FindUser: Error/Edge Cases ---
-
-func TestFindUser_EmptyQuery(t *testing.T) {
-	svc := find.New(zeroRepos())
-	_, err := svc.FindUser(testCtx, find.FindUserQuery{})
-	assertError(t, err)
-}
-
-func TestFindUser_NotFoundByID(t *testing.T) {
-	svc := newServiceWith(
-		nil, nil, nil, nil,
-		&stubUserRepo{err: errors.New("not found")},
-	)
-
-	_, err := svc.FindUser(testCtx, find.FindUserQuery{ID: 999})
-	assertError(t, err)
-}
-
-func TestFindUser_NoMatchByName(t *testing.T) {
-	svc := newServiceWith(
-		nil, nil, nil, nil,
-		&stubUserRepo{searchResult: nil},
-	)
-
-	got, err := svc.FindUser(testCtx, find.FindUserQuery{Name: "nonexistent"})
-	assertNoError(t, err)
-	assertUserResultLen(t, got, 0)
-}
-
-// --- FindUser: Priority Cases ---
-
-func TestFindUser_IDPriorityOverName(t *testing.T) {
-	user := &boardapi.UserEntity{ID: 1, Name: "By ID"}
-
-	svc := newServiceWith(
-		nil, nil, nil, nil,
-		&stubUserRepo{
-			getResult:    user,
-			searchResult: []boardapi.UserEntity{{ID: 2, Name: "By Name"}},
+// U02: ByName — NameCont が API に渡る
+func TestService_FindUser_ByName_DelegatesNameCont(t *testing.T) {
+	var captured boardapi.UserListOptions
+	users := &stubUserRepo{
+		searchFunc: func(_ context.Context, f boardapi.UserListOptions, _ repository.ReadOptions) ([]boardapi.UserEntity, error) {
+			captured = f
+			return []boardapi.UserEntity{{ID: 1, Name: "Alice"}, {ID: 2, Name: "Aliciana"}}, nil
 		},
-	)
+	}
+	svc := newUserTestService(users)
 
-	got, err := svc.FindUser(testCtx, find.FindUserQuery{ID: 1, Name: "By Name"})
+	results, err := svc.FindUser(testCtx, FindUserQuery{Name: "Ali"})
 	assertNoError(t, err)
-	assertUserResultLen(t, got, 1)
-	if got[0].User.ID != 1 {
-		t.Errorf("expected ID lookup (1), got %d", got[0].User.ID)
+	if len(results) != 2 {
+		t.Errorf("expected 2 results, got %d", len(results))
+	}
+	if captured.NameCont != "Ali" {
+		t.Errorf("NameCont=%q, want 'Ali'", captured.NameCont)
 	}
 }
 
-func TestFindUser_NamePriorityOverText(t *testing.T) {
-	searchResult := []boardapi.UserEntity{{ID: 1, Name: "Search Result"}}
-
-	svc := newServiceWith(
-		nil, nil, nil, nil,
-		&stubUserRepo{
-			searchResult: searchResult,
+// U03: ByText — Name マッチ
+func TestService_FindUser_ByText_MatchesName(t *testing.T) {
+	users := &stubUserRepo{
+		searchResult: []boardapi.UserEntity{
+			{ID: 1, Name: "Alice"},
+			{ID: 2, Name: "Bob"},
 		},
-	)
+	}
+	svc := newUserTestService(users)
 
-	got, err := svc.FindUser(testCtx, find.FindUserQuery{Name: "Search", Text: "List"})
+	results, err := svc.FindUser(testCtx, FindUserQuery{Text: "alice"})
 	assertNoError(t, err)
-	assertUserResultLen(t, got, 1)
-	if got[0].User.ID != 1 {
-		t.Errorf("expected Name search (1), got %d", got[0].User.ID)
+	if len(results) != 1 {
+		t.Errorf("expected 1 result, got %d", len(results))
 	}
 }
 
-// --- FindUser: Limit Cases ---
-
-func TestFindUser_Limit(t *testing.T) {
-	users := []boardapi.UserEntity{
-		{ID: 1, Name: "A"}, {ID: 2, Name: "B"}, {ID: 3, Name: "C"},
-		{ID: 4, Name: "D"}, {ID: 5, Name: "E"},
+// U04: ByText — LastName マッチ
+func TestService_FindUser_ByText_MatchesLastName(t *testing.T) {
+	users := &stubUserRepo{
+		searchResult: []boardapi.UserEntity{
+			{ID: 1, LastName: "Tanaka"},
+			{ID: 2, LastName: "Suzuki"},
+		},
 	}
+	svc := newUserTestService(users)
 
-	svc := newServiceWith(
-		nil, nil, nil, nil,
-		&stubUserRepo{searchResult: users},
-	)
-
-	got, err := svc.FindUser(testCtx, find.FindUserQuery{Name: "A", Limit: 2})
+	results, err := svc.FindUser(testCtx, FindUserQuery{Text: "tanaka"})
 	assertNoError(t, err)
-	assertUserResultLen(t, got, 2)
+	if len(results) != 1 {
+		t.Errorf("expected 1 result, got %d", len(results))
+	}
+}
+
+// U05: ByText — FirstName マッチ
+func TestService_FindUser_ByText_MatchesFirstName(t *testing.T) {
+	users := &stubUserRepo{
+		searchResult: []boardapi.UserEntity{
+			{ID: 1, FirstName: "Taro"},
+			{ID: 2, FirstName: "Jiro"},
+		},
+	}
+	svc := newUserTestService(users)
+
+	results, err := svc.FindUser(testCtx, FindUserQuery{Text: "taro"})
+	assertNoError(t, err)
+	if len(results) != 1 {
+		t.Errorf("expected 1 result, got %d", len(results))
+	}
+}
+
+// U06: ByText — Email マッチ
+func TestService_FindUser_ByText_MatchesEmail(t *testing.T) {
+	users := &stubUserRepo{
+		searchResult: []boardapi.UserEntity{
+			{ID: 1, Email: "alice@example.com"},
+			{ID: 2, Email: "bob@example.com"},
+		},
+	}
+	svc := newUserTestService(users)
+
+	results, err := svc.FindUser(testCtx, FindUserQuery{Text: "alice@"})
+	assertNoError(t, err)
+	if len(results) != 1 {
+		t.Errorf("expected 1 result, got %d", len(results))
+	}
+}
+
+// U07: Limit=2 — 3 件中 2 件で打ち切り
+func TestService_FindUser_LimitTwo_StopsLoop(t *testing.T) {
+	users := &stubUserRepo{
+		searchResult: []boardapi.UserEntity{
+			{ID: 1, Name: "user-a"},
+			{ID: 2, Name: "user-b"},
+			{ID: 3, Name: "user-c"},
+		},
+	}
+	svc := newUserTestService(users)
+
+	results, err := svc.FindUser(testCtx, FindUserQuery{
+		Text:           "user",
+		FindCommonOpts: FindCommonOpts{Limit: 2},
+	})
+	assertNoError(t, err)
+	if len(results) != 2 {
+		t.Errorf("expected 2 results, got %d", len(results))
+	}
+}
+
+// U08: Empty query → error
+func TestService_FindUser_EmptyQuery_Error(t *testing.T) {
+	svc := newUserTestService(&stubUserRepo{})
+
+	_, err := svc.FindUser(testCtx, FindUserQuery{})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "at least one field required") {
+		t.Errorf("unexpected error message: %v", err)
+	}
+}
+
+// U09: GetByID error → fail-fast
+func TestService_FindUser_GetByIDError_Bubbles(t *testing.T) {
+	fakeErr := errors.New("user API error")
+	users := &stubUserRepo{err: fakeErr}
+	svc := newUserTestService(users)
+
+	_, err := svc.FindUser(testCtx, FindUserQuery{ID: 10})
+	if !errors.Is(err, fakeErr) {
+		t.Errorf("expected fakeErr, got %v", err)
+	}
+}
+
+// U10: PriorityIDOverridesName — ID が優先されると Search は呼ばれない
+func TestService_FindUser_Priority_IDOverridesName(t *testing.T) {
+	users := &stubUserRepo{
+		getResult: &boardapi.UserEntity{ID: 10, Name: "Alice"},
+	}
+	svc := newUserTestService(users)
+
+	_, err := svc.FindUser(testCtx, FindUserQuery{ID: 10, Name: "Alice"})
+	assertNoError(t, err)
+	if users.searchCount != 0 {
+		t.Errorf("Search should not be called when ID is set, got %d", users.searchCount)
+	}
+}
+
+// U11: LimitNegative → error
+func TestService_FindUser_LimitNegative_Error(t *testing.T) {
+	svc := newUserTestService(&stubUserRepo{})
+
+	_, err := svc.FindUser(testCtx, FindUserQuery{
+		ID:             10,
+		FindCommonOpts: FindCommonOpts{Limit: -1},
+	})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "limit must be >= 0") {
+		t.Errorf("unexpected error message: %v", err)
+	}
 }

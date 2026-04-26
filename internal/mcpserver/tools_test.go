@@ -12,8 +12,8 @@ func TestRegisterTools_Count(t *testing.T) {
 	s := New(nil)
 
 	tools := s.MCPServer().ListTools()
-	if len(tools) != 12 {
-		t.Fatalf("expected 12 tools, got %d", len(tools))
+	if len(tools) != 11 {
+		t.Fatalf("expected 11 tools, got %d", len(tools))
 	}
 }
 
@@ -32,7 +32,6 @@ func TestRegisterTools_Names(t *testing.T) {
 		"find_purchase_orders",
 		"find_payments",
 		"find_users",
-		"find_groups",
 	}
 
 	tools := s.MCPServer().ListTools()
@@ -69,7 +68,6 @@ func TestRegisterTools_InputSchemaProperties(t *testing.T) {
 		"find_clients": {"id", "name", "text", "limit"},
 		"find_vendors": {"id", "name", "text", "limit"},
 		"find_users":   {"id", "name", "text", "limit"},
-		"find_groups":  {"id", "name", "text", "limit"},
 	}
 	for toolName, expectedProps := range simpleCases {
 		tool, ok := tools[toolName]

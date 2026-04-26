@@ -1,235 +1,309 @@
-package find_test
+package find
 
 import (
+	"context"
 	"errors"
 	"testing"
 
 	"github.com/youyo/board/internal/boardapi"
-	"github.com/youyo/board/internal/service/find"
+	"github.com/youyo/board/internal/repository"
 )
 
-// --- FindReceipt: Normal Cases ---
+func newReceiptTestService(rr *stubReceiptRepo, pr *stubProjectRepo, cr *stubClientRepo) *Service {
+	repos := newTestRepos()
+	repos.Receipts = rr
+	repos.Projects = pr
+	repos.Clients = cr
+	return New(repos)
+}
 
-// M38: ReceiptEntity に ClientID/ProjectID/Status フィールドは存在しない。
-// ReceiptDate は実在フィールドなので引き続き利用可能。
-// ID lookup では client/project は nil。ProjectID/ClientName/ProjectName ブランチでは
-// project コンテキストから enrichment を行う。
-//
-// M29 FIX: BOARD API は response_group=receipt で "receipts" 複数形配列を返す。
-// モックデータも ProjectEntity.Receipts ([]DocumentSummary) で設定すること。
+// N06-R01: ID branch ハッピーパス。
+func TestService_FindReceipt_ByID_HappyPath(t *testing.T) {
+	rr := &stubReceiptRepo{getByDocIDResult: &boardapi.ReceiptEntity{ID: 400}}
+	pr := &stubProjectRepo{
+		searchResult: []boardapi.ProjectEntity{
+			{ID: 7, Receipts: []boardapi.DocumentSummary{{ID: 400}}, Client: &boardapi.ClientRef{ID: 5}},
+		},
+		getResult: &boardapi.ProjectEntity{ID: 7, Client: &boardapi.ClientRef{ID: 5}},
+	}
+	cr := &stubClientRepo{getResult: &boardapi.ClientEntity{ID: 5}}
+	svc := newReceiptTestService(rr, pr, cr)
 
-func TestFindReceipt_ByID(t *testing.T) {
-	rec := &boardapi.ReceiptEntity{ID: 1, Total: "90000.0", ReceiptDate: "2026-06-30"}
-
-	svc := newServiceWith(
-		nil, nil, nil,
-		&stubProjectRepo{},
-		&stubReceiptRepo{getByDocIDResult: rec},
-	)
-
-	got, err := svc.FindReceipt(testCtx, find.FindReceiptQuery{ID: 1})
+	results, err := svc.FindReceipt(testCtx, FindReceiptQuery{ID: 400})
 	assertNoError(t, err)
-	assertReceiptResultLen(t, got, 1)
-
-	if got[0].Receipt.ID != 1 {
-		t.Errorf("receipt ID = %d, want 1", got[0].Receipt.ID)
+	if len(results) != 1 {
+		t.Fatalf("expected 1, got %d", len(results))
 	}
-	// ID lookup では client/project は特定不能なので nil
-	if got[0].Client != nil {
-		t.Errorf("expected nil client for ID-only lookup, got %+v", got[0].Client)
-	}
-	if got[0].Project != nil {
-		t.Errorf("expected nil project for ID-only lookup, got %+v", got[0].Project)
+	r := results[0]
+	if r.Receipt.ID != 400 || r.ProjectID != 7 || r.ClientID != 5 {
+		t.Errorf("unexpected: %+v", r)
 	}
 }
 
-func TestFindReceipt_ByProjectID(t *testing.T) {
-	docSummary := boardapi.DocumentSummary{ID: 42}
-	project := &boardapi.ProjectEntity{ID: 100, Client: &boardapi.ClientRef{ID: 10}, Name: "Web Dev", Receipts: []boardapi.DocumentSummary{docSummary}}
-	rec := &boardapi.ReceiptEntity{ID: 42, Total: "80000.0", ReceiptDate: "2026-06-30"}
+// N06-R02: ID branch、reverseMap miss。
+func TestService_FindReceipt_ByID_ReverseMapMiss_PartialResult(t *testing.T) {
+	rr := &stubReceiptRepo{getByDocIDResult: &boardapi.ReceiptEntity{ID: 999}}
+	pr := &stubProjectRepo{searchResult: []boardapi.ProjectEntity{}}
+	svc := newReceiptTestService(rr, pr, &stubClientRepo{})
 
-	svc := newServiceWith(
-		&stubClientRepo{getResult: &boardapi.ClientEntity{ID: 10}},
-		nil, nil,
-		&stubProjectRepo{getWithGroupResult: project, getResult: &boardapi.ProjectEntity{ID: 100}},
-		&stubReceiptRepo{getByDocIDResult: rec},
-	)
-
-	got, err := svc.FindReceipt(testCtx, find.FindReceiptQuery{ProjectID: 100})
+	results, err := svc.FindReceipt(testCtx, FindReceiptQuery{ID: 999})
 	assertNoError(t, err)
-	assertReceiptResultLen(t, got, 1)
-	if got[0].Receipt.ID != 42 {
-		t.Errorf("receipt ID = %d, want 42", got[0].Receipt.ID)
+	if len(results) != 1 || results[0].ProjectID != 0 {
+		t.Fatalf("unexpected: %+v", results)
 	}
 }
 
-func TestFindReceipt_ByClientName(t *testing.T) {
-	clients := []boardapi.ClientEntity{{ID: 10, Name: "ABC Corp"}}
-	docSummary := boardapi.DocumentSummary{ID: 1}
-	projects := []boardapi.ProjectEntity{
-		{ID: 100, Client: &boardapi.ClientRef{ID: 10}, Name: "P1", Receipts: []boardapi.DocumentSummary{docSummary}},
-	}
-	rec := &boardapi.ReceiptEntity{ID: 1, Total: "50000.0"}
-
-	svc := newServiceWith(
-		&stubClientRepo{searchResult: clients, getResult: &boardapi.ClientEntity{ID: 10}},
-		nil, nil,
-		&stubProjectRepo{searchResult: projects},
-		&stubReceiptRepo{getByDocIDResult: rec},
-	)
-
-	got, err := svc.FindReceipt(testCtx, find.FindReceiptQuery{ClientName: "ABC"})
-	assertNoError(t, err)
-	assertReceiptResultLen(t, got, 1)
-}
-
-func TestFindReceipt_ByProjectName(t *testing.T) {
-	docSummary := boardapi.DocumentSummary{ID: 1}
-	projects := []boardapi.ProjectEntity{
-		{ID: 100, Client: &boardapi.ClientRef{ID: 10}, Name: "Web Dev", Receipts: []boardapi.DocumentSummary{docSummary}},
-	}
-	rec := &boardapi.ReceiptEntity{ID: 1, Total: "80000.0"}
-
-	svc := newServiceWith(
-		&stubClientRepo{getResult: &boardapi.ClientEntity{ID: 10}},
-		nil, nil,
-		&stubProjectRepo{searchResult: projects},
-		&stubReceiptRepo{getByDocIDResult: rec},
-	)
-
-	got, err := svc.FindReceipt(testCtx, find.FindReceiptQuery{ProjectName: "Web"})
-	assertNoError(t, err)
-	assertReceiptResultLen(t, got, 1)
-}
-
-// TestFindReceipt_ByClientNameWithStatus: Status クエリパラメータを受け付けるが、
-// M38 時点では Status post-filter は無効（ReceiptEntity に Status フィールド無し）。
-// TODO(M25-M32): Status post-filter を再設計で復元する。
-func TestFindReceipt_ByClientNameWithStatus(t *testing.T) {
-	clients := []boardapi.ClientEntity{{ID: 10, Name: "ABC"}}
-	docSummary := boardapi.DocumentSummary{ID: 1}
-	projects := []boardapi.ProjectEntity{
-		{ID: 100, Client: &boardapi.ClientRef{ID: 10}, Name: "P1", Receipts: []boardapi.DocumentSummary{docSummary}},
-	}
-	rec := &boardapi.ReceiptEntity{ID: 1, Total: "50000.0"}
-
-	svc := newServiceWith(
-		&stubClientRepo{searchResult: clients, getResult: &boardapi.ClientEntity{ID: 10}},
-		nil, nil,
-		&stubProjectRepo{searchResult: projects},
-		&stubReceiptRepo{getByDocIDResult: rec},
-	)
-
-	got, err := svc.FindReceipt(testCtx, find.FindReceiptQuery{ClientName: "ABC", Status: "confirmed"})
-	assertNoError(t, err)
-	// Status post-filter は無効のため、条件に関係なく 1 件返る
-	assertReceiptResultLen(t, got, 1)
-}
-
-// --- FindReceipt: Error/Edge Cases ---
-
-func TestFindReceipt_EmptyQuery(t *testing.T) {
-	svc := find.New(zeroRepos())
-	_, err := svc.FindReceipt(testCtx, find.FindReceiptQuery{})
-	assertError(t, err)
-}
-
-func TestFindReceipt_StatusOnlyQuery(t *testing.T) {
-	svc := find.New(zeroRepos())
-	_, err := svc.FindReceipt(testCtx, find.FindReceiptQuery{Status: "confirmed"})
-	assertError(t, err)
-}
-
-func TestFindReceipt_NotFoundByID(t *testing.T) {
-	svc := newServiceWith(nil, nil, nil, nil,
-		&stubReceiptRepo{err: errors.New("not found")},
-	)
-	_, err := svc.FindReceipt(testCtx, find.FindReceiptQuery{ID: 999})
-	assertError(t, err)
-}
-
-func TestFindReceipt_NoMatchByClientName(t *testing.T) {
-	svc := newServiceWith(
-		&stubClientRepo{searchResult: nil}, nil, nil, nil,
-		&stubReceiptRepo{},
-	)
-	got, err := svc.FindReceipt(testCtx, find.FindReceiptQuery{ClientName: "nonexistent"})
-	assertNoError(t, err)
-	assertReceiptResultLen(t, got, 0)
-}
-
-// TestFindReceipt_ClientResolutionFailure: ID lookup では enrichment しないため
-// client error は発生しない。結果は Client=nil で正常に返る。
-func TestFindReceipt_ClientResolutionFailure(t *testing.T) {
-	rec := &boardapi.ReceiptEntity{ID: 1, Total: "90000.0"}
-	svc := newServiceWith(
-		nil, nil, nil, nil,
-		&stubReceiptRepo{getByDocIDResult: rec},
-	)
-
-	got, err := svc.FindReceipt(testCtx, find.FindReceiptQuery{ID: 1})
-	assertNoError(t, err)
-	assertReceiptResultLen(t, got, 1)
-	if got[0].Client != nil {
-		t.Error("expected nil client for ID-only lookup")
+// N06-R03: ID branch、Document fetch error 伝播。
+func TestService_FindReceipt_ByID_DocumentFetchError_Bubbles(t *testing.T) {
+	fakeErr := errors.New("upstream")
+	rr := &stubReceiptRepo{err: fakeErr}
+	svc := newReceiptTestService(rr, &stubProjectRepo{}, &stubClientRepo{})
+	_, err := svc.FindReceipt(testCtx, FindReceiptQuery{ID: 400})
+	if !errors.Is(err, fakeErr) {
+		t.Errorf("got %v", err)
 	}
 }
 
-// TestFindReceipt_ProjectResolutionFailure: ID lookup では enrichment しないため
-// project error は発生しない。結果は Project=nil で正常に返る。
-func TestFindReceipt_ProjectResolutionFailure(t *testing.T) {
-	rec := &boardapi.ReceiptEntity{ID: 1, Total: "90000.0"}
-	svc := newServiceWith(
-		nil, nil, nil, nil,
-		&stubReceiptRepo{getByDocIDResult: rec},
-	)
-
-	got, err := svc.FindReceipt(testCtx, find.FindReceiptQuery{ID: 1})
+// N06-R04: ID branch、projects.GetByID fail → non-fatal。
+func TestService_FindReceipt_ByID_ProjectFetchFails_NonFatal(t *testing.T) {
+	rec := withRecordedSlog(t)
+	fakeErr := errors.New("project fetch failed")
+	rr := &stubReceiptRepo{getByDocIDResult: &boardapi.ReceiptEntity{ID: 400}}
+	pr := &stubProjectRepo{
+		searchResult: []boardapi.ProjectEntity{{ID: 7, Receipts: []boardapi.DocumentSummary{{ID: 400}}}},
+		getFunc: func(_ context.Context) (*boardapi.ProjectEntity, error) {
+			return nil, fakeErr
+		},
+	}
+	svc := newReceiptTestService(rr, pr, &stubClientRepo{})
+	results, err := svc.FindReceipt(testCtx, FindReceiptQuery{ID: 400})
 	assertNoError(t, err)
-	assertReceiptResultLen(t, got, 1)
-	if got[0].Project != nil {
-		t.Error("expected nil project for ID-only lookup")
+	if len(results) != 1 || results[0].ProjectID != 7 || results[0].Project != nil {
+		t.Fatalf("unexpected: %+v", results)
+	}
+	warns := filterWarn(rec.records)
+	if len(warns) != 1 || warns[0].Message != "find.FindReceipt: project enrichment failed" {
+		t.Errorf("unexpected warns: %+v", warns)
 	}
 }
 
-// --- FindReceipt: Priority ---
+// N06-R05: ProjectID branch、複数 Receipts 全件ループ（**配列対応**）。
+func TestService_FindReceipt_ByProjectID_MultipleReceipts_LoopsAll(t *testing.T) {
+	docCount := 0
+	rr := &stubReceiptRepo{
+		getByDocIDFunc: func(_ context.Context, id int) (*boardapi.ReceiptEntity, error) {
+			docCount++
+			return &boardapi.ReceiptEntity{ID: id}, nil
+		},
+	}
+	pr := &stubProjectRepo{
+		getWithGroupResult: &boardapi.ProjectEntity{
+			ID: 7,
+			Receipts: []boardapi.DocumentSummary{
+				{ID: 400},
+				{ID: 401},
+				{ID: 402},
+			},
+			Client: &boardapi.ClientRef{ID: 5},
+		},
+	}
+	cr := &stubClientRepo{getResult: &boardapi.ClientEntity{ID: 5}}
+	svc := newReceiptTestService(rr, pr, cr)
 
-func TestFindReceipt_IDPriorityOverProjectID(t *testing.T) {
-	rec := &boardapi.ReceiptEntity{ID: 1, Total: "90000.0"}
-	svc := newServiceWith(
-		nil, nil, nil,
-		&stubProjectRepo{},
-		&stubReceiptRepo{getByDocIDResult: rec},
-	)
-
-	got, err := svc.FindReceipt(testCtx, find.FindReceiptQuery{ID: 1, ProjectID: 100})
+	results, err := svc.FindReceipt(testCtx, FindReceiptQuery{ProjectID: 7})
 	assertNoError(t, err)
-	assertReceiptResultLen(t, got, 1)
-	if got[0].Receipt.ID != 1 {
-		t.Errorf("expected ID lookup (1), got %d", got[0].Receipt.ID)
+	if len(results) != 3 {
+		t.Fatalf("expected 3 (loops all), got %d", len(results))
+	}
+	if docCount != 3 {
+		t.Errorf("expected GetByDocumentID called 3 times, got %d", docCount)
+	}
+	if cr.getCount != 1 {
+		t.Errorf("expected client lookup once per project, got %d", cr.getCount)
 	}
 }
 
-// --- FindReceipt: Limit ---
-
-func TestFindReceipt_Limit(t *testing.T) {
-	docSummary1 := boardapi.DocumentSummary{ID: 1}
-	docSummary2 := boardapi.DocumentSummary{ID: 2}
-	docSummary3 := boardapi.DocumentSummary{ID: 3}
-	projects := []boardapi.ProjectEntity{
-		{ID: 100, Client: &boardapi.ClientRef{ID: 10}, Name: "P1", Receipts: []boardapi.DocumentSummary{docSummary1}},
-		{ID: 101, Client: &boardapi.ClientRef{ID: 10}, Name: "P2", Receipts: []boardapi.DocumentSummary{docSummary2}},
-		{ID: 102, Client: &boardapi.ClientRef{ID: 10}, Name: "P3", Receipts: []boardapi.DocumentSummary{docSummary3}},
-	}
-	rec := &boardapi.ReceiptEntity{ID: 1, Total: "50000.0"}
-
-	svc := newServiceWith(
-		nil, nil, nil,
-		&stubProjectRepo{searchResult: projects},
-		&stubReceiptRepo{getByDocIDResult: rec},
-	)
-
-	got, err := svc.FindReceipt(testCtx, find.FindReceiptQuery{ProjectName: "P", Limit: 2})
+// N06-R06: ProjectID branch、Receipts なし → 0 件。
+func TestService_FindReceipt_ByProjectID_NoReceipts_ReturnsEmpty(t *testing.T) {
+	pr := &stubProjectRepo{getWithGroupResult: &boardapi.ProjectEntity{ID: 7, Receipts: nil}}
+	svc := newReceiptTestService(&stubReceiptRepo{}, pr, &stubClientRepo{})
+	results, err := svc.FindReceipt(testCtx, FindReceiptQuery{ProjectID: 7})
 	assertNoError(t, err)
-	assertReceiptResultLen(t, got, 2)
+	if len(results) != 0 {
+		t.Errorf("expected 0, got %d", len(results))
+	}
+}
+
+// N06-R07: ProjectID branch、GetByIDWithGroup error 伝播。
+func TestService_FindReceipt_ByProjectID_GetWithGroupError_Bubbles(t *testing.T) {
+	fakeErr := errors.New("upstream")
+	pr := &stubProjectRepo{getWithGroupErr: fakeErr}
+	svc := newReceiptTestService(&stubReceiptRepo{}, pr, &stubClientRepo{})
+	_, err := svc.FindReceipt(testCtx, FindReceiptQuery{ProjectID: 7})
+	if !errors.Is(err, fakeErr) {
+		t.Errorf("got %v", err)
+	}
+}
+
+// N06-R08: ClientName branch、配列 fanout。
+func TestService_FindReceipt_ByClientName_FanoutsAcrossReceipts(t *testing.T) {
+	rr := &stubReceiptRepo{
+		getByDocIDFunc: func(_ context.Context, id int) (*boardapi.ReceiptEntity, error) {
+			return &boardapi.ReceiptEntity{ID: id}, nil
+		},
+	}
+	pr := &stubProjectRepo{
+		searchResult: []boardapi.ProjectEntity{
+			{
+				ID: 7,
+				Receipts: []boardapi.DocumentSummary{
+					{ID: 400},
+					{ID: 401},
+				},
+				Client: &boardapi.ClientRef{ID: 5},
+			},
+		},
+	}
+	cr := &stubClientRepo{searchResult: []boardapi.ClientEntity{{ID: 5}}}
+	svc := newReceiptTestService(rr, pr, cr)
+
+	results, err := svc.FindReceipt(testCtx, FindReceiptQuery{ClientName: "Acme"})
+	assertNoError(t, err)
+	if len(results) != 2 {
+		t.Fatalf("expected 2, got %d", len(results))
+	}
+	if cr.getCount != 0 {
+		t.Errorf("expected outer reuse, got %d", cr.getCount)
+	}
+}
+
+// N06-R09: ProjectName branch、Search filter assert。
+func TestService_FindReceipt_ByProjectName_HappyPath(t *testing.T) {
+	var captured boardapi.ProjectListOptions
+	rr := &stubReceiptRepo{getByDocIDResult: &boardapi.ReceiptEntity{ID: 400}}
+	pr := &stubProjectRepo{
+		searchFunc: func(_ context.Context, filter boardapi.ProjectListOptions, _ repository.ReadOptions) ([]boardapi.ProjectEntity, error) {
+			captured = filter
+			return []boardapi.ProjectEntity{
+				{ID: 7, Receipts: []boardapi.DocumentSummary{{ID: 400}}, Client: &boardapi.ClientRef{ID: 5}},
+			}, nil
+		},
+	}
+	cr := &stubClientRepo{getResult: &boardapi.ClientEntity{ID: 5}}
+	svc := newReceiptTestService(rr, pr, cr)
+
+	results, err := svc.FindReceipt(testCtx, FindReceiptQuery{ProjectName: "Foo"})
+	assertNoError(t, err)
+	if len(results) != 1 {
+		t.Fatalf("expected 1, got %d", len(results))
+	}
+	if captured.NameCont != "Foo" || captured.ResponseGroup != "receipt" {
+		t.Errorf("captured: %+v", captured)
+	}
+}
+
+// N06-R10: ProjectName + Limit=2。
+func TestService_FindReceipt_LimitTwo_StopsAcrossInnerLoop(t *testing.T) {
+	count := 0
+	rr := &stubReceiptRepo{
+		getByDocIDFunc: func(_ context.Context, id int) (*boardapi.ReceiptEntity, error) {
+			count++
+			return &boardapi.ReceiptEntity{ID: id}, nil
+		},
+	}
+	pr := &stubProjectRepo{
+		searchResult: []boardapi.ProjectEntity{
+			{ID: 7, Receipts: []boardapi.DocumentSummary{{ID: 401}, {ID: 402}}},
+			{ID: 8, Receipts: []boardapi.DocumentSummary{{ID: 403}}},
+		},
+	}
+	svc := newReceiptTestService(rr, pr, &stubClientRepo{})
+	results, err := svc.FindReceipt(testCtx, FindReceiptQuery{ProjectName: "x", FindCommonOpts: FindCommonOpts{Limit: 2}})
+	assertNoError(t, err)
+	if len(results) != 2 {
+		t.Fatalf("expected 2, got %d", len(results))
+	}
+	if count != 2 {
+		t.Errorf("expected count=2, got %d", count)
+	}
+}
+
+// N06-R11: ClientName branch、IsNotFound はスキップ。
+func TestService_FindReceipt_ByClientName_DocumentNotFoundSkipped(t *testing.T) {
+	rr := &stubReceiptRepo{
+		getByDocIDFunc: func(_ context.Context, id int) (*boardapi.ReceiptEntity, error) {
+			if id == 400 {
+				return nil, fakeNotFoundErr()
+			}
+			return &boardapi.ReceiptEntity{ID: id}, nil
+		},
+	}
+	pr := &stubProjectRepo{
+		searchResult: []boardapi.ProjectEntity{
+			{
+				ID: 7,
+				Receipts: []boardapi.DocumentSummary{
+					{ID: 400},
+					{ID: 401},
+				},
+				Client: &boardapi.ClientRef{ID: 5},
+			},
+		},
+	}
+	cr := &stubClientRepo{searchResult: []boardapi.ClientEntity{{ID: 5}}}
+	svc := newReceiptTestService(rr, pr, cr)
+
+	results, err := svc.FindReceipt(testCtx, FindReceiptQuery{ClientName: "x"})
+	assertNoError(t, err)
+	if len(results) != 1 {
+		t.Fatalf("expected 1, got %d", len(results))
+	}
+	if results[0].Receipt.ID != 401 {
+		t.Errorf("expected ID=401, got %d", results[0].Receipt.ID)
+	}
+}
+
+// --- バリデーション ---
+
+func TestService_FindReceipt_EmptyQuery_Error(t *testing.T) {
+	svc := New(newTestRepos())
+	_, err := svc.FindReceipt(testCtx, FindReceiptQuery{})
+	if err == nil || err.Error() != "at least one field required" {
+		t.Errorf("got %v", err)
+	}
+}
+
+func TestService_FindReceipt_LimitNegative_Error(t *testing.T) {
+	svc := New(newTestRepos())
+	_, err := svc.FindReceipt(testCtx, FindReceiptQuery{ID: 1, FindCommonOpts: FindCommonOpts{Limit: -1}})
+	if err == nil || err.Error() != "limit must be >= 0" {
+		t.Errorf("got %v", err)
+	}
+}
+
+func TestService_FindReceipt_TextOnly_ReturnsEmpty(t *testing.T) {
+	rr := &stubReceiptRepo{}
+	pr := &stubProjectRepo{}
+	cr := &stubClientRepo{}
+	svc := newReceiptTestService(rr, pr, cr)
+	results, err := svc.FindReceipt(testCtx, FindReceiptQuery{Text: "abc"})
+	assertNoError(t, err)
+	if len(results) != 0 {
+		t.Errorf("got %d", len(results))
+	}
+}
+
+func TestService_FindReceipt_PriorityIDOverridesProjectID(t *testing.T) {
+	rr := &stubReceiptRepo{getByDocIDResult: &boardapi.ReceiptEntity{ID: 400}}
+	pr := &stubProjectRepo{searchResult: []boardapi.ProjectEntity{}}
+	svc := newReceiptTestService(rr, pr, &stubClientRepo{})
+
+	results, err := svc.FindReceipt(testCtx, FindReceiptQuery{ID: 400, ProjectID: 7})
+	assertNoError(t, err)
+	if len(results) != 1 {
+		t.Fatalf("expected 1, got %d", len(results))
+	}
+	if pr.getWithGroupCount != 0 {
+		t.Errorf("expected GetByIDWithGroup not called, got %d", pr.getWithGroupCount)
+	}
 }

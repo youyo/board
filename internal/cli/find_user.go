@@ -34,14 +34,16 @@ func NewFindUserCmd() *cobra.Command {
 
 			opts := readOptionsFromCmd(cmd)
 			q := find.FindUserQuery{
-				ID:    id,
-				Name:  name,
-				Text:  text,
-				Limit: opts.Limit,
-				Opts: repository.ReadOptions{
-					Refresh:      opts.Refresh,
-					ForceRefresh: opts.ForceRefresh,
+				FindCommonOpts: find.FindCommonOpts{
+					Limit: opts.Limit,
+					Opts: repository.ReadOptions{
+						Refresh:      opts.Refresh,
+						ForceRefresh: opts.ForceRefresh,
+					},
 				},
+				ID:   id,
+				Name: name,
+				Text: text,
 			}
 
 			results, err := svc.FindUser(cmd.Context(), q)

@@ -1,15 +1,15 @@
-package find_test
+package find
 
 import (
 	"context"
+	"log/slog"
 	"testing"
 
 	"github.com/youyo/board/internal/boardapi"
 	"github.com/youyo/board/internal/repository"
-	"github.com/youyo/board/internal/service/find"
 )
 
-// --- Test context and options ---
+// --- テストコンテキスト ---
 
 var testCtx = context.Background()
 
@@ -32,469 +32,429 @@ func assertError(t *testing.T, err error) {
 	}
 }
 
-func assertClientResultLen(t *testing.T, got []find.ClientResult, want int) {
-	t.Helper()
-	if len(got) != want {
-		t.Fatalf("ClientResult len = %d, want %d", len(got), want)
-	}
-}
-
-func assertProjectResultLen(t *testing.T, got []find.ProjectResult, want int) {
-	t.Helper()
-	if len(got) != want {
-		t.Fatalf("ProjectResult len = %d, want %d", len(got), want)
-	}
-}
-
-func assertEstimateResultLen(t *testing.T, got []find.EstimateResult, want int) {
-	t.Helper()
-	if len(got) != want {
-		t.Fatalf("EstimateResult len = %d, want %d", len(got), want)
-	}
-}
-
-func assertInvoiceResultLen(t *testing.T, got []find.InvoiceResult, want int) {
-	t.Helper()
-	if len(got) != want {
-		t.Fatalf("InvoiceResult len = %d, want %d", len(got), want)
-	}
-}
-
-func assertOrderResultLen(t *testing.T, got []find.OrderResult, want int) {
-	t.Helper()
-	if len(got) != want {
-		t.Fatalf("OrderResult len = %d, want %d", len(got), want)
-	}
-}
-
-func assertDeliveryResultLen(t *testing.T, got []find.DeliveryResult, want int) {
-	t.Helper()
-	if len(got) != want {
-		t.Fatalf("DeliveryResult len = %d, want %d", len(got), want)
-	}
-}
-
-func assertReceiptResultLen(t *testing.T, got []find.ReceiptResult, want int) {
-	t.Helper()
-	if len(got) != want {
-		t.Fatalf("ReceiptResult len = %d, want %d", len(got), want)
-	}
-}
-
-func assertVendorResultLen(t *testing.T, got []find.VendorResult, want int) {
-	t.Helper()
-	if len(got) != want {
-		t.Fatalf("VendorResult len = %d, want %d", len(got), want)
-	}
-}
-
-func assertPurchaseOrderResultLen(t *testing.T, got []find.PurchaseOrderResult, want int) {
-	t.Helper()
-	if len(got) != want {
-		t.Fatalf("PurchaseOrderResult len = %d, want %d", len(got), want)
-	}
-}
-
-func assertPaymentResultLen(t *testing.T, got []find.PaymentResult, want int) {
-	t.Helper()
-	if len(got) != want {
-		t.Fatalf("PaymentResult len = %d, want %d", len(got), want)
-	}
-}
-
-func assertUserResultLen(t *testing.T, got []find.UserResult, want int) {
-	t.Helper()
-	if len(got) != want {
-		t.Fatalf("UserResult len = %d, want %d", len(got), want)
-	}
-}
-
-func assertGroupResultLen(t *testing.T, got []find.GroupResult, want int) {
-	t.Helper()
-	if len(got) != want {
-		t.Fatalf("GroupResult len = %d, want %d", len(got), want)
-	}
-}
-
-// --- Stub implementations ---
+// --- Stub 実装 ---
+// ClientBranchRepo / ContactRepo / VendorBranchRepo / VendorContactRepo は
+// Search のみが interface 要件だが、stub は将来の拡張に備えて GetByID も持つ（余剰メソッドは無害）。
 
 type stubClientRepo struct {
-	listResult   []boardapi.ClientEntity
 	getResult    *boardapi.ClientEntity
 	searchResult []boardapi.ClientEntity
 	err          error
+	searchErr    error // Search 専用エラー（GetByID は err を使い、Search は searchErr を使う）
+	searchCount  int   // Search 呼び出し回数カウンター（T06 で使用）
+	getCount     int   // GetByID 呼び出し回数カウンター（N05-T02/T08 で使用）
+	// getFunc が非 nil の場合、GetByID はこの関数を呼ぶ（ctx-aware テスト用）。
+	getFunc func(ctx context.Context) (*boardapi.ClientEntity, error)
+	// searchFunc が非 nil の場合、Search はこの関数を呼ぶ（ctx-aware テスト用）。
+	searchFunc func(ctx context.Context, filter boardapi.ClientListOptions, opts repository.ReadOptions) ([]boardapi.ClientEntity, error)
 }
 
-func (s *stubClientRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.ClientEntity, error) {
+func (s *stubClientRepo) GetByID(ctx context.Context, _ int, _ repository.ReadOptions) (*boardapi.ClientEntity, error) {
+	s.getCount++
+	if s.getFunc != nil {
+		return s.getFunc(ctx)
+	}
 	return s.getResult, s.err
 }
-
-// Search returns listResult for a zero filter (used by Text search in
-// find_client to fetch all clients before in-memory filtering) and
-// searchResult otherwise. Callers can still set either field independently.
-func (s *stubClientRepo) Search(_ context.Context, filter boardapi.ClientListOptions, _ repository.ReadOptions) ([]boardapi.ClientEntity, error) {
-	if filter.NameCont == "" && len(filter.Tags) == 0 && filter.CustomNoEq == "" &&
-		filter.NameDispCont == "" && filter.InvoiceSystemNumberEq == "" &&
-		filter.UpdatedAtGteq == "" && filter.UpdatedAtLteq == "" &&
-		filter.IncludeArchiveFlg == nil && filter.ResponseGroup == "" {
-		return s.listResult, s.err
+func (s *stubClientRepo) Search(ctx context.Context, filter boardapi.ClientListOptions, opts repository.ReadOptions) ([]boardapi.ClientEntity, error) {
+	s.searchCount++
+	if s.searchFunc != nil {
+		return s.searchFunc(ctx, filter, opts)
+	}
+	if s.searchErr != nil {
+		return nil, s.searchErr
 	}
 	return s.searchResult, s.err
 }
 
 type stubClientBranchRepo struct {
-	getResult    *boardapi.ClientBranchEntity
 	searchResult []boardapi.ClientBranchEntity
 	err          error
+	// searchFunc が非 nil の場合、Search はこの関数を呼ぶ（ctx-aware / handshake テスト用）。
+	searchFunc func(ctx context.Context, filter boardapi.ClientBranchListOptions, opts repository.ReadOptions) ([]boardapi.ClientBranchEntity, error)
 }
 
-func (s *stubClientBranchRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.ClientBranchEntity, error) {
-	return s.getResult, s.err
-}
-func (s *stubClientBranchRepo) Search(_ context.Context, _ boardapi.ClientBranchListOptions, _ repository.ReadOptions) ([]boardapi.ClientBranchEntity, error) {
-	return s.searchResult, s.err
-}
-
-type stubContactRepo struct {
-	getResult    *boardapi.ContactEntity
-	searchResult []boardapi.ContactEntity
-	err          error
-}
-
-func (s *stubContactRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.ContactEntity, error) {
-	return s.getResult, s.err
-}
-func (s *stubContactRepo) Search(_ context.Context, _ boardapi.ContactListOptions, _ repository.ReadOptions) ([]boardapi.ContactEntity, error) {
-	return s.searchResult, s.err
-}
-
-type stubProjectRepo struct {
-	listResult         []boardapi.ProjectEntity
-	getResult          *boardapi.ProjectEntity
-	searchResult       []boardapi.ProjectEntity
-	getWithGroupResult *boardapi.ProjectEntity
-	err                error
-}
-
-func (s *stubProjectRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.ProjectEntity, error) {
-	return s.getResult, s.err
-}
-func (s *stubProjectRepo) Search(_ context.Context, filter boardapi.ProjectListOptions, _ repository.ReadOptions) ([]boardapi.ProjectEntity, error) {
-	// ゼロフィルタ → listResult を返す（全件取得の代替）、非ゼロ → searchResult
-	if projectListOptionsIsZero(filter) {
-		return s.listResult, s.err
+func (s *stubClientBranchRepo) Search(ctx context.Context, filter boardapi.ClientBranchListOptions, opts repository.ReadOptions) ([]boardapi.ClientBranchEntity, error) {
+	if s.searchFunc != nil {
+		return s.searchFunc(ctx, filter, opts)
 	}
 	return s.searchResult, s.err
 }
 
-// projectListOptionsIsZero reports whether filter is the zero value.
-// Cannot use == because ProjectListOptions contains slice fields.
-func projectListOptionsIsZero(f boardapi.ProjectListOptions) bool {
-	return f.Page == 0 && f.PerPage == 0 &&
-		f.UpdatedAtGteq == "" && f.UpdatedAtLteq == "" &&
-		f.CreatedAtGteq == "" && f.CreatedAtLteq == "" &&
-		f.IncludeArchiveFlg == nil && f.IncludeLostFlg == nil &&
-		f.NameCont == "" && f.ClientIDEq == 0 && f.ClientNameCont == "" &&
-		len(f.OrderStatusIn) == 0 && len(f.DeliveryStatusIn) == 0 &&
-		f.ProjectNoEq == "" && f.ManagementNoEq == "" &&
-		f.DeliveryDateGteq == "" && f.DeliveryDateLteq == "" &&
-		f.InvoiceDateGteq == "" && f.InvoiceDateLteq == "" &&
-		len(f.InvoiceTimingKbnIn) == 0 && len(f.Tags) == 0 &&
-		f.ResponseGroup == ""
+type stubContactRepo struct {
+	searchResult []boardapi.ContactEntity
+	err          error
+	// searchFunc が非 nil の場合、Search はこの関数を呼ぶ（ctx-aware / handshake テスト用）。
+	searchFunc func(ctx context.Context, filter boardapi.ContactListOptions, opts repository.ReadOptions) ([]boardapi.ContactEntity, error)
 }
-func (s *stubProjectRepo) GetByIDWithGroup(_ context.Context, id int, _ string) (*boardapi.ProjectEntity, error) {
+
+func (s *stubContactRepo) Search(ctx context.Context, filter boardapi.ContactListOptions, opts repository.ReadOptions) ([]boardapi.ContactEntity, error) {
+	if s.searchFunc != nil {
+		return s.searchFunc(ctx, filter, opts)
+	}
+	return s.searchResult, s.err
+}
+
+// stubProjectRepo は searchFunc を持ち、テストごとに動作を制御できる。
+type stubProjectRepo struct {
+	getResult          *boardapi.ProjectEntity
+	searchResult       []boardapi.ProjectEntity
+	getWithGroupResult *boardapi.ProjectEntity
+	getWithGroupErr    error // GetByIDWithGroup 専用エラー（N06）
+	err                error
+	getCount           int // GetByID 呼び出し回数カウンター（N06 で reverseMapper hit/miss / project enrichment fail テスト等で使用）
+	getWithGroupCount  int // GetByIDWithGroup 呼び出し回数カウンター（N06 で priority テスト等で使用）
+	searchCount        int // Search 呼び出し回数カウンター（N06 で priority テスト等で使用）
+	// searchFunc が非 nil の場合、Search はこの関数を呼ぶ（singleflight/timeout テスト用）。
+	searchFunc func(ctx context.Context, filter boardapi.ProjectListOptions, opts repository.ReadOptions) ([]boardapi.ProjectEntity, error)
+	// getFunc が非 nil の場合、GetByID はこの関数を呼ぶ（ctx-aware テスト用）。
+	// 既存 N03/N04/N05 の互換性のため引数は ctx のみ（id を観測したい場合は getFuncWithID を使う）。
+	getFunc func(ctx context.Context) (*boardapi.ProjectEntity, error)
+	// getFuncWithID は id を観測したい場合に使用する N06 拡張。getFunc と排他。
+	getFuncWithID func(ctx context.Context, id int) (*boardapi.ProjectEntity, error)
+	// getWithGroupFunc が非 nil の場合、GetByIDWithGroup はこの関数を呼ぶ（N06）。
+	getWithGroupFunc func(ctx context.Context, id int, rg string) (*boardapi.ProjectEntity, error)
+}
+
+func (s *stubProjectRepo) GetByID(ctx context.Context, id int, _ repository.ReadOptions) (*boardapi.ProjectEntity, error) {
+	s.getCount++
+	if s.getFuncWithID != nil {
+		return s.getFuncWithID(ctx, id)
+	}
+	if s.getFunc != nil {
+		return s.getFunc(ctx)
+	}
+	return s.getResult, s.err
+}
+func (s *stubProjectRepo) Search(ctx context.Context, filter boardapi.ProjectListOptions, opts repository.ReadOptions) ([]boardapi.ProjectEntity, error) {
+	s.searchCount++
+	if s.searchFunc != nil {
+		return s.searchFunc(ctx, filter, opts)
+	}
+	return s.searchResult, s.err
+}
+func (s *stubProjectRepo) GetByIDWithGroup(ctx context.Context, id int, rg string) (*boardapi.ProjectEntity, error) {
+	s.getWithGroupCount++
+	if s.getWithGroupFunc != nil {
+		return s.getWithGroupFunc(ctx, id, rg)
+	}
+	if s.getWithGroupErr != nil {
+		return nil, s.getWithGroupErr
+	}
 	if s.getWithGroupResult != nil {
 		return s.getWithGroupResult, nil
 	}
 	if s.getResult != nil {
 		return s.getResult, nil
 	}
-	if s.err != nil {
-		return nil, s.err
-	}
-	// Return a bare entity with no document summary so enrichment is a no-op
-	return &boardapi.ProjectEntity{ID: id}, nil
+	return nil, s.err
 }
 
 type stubEstimateRepo struct {
 	getByDocIDResult *boardapi.EstimateEntity
 	err              error
+	getByDocIDCount  int
+	getByDocIDFunc   func(ctx context.Context, documentID int) (*boardapi.EstimateEntity, error)
 }
 
-func (s *stubEstimateRepo) GetByDocumentID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.EstimateEntity, error) {
-	return s.getByDocIDResult, s.err
-}
-
-type stubInvoiceRepo struct {
-	listResult   []boardapi.InvoiceEntity
-	getResult    *boardapi.InvoiceEntity
-	searchResult []boardapi.InvoiceEntity
-	err          error
-}
-
-func (s *stubInvoiceRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.InvoiceEntity, error) {
-	return s.getResult, s.err
-}
-
-// Search returns listResult for a zero filter (used by "list all" semantics)
-// and searchResult otherwise.
-func (s *stubInvoiceRepo) Search(_ context.Context, filter boardapi.InvoiceListOptions, _ repository.ReadOptions) ([]boardapi.InvoiceEntity, error) {
-	if invoiceListOptionsIsZero(filter) {
-		return s.listResult, s.err
+func (s *stubEstimateRepo) GetByDocumentID(ctx context.Context, documentID int, _ repository.ReadOptions) (*boardapi.EstimateEntity, error) {
+	s.getByDocIDCount++
+	if s.getByDocIDFunc != nil {
+		return s.getByDocIDFunc(ctx, documentID)
 	}
-	return s.searchResult, s.err
-}
-
-// invoiceListOptionsIsZero reports whether filter is the zero value.
-func invoiceListOptionsIsZero(f boardapi.InvoiceListOptions) bool {
-	return f.Page == 0 && f.PerPage == 0 &&
-		f.UpdatedAtGteq == "" && f.UpdatedAtLteq == "" &&
-		f.IncludeArchiveFlg == nil &&
-		f.ClientIDEq == 0 && f.ProjectIDEq == 0 &&
-		f.StatusEq == "" && f.ResponseGroup == ""
+	return s.getByDocIDResult, s.err
 }
 
 type stubOrderRepo struct {
 	getByDocIDResult *boardapi.OrderEntity
 	err              error
+	getByDocIDCount  int
+	getByDocIDFunc   func(ctx context.Context, documentID int) (*boardapi.OrderEntity, error)
 }
 
-func (s *stubOrderRepo) GetByDocumentID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.OrderEntity, error) {
+func (s *stubOrderRepo) GetByDocumentID(ctx context.Context, documentID int, _ repository.ReadOptions) (*boardapi.OrderEntity, error) {
+	s.getByDocIDCount++
+	if s.getByDocIDFunc != nil {
+		return s.getByDocIDFunc(ctx, documentID)
+	}
 	return s.getByDocIDResult, s.err
 }
 
 type stubDeliveryRepo struct {
 	getByDocIDResult *boardapi.DeliveryEntity
 	err              error
+	getByDocIDCount  int
+	getByDocIDFunc   func(ctx context.Context, documentID int) (*boardapi.DeliveryEntity, error)
 }
 
-func (s *stubDeliveryRepo) GetByDocumentID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.DeliveryEntity, error) {
+func (s *stubDeliveryRepo) GetByDocumentID(ctx context.Context, documentID int, _ repository.ReadOptions) (*boardapi.DeliveryEntity, error) {
+	s.getByDocIDCount++
+	if s.getByDocIDFunc != nil {
+		return s.getByDocIDFunc(ctx, documentID)
+	}
 	return s.getByDocIDResult, s.err
 }
 
 type stubReceiptRepo struct {
 	getByDocIDResult *boardapi.ReceiptEntity
 	err              error
+	getByDocIDCount  int
+	getByDocIDFunc   func(ctx context.Context, documentID int) (*boardapi.ReceiptEntity, error)
 }
 
-func (s *stubReceiptRepo) GetByDocumentID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.ReceiptEntity, error) {
+func (s *stubReceiptRepo) GetByDocumentID(ctx context.Context, documentID int, _ repository.ReadOptions) (*boardapi.ReceiptEntity, error) {
+	s.getByDocIDCount++
+	if s.getByDocIDFunc != nil {
+		return s.getByDocIDFunc(ctx, documentID)
+	}
 	return s.getByDocIDResult, s.err
 }
 
+type stubInvoiceRepo struct {
+	getResult    *boardapi.InvoiceEntity
+	searchResult []boardapi.InvoiceEntity
+	err          error
+	searchErr    error // N07a: Search 専用エラー（GetByID は err を使い、Search は searchErr を使う）
+	searchCount  int   // N07a: Search 呼び出し回数カウンター
+	getCount     int   // N07a: GetByID 呼び出し回数カウンター
+	// N07a: getFunc が非 nil の場合、GetByID はこの関数を呼ぶ。
+	getFunc func(ctx context.Context, id int) (*boardapi.InvoiceEntity, error)
+	// N07a: searchFunc が非 nil の場合、Search はこの関数を呼ぶ（filter 観測 / ctx-aware テスト用）。
+	searchFunc func(ctx context.Context, filter boardapi.InvoiceListOptions, opts repository.ReadOptions) ([]boardapi.InvoiceEntity, error)
+}
+
+func (s *stubInvoiceRepo) GetByID(ctx context.Context, id int, _ repository.ReadOptions) (*boardapi.InvoiceEntity, error) {
+	s.getCount++
+	if s.getFunc != nil {
+		return s.getFunc(ctx, id)
+	}
+	return s.getResult, s.err
+}
+func (s *stubInvoiceRepo) Search(ctx context.Context, filter boardapi.InvoiceListOptions, opts repository.ReadOptions) ([]boardapi.InvoiceEntity, error) {
+	s.searchCount++
+	if s.searchFunc != nil {
+		return s.searchFunc(ctx, filter, opts)
+	}
+	if s.searchErr != nil {
+		return nil, s.searchErr
+	}
+	return s.searchResult, s.err
+}
+
 type stubVendorRepo struct {
-	listResult   []boardapi.VendorEntity
 	getResult    *boardapi.VendorEntity
 	searchResult []boardapi.VendorEntity
 	err          error
+	searchErr    error // Search 専用エラー（GetByID は err を使い、Search は searchErr を使う）
+	searchCount  int   // Search 呼び出し回数カウンター（FindVendor T16 相当で使用）
+	// searchFunc が非 nil の場合、Search はこの関数を呼ぶ（ctx-aware テスト用）。
+	searchFunc func(ctx context.Context, filter boardapi.VendorListOptions, opts repository.ReadOptions) ([]boardapi.VendorEntity, error)
 }
 
 func (s *stubVendorRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.VendorEntity, error) {
 	return s.getResult, s.err
 }
-
-// Search はゼロフィルタの場合 listResult を返し（全件取得の代替）、非ゼロの場合 searchResult を返す。
-func (s *stubVendorRepo) Search(_ context.Context, filter boardapi.VendorListOptions, _ repository.ReadOptions) ([]boardapi.VendorEntity, error) {
-	if vendorListOptionsIsZero(filter) {
-		return s.listResult, s.err
+func (s *stubVendorRepo) Search(ctx context.Context, filter boardapi.VendorListOptions, opts repository.ReadOptions) ([]boardapi.VendorEntity, error) {
+	s.searchCount++
+	if s.searchFunc != nil {
+		return s.searchFunc(ctx, filter, opts)
+	}
+	if s.searchErr != nil {
+		return nil, s.searchErr
 	}
 	return s.searchResult, s.err
 }
 
-// ListEntities は find 層の Text 検索（全件取得）で使われる。listResult を返す。
-func (s *stubVendorRepo) ListEntities(_ context.Context, _ repository.ReadOptions, _ boardapi.VendorListOptions) ([]boardapi.VendorEntity, error) {
-	return s.listResult, s.err
-}
-
-// vendorListOptionsIsZero reports whether filter is the zero value.
-func vendorListOptionsIsZero(f boardapi.VendorListOptions) bool {
-	return f.Page == 0 && f.PerPage == 0 &&
-		f.UpdatedAtGteq == "" && f.UpdatedAtLteq == "" &&
-		f.IncludeArchiveFlg == nil && f.NameCont == ""
-}
-
 type stubVendorBranchRepo struct {
-	getResult    *boardapi.VendorBranchEntity
 	searchResult []boardapi.VendorBranchEntity
 	err          error
+	// searchFunc が非 nil の場合、Search はこの関数を呼ぶ（ctx-aware / handshake テスト用）。
+	searchFunc func(ctx context.Context, filter boardapi.VendorBranchListOptions, opts repository.ReadOptions) ([]boardapi.VendorBranchEntity, error)
 }
 
-func (s *stubVendorBranchRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.VendorBranchEntity, error) {
-	return s.getResult, s.err
-}
-func (s *stubVendorBranchRepo) Search(_ context.Context, _ boardapi.VendorBranchListOptions, _ repository.ReadOptions) ([]boardapi.VendorBranchEntity, error) {
+func (s *stubVendorBranchRepo) Search(ctx context.Context, filter boardapi.VendorBranchListOptions, opts repository.ReadOptions) ([]boardapi.VendorBranchEntity, error) {
+	if s.searchFunc != nil {
+		return s.searchFunc(ctx, filter, opts)
+	}
 	return s.searchResult, s.err
 }
 
 type stubVendorContactRepo struct {
-	getResult    *boardapi.VendorContactEntity
 	searchResult []boardapi.VendorContactEntity
 	err          error
+	// searchFunc が非 nil の場合、Search はこの関数を呼ぶ（ctx-aware / handshake テスト用）。
+	searchFunc func(ctx context.Context, filter boardapi.VendorContactListOptions, opts repository.ReadOptions) ([]boardapi.VendorContactEntity, error)
 }
 
-func (s *stubVendorContactRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.VendorContactEntity, error) {
-	return s.getResult, s.err
-}
-func (s *stubVendorContactRepo) Search(_ context.Context, _ boardapi.VendorContactListOptions, _ repository.ReadOptions) ([]boardapi.VendorContactEntity, error) {
+func (s *stubVendorContactRepo) Search(ctx context.Context, filter boardapi.VendorContactListOptions, opts repository.ReadOptions) ([]boardapi.VendorContactEntity, error) {
+	if s.searchFunc != nil {
+		return s.searchFunc(ctx, filter, opts)
+	}
 	return s.searchResult, s.err
 }
 
 type stubPurchaseOrderRepo struct {
-	listResult   []boardapi.PurchaseOrderEntity
 	getResult    *boardapi.PurchaseOrderEntity
 	searchResult []boardapi.PurchaseOrderEntity
 	err          error
+	searchErr    error
+	searchCount  int
+	getCount     int
+	getFunc      func(ctx context.Context, id int) (*boardapi.PurchaseOrderEntity, error)
+	searchFunc   func(ctx context.Context, filter boardapi.PurchaseOrderListOptions, opts repository.ReadOptions) ([]boardapi.PurchaseOrderEntity, error)
 }
 
-func (s *stubPurchaseOrderRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.PurchaseOrderEntity, error) {
+func (s *stubPurchaseOrderRepo) GetByID(ctx context.Context, id int, _ repository.ReadOptions) (*boardapi.PurchaseOrderEntity, error) {
+	s.getCount++
+	if s.getFunc != nil {
+		return s.getFunc(ctx, id)
+	}
 	return s.getResult, s.err
 }
-
-// Search returns listResult for a zero filter (used by "list all" semantics)
-// and searchResult otherwise.
-func (s *stubPurchaseOrderRepo) Search(_ context.Context, filter boardapi.PurchaseOrderListOptions, _ repository.ReadOptions) ([]boardapi.PurchaseOrderEntity, error) {
-	if purchaseOrderListOptionsIsZero(filter) {
-		return s.listResult, s.err
+func (s *stubPurchaseOrderRepo) Search(ctx context.Context, filter boardapi.PurchaseOrderListOptions, opts repository.ReadOptions) ([]boardapi.PurchaseOrderEntity, error) {
+	s.searchCount++
+	if s.searchFunc != nil {
+		return s.searchFunc(ctx, filter, opts)
+	}
+	if s.searchErr != nil {
+		return nil, s.searchErr
 	}
 	return s.searchResult, s.err
-}
-
-// purchaseOrderListOptionsIsZero reports whether filter is the zero value.
-func purchaseOrderListOptionsIsZero(f boardapi.PurchaseOrderListOptions) bool {
-	return f.Page == 0 && f.PerPage == 0 &&
-		f.UpdatedAtGteq == "" && f.UpdatedAtLteq == "" &&
-		f.IncludeArchiveFlg == nil &&
-		f.VendorIDEq == 0 && f.ProjectIDEq == 0 &&
-		f.StatusEq == "" && f.ResponseGroup == ""
 }
 
 type stubPaymentRepo struct {
-	listResult   []boardapi.PaymentEntity
 	getResult    *boardapi.PaymentEntity
 	searchResult []boardapi.PaymentEntity
 	err          error
+	searchErr    error
+	searchCount  int
+	getCount     int
+	getFunc      func(ctx context.Context, id int) (*boardapi.PaymentEntity, error)
+	searchFunc   func(ctx context.Context, filter boardapi.PaymentListOptions, opts repository.ReadOptions) ([]boardapi.PaymentEntity, error)
 }
 
-func (s *stubPaymentRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.PaymentEntity, error) {
+func (s *stubPaymentRepo) GetByID(ctx context.Context, id int, _ repository.ReadOptions) (*boardapi.PaymentEntity, error) {
+	s.getCount++
+	if s.getFunc != nil {
+		return s.getFunc(ctx, id)
+	}
 	return s.getResult, s.err
 }
-
-// Search returns listResult for a zero filter (used by "list all" semantics)
-// and searchResult otherwise.
-func (s *stubPaymentRepo) Search(_ context.Context, filter boardapi.PaymentListOptions, _ repository.ReadOptions) ([]boardapi.PaymentEntity, error) {
-	if paymentListOptionsIsZero(filter) {
-		return s.listResult, s.err
+func (s *stubPaymentRepo) Search(ctx context.Context, filter boardapi.PaymentListOptions, opts repository.ReadOptions) ([]boardapi.PaymentEntity, error) {
+	s.searchCount++
+	if s.searchFunc != nil {
+		return s.searchFunc(ctx, filter, opts)
+	}
+	if s.searchErr != nil {
+		return nil, s.searchErr
 	}
 	return s.searchResult, s.err
 }
 
-// paymentListOptionsIsZero reports whether filter is the zero value.
-func paymentListOptionsIsZero(f boardapi.PaymentListOptions) bool {
-	return f.Page == 0 && f.PerPage == 0 &&
-		f.UpdatedAtGteq == "" && f.UpdatedAtLteq == "" &&
-		f.IncludeArchiveFlg == nil &&
-		f.VendorIDEq == 0 && f.PurchaseOrderIDEq == 0 &&
-		f.StatusEq == "" && f.ResponseGroup == ""
-}
-
 type stubUserRepo struct {
-	searchResult []boardapi.UserEntity
 	getResult    *boardapi.UserEntity
+	searchResult []boardapi.UserEntity
 	err          error
+	searchErr    error
+	searchCount  int
+	getCount     int
+	getFunc      func(ctx context.Context, id int) (*boardapi.UserEntity, error)
+	searchFunc   func(ctx context.Context, filter boardapi.UserListOptions, opts repository.ReadOptions) ([]boardapi.UserEntity, error)
 }
 
-func (s *stubUserRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.UserEntity, error) {
+func (s *stubUserRepo) GetByID(ctx context.Context, id int, _ repository.ReadOptions) (*boardapi.UserEntity, error) {
+	s.getCount++
+	if s.getFunc != nil {
+		return s.getFunc(ctx, id)
+	}
 	return s.getResult, s.err
 }
-func (s *stubUserRepo) Search(_ context.Context, _ boardapi.UserListOptions, _ repository.ReadOptions) ([]boardapi.UserEntity, error) {
+func (s *stubUserRepo) Search(ctx context.Context, filter boardapi.UserListOptions, opts repository.ReadOptions) ([]boardapi.UserEntity, error) {
+	s.searchCount++
+	if s.searchFunc != nil {
+		return s.searchFunc(ctx, filter, opts)
+	}
+	if s.searchErr != nil {
+		return nil, s.searchErr
+	}
 	return s.searchResult, s.err
 }
 
-type stubGroupRepo struct {
-	searchResult []boardapi.GroupEntity
-	getResult    *boardapi.GroupEntity
-	err          error
-}
-
-func (s *stubGroupRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.GroupEntity, error) {
-	return s.getResult, s.err
-}
-func (s *stubGroupRepo) Search(_ context.Context, _ boardapi.GroupListOptions, _ repository.ReadOptions) ([]boardapi.GroupEntity, error) {
-	return s.searchResult, s.err
-}
-
-// --- Service constructors ---
-
-func zeroRepos() find.Repos {
-	return find.Repos{
+// newTestRepos は全 stub を埋めた Repos を返すヘルパー（ゼロ値 stub で OK な場合用）。
+func newTestRepos() Repos {
+	return Repos{
 		Clients:        &stubClientRepo{},
 		ClientBranches: &stubClientBranchRepo{},
 		Contacts:       &stubContactRepo{},
 		Projects:       &stubProjectRepo{},
 		Estimates:      &stubEstimateRepo{},
-		Invoices:       &stubInvoiceRepo{},
 		Orders:         &stubOrderRepo{},
 		Deliveries:     &stubDeliveryRepo{},
 		Receipts:       &stubReceiptRepo{},
+		Invoices:       &stubInvoiceRepo{},
 		Vendors:        &stubVendorRepo{},
 		VendorBranches: &stubVendorBranchRepo{},
 		VendorContacts: &stubVendorContactRepo{},
 		PurchaseOrders: &stubPurchaseOrderRepo{},
 		Payments:       &stubPaymentRepo{},
 		Users:          &stubUserRepo{},
-		Groups:         &stubGroupRepo{},
 	}
 }
 
-// newServiceWith creates a service with optional stub overrides.
-// Pass nil for any repo to use the zero stub.
-func newServiceWith(
-	clients *stubClientRepo,
-	branches *stubClientBranchRepo,
-	contacts *stubContactRepo,
-	projects *stubProjectRepo,
-	opts ...interface{},
-) *find.Service {
-	r := zeroRepos()
-	if clients != nil {
-		r.Clients = clients
-	}
-	if branches != nil {
-		r.ClientBranches = branches
-	}
-	if contacts != nil {
-		r.Contacts = contacts
-	}
-	if projects != nil {
-		r.Projects = projects
-	}
-	// Process optional repo stubs
-	for _, opt := range opts {
-		switch v := opt.(type) {
-		case *stubEstimateRepo:
-			r.Estimates = v
-		case *stubInvoiceRepo:
-			r.Invoices = v
-		case *stubOrderRepo:
-			r.Orders = v
-		case *stubDeliveryRepo:
-			r.Deliveries = v
-		case *stubReceiptRepo:
-			r.Receipts = v
-		case *stubVendorRepo:
-			r.Vendors = v
-		case *stubVendorBranchRepo:
-			r.VendorBranches = v
-		case *stubVendorContactRepo:
-			r.VendorContacts = v
-		case *stubPurchaseOrderRepo:
-			r.PurchaseOrders = v
-		case *stubPaymentRepo:
-			r.Payments = v
-		case *stubUserRepo:
-			r.Users = v
-		case *stubGroupRepo:
-			r.Groups = v
+// recordingHandler は slog.Warn 等を観測するためのテスト用 slog.Handler。
+// withRecordedSlog(t) で slog default handler をテスト中だけ差し替える。
+// N05 T22 / N06+ で reuse 可能。
+type recordingHandler struct {
+	records []slog.Record
+}
+
+func (h *recordingHandler) Enabled(_ context.Context, _ slog.Level) bool { return true }
+func (h *recordingHandler) Handle(_ context.Context, r slog.Record) error {
+	h.records = append(h.records, r)
+	return nil
+}
+func (h *recordingHandler) WithAttrs(_ []slog.Attr) slog.Handler { return h }
+func (h *recordingHandler) WithGroup(_ string) slog.Handler      { return h }
+
+// withRecordedSlog は slog default handler を recordingHandler に差し替え、
+// t.Cleanup で元に戻す。返値の *recordingHandler に記録されたログを参照できる。
+// 注意: t.Parallel() と組み合わせると slog default が競合するため使用不可。
+func withRecordedSlog(t *testing.T) *recordingHandler {
+	t.Helper()
+	h := &recordingHandler{}
+	orig := slog.Default()
+	slog.SetDefault(slog.New(h))
+	t.Cleanup(func() { slog.SetDefault(orig) })
+	return h
+}
+
+// filterWarn は recordingHandler に記録された Records から Warn 以上のものを抽出する。
+// reverseMapper.ensureBuilt が出力する `[SLOW:cold-reverse-map]` Info を除外したい場面で使用。
+func filterWarn(records []slog.Record) []slog.Record {
+	out := make([]slog.Record, 0, len(records))
+	for _, r := range records {
+		if r.Level >= slog.LevelWarn {
+			out = append(out, r)
 		}
 	}
-	return find.New(r)
+	return out
 }
+
+// --- インターフェース適合の静的検証（コンパイル時チェック）---
+var (
+	_ ClientRepo        = (*stubClientRepo)(nil)
+	_ ClientBranchRepo  = (*stubClientBranchRepo)(nil)
+	_ ContactRepo       = (*stubContactRepo)(nil)
+	_ ProjectRepo       = (*stubProjectRepo)(nil)
+	_ EstimateRepo      = (*stubEstimateRepo)(nil)
+	_ OrderRepo         = (*stubOrderRepo)(nil)
+	_ DeliveryRepo      = (*stubDeliveryRepo)(nil)
+	_ ReceiptRepo       = (*stubReceiptRepo)(nil)
+	_ InvoiceRepo       = (*stubInvoiceRepo)(nil)
+	_ VendorRepo        = (*stubVendorRepo)(nil)
+	_ VendorBranchRepo  = (*stubVendorBranchRepo)(nil)
+	_ VendorContactRepo = (*stubVendorContactRepo)(nil)
+	_ PurchaseOrderRepo = (*stubPurchaseOrderRepo)(nil)
+	_ PaymentRepo       = (*stubPaymentRepo)(nil)
+	_ UserRepo          = (*stubUserRepo)(nil)
+)
