@@ -214,12 +214,30 @@ type stubInvoiceRepo struct {
 	getResult    *boardapi.InvoiceEntity
 	searchResult []boardapi.InvoiceEntity
 	err          error
+	searchErr    error // N07a: Search 専用エラー（GetByID は err を使い、Search は searchErr を使う）
+	searchCount  int   // N07a: Search 呼び出し回数カウンター
+	getCount     int   // N07a: GetByID 呼び出し回数カウンター
+	// N07a: getFunc が非 nil の場合、GetByID はこの関数を呼ぶ。
+	getFunc func(ctx context.Context, id int) (*boardapi.InvoiceEntity, error)
+	// N07a: searchFunc が非 nil の場合、Search はこの関数を呼ぶ（filter 観測 / ctx-aware テスト用）。
+	searchFunc func(ctx context.Context, filter boardapi.InvoiceListOptions, opts repository.ReadOptions) ([]boardapi.InvoiceEntity, error)
 }
 
-func (s *stubInvoiceRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.InvoiceEntity, error) {
+func (s *stubInvoiceRepo) GetByID(ctx context.Context, id int, _ repository.ReadOptions) (*boardapi.InvoiceEntity, error) {
+	s.getCount++
+	if s.getFunc != nil {
+		return s.getFunc(ctx, id)
+	}
 	return s.getResult, s.err
 }
-func (s *stubInvoiceRepo) Search(_ context.Context, _ boardapi.InvoiceListOptions, _ repository.ReadOptions) ([]boardapi.InvoiceEntity, error) {
+func (s *stubInvoiceRepo) Search(ctx context.Context, filter boardapi.InvoiceListOptions, opts repository.ReadOptions) ([]boardapi.InvoiceEntity, error) {
+	s.searchCount++
+	if s.searchFunc != nil {
+		return s.searchFunc(ctx, filter, opts)
+	}
+	if s.searchErr != nil {
+		return nil, s.searchErr
+	}
 	return s.searchResult, s.err
 }
 
@@ -279,12 +297,28 @@ type stubPurchaseOrderRepo struct {
 	getResult    *boardapi.PurchaseOrderEntity
 	searchResult []boardapi.PurchaseOrderEntity
 	err          error
+	searchErr    error
+	searchCount  int
+	getCount     int
+	getFunc      func(ctx context.Context, id int) (*boardapi.PurchaseOrderEntity, error)
+	searchFunc   func(ctx context.Context, filter boardapi.PurchaseOrderListOptions, opts repository.ReadOptions) ([]boardapi.PurchaseOrderEntity, error)
 }
 
-func (s *stubPurchaseOrderRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.PurchaseOrderEntity, error) {
+func (s *stubPurchaseOrderRepo) GetByID(ctx context.Context, id int, _ repository.ReadOptions) (*boardapi.PurchaseOrderEntity, error) {
+	s.getCount++
+	if s.getFunc != nil {
+		return s.getFunc(ctx, id)
+	}
 	return s.getResult, s.err
 }
-func (s *stubPurchaseOrderRepo) Search(_ context.Context, _ boardapi.PurchaseOrderListOptions, _ repository.ReadOptions) ([]boardapi.PurchaseOrderEntity, error) {
+func (s *stubPurchaseOrderRepo) Search(ctx context.Context, filter boardapi.PurchaseOrderListOptions, opts repository.ReadOptions) ([]boardapi.PurchaseOrderEntity, error) {
+	s.searchCount++
+	if s.searchFunc != nil {
+		return s.searchFunc(ctx, filter, opts)
+	}
+	if s.searchErr != nil {
+		return nil, s.searchErr
+	}
 	return s.searchResult, s.err
 }
 
@@ -292,12 +326,28 @@ type stubPaymentRepo struct {
 	getResult    *boardapi.PaymentEntity
 	searchResult []boardapi.PaymentEntity
 	err          error
+	searchErr    error
+	searchCount  int
+	getCount     int
+	getFunc      func(ctx context.Context, id int) (*boardapi.PaymentEntity, error)
+	searchFunc   func(ctx context.Context, filter boardapi.PaymentListOptions, opts repository.ReadOptions) ([]boardapi.PaymentEntity, error)
 }
 
-func (s *stubPaymentRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.PaymentEntity, error) {
+func (s *stubPaymentRepo) GetByID(ctx context.Context, id int, _ repository.ReadOptions) (*boardapi.PaymentEntity, error) {
+	s.getCount++
+	if s.getFunc != nil {
+		return s.getFunc(ctx, id)
+	}
 	return s.getResult, s.err
 }
-func (s *stubPaymentRepo) Search(_ context.Context, _ boardapi.PaymentListOptions, _ repository.ReadOptions) ([]boardapi.PaymentEntity, error) {
+func (s *stubPaymentRepo) Search(ctx context.Context, filter boardapi.PaymentListOptions, opts repository.ReadOptions) ([]boardapi.PaymentEntity, error) {
+	s.searchCount++
+	if s.searchFunc != nil {
+		return s.searchFunc(ctx, filter, opts)
+	}
+	if s.searchErr != nil {
+		return nil, s.searchErr
+	}
 	return s.searchResult, s.err
 }
 
@@ -305,12 +355,28 @@ type stubUserRepo struct {
 	getResult    *boardapi.UserEntity
 	searchResult []boardapi.UserEntity
 	err          error
+	searchErr    error
+	searchCount  int
+	getCount     int
+	getFunc      func(ctx context.Context, id int) (*boardapi.UserEntity, error)
+	searchFunc   func(ctx context.Context, filter boardapi.UserListOptions, opts repository.ReadOptions) ([]boardapi.UserEntity, error)
 }
 
-func (s *stubUserRepo) GetByID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.UserEntity, error) {
+func (s *stubUserRepo) GetByID(ctx context.Context, id int, _ repository.ReadOptions) (*boardapi.UserEntity, error) {
+	s.getCount++
+	if s.getFunc != nil {
+		return s.getFunc(ctx, id)
+	}
 	return s.getResult, s.err
 }
-func (s *stubUserRepo) Search(_ context.Context, _ boardapi.UserListOptions, _ repository.ReadOptions) ([]boardapi.UserEntity, error) {
+func (s *stubUserRepo) Search(ctx context.Context, filter boardapi.UserListOptions, opts repository.ReadOptions) ([]boardapi.UserEntity, error) {
+	s.searchCount++
+	if s.searchFunc != nil {
+		return s.searchFunc(ctx, filter, opts)
+	}
+	if s.searchErr != nil {
+		return nil, s.searchErr
+	}
 	return s.searchResult, s.err
 }
 
