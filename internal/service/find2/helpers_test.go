@@ -100,26 +100,47 @@ type stubProjectRepo struct {
 	getResult          *boardapi.ProjectEntity
 	searchResult       []boardapi.ProjectEntity
 	getWithGroupResult *boardapi.ProjectEntity
+	getWithGroupErr    error // GetByIDWithGroup 専用エラー（N06）
 	err                error
+	getCount           int // GetByID 呼び出し回数カウンター（N06 で reverseMapper hit/miss / project enrichment fail テスト等で使用）
+	getWithGroupCount  int // GetByIDWithGroup 呼び出し回数カウンター（N06 で priority テスト等で使用）
+	searchCount        int // Search 呼び出し回数カウンター（N06 で priority テスト等で使用）
 	// searchFunc が非 nil の場合、Search はこの関数を呼ぶ（singleflight/timeout テスト用）。
 	searchFunc func(ctx context.Context, filter boardapi.ProjectListOptions, opts repository.ReadOptions) ([]boardapi.ProjectEntity, error)
 	// getFunc が非 nil の場合、GetByID はこの関数を呼ぶ（ctx-aware テスト用）。
+	// 既存 N03/N04/N05 の互換性のため引数は ctx のみ（id を観測したい場合は getFuncWithID を使う）。
 	getFunc func(ctx context.Context) (*boardapi.ProjectEntity, error)
+	// getFuncWithID は id を観測したい場合に使用する N06 拡張。getFunc と排他。
+	getFuncWithID func(ctx context.Context, id int) (*boardapi.ProjectEntity, error)
+	// getWithGroupFunc が非 nil の場合、GetByIDWithGroup はこの関数を呼ぶ（N06）。
+	getWithGroupFunc func(ctx context.Context, id int, rg string) (*boardapi.ProjectEntity, error)
 }
 
-func (s *stubProjectRepo) GetByID(ctx context.Context, _ int, _ repository.ReadOptions) (*boardapi.ProjectEntity, error) {
+func (s *stubProjectRepo) GetByID(ctx context.Context, id int, _ repository.ReadOptions) (*boardapi.ProjectEntity, error) {
+	s.getCount++
+	if s.getFuncWithID != nil {
+		return s.getFuncWithID(ctx, id)
+	}
 	if s.getFunc != nil {
 		return s.getFunc(ctx)
 	}
 	return s.getResult, s.err
 }
 func (s *stubProjectRepo) Search(ctx context.Context, filter boardapi.ProjectListOptions, opts repository.ReadOptions) ([]boardapi.ProjectEntity, error) {
+	s.searchCount++
 	if s.searchFunc != nil {
 		return s.searchFunc(ctx, filter, opts)
 	}
 	return s.searchResult, s.err
 }
-func (s *stubProjectRepo) GetByIDWithGroup(_ context.Context, _ int, _ string) (*boardapi.ProjectEntity, error) {
+func (s *stubProjectRepo) GetByIDWithGroup(ctx context.Context, id int, rg string) (*boardapi.ProjectEntity, error) {
+	s.getWithGroupCount++
+	if s.getWithGroupFunc != nil {
+		return s.getWithGroupFunc(ctx, id, rg)
+	}
+	if s.getWithGroupErr != nil {
+		return nil, s.getWithGroupErr
+	}
 	if s.getWithGroupResult != nil {
 		return s.getWithGroupResult, nil
 	}
@@ -132,36 +153,60 @@ func (s *stubProjectRepo) GetByIDWithGroup(_ context.Context, _ int, _ string) (
 type stubEstimateRepo struct {
 	getByDocIDResult *boardapi.EstimateEntity
 	err              error
+	getByDocIDCount  int
+	getByDocIDFunc   func(ctx context.Context, documentID int) (*boardapi.EstimateEntity, error)
 }
 
-func (s *stubEstimateRepo) GetByDocumentID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.EstimateEntity, error) {
+func (s *stubEstimateRepo) GetByDocumentID(ctx context.Context, documentID int, _ repository.ReadOptions) (*boardapi.EstimateEntity, error) {
+	s.getByDocIDCount++
+	if s.getByDocIDFunc != nil {
+		return s.getByDocIDFunc(ctx, documentID)
+	}
 	return s.getByDocIDResult, s.err
 }
 
 type stubOrderRepo struct {
 	getByDocIDResult *boardapi.OrderEntity
 	err              error
+	getByDocIDCount  int
+	getByDocIDFunc   func(ctx context.Context, documentID int) (*boardapi.OrderEntity, error)
 }
 
-func (s *stubOrderRepo) GetByDocumentID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.OrderEntity, error) {
+func (s *stubOrderRepo) GetByDocumentID(ctx context.Context, documentID int, _ repository.ReadOptions) (*boardapi.OrderEntity, error) {
+	s.getByDocIDCount++
+	if s.getByDocIDFunc != nil {
+		return s.getByDocIDFunc(ctx, documentID)
+	}
 	return s.getByDocIDResult, s.err
 }
 
 type stubDeliveryRepo struct {
 	getByDocIDResult *boardapi.DeliveryEntity
 	err              error
+	getByDocIDCount  int
+	getByDocIDFunc   func(ctx context.Context, documentID int) (*boardapi.DeliveryEntity, error)
 }
 
-func (s *stubDeliveryRepo) GetByDocumentID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.DeliveryEntity, error) {
+func (s *stubDeliveryRepo) GetByDocumentID(ctx context.Context, documentID int, _ repository.ReadOptions) (*boardapi.DeliveryEntity, error) {
+	s.getByDocIDCount++
+	if s.getByDocIDFunc != nil {
+		return s.getByDocIDFunc(ctx, documentID)
+	}
 	return s.getByDocIDResult, s.err
 }
 
 type stubReceiptRepo struct {
 	getByDocIDResult *boardapi.ReceiptEntity
 	err              error
+	getByDocIDCount  int
+	getByDocIDFunc   func(ctx context.Context, documentID int) (*boardapi.ReceiptEntity, error)
 }
 
-func (s *stubReceiptRepo) GetByDocumentID(_ context.Context, _ int, _ repository.ReadOptions) (*boardapi.ReceiptEntity, error) {
+func (s *stubReceiptRepo) GetByDocumentID(ctx context.Context, documentID int, _ repository.ReadOptions) (*boardapi.ReceiptEntity, error) {
+	s.getByDocIDCount++
+	if s.getByDocIDFunc != nil {
+		return s.getByDocIDFunc(ctx, documentID)
+	}
 	return s.getByDocIDResult, s.err
 }
 
@@ -315,6 +360,18 @@ func withRecordedSlog(t *testing.T) *recordingHandler {
 	slog.SetDefault(slog.New(h))
 	t.Cleanup(func() { slog.SetDefault(orig) })
 	return h
+}
+
+// filterWarn は recordingHandler に記録された Records から Warn 以上のものを抽出する。
+// reverseMapper.ensureBuilt が出力する `[SLOW:cold-reverse-map]` Info を除外したい場面で使用。
+func filterWarn(records []slog.Record) []slog.Record {
+	out := make([]slog.Record, 0, len(records))
+	for _, r := range records {
+		if r.Level >= slog.LevelWarn {
+			out = append(out, r)
+		}
+	}
+	return out
 }
 
 // --- インターフェース適合の静的検証（コンパイル時チェック）---
