@@ -186,6 +186,12 @@ func (q FindInvoiceQuery) validate() error {
 		q.Status == "" && len(q.Statuses) == 0 {
 		return errors.New("at least one field required")
 	}
+	// N07a D2: Statuses (multi) only は API delegation 不可で full-scan を要するため reject。
+	// Status (single) は StatusEq で API delegation 可のため allow。
+	hasNarrow := q.ID != 0 || q.ClientID != 0 || q.Text != "" || q.Status != ""
+	if len(q.Statuses) > 0 && !hasNarrow {
+		return errors.New("Statuses requires at least one of ID, ClientID, Text, or Status to narrow results")
+	}
 	return nil
 }
 
@@ -222,6 +228,12 @@ func (q FindPurchaseOrderQuery) validate() error {
 		q.Status == "" && len(q.Statuses) == 0 {
 		return errors.New("at least one field required")
 	}
+	// N07a D2: Statuses (multi) only は API delegation 不可で full-scan を要するため reject。
+	// Status (single) は StatusEq で API delegation 可のため allow。
+	hasNarrow := q.ID != 0 || q.VendorID != 0 || q.Text != "" || q.Status != ""
+	if len(q.Statuses) > 0 && !hasNarrow {
+		return errors.New("Statuses requires at least one of ID, VendorID, Text, or Status to narrow results")
+	}
 	return nil
 }
 
@@ -242,6 +254,12 @@ func (q FindPaymentQuery) validate() error {
 	if q.ID == 0 && q.VendorID == 0 && q.Text == "" &&
 		q.Status == "" && len(q.Statuses) == 0 {
 		return errors.New("at least one field required")
+	}
+	// N07a D2: Statuses (multi) only は API delegation 不可で full-scan を要するため reject。
+	// Status (single) は StatusEq で API delegation 可のため allow。
+	hasNarrow := q.ID != 0 || q.VendorID != 0 || q.Text != "" || q.Status != ""
+	if len(q.Statuses) > 0 && !hasNarrow {
+		return errors.New("Statuses requires at least one of ID, VendorID, Text, or Status to narrow results")
 	}
 	return nil
 }
