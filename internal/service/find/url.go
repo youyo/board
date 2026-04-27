@@ -1,19 +1,9 @@
 package find
 
-import (
-	"fmt"
-	"strings"
-)
+import "fmt"
 
-// deriveUIBaseURL は API base URL から UI base URL を導出する。
-// 例: "https://api.the-board.jp" → "https://the-board.jp"
-//
-// "://api." を "://" に置換する単純規則。Sandbox 等で API host が
-// "api." prefix を持たない構成では BOARD_UI_BASE_URL 環境変数で上書きする
-// （BuildUIBaseURL 参照）。
-func deriveUIBaseURL(apiBase string) string {
-	return strings.Replace(apiBase, "://api.", "://", 1)
-}
+// UI base URL の導出は呼び出し元（app.go）で行う:
+// "://api." を "://" に置換する単純規則。BOARD_UI_BASE_URL 環境変数で上書き可能。
 
 // projectURL は projects/{id}/edit の編集ページ URL を返す。id=0 のときは空文字。
 func projectURL(uiBase string, id int) string {
