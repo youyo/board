@@ -51,7 +51,6 @@ board configure show
   "base_url": "https://api.the-board.jp",
   "api_key": "***",
   "api_token": "***",
-  "daily_auto_refresh": true,
   "request_timeout_seconds": 30,
   "retry_max": 5,
   "pretty_default": false
@@ -183,7 +182,7 @@ BOARD API の rate limit（3,000 回/日 または 3 回/秒）に達しまし�
 
 - しばらく待つか、翌日まで待ちます
 - キャッシュを活用することで API 呼び出し回数を削減できます
-- `--refresh` や `--force-refresh` を頻繁に使うと消費量が増えます
+- `--refresh` や `--refresh-full` を頻繁に使うと消費量が増えます
 
 ### データが古い（キャッシュが更新されない）
 
@@ -191,7 +190,7 @@ BOARD API の rate limit（3,000 回/日 または 3 回/秒）に達しまし�
 
 ```sh
 board api clients list --refresh      # 差分更新
-board api clients list --force-refresh  # 全件再取得
+board api clients list --refresh-full  # 全件再取得
 ```
 
 または:

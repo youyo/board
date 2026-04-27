@@ -255,7 +255,7 @@ board mcp serve --port 8081
 BOARD API の rate limit（3,000 回/日、3 回/秒）に達した可能性があります。
 
 - キャッシュが有効な場合、2 回目以降の同じリクエストはキャッシュから返却されます
-- `--force-refresh` を多用すると rate limit を消費します
+- `--refresh-full` を多用すると rate limit を消費します
 - 翌日まで待つか、しばらく時間をおいてから再試行してください
 
 ---

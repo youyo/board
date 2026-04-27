@@ -179,8 +179,8 @@ completion values.
 | `--profile`, `-p` | (current) | Profile name to use |
 | `--pretty` | false | Pretty-print JSON output |
 | `--limit` | 0 (unlimited) | Max results to return (0 = no limit) |
-| `--refresh` | false | Force cache refresh before reading |
-| `--force-refresh` | false | Force full cache refresh |
+| `--refresh` | false | Trigger incremental (delta) cache refresh before reading |
+| `--refresh-full` | false | Trigger full refresh (re-fetch + remove stale entries). Takes priority over `--refresh`. |
 | `--version` | — | Print version |
 
 ## Configuration
@@ -195,11 +195,37 @@ timezone = "UTC"
 base_url = "https://api.the-board.jp"
 api_key = ""        # x-api-key header
 api_token = ""      # Bearer token
-daily_auto_refresh = true
 request_timeout_seconds = 30
 retry_max = 5
 pretty_default = false
 ```
+
+### Cache freshness model (LLM-driven)
+
+board does not auto-refresh the cache on a daily schedule. After the initial
+build (`board ... --refresh-full`), the cache is read as-is until you explicitly
+trigger a refresh:
+
+- `--refresh` — incremental (delta) sync, fetches entries updated since last sync
+- `--refresh-full` — full re-fetch (also removes stale entries)
+
+Each `board find` response includes a `cache` array showing the freshness of
+each accessed resource:
+
+```json
+{
+  "items": [...],
+  "cache": [
+    {"resource": "clients",   "cached_at": "2026-04-25T10:00:00Z"},
+    {"resource": "projects",  "cached_at": "2026-04-26T08:30:00Z", "full_refreshed_at": "2026-04-01T12:00:00Z"}
+  ]
+}
+```
+
+The LLM (or human) inspects `cached_at` / `full_refreshed_at` and decides
+whether to retry with `--refresh` or `--refresh-full`. Concurrent refreshes
+return `refresh_in_progress` (HTTP 429-style) immediately so clients can retry
+later without blocking.
 
 Multiple profiles are supported. Switch with `board configure use <profile>` or `-p <profile>` per command.
 
