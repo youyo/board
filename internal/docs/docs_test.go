@@ -28,11 +28,13 @@ func TestList(t *testing.T) {
 	}
 	wantPaths := []string{
 		"README.md",
+		"adr/ADR-001-find-layer.md",
 		"api-reference.md",
 		"guides/getting-started.md",
 		"guides/mcp-server.md",
 		"installation.md",
 		"installation_ja.md",
+		"migration/v0.7.0.md",
 	}
 	if len(entries) != len(wantPaths) {
 		t.Fatalf("len(entries)=%d, want %d (%v)", len(entries), len(wantPaths), entries)

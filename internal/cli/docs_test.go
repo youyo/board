@@ -82,8 +82,8 @@ func TestDocs_List_JSON(t *testing.T) {
 	if got.Mode != "list" {
 		t.Errorf("mode=%q, want list", got.Mode)
 	}
-	if len(got.Results) != 6 {
-		t.Errorf("results len=%d, want 6", len(got.Results))
+	if len(got.Results) != 8 {
+		t.Errorf("results len=%d, want 8", len(got.Results))
 	}
 	for _, r := range got.Results {
 		if r.File == "" {
