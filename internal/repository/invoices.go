@@ -20,7 +20,6 @@ type InvoiceRepository struct {
 	refresher   *refresh.Refresher
 	lockManager *refresh.LockManager
 	tz          *time.Location
-	autoRefresh bool
 }
 
 // NewInvoiceRepository creates a new InvoiceRepository.
@@ -32,7 +31,6 @@ func NewInvoiceRepository(
 	refresher *refresh.Refresher,
 	lm *refresh.LockManager,
 	tz *time.Location,
-	autoRefresh bool,
 ) *InvoiceRepository {
 	return &InvoiceRepository{
 		profile:     profile,
@@ -42,7 +40,6 @@ func NewInvoiceRepository(
 		refresher:   refresher,
 		lockManager: lm,
 		tz:          tz,
-		autoRefresh: autoRefresh,
 	}
 }
 
@@ -94,24 +91,12 @@ func (r *InvoiceRepository) List(ctx context.Context, readOpts ReadOptions, filt
 	if err != nil {
 		return nil, err
 	}
-	if err := maybeRefresh(ctx, r.profile, invoicesResource, readOpts, state, r.autoRefresh, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
+	if err := maybeRefresh(ctx, r.profile, invoicesResource, readOpts, state, false, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
 		return nil, err
 	}
 	entries, err := r.cache.List(ctx, r.profile, invoicesResource)
 	if err != nil {
 		return nil, err
-	}
-	if len(entries) == 0 && state == nil {
-		if err := r.lockManager.WithLock(ctx, r.profile, invoicesResource, func() error {
-			_, err := r.refresher.ForceRefresh(ctx, r.profile, fetcher, now, r.tz)
-			return err
-		}); err != nil {
-			return nil, err
-		}
-		entries, err = r.cache.List(ctx, r.profile, invoicesResource)
-		if err != nil {
-			return nil, err
-		}
 	}
 	entities, err := decodeEntries[boardapi.InvoiceEntity](entries)
 	if err != nil {
@@ -142,7 +127,7 @@ func (r *InvoiceRepository) GetByID(ctx context.Context, id int, opts ReadOption
 		return nil, err
 	}
 
-	if err := maybeRefresh(ctx, r.profile, invoicesResource, opts, state, r.autoRefresh, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
+	if err := maybeRefresh(ctx, r.profile, invoicesResource, opts, state, false, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
 		return nil, err
 	}
 

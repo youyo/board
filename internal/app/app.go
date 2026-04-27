@@ -99,7 +99,7 @@ func New(profileName string) (*App, error) {
 	)
 
 	// 9. Initialize all 22 repositories
-	repos := newRepositories(profileName, apiClient, rc, ss, refresher, lm, tz, prof.DailyAutoRefresh)
+	repos := newRepositories(profileName, apiClient, rc, ss, refresher, lm, tz)
 
 	return &App{
 		Config:        cfg,

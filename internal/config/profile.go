@@ -37,10 +37,6 @@ func AddOrUpdateProfile(cfg *Config, name string, profile ProfileConfig) {
 // ApplyDefaults returns a ProfileConfig with default values applied to zero-value fields.
 // Because the TOML parser cannot distinguish between a zero value and "not specified",
 // call this function after loading to fill in default values.
-//
-// Note: The default for DailyAutoRefresh is true, but the TOML zero value is false,
-// so this field is always filled in as true.
-// Do not call this function if you want to explicitly set it to false.
 func ApplyDefaults(p ProfileConfig) ProfileConfig {
 	defaults := DefaultProfileConfig()
 
@@ -52,11 +48,6 @@ func ApplyDefaults(p ProfileConfig) ProfileConfig {
 	}
 	if p.RetryMax == 0 {
 		p.RetryMax = defaults.RetryMax
-	}
-	// DailyAutoRefresh: zero value (false) is filled in with the default (true).
-	// Consider migrating to *bool pointer type in the future.
-	if !p.DailyAutoRefresh {
-		p.DailyAutoRefresh = defaults.DailyAutoRefresh
 	}
 
 	return p

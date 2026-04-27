@@ -20,7 +20,6 @@ type DocumentSendChannelRepository struct {
 	refresher   *refresh.Refresher
 	lockManager *refresh.LockManager
 	tz          *time.Location
-	autoRefresh bool
 }
 
 // NewDocumentSendChannelRepository creates a new DocumentSendChannelRepository.
@@ -32,7 +31,6 @@ func NewDocumentSendChannelRepository(
 	refresher *refresh.Refresher,
 	lm *refresh.LockManager,
 	tz *time.Location,
-	autoRefresh bool,
 ) *DocumentSendChannelRepository {
 	return &DocumentSendChannelRepository{
 		profile:     profile,
@@ -42,7 +40,6 @@ func NewDocumentSendChannelRepository(
 		refresher:   refresher,
 		lockManager: lm,
 		tz:          tz,
-		autoRefresh: autoRefresh,
 	}
 }
 
@@ -88,24 +85,12 @@ func (r *DocumentSendChannelRepository) List(ctx context.Context, readOpts ReadO
 	if err != nil {
 		return nil, err
 	}
-	if err := maybeRefresh(ctx, r.profile, documentSendChannelsResource, readOpts, state, r.autoRefresh, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
+	if err := maybeRefresh(ctx, r.profile, documentSendChannelsResource, readOpts, state, false, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
 		return nil, err
 	}
 	entries, err := r.cache.List(ctx, r.profile, documentSendChannelsResource)
 	if err != nil {
 		return nil, err
-	}
-	if len(entries) == 0 && state == nil {
-		if err := r.lockManager.WithLock(ctx, r.profile, documentSendChannelsResource, func() error {
-			_, err := r.refresher.ForceRefresh(ctx, r.profile, fetcher, now, r.tz)
-			return err
-		}); err != nil {
-			return nil, err
-		}
-		entries, err = r.cache.List(ctx, r.profile, documentSendChannelsResource)
-		if err != nil {
-			return nil, err
-		}
 	}
 	entities, err := decodeEntries[boardapi.DocumentSendChannelEntity](entries)
 	if err != nil {
@@ -136,7 +121,7 @@ func (r *DocumentSendChannelRepository) GetByID(ctx context.Context, id int, opt
 		return nil, err
 	}
 
-	if err := maybeRefresh(ctx, r.profile, documentSendChannelsResource, opts, state, r.autoRefresh, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
+	if err := maybeRefresh(ctx, r.profile, documentSendChannelsResource, opts, state, false, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
 		return nil, err
 	}
 

@@ -20,7 +20,6 @@ type AccountingTypeRepository struct {
 	refresher   *refresh.Refresher
 	lockManager *refresh.LockManager
 	tz          *time.Location
-	autoRefresh bool
 }
 
 // NewAccountingTypeRepository creates a new AccountingTypeRepository.
@@ -32,7 +31,6 @@ func NewAccountingTypeRepository(
 	refresher *refresh.Refresher,
 	lm *refresh.LockManager,
 	tz *time.Location,
-	autoRefresh bool,
 ) *AccountingTypeRepository {
 	return &AccountingTypeRepository{
 		profile:     profile,
@@ -42,7 +40,6 @@ func NewAccountingTypeRepository(
 		refresher:   refresher,
 		lockManager: lm,
 		tz:          tz,
-		autoRefresh: autoRefresh,
 	}
 }
 
@@ -88,24 +85,12 @@ func (r *AccountingTypeRepository) List(ctx context.Context, readOpts ReadOption
 	if err != nil {
 		return nil, err
 	}
-	if err := maybeRefresh(ctx, r.profile, accountingTypesResource, readOpts, state, r.autoRefresh, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
+	if err := maybeRefresh(ctx, r.profile, accountingTypesResource, readOpts, state, false, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
 		return nil, err
 	}
 	entries, err := r.cache.List(ctx, r.profile, accountingTypesResource)
 	if err != nil {
 		return nil, err
-	}
-	if len(entries) == 0 && state == nil {
-		if err := r.lockManager.WithLock(ctx, r.profile, accountingTypesResource, func() error {
-			_, err := r.refresher.ForceRefresh(ctx, r.profile, fetcher, now, r.tz)
-			return err
-		}); err != nil {
-			return nil, err
-		}
-		entries, err = r.cache.List(ctx, r.profile, accountingTypesResource)
-		if err != nil {
-			return nil, err
-		}
 	}
 	entities, err := decodeEntries[boardapi.AccountingTypeEntity](entries)
 	if err != nil {
@@ -136,7 +121,7 @@ func (r *AccountingTypeRepository) GetByID(ctx context.Context, id int, opts Rea
 		return nil, err
 	}
 
-	if err := maybeRefresh(ctx, r.profile, accountingTypesResource, opts, state, r.autoRefresh, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
+	if err := maybeRefresh(ctx, r.profile, accountingTypesResource, opts, state, false, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
 		return nil, err
 	}
 

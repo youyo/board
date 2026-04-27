@@ -31,9 +31,6 @@ func TestDefaultProfileConfig(t *testing.T) {
 	if p.BaseURL != "https://api.the-board.jp" {
 		t.Errorf("expected BaseURL=https://api.the-board.jp, got %q", p.BaseURL)
 	}
-	if !p.DailyAutoRefresh {
-		t.Error("expected DailyAutoRefresh=true")
-	}
 	if p.RequestTimeoutSeconds != 30 {
 		t.Errorf("expected RequestTimeoutSeconds=30, got %d", p.RequestTimeoutSeconds)
 	}
@@ -76,7 +73,6 @@ func TestLoadRoundtrip(t *testing.T) {
 		BaseURL:               "https://custom.api.example.com",
 		APIKey:                "testkey",
 		APIToken:              "testtoken",
-		DailyAutoRefresh:      false,
 		RequestTimeoutSeconds: 60,
 		RetryMax:              3,
 		PrettyDefault:         true,
@@ -122,7 +118,6 @@ func TestMultipleProfiles(t *testing.T) {
 		BaseURL:               "https://api.the-board.jp",
 		APIKey:                "readonly-key",
 		APIToken:              "readonly-token",
-		DailyAutoRefresh:      true,
 		RequestTimeoutSeconds: 30,
 		RetryMax:              5,
 	}
@@ -308,10 +303,6 @@ func TestApplyDefaults(t *testing.T) {
 	}
 	if result.RetryMax != 5 {
 		t.Errorf("expected RetryMax=5, got %d", result.RetryMax)
-	}
-	// DailyAutoRefresh: zero value (false) is filled in as true
-	if !result.DailyAutoRefresh {
-		t.Error("expected DailyAutoRefresh=true after ApplyDefaults")
 	}
 }
 

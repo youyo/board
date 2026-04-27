@@ -20,7 +20,6 @@ type GroupRepository struct {
 	refresher   *refresh.Refresher
 	lockManager *refresh.LockManager
 	tz          *time.Location
-	autoRefresh bool
 }
 
 // NewGroupRepository creates a new GroupRepository.
@@ -32,7 +31,6 @@ func NewGroupRepository(
 	refresher *refresh.Refresher,
 	lm *refresh.LockManager,
 	tz *time.Location,
-	autoRefresh bool,
 ) *GroupRepository {
 	return &GroupRepository{
 		profile:     profile,
@@ -42,7 +40,6 @@ func NewGroupRepository(
 		refresher:   refresher,
 		lockManager: lm,
 		tz:          tz,
-		autoRefresh: autoRefresh,
 	}
 }
 
@@ -88,24 +85,12 @@ func (r *GroupRepository) List(ctx context.Context, readOpts ReadOptions, filter
 	if err != nil {
 		return nil, err
 	}
-	if err := maybeRefresh(ctx, r.profile, groupsResource, readOpts, state, r.autoRefresh, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
+	if err := maybeRefresh(ctx, r.profile, groupsResource, readOpts, state, false, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
 		return nil, err
 	}
 	entries, err := r.cache.List(ctx, r.profile, groupsResource)
 	if err != nil {
 		return nil, err
-	}
-	if len(entries) == 0 && state == nil {
-		if err := r.lockManager.WithLock(ctx, r.profile, groupsResource, func() error {
-			_, err := r.refresher.ForceRefresh(ctx, r.profile, fetcher, now, r.tz)
-			return err
-		}); err != nil {
-			return nil, err
-		}
-		entries, err = r.cache.List(ctx, r.profile, groupsResource)
-		if err != nil {
-			return nil, err
-		}
 	}
 	entities, err := decodeEntries[boardapi.GroupEntity](entries)
 	if err != nil {
@@ -136,7 +121,7 @@ func (r *GroupRepository) GetByID(ctx context.Context, id int, opts ReadOptions)
 		return nil, err
 	}
 
-	if err := maybeRefresh(ctx, r.profile, groupsResource, opts, state, r.autoRefresh, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
+	if err := maybeRefresh(ctx, r.profile, groupsResource, opts, state, false, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
 		return nil, err
 	}
 

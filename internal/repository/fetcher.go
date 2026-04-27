@@ -69,17 +69,21 @@ func upsertRaw(ctx context.Context, rc *cache.ResourceCache, profile, resource s
 	})
 }
 
+// refreshRetryAfterSeconds は同時 refresh 競合時の retry-after 推奨値（固定）。
+const refreshRetryAfterSeconds = 30
+
 // maybeRefresh determines whether a refresh is needed and executes it if so.
-// If ForceRefresh is true, ForceRefresh takes priority.
-// If Refresh is true or autoRefresh and NeedsDailyRefresh, DeltaRefresh is performed.
-// On DeltaRefresh error, stale data is returned (logged only).
-// On ForceRefresh error, the error is propagated.
+// 排他は TryWithLock で行い、ロック競合時は *refresh.RefreshInProgressError を即返却する。
+//
+//   - ForceRefresh / Refresh どちらも指定されていない場合は no-op（auto refresh は廃止）。
+//   - ForceRefresh は full refresh を実行、エラーは伝播。
+//   - Refresh (delta) はエラー時 stale cache を返す（log only）。
 func maybeRefresh(
 	ctx context.Context,
 	profile, resource string,
 	opts ReadOptions,
-	state *cache.SyncState,
-	autoRefresh bool,
+	_ *cache.SyncState, // state は将来の判断材料用に残す（現状未使用）
+	_ bool,
 	tz *time.Location,
 	lm *refresh.LockManager,
 	refresher *refresh.Refresher,
@@ -88,17 +92,21 @@ func maybeRefresh(
 ) error {
 	switch {
 	case opts.ForceRefresh:
-		return lm.WithLock(ctx, profile, resource, func() error {
+		return lm.TryWithLock(ctx, profile, resource, refreshRetryAfterSeconds, func() error {
 			_, err := refresher.ForceRefresh(ctx, profile, fetcher, now, tz)
 			return err
 		})
-	case opts.Refresh || (autoRefresh && refresh.NeedsDailyRefresh(state, now, tz)):
-		err := lm.WithLock(ctx, profile, resource, func() error {
+	case opts.Refresh:
+		err := lm.TryWithLock(ctx, profile, resource, refreshRetryAfterSeconds, func() error {
 			_, err := refresher.DeltaRefresh(ctx, profile, fetcher, now, tz)
 			return err
 		})
-		if opts.Refresh && err != nil {
-			// DeltaRefresh failure returns stale data (log only)
+		if err != nil {
+			// 同時実行競合は呼び出し元で 429 として返したいので伝播。
+			if refresh.IsRefreshInProgress(err) {
+				return err
+			}
+			// それ以外（API エラー等）は stale cache を返す（log only）。
 			slog.Warn("DeltaRefresh failed, returning stale cache",
 				"profile", profile,
 				"resource", resource,

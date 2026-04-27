@@ -20,7 +20,6 @@ func TestConfigureInteractive(t *testing.T) {
 			"https://example.com", // base_url
 			"newapikey",           // api_key
 			"newapitoken",         // api_token
-			"true",                // daily_auto_refresh
 			"Asia/Tokyo",          // timezone
 			"yes",                 // set as current
 			"",
@@ -111,7 +110,6 @@ func TestConfigureInteractive(t *testing.T) {
 			"https://new.com", // base_url
 			"",                // api_key (skip)
 			"",                // api_token (skip)
-			"",                // daily_auto_refresh (skip)
 			"",                // timezone (skip)
 			"yes",             // set as current
 			"",
@@ -146,7 +144,6 @@ func TestConfigureInteractive(t *testing.T) {
 			"",               // base_url (skip)
 			"mysecretapikey", // api_key
 			"mysecrettoken",  // api_token
-			"",               // daily_auto_refresh (skip)
 			"",               // timezone (skip)
 			"yes",            // set as current
 			"",

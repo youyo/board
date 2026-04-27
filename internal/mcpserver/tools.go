@@ -3,11 +3,13 @@ package mcpserver
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/youyo/board/internal/cache"
+	"github.com/youyo/board/internal/refresh"
 	"github.com/youyo/board/internal/repository"
 	"github.com/youyo/board/internal/service/find"
 )
@@ -169,8 +171,55 @@ func wrapAndMarshal[T any](ctx context.Context, srv *Server, kind string, items 
 }
 
 // errorResult returns a tool error result from an error.
+// RefreshInProgressError は構造化エラー（error_code, retry_after_seconds 含む）として返す。
 func errorResult(err error) *mcp.CallToolResult {
+	var rip *refresh.RefreshInProgressError
+	if errors.As(err, &rip) {
+		body := struct {
+			Error             bool   `json:"error"`
+			ErrorCode         string `json:"error_code"`
+			Message           string `json:"message"`
+			Resource          string `json:"resource"`
+			Holder            string `json:"holder,omitempty"`
+			ElapsedSeconds    int    `json:"elapsed_seconds"`
+			RetryAfterSeconds int    `json:"retry_after_seconds"`
+		}{
+			Error:             true,
+			ErrorCode:         "refresh_in_progress",
+			Message:           rip.Error(),
+			Resource:          rip.Resource,
+			Holder:            rip.Holder,
+			ElapsedSeconds:    rip.ElapsedSeconds,
+			RetryAfterSeconds: rip.RetryAfterSeconds,
+		}
+		data, _ := json.Marshal(body)
+		// MCP の IsError=true で構造化 JSON を text content として返す。
+		return mcp.NewToolResultError(string(data))
+	}
 	return mcp.NewToolResultError(err.Error())
+}
+
+// parseRefreshArg は MCP 引数 refresh ("none"/"delta"/"full") を ReadOptions に変換する。
+// "" / "none" / unknown は no-op (delta=false, full=false)。
+// "delta" は Refresh=true。
+// "full" は ForceRefresh=true（Refresh より優先）。
+func parseRefreshArg(v string) repository.ReadOptions {
+	switch v {
+	case "delta":
+		return repository.ReadOptions{Refresh: true}
+	case "full":
+		return repository.ReadOptions{ForceRefresh: true}
+	}
+	return repository.ReadOptions{}
+}
+
+func refreshDesc() string {
+	return `Trigger a refresh before reading cache. "none" (default) reads cache as-is. "delta" fetches incremental changes since last sync. "full" re-fetches all entries and removes stale ones (use periodically). Concurrent refreshes return refresh_in_progress; clients should wait and retry.`
+}
+
+// refreshToolOption は各 find tool に refresh enum パラメータを追加するヘルパー。
+func refreshToolOption() mcp.ToolOption {
+	return mcp.WithString("refresh", mcp.Description(refreshDesc()), mcp.Enum("none", "delta", "full"))
 }
 
 // --- Tool definitions ---
@@ -181,12 +230,13 @@ func findClientsTool(srv *Server) server.ServerTool {
 			mcp.WithDescription("Search BOARD clients by ID or name. Returns client entities with branches and contacts. Priority: id > name."),
 			mcp.WithNumber("id", mcp.Description("Client ID for direct lookup (highest priority; ignores name).")),
 			mcp.WithString("name", mcp.Description("Substring match on client name.")),
+			refreshToolOption(),
 			mcp.WithNumber("limit", mcp.Description(limitDesc())),
 			readOnlyAnnotation(),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			results, err := srv.FindService().FindClient(ctx, find.FindClientQuery{
-				FindCommonOpts: find.FindCommonOpts{Limit: getIntArg(req, "limit")},
+				FindCommonOpts: find.FindCommonOpts{Limit: getIntArg(req, "limit"), Opts: parseRefreshArg(getStringArg(req, "refresh"))},
 				ID:             getIntArg(req, "id"),
 				Name:           getStringArg(req, "name"),
 			})
@@ -204,12 +254,13 @@ func findVendorsTool(srv *Server) server.ServerTool {
 			mcp.WithDescription("Search BOARD vendors by ID or name. Returns vendor entities with branches and contacts. Priority: id > name."),
 			mcp.WithNumber("id", mcp.Description("Vendor ID for direct lookup (highest priority; ignores name).")),
 			mcp.WithString("name", mcp.Description("Substring match on vendor name.")),
+			refreshToolOption(),
 			mcp.WithNumber("limit", mcp.Description(limitDesc())),
 			readOnlyAnnotation(),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			results, err := srv.FindService().FindVendor(ctx, find.FindVendorQuery{
-				FindCommonOpts: find.FindCommonOpts{Limit: getIntArg(req, "limit")},
+				FindCommonOpts: find.FindCommonOpts{Limit: getIntArg(req, "limit"), Opts: parseRefreshArg(getStringArg(req, "refresh"))},
 				ID:             getIntArg(req, "id"),
 				Name:           getStringArg(req, "name"),
 			})
@@ -227,12 +278,13 @@ func findUsersTool(srv *Server) server.ServerTool {
 			mcp.WithDescription("Search BOARD users by ID or name. Returns user entities. Priority: id > name."),
 			mcp.WithNumber("id", mcp.Description("User ID for direct lookup (highest priority; ignores name).")),
 			mcp.WithString("name", mcp.Description("Substring match on user name.")),
+			refreshToolOption(),
 			mcp.WithNumber("limit", mcp.Description(limitDesc())),
 			readOnlyAnnotation(),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			results, err := srv.FindService().FindUser(ctx, find.FindUserQuery{
-				FindCommonOpts: find.FindCommonOpts{Limit: getIntArg(req, "limit")},
+				FindCommonOpts: find.FindCommonOpts{Limit: getIntArg(req, "limit"), Opts: parseRefreshArg(getStringArg(req, "refresh"))},
 				ID:             getIntArg(req, "id"),
 				Name:           getStringArg(req, "name"),
 			})
@@ -254,6 +306,7 @@ func findProjectsTool(srv *Server) server.ServerTool {
 			mcp.WithString("status", mcp.Description("Filter by project status (e.g. 受注, 完了). MUST be combined with id/client_name/name — status-only query is rejected (API delegation not possible, narrowing required). Mutually exclusive with statuses / contract_status.")),
 			mcp.WithArray("statuses", mcp.WithStringItems(), mcp.Description("Filter by multiple project statuses (OR). Mutually exclusive with status / contract_status. Same narrowing rules apply. Max 10 items.")),
 			mcp.WithString("contract_status", mcp.Description("Contract status alias. Valid values: active (in-progress: 未着手/着手中/納品済), ended (検収済), prospect (見積中*), all. Mutually exclusive with status / statuses. Same narrowing rules apply. See docs/usage/maintenance-contract-search.md.")),
+			refreshToolOption(),
 			mcp.WithNumber("limit", mcp.Description(limitDesc())),
 			readOnlyAnnotation(),
 		),
@@ -268,7 +321,7 @@ func findProjectsTool(srv *Server) server.ServerTool {
 				clientID = id
 			}
 			results, err := svc.FindProject(ctx, find.FindProjectQuery{
-				FindCommonOpts: find.FindCommonOpts{Limit: getIntArg(req, "limit")},
+				FindCommonOpts: find.FindCommonOpts{Limit: getIntArg(req, "limit"), Opts: parseRefreshArg(getStringArg(req, "refresh"))},
 				ID:             getIntArg(req, "id"),
 				ClientID:       clientID,
 				Name:           getStringArg(req, "name"),
@@ -292,6 +345,7 @@ func findEstimatesTool(srv *Server) server.ServerTool {
 			mcp.WithNumber("project_id", mcp.Description("Project ID to find its estimate (use to narrow to a single document).")),
 			mcp.WithString("client_name", mcp.Description(fanoutNameDesc("client", "estimate", "project_id"))),
 			mcp.WithString("project_name", mcp.Description(fanoutNameDesc("project", "estimate", "project_id"))),
+			refreshToolOption(),
 			mcp.WithNumber("limit", mcp.Description(limitDesc())),
 			readOnlyAnnotation(),
 		),
@@ -301,7 +355,7 @@ func findEstimatesTool(srv *Server) server.ServerTool {
 				return errorResult(fmt.Errorf("status filtering is not supported for documents (no Status field on entity)")), nil
 			}
 			results, err := srv.FindService().FindEstimate(ctx, find.FindEstimateQuery{
-				FindCommonOpts: find.FindCommonOpts{Limit: getIntArg(req, "limit")},
+				FindCommonOpts: find.FindCommonOpts{Limit: getIntArg(req, "limit"), Opts: parseRefreshArg(getStringArg(req, "refresh"))},
 				ID:             getIntArg(req, "id"),
 				ProjectID:      getIntArg(req, "project_id"),
 				ClientName:     getStringArg(req, "client_name"),
@@ -323,6 +377,7 @@ func findInvoicesTool(srv *Server) server.ServerTool {
 			mcp.WithString("client_name", mcp.Description(disambiguateNameDesc("client", "invoice"))),
 			mcp.WithString("project_name", mcp.Description(notYetSupportedDesc("project name", "invoices"))),
 			mcp.WithString("status", mcp.Description("Filter by invoice status (single value; API delegated, no narrowing required).")),
+			refreshToolOption(),
 			mcp.WithNumber("limit", mcp.Description(limitDesc())),
 			readOnlyAnnotation(),
 		),
@@ -340,7 +395,7 @@ func findInvoicesTool(srv *Server) server.ServerTool {
 				clientID = id
 			}
 			results, err := svc.FindInvoice(ctx, find.FindInvoiceQuery{
-				FindCommonOpts: find.FindCommonOpts{Limit: getIntArg(req, "limit")},
+				FindCommonOpts: find.FindCommonOpts{Limit: getIntArg(req, "limit"), Opts: parseRefreshArg(getStringArg(req, "refresh"))},
 				ID:             getIntArg(req, "id"),
 				ClientID:       clientID,
 				Status:         getStringArg(req, "status"),
@@ -361,6 +416,7 @@ func findOrdersTool(srv *Server) server.ServerTool {
 			mcp.WithNumber("project_id", mcp.Description("Project ID to find its order (use to narrow to a single document).")),
 			mcp.WithString("client_name", mcp.Description(fanoutNameDesc("client", "order", "project_id"))),
 			mcp.WithString("project_name", mcp.Description(fanoutNameDesc("project", "order", "project_id"))),
+			refreshToolOption(),
 			mcp.WithNumber("limit", mcp.Description(limitDesc())),
 			readOnlyAnnotation(),
 		),
@@ -369,7 +425,7 @@ func findOrdersTool(srv *Server) server.ServerTool {
 				return errorResult(fmt.Errorf("status filtering is not supported for documents (no Status field on entity)")), nil
 			}
 			results, err := srv.FindService().FindOrder(ctx, find.FindOrderQuery{
-				FindCommonOpts: find.FindCommonOpts{Limit: getIntArg(req, "limit")},
+				FindCommonOpts: find.FindCommonOpts{Limit: getIntArg(req, "limit"), Opts: parseRefreshArg(getStringArg(req, "refresh"))},
 				ID:             getIntArg(req, "id"),
 				ProjectID:      getIntArg(req, "project_id"),
 				ClientName:     getStringArg(req, "client_name"),
@@ -391,6 +447,7 @@ func findDeliveriesTool(srv *Server) server.ServerTool {
 			mcp.WithNumber("project_id", mcp.Description("Project ID to find its deliveries (use to narrow to a single project).")),
 			mcp.WithString("client_name", mcp.Description(fanoutNameDesc("client", "delivery", "project_id"))),
 			mcp.WithString("project_name", mcp.Description(fanoutNameDesc("project", "delivery", "project_id"))),
+			refreshToolOption(),
 			mcp.WithNumber("limit", mcp.Description(limitDesc())),
 			readOnlyAnnotation(),
 		),
@@ -399,7 +456,7 @@ func findDeliveriesTool(srv *Server) server.ServerTool {
 				return errorResult(fmt.Errorf("status filtering is not supported for documents (no Status field on entity)")), nil
 			}
 			results, err := srv.FindService().FindDelivery(ctx, find.FindDeliveryQuery{
-				FindCommonOpts: find.FindCommonOpts{Limit: getIntArg(req, "limit")},
+				FindCommonOpts: find.FindCommonOpts{Limit: getIntArg(req, "limit"), Opts: parseRefreshArg(getStringArg(req, "refresh"))},
 				ID:             getIntArg(req, "id"),
 				ProjectID:      getIntArg(req, "project_id"),
 				ClientName:     getStringArg(req, "client_name"),
@@ -421,6 +478,7 @@ func findReceiptsTool(srv *Server) server.ServerTool {
 			mcp.WithNumber("project_id", mcp.Description("Project ID to find its receipts (use to narrow to a single project).")),
 			mcp.WithString("client_name", mcp.Description(fanoutNameDesc("client", "receipt", "project_id"))),
 			mcp.WithString("project_name", mcp.Description(fanoutNameDesc("project", "receipt", "project_id"))),
+			refreshToolOption(),
 			mcp.WithNumber("limit", mcp.Description(limitDesc())),
 			readOnlyAnnotation(),
 		),
@@ -429,7 +487,7 @@ func findReceiptsTool(srv *Server) server.ServerTool {
 				return errorResult(fmt.Errorf("status filtering is not supported for documents (no Status field on entity)")), nil
 			}
 			results, err := srv.FindService().FindReceipt(ctx, find.FindReceiptQuery{
-				FindCommonOpts: find.FindCommonOpts{Limit: getIntArg(req, "limit")},
+				FindCommonOpts: find.FindCommonOpts{Limit: getIntArg(req, "limit"), Opts: parseRefreshArg(getStringArg(req, "refresh"))},
 				ID:             getIntArg(req, "id"),
 				ProjectID:      getIntArg(req, "project_id"),
 				ClientName:     getStringArg(req, "client_name"),
@@ -451,6 +509,7 @@ func findPurchaseOrdersTool(srv *Server) server.ServerTool {
 			mcp.WithString("vendor_name", mcp.Description(disambiguateNameDesc("vendor", "purchase order"))),
 			mcp.WithString("project_name", mcp.Description(notYetSupportedDesc("project name", "purchase orders"))),
 			mcp.WithString("status", mcp.Description("Filter by purchase order status (single value; API delegated, no narrowing required).")),
+			refreshToolOption(),
 			mcp.WithNumber("limit", mcp.Description(limitDesc())),
 			readOnlyAnnotation(),
 		),
@@ -468,7 +527,7 @@ func findPurchaseOrdersTool(srv *Server) server.ServerTool {
 				vendorID = id
 			}
 			results, err := svc.FindPurchaseOrder(ctx, find.FindPurchaseOrderQuery{
-				FindCommonOpts: find.FindCommonOpts{Limit: getIntArg(req, "limit")},
+				FindCommonOpts: find.FindCommonOpts{Limit: getIntArg(req, "limit"), Opts: parseRefreshArg(getStringArg(req, "refresh"))},
 				ID:             getIntArg(req, "id"),
 				VendorID:       vendorID,
 				Status:         getStringArg(req, "status"),
@@ -489,6 +548,7 @@ func findPaymentsTool(srv *Server) server.ServerTool {
 			mcp.WithString("vendor_name", mcp.Description(disambiguateNameDesc("vendor", "payment"))),
 			mcp.WithNumber("purchase_order_id", mcp.Description(notYetSupportedDesc("purchase order ID", "payments"))),
 			mcp.WithString("status", mcp.Description("Filter by payment status (single value; API delegated, no narrowing required).")),
+			refreshToolOption(),
 			mcp.WithNumber("limit", mcp.Description(limitDesc())),
 			readOnlyAnnotation(),
 		),
@@ -506,7 +566,7 @@ func findPaymentsTool(srv *Server) server.ServerTool {
 				vendorID = id
 			}
 			results, err := svc.FindPayment(ctx, find.FindPaymentQuery{
-				FindCommonOpts: find.FindCommonOpts{Limit: getIntArg(req, "limit")},
+				FindCommonOpts: find.FindCommonOpts{Limit: getIntArg(req, "limit"), Opts: parseRefreshArg(getStringArg(req, "refresh"))},
 				ID:             getIntArg(req, "id"),
 				VendorID:       vendorID,
 				Status:         getStringArg(req, "status"),

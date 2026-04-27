@@ -20,7 +20,6 @@ type ProjectRepository struct {
 	refresher   *refresh.Refresher
 	lockManager *refresh.LockManager
 	tz          *time.Location
-	autoRefresh bool
 }
 
 // NewProjectRepository creates a new ProjectRepository.
@@ -32,7 +31,6 @@ func NewProjectRepository(
 	refresher *refresh.Refresher,
 	lm *refresh.LockManager,
 	tz *time.Location,
-	autoRefresh bool,
 ) *ProjectRepository {
 	return &ProjectRepository{
 		profile:     profile,
@@ -42,7 +40,6 @@ func NewProjectRepository(
 		refresher:   refresher,
 		lockManager: lm,
 		tz:          tz,
-		autoRefresh: autoRefresh,
 	}
 }
 
@@ -108,24 +105,12 @@ func (r *ProjectRepository) List(ctx context.Context, readOpts ReadOptions, filt
 	if err != nil {
 		return nil, err
 	}
-	if err := maybeRefresh(ctx, r.profile, projectsResource, readOpts, state, r.autoRefresh, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
+	if err := maybeRefresh(ctx, r.profile, projectsResource, readOpts, state, false, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
 		return nil, err
 	}
 	entries, err := r.cache.List(ctx, r.profile, projectsResource)
 	if err != nil {
 		return nil, err
-	}
-	if len(entries) == 0 && state == nil {
-		if err := r.lockManager.WithLock(ctx, r.profile, projectsResource, func() error {
-			_, err := r.refresher.ForceRefresh(ctx, r.profile, fetcher, now, r.tz)
-			return err
-		}); err != nil {
-			return nil, err
-		}
-		entries, err = r.cache.List(ctx, r.profile, projectsResource)
-		if err != nil {
-			return nil, err
-		}
 	}
 	entities, err := decodeEntries[boardapi.ProjectEntity](entries)
 	if err != nil {
@@ -158,7 +143,7 @@ func (r *ProjectRepository) GetByID(ctx context.Context, id int, opts ReadOption
 		return nil, err
 	}
 
-	if err := maybeRefresh(ctx, r.profile, projectsResource, opts, state, r.autoRefresh, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
+	if err := maybeRefresh(ctx, r.profile, projectsResource, opts, state, false, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
 		return nil, err
 	}
 

@@ -73,7 +73,6 @@ var validProfileFields = map[string]bool{
 	"base_url":                true,
 	"api_key":                 true,
 	"api_token":               true,
-	"daily_auto_refresh":      true,
 	"request_timeout_seconds": true,
 	"retry_max":               true,
 	"pretty_default":          true,
@@ -117,8 +116,6 @@ func getField(cfg config.Config, key string) (val string, isSecret bool, err err
 			return prof.APIKey, isSecret, nil
 		case "api_token":
 			return prof.APIToken, isSecret, nil
-		case "daily_auto_refresh":
-			return strconv.FormatBool(prof.DailyAutoRefresh), isSecret, nil
 		case "request_timeout_seconds":
 			return strconv.Itoa(prof.RequestTimeoutSeconds), isSecret, nil
 		case "retry_max":

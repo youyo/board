@@ -38,7 +38,6 @@ func NewConfigureShowCmd() *cobra.Command {
 					"base_url":                prof.BaseURL,
 					"api_key":                 maskSecret(prof.APIKey),
 					"api_token":               maskSecret(prof.APIToken),
-					"daily_auto_refresh":      prof.DailyAutoRefresh,
 					"request_timeout_seconds": prof.RequestTimeoutSeconds,
 					"retry_max":               prof.RetryMax,
 					"pretty_default":          prof.PrettyDefault,

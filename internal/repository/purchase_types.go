@@ -20,7 +20,6 @@ type PurchaseTypeRepository struct {
 	refresher   *refresh.Refresher
 	lockManager *refresh.LockManager
 	tz          *time.Location
-	autoRefresh bool
 }
 
 // NewPurchaseTypeRepository creates a new PurchaseTypeRepository.
@@ -32,7 +31,6 @@ func NewPurchaseTypeRepository(
 	refresher *refresh.Refresher,
 	lm *refresh.LockManager,
 	tz *time.Location,
-	autoRefresh bool,
 ) *PurchaseTypeRepository {
 	return &PurchaseTypeRepository{
 		profile:     profile,
@@ -42,7 +40,6 @@ func NewPurchaseTypeRepository(
 		refresher:   refresher,
 		lockManager: lm,
 		tz:          tz,
-		autoRefresh: autoRefresh,
 	}
 }
 
@@ -88,24 +85,12 @@ func (r *PurchaseTypeRepository) List(ctx context.Context, readOpts ReadOptions,
 	if err != nil {
 		return nil, err
 	}
-	if err := maybeRefresh(ctx, r.profile, purchaseTypesResource, readOpts, state, r.autoRefresh, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
+	if err := maybeRefresh(ctx, r.profile, purchaseTypesResource, readOpts, state, false, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
 		return nil, err
 	}
 	entries, err := r.cache.List(ctx, r.profile, purchaseTypesResource)
 	if err != nil {
 		return nil, err
-	}
-	if len(entries) == 0 && state == nil {
-		if err := r.lockManager.WithLock(ctx, r.profile, purchaseTypesResource, func() error {
-			_, err := r.refresher.ForceRefresh(ctx, r.profile, fetcher, now, r.tz)
-			return err
-		}); err != nil {
-			return nil, err
-		}
-		entries, err = r.cache.List(ctx, r.profile, purchaseTypesResource)
-		if err != nil {
-			return nil, err
-		}
 	}
 	entities, err := decodeEntries[boardapi.PurchaseTypeEntity](entries)
 	if err != nil {
@@ -136,7 +121,7 @@ func (r *PurchaseTypeRepository) GetByID(ctx context.Context, id int, opts ReadO
 		return nil, err
 	}
 
-	if err := maybeRefresh(ctx, r.profile, purchaseTypesResource, opts, state, r.autoRefresh, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
+	if err := maybeRefresh(ctx, r.profile, purchaseTypesResource, opts, state, false, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
 		return nil, err
 	}
 

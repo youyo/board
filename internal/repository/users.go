@@ -20,7 +20,6 @@ type UserRepository struct {
 	refresher   *refresh.Refresher
 	lockManager *refresh.LockManager
 	tz          *time.Location
-	autoRefresh bool
 }
 
 // NewUserRepository creates a new UserRepository.
@@ -32,7 +31,6 @@ func NewUserRepository(
 	refresher *refresh.Refresher,
 	lm *refresh.LockManager,
 	tz *time.Location,
-	autoRefresh bool,
 ) *UserRepository {
 	return &UserRepository{
 		profile:     profile,
@@ -42,7 +40,6 @@ func NewUserRepository(
 		refresher:   refresher,
 		lockManager: lm,
 		tz:          tz,
-		autoRefresh: autoRefresh,
 	}
 }
 
@@ -89,24 +86,12 @@ func (r *UserRepository) List(ctx context.Context, readOpts ReadOptions, filter 
 	if err != nil {
 		return nil, err
 	}
-	if err := maybeRefresh(ctx, r.profile, usersResource, readOpts, state, r.autoRefresh, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
+	if err := maybeRefresh(ctx, r.profile, usersResource, readOpts, state, false, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
 		return nil, err
 	}
 	entries, err := r.cache.List(ctx, r.profile, usersResource)
 	if err != nil {
 		return nil, err
-	}
-	if len(entries) == 0 && state == nil {
-		if err := r.lockManager.WithLock(ctx, r.profile, usersResource, func() error {
-			_, err := r.refresher.ForceRefresh(ctx, r.profile, fetcher, now, r.tz)
-			return err
-		}); err != nil {
-			return nil, err
-		}
-		entries, err = r.cache.List(ctx, r.profile, usersResource)
-		if err != nil {
-			return nil, err
-		}
 	}
 	entities, err := decodeEntries[boardapi.UserEntity](entries)
 	if err != nil {
@@ -137,7 +122,7 @@ func (r *UserRepository) GetByID(ctx context.Context, id int, opts ReadOptions) 
 		return nil, err
 	}
 
-	if err := maybeRefresh(ctx, r.profile, usersResource, opts, state, r.autoRefresh, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
+	if err := maybeRefresh(ctx, r.profile, usersResource, opts, state, false, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
 		return nil, err
 	}
 

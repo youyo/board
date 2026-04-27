@@ -15,7 +15,7 @@ func TestNewRootCmd_HasVersionFlag(t *testing.T) {
 
 func TestNewRootCmd_GlobalFlags(t *testing.T) {
 	cmd := cli.NewRootCmd("dev")
-	flags := []string{"profile", "refresh", "force-refresh", "pretty", "limit"}
+	flags := []string{"profile", "refresh", "refresh-full", "pretty", "limit"}
 	for _, name := range flags {
 		if cmd.PersistentFlags().Lookup(name) == nil {
 			t.Errorf("flag --%s not found", name)

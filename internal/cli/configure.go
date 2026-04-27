@@ -99,18 +99,10 @@ func runConfigure(cmd *cobra.Command, in io.Reader, profileName string) error {
 		}
 	}
 
-	// Question 5: daily_auto_refresh
-	darDefault := "true"
-	if !prof.DailyAutoRefresh {
-		darDefault = "false"
-	}
-	darStr := ask("Daily auto refresh (true/false)", darDefault)
-	prof.DailyAutoRefresh = darStr == "true" || darStr == "1" || darStr == "yes"
-
-	// Question 6: timezone (global)
+	// Question 5: timezone (global)
 	cfg.Timezone = ask("Timezone", cfg.Timezone)
 
-	// Question 7: whether to set as current profile
+	// Question 6: whether to set as current profile
 	setCurrentStr := ask(fmt.Sprintf("Set %q as current profile? (yes/no)", newProfileName), "yes")
 	setAsCurrent := setCurrentStr == "yes" || setCurrentStr == "y" || setCurrentStr == "true"
 
@@ -131,7 +123,6 @@ func runConfigure(cmd *cobra.Command, in io.Reader, profileName string) error {
 			"base_url":                prof.BaseURL,
 			"api_key":                 maskSecret(prof.APIKey),
 			"api_token":               maskSecret(prof.APIToken),
-			"daily_auto_refresh":      prof.DailyAutoRefresh,
 			"request_timeout_seconds": prof.RequestTimeoutSeconds,
 			"retry_max":               prof.RetryMax,
 			"pretty_default":          prof.PrettyDefault,

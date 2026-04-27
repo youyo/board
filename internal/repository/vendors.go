@@ -20,7 +20,6 @@ type VendorRepository struct {
 	refresher   *refresh.Refresher
 	lockManager *refresh.LockManager
 	tz          *time.Location
-	autoRefresh bool
 }
 
 // NewVendorRepository creates a new VendorRepository.
@@ -32,7 +31,6 @@ func NewVendorRepository(
 	refresher *refresh.Refresher,
 	lm *refresh.LockManager,
 	tz *time.Location,
-	autoRefresh bool,
 ) *VendorRepository {
 	return &VendorRepository{
 		profile:     profile,
@@ -42,7 +40,6 @@ func NewVendorRepository(
 		refresher:   refresher,
 		lockManager: lm,
 		tz:          tz,
-		autoRefresh: autoRefresh,
 	}
 }
 
@@ -88,24 +85,12 @@ func (r *VendorRepository) List(ctx context.Context, readOpts ReadOptions, filte
 	if err != nil {
 		return nil, err
 	}
-	if err := maybeRefresh(ctx, r.profile, vendorsResource, readOpts, state, r.autoRefresh, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
+	if err := maybeRefresh(ctx, r.profile, vendorsResource, readOpts, state, false, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
 		return nil, err
 	}
 	entries, err := r.cache.List(ctx, r.profile, vendorsResource)
 	if err != nil {
 		return nil, err
-	}
-	if len(entries) == 0 && state == nil {
-		if err := r.lockManager.WithLock(ctx, r.profile, vendorsResource, func() error {
-			_, err := r.refresher.ForceRefresh(ctx, r.profile, fetcher, now, r.tz)
-			return err
-		}); err != nil {
-			return nil, err
-		}
-		entries, err = r.cache.List(ctx, r.profile, vendorsResource)
-		if err != nil {
-			return nil, err
-		}
 	}
 	entities, err := decodeEntries[boardapi.VendorEntity](entries)
 	if err != nil {
@@ -136,7 +121,7 @@ func (r *VendorRepository) GetByID(ctx context.Context, id int, opts ReadOptions
 		return nil, err
 	}
 
-	if err := maybeRefresh(ctx, r.profile, vendorsResource, opts, state, r.autoRefresh, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
+	if err := maybeRefresh(ctx, r.profile, vendorsResource, opts, state, false, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
 		return nil, err
 	}
 

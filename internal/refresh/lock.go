@@ -20,6 +20,26 @@ var (
 	ErrLockCanceled = errors.New("lock acquisition canceled")
 )
 
+// RefreshInProgressError indicates that another in-flight refresh is holding the lock.
+// Returned by TryAcquireLock / TryWithLock so callers can return 429-style responses.
+type RefreshInProgressError struct {
+	Profile           string
+	Resource          string
+	Holder            string
+	ElapsedSeconds    int
+	RetryAfterSeconds int
+}
+
+func (e *RefreshInProgressError) Error() string {
+	return fmt.Sprintf("refresh in progress for %s (holder=%s, elapsed=%ds)", e.Resource, e.Holder, e.ElapsedSeconds)
+}
+
+// IsRefreshInProgress reports whether err is a RefreshInProgressError.
+func IsRefreshInProgress(err error) bool {
+	var rip *RefreshInProgressError
+	return errors.As(err, &rip)
+}
+
 // lockKey is a map key representing a profile+resource combination.
 type lockKey struct {
 	Profile  string
@@ -138,6 +158,108 @@ func (m *LockManager) ReleaseLock(ctx context.Context, profile, resource string)
 	}
 
 	return dbErr
+}
+
+// TryAcquireLock attempts to acquire the lock without blocking.
+// Returns *RefreshInProgressError if the lock is held by another holder
+// (in-process mutex busy, or DB has a non-stale lock owned by someone else).
+// If the DB lock is stale (older than staleLockTimeout), takeover succeeds.
+//
+// retryAfterSeconds は呼び出し元が応答に含める推奨値（固定値）。
+func (m *LockManager) TryAcquireLock(ctx context.Context, profile, resource string, retryAfterSeconds int) error {
+	if ctx.Err() != nil {
+		return ErrLockCanceled
+	}
+
+	key := lockKey{Profile: profile, Resource: resource}
+	keyMu := m.getKeyMutex(key)
+	if !keyMu.TryLock() {
+		// in-process holder. DB から holder/elapsed を読んで返す（best-effort）。
+		holder, elapsed := m.dbHolderInfo(ctx, profile, resource)
+		return &RefreshInProgressError{
+			Profile:           profile,
+			Resource:          resource,
+			Holder:            holder,
+			ElapsedSeconds:    elapsed,
+			RetryAfterSeconds: retryAfterSeconds,
+		}
+	}
+
+	if ctx.Err() != nil {
+		keyMu.Unlock()
+		return ErrLockCanceled
+	}
+
+	state, err := m.syncStore.Get(ctx, profile, resource)
+	if err != nil {
+		keyMu.Unlock()
+		return err
+	}
+
+	// DB に他プロセスの active lock がある場合、stale でなければ 429 相当を返す。
+	if state != nil && state.RefreshStartedAt.Valid && !m.isStale(state) {
+		holder := ""
+		if state.RefreshOwner.Valid {
+			holder = state.RefreshOwner.String
+		}
+		// 自分自身（同 ownerID）が保持しているのは想定外（in-process mutex を抜けた直後）。
+		// 念のため自分以外なら refresh in progress を返す。
+		if holder != "" && holder != m.ownerID {
+			elapsed, _ := elapsedSecondsSince(state.RefreshStartedAt.String, m.now())
+			keyMu.Unlock()
+			return &RefreshInProgressError{
+				Profile:           profile,
+				Resource:          resource,
+				Holder:            holder,
+				ElapsedSeconds:    elapsed,
+				RetryAfterSeconds: retryAfterSeconds,
+			}
+		}
+	}
+
+	if err := m.updater.MarkLockAcquired(ctx, profile, resource, m.ownerID, m.now()); err != nil {
+		keyMu.Unlock()
+		return err
+	}
+	return nil
+}
+
+// TryWithLock is the non-blocking variant of WithLock. Returns *RefreshInProgressError
+// when the lock is busy.
+func (m *LockManager) TryWithLock(ctx context.Context, profile, resource string, retryAfterSeconds int, fn func() error) error {
+	if err := m.TryAcquireLock(ctx, profile, resource, retryAfterSeconds); err != nil {
+		return err
+	}
+	defer func() {
+		_ = m.ReleaseLock(context.Background(), profile, resource)
+	}()
+	return fn()
+}
+
+// dbHolderInfo は sync_state から holder と経過秒を best-effort で取得する。
+func (m *LockManager) dbHolderInfo(ctx context.Context, profile, resource string) (string, int) {
+	state, err := m.syncStore.Get(ctx, profile, resource)
+	if err != nil || state == nil {
+		return "", 0
+	}
+	holder := ""
+	if state.RefreshOwner.Valid {
+		holder = state.RefreshOwner.String
+	}
+	elapsed := 0
+	if state.RefreshStartedAt.Valid {
+		elapsed, _ = elapsedSecondsSince(state.RefreshStartedAt.String, m.now())
+	}
+	return holder, elapsed
+}
+
+// elapsedSecondsSince は RFC3339 文字列から「now との差秒」を返す。
+func elapsedSecondsSince(rfc3339Str string, now time.Time) (int, error) {
+	t, err := time.Parse(time.RFC3339, rfc3339Str)
+	if err != nil {
+		return 0, err
+	}
+	return int(now.Sub(t).Seconds()), nil
 }
 
 // WithLock is a helper that guarantees: acquire lock → execute fn → release lock.

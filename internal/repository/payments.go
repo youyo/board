@@ -20,7 +20,6 @@ type PaymentRepository struct {
 	refresher   *refresh.Refresher
 	lockManager *refresh.LockManager
 	tz          *time.Location
-	autoRefresh bool
 }
 
 // NewPaymentRepository creates a new PaymentRepository.
@@ -32,7 +31,6 @@ func NewPaymentRepository(
 	refresher *refresh.Refresher,
 	lm *refresh.LockManager,
 	tz *time.Location,
-	autoRefresh bool,
 ) *PaymentRepository {
 	return &PaymentRepository{
 		profile:     profile,
@@ -42,7 +40,6 @@ func NewPaymentRepository(
 		refresher:   refresher,
 		lockManager: lm,
 		tz:          tz,
-		autoRefresh: autoRefresh,
 	}
 }
 
@@ -94,24 +91,12 @@ func (r *PaymentRepository) List(ctx context.Context, readOpts ReadOptions, filt
 	if err != nil {
 		return nil, err
 	}
-	if err := maybeRefresh(ctx, r.profile, paymentsResource, readOpts, state, r.autoRefresh, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
+	if err := maybeRefresh(ctx, r.profile, paymentsResource, readOpts, state, false, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
 		return nil, err
 	}
 	entries, err := r.cache.List(ctx, r.profile, paymentsResource)
 	if err != nil {
 		return nil, err
-	}
-	if len(entries) == 0 && state == nil {
-		if err := r.lockManager.WithLock(ctx, r.profile, paymentsResource, func() error {
-			_, err := r.refresher.ForceRefresh(ctx, r.profile, fetcher, now, r.tz)
-			return err
-		}); err != nil {
-			return nil, err
-		}
-		entries, err = r.cache.List(ctx, r.profile, paymentsResource)
-		if err != nil {
-			return nil, err
-		}
 	}
 	entities, err := decodeEntries[boardapi.PaymentEntity](entries)
 	if err != nil {
@@ -142,7 +127,7 @@ func (r *PaymentRepository) GetByID(ctx context.Context, id int, opts ReadOption
 		return nil, err
 	}
 
-	if err := maybeRefresh(ctx, r.profile, paymentsResource, opts, state, r.autoRefresh, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
+	if err := maybeRefresh(ctx, r.profile, paymentsResource, opts, state, false, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
 		return nil, err
 	}
 

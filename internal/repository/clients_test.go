@@ -63,14 +63,14 @@ func newErrorAPIServer(t *testing.T) *httptest.Server {
 }
 
 // makeClientRepo constructs a ClientRepository for testing.
-func makeClientRepo(t *testing.T, db *cache.DB, apiClient *boardapi.Client, autoRefresh bool) *repository.ClientRepository {
+func makeClientRepo(t *testing.T, db *cache.DB, apiClient *boardapi.Client) *repository.ClientRepository {
 	t.Helper()
 	rc := cache.NewResourceCache(db)
 	ss := cache.NewSyncStateStore(db)
 	refresher := refresh.NewRefresher(rc, ss)
 	lm := refresh.NewLockManager(ss, "test-owner")
 	tz := time.UTC
-	return repository.NewClientRepository("default", apiClient, rc, ss, refresher, lm, tz, autoRefresh)
+	return repository.NewClientRepository("default", apiClient, rc, ss, refresher, lm, tz)
 }
 
 // seedClientCache writes ClientEntity records directly into the cache.
@@ -131,7 +131,7 @@ func TestClientRepository_List_CacheHit(t *testing.T) {
 	srv := newClientAPIServer(t, nil) // API should not be called
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makeClientRepo(t, db, apiClient, false)
+	repo := makeClientRepo(t, db, apiClient)
 	result, err := repo.List(context.Background(), repository.ReadOptions{}, boardapi.ClientListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
@@ -139,52 +139,6 @@ func TestClientRepository_List_CacheHit(t *testing.T) {
 	got := result.Items
 	if len(got) != len(sampleClients) {
 		t.Errorf("len(got) = %d, want %d", len(got), len(sampleClients))
-	}
-}
-
-// T_R02: List - no cache (initial load), autoRefresh=false -> returns data after ForceRefresh
-func TestClientRepository_List_InitialLoad(t *testing.T) {
-	db := newTestDB(t)
-
-	srv := newClientAPIServer(t, sampleClients)
-	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
-
-	repo := makeClientRepo(t, db, apiClient, false)
-	result, err := repo.List(context.Background(), repository.ReadOptions{}, boardapi.ClientListOptions{})
-	if err != nil {
-		t.Fatalf("List: %v", err)
-	}
-	got := result.Items
-	if len(got) != len(sampleClients) {
-		t.Errorf("len(got) = %d, want %d", len(got), len(sampleClients))
-	}
-}
-
-// T_R03: List - autoRefresh=true, NeedsDailyRefresh=true -> returns data after DeltaRefresh
-func TestClientRepository_List_AutoRefresh(t *testing.T) {
-	db := newTestDB(t)
-	// Seed cache with data but set SyncState to "yesterday"
-	seedClientCache(t, db, sampleClients[:1])
-	ss := cache.NewSyncStateStore(db)
-	yesterday := time.Now().UTC().AddDate(0, 0, -1).Format("2006-01-02")
-	_ = ss.Upsert(context.Background(), cache.SyncState{
-		ProfileName:          "default",
-		ResourceName:         "clients",
-		LastDailyRefreshDate: sql.NullString{Valid: true, String: yesterday},
-	})
-
-	// API returns all entries
-	srv := newClientAPIServer(t, sampleClients)
-	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
-
-	repo := makeClientRepo(t, db, apiClient, true)
-	result, err := repo.List(context.Background(), repository.ReadOptions{}, boardapi.ClientListOptions{})
-	if err != nil {
-		t.Fatalf("List: %v", err)
-	}
-	got := result.Items
-	if len(got) == 0 {
-		t.Error("expected non-empty result after auto refresh")
 	}
 }
 
@@ -195,7 +149,7 @@ func TestClientRepository_List_ForceRefresh(t *testing.T) {
 	srv := newClientAPIServer(t, sampleClients)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makeClientRepo(t, db, apiClient, false)
+	repo := makeClientRepo(t, db, apiClient)
 	result, err := repo.List(context.Background(), repository.ReadOptions{ForceRefresh: true}, boardapi.ClientListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
@@ -216,7 +170,7 @@ func TestClientRepository_List_DeltaRefresh(t *testing.T) {
 	srv := newClientAPIServer(t, sampleClients)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makeClientRepo(t, db, apiClient, false)
+	repo := makeClientRepo(t, db, apiClient)
 	result, err := repo.List(context.Background(), repository.ReadOptions{Refresh: true}, boardapi.ClientListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
@@ -236,7 +190,7 @@ func TestClientRepository_List_Limit(t *testing.T) {
 	srv := newClientAPIServer(t, nil)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makeClientRepo(t, db, apiClient, false)
+	repo := makeClientRepo(t, db, apiClient)
 	result, err := repo.List(context.Background(), repository.ReadOptions{Limit: 2}, boardapi.ClientListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
@@ -256,7 +210,7 @@ func TestClientRepository_List_DeltaRefreshAPIError_StaleCache(t *testing.T) {
 	srv := newErrorAPIServer(t)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makeClientRepo(t, db, apiClient, false)
+	repo := makeClientRepo(t, db, apiClient)
 	result, err := repo.List(context.Background(), repository.ReadOptions{Refresh: true}, boardapi.ClientListOptions{})
 	if err != nil {
 		t.Fatalf("expected no error on delta refresh failure, got: %v", err)
@@ -276,7 +230,7 @@ func TestClientRepository_GetByID_CacheHit(t *testing.T) {
 	srv := newClientAPIServer(t, nil) // API should not be called
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makeClientRepo(t, db, apiClient, false)
+	repo := makeClientRepo(t, db, apiClient)
 	got, err := repo.GetByID(context.Background(), 1, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
@@ -302,7 +256,7 @@ func TestClientRepository_GetByID_CacheMiss_APISuccess(t *testing.T) {
 
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makeClientRepo(t, db, apiClient, false)
+	repo := makeClientRepo(t, db, apiClient)
 	got, err := repo.GetByID(context.Background(), 42, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
@@ -320,7 +274,7 @@ func TestClientRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	srv := newErrorAPIServer(t)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makeClientRepo(t, db, apiClient, false)
+	repo := makeClientRepo(t, db, apiClient)
 	_, err := repo.GetByID(context.Background(), 999, repository.ReadOptions{})
 	if err == nil {
 		t.Fatal("expected error, got nil")
@@ -336,7 +290,7 @@ func TestClientRepository_Search_NoFilter(t *testing.T) {
 	srv := newClientAPIServer(t, nil)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makeClientRepo(t, db, apiClient, false)
+	repo := makeClientRepo(t, db, apiClient)
 	got, err := repo.Search(context.Background(), boardapi.ClientListOptions{}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
@@ -361,7 +315,7 @@ func TestClientRepository_Search_NameFilter(t *testing.T) {
 	srv := newClientAPIServer(t, filtered)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makeClientRepo(t, db, apiClient, false)
+	repo := makeClientRepo(t, db, apiClient)
 	got, err := repo.Search(context.Background(), boardapi.ClientListOptions{NameCont: "ClientA"}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
@@ -381,7 +335,7 @@ func TestClientRepository_Search_ForceRefresh(t *testing.T) {
 	srv := newClientAPIServer(t, sampleClients)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makeClientRepo(t, db, apiClient, false)
+	repo := makeClientRepo(t, db, apiClient)
 	got, err := repo.Search(context.Background(), boardapi.ClientListOptions{NameCont: "Client"}, repository.ReadOptions{ForceRefresh: true})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
@@ -401,7 +355,7 @@ func TestClientRepository_List_NoLimit(t *testing.T) {
 	srv := newClientAPIServer(t, nil)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makeClientRepo(t, db, apiClient, false)
+	repo := makeClientRepo(t, db, apiClient)
 	result, err := repo.List(context.Background(), repository.ReadOptions{Limit: 0}, boardapi.ClientListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
@@ -427,7 +381,7 @@ func TestClientRepository_Search_LimitAppliedAfterFilter(t *testing.T) {
 	srv := newClientAPIServer(t, filtered)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makeClientRepo(t, db, apiClient, false)
+	repo := makeClientRepo(t, db, apiClient)
 	got, err := repo.Search(context.Background(), boardapi.ClientListOptions{NameCont: "Other"}, repository.ReadOptions{Limit: 2})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
@@ -453,7 +407,7 @@ func TestClientRepository_List_ContextCanceled(t *testing.T) {
 
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makeClientRepo(t, db, apiClient, false)
+	repo := makeClientRepo(t, db, apiClient)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // cancel immediately

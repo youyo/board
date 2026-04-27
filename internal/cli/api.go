@@ -85,7 +85,11 @@ func apiServiceFromCmd(cmd *cobra.Command) (*serviceapi.Service, error) {
 // readOptionsFromCmd builds ReadOptions from the persistent flags.
 func readOptionsFromCmd(cmd *cobra.Command) repository.ReadOptions {
 	refresh, _ := cmd.Root().PersistentFlags().GetBool("refresh")
-	forceRefresh, _ := cmd.Root().PersistentFlags().GetBool("force-refresh")
+	forceRefresh, _ := cmd.Root().PersistentFlags().GetBool("refresh-full")
+	// --refresh-full takes priority over --refresh.
+	if forceRefresh {
+		refresh = false
+	}
 	limit, _ := cmd.Root().PersistentFlags().GetInt("limit")
 	return repository.ReadOptions{
 		Refresh:      refresh,

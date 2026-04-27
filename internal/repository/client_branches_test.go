@@ -17,14 +17,14 @@ import (
 )
 
 // makeClientBranchRepo constructs a ClientBranchRepository for testing.
-func makeClientBranchRepo(t *testing.T, db *cache.DB, apiClient *boardapi.Client, autoRefresh bool) *repository.ClientBranchRepository {
+func makeClientBranchRepo(t *testing.T, db *cache.DB, apiClient *boardapi.Client) *repository.ClientBranchRepository {
 	t.Helper()
 	rc := cache.NewResourceCache(db)
 	ss := cache.NewSyncStateStore(db)
 	refresher := refresh.NewRefresher(rc, ss)
 	lm := refresh.NewLockManager(ss, "test-owner")
 	tz := time.UTC
-	return repository.NewClientBranchRepository("default", apiClient, rc, ss, refresher, lm, tz, autoRefresh)
+	return repository.NewClientBranchRepository("default", apiClient, rc, ss, refresher, lm, tz)
 }
 
 // seedClientBranchCache writes ClientBranchEntity records directly into the cache.
@@ -120,55 +120,13 @@ func TestClientBranchRepository_List_CacheHit(t *testing.T) {
 	srv := newClientBranchAPIServer(t, nil)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makeClientBranchRepo(t, db, apiClient, false)
+	repo := makeClientBranchRepo(t, db, apiClient)
 	got, err := repo.List(context.Background(), repository.ReadOptions{}, boardapi.ClientBranchListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
 	if len(got.Items) != len(sampleClientBranches) {
 		t.Errorf("len(got.Items) = %d, want %d", len(got.Items), len(sampleClientBranches))
-	}
-}
-
-// T_R17: List - no cache (initial load) -> returns data after ForceRefresh
-func TestClientBranchRepository_List_InitialLoad(t *testing.T) {
-	db := newTestDB(t)
-
-	srv := newClientBranchAPIServer(t, sampleClientBranches)
-	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
-
-	repo := makeClientBranchRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{}, boardapi.ClientBranchListOptions{})
-	if err != nil {
-		t.Fatalf("List: %v", err)
-	}
-	if len(got.Items) != len(sampleClientBranches) {
-		t.Errorf("len(got.Items) = %d, want %d", len(got.Items), len(sampleClientBranches))
-	}
-}
-
-// T_R18: List - autoRefresh=true, NeedsDailyRefresh=true -> returns data after DeltaRefresh
-func TestClientBranchRepository_List_AutoRefresh(t *testing.T) {
-	db := newTestDB(t)
-	seedClientBranchCache(t, db, sampleClientBranches[:1])
-	ss := cache.NewSyncStateStore(db)
-	yesterday := time.Now().UTC().AddDate(0, 0, -1).Format("2006-01-02")
-	_ = ss.Upsert(context.Background(), cache.SyncState{
-		ProfileName:          "default",
-		ResourceName:         "client_branches",
-		LastDailyRefreshDate: sql.NullString{Valid: true, String: yesterday},
-	})
-
-	srv := newClientBranchAPIServer(t, sampleClientBranches)
-	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
-
-	repo := makeClientBranchRepo(t, db, apiClient, true)
-	got, err := repo.List(context.Background(), repository.ReadOptions{}, boardapi.ClientBranchListOptions{})
-	if err != nil {
-		t.Fatalf("List: %v", err)
-	}
-	if len(got.Items) == 0 {
-		t.Error("expected non-empty result after auto refresh")
 	}
 }
 
@@ -179,7 +137,7 @@ func TestClientBranchRepository_List_ForceRefresh(t *testing.T) {
 	srv := newClientBranchAPIServer(t, sampleClientBranches)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makeClientBranchRepo(t, db, apiClient, false)
+	repo := makeClientBranchRepo(t, db, apiClient)
 	got, err := repo.List(context.Background(), repository.ReadOptions{ForceRefresh: true}, boardapi.ClientBranchListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
@@ -198,7 +156,7 @@ func TestClientBranchRepository_List_DeltaRefresh(t *testing.T) {
 	srv := newClientBranchAPIServer(t, sampleClientBranches)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makeClientBranchRepo(t, db, apiClient, false)
+	repo := makeClientBranchRepo(t, db, apiClient)
 	got, err := repo.List(context.Background(), repository.ReadOptions{Refresh: true}, boardapi.ClientBranchListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
@@ -217,7 +175,7 @@ func TestClientBranchRepository_List_Limit(t *testing.T) {
 	srv := newClientBranchAPIServer(t, nil)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makeClientBranchRepo(t, db, apiClient, false)
+	repo := makeClientBranchRepo(t, db, apiClient)
 	got, err := repo.List(context.Background(), repository.ReadOptions{Limit: 2}, boardapi.ClientBranchListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
@@ -236,7 +194,7 @@ func TestClientBranchRepository_List_DeltaRefreshAPIError_StaleCache(t *testing.
 	srv := newErrorAPIServer(t)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makeClientBranchRepo(t, db, apiClient, false)
+	repo := makeClientBranchRepo(t, db, apiClient)
 	got, err := repo.List(context.Background(), repository.ReadOptions{Refresh: true}, boardapi.ClientBranchListOptions{})
 	if err != nil {
 		t.Fatalf("expected no error on delta refresh failure, got: %v", err)
@@ -262,7 +220,7 @@ func TestClientBranchRepository_Search_ClientIDFilter(t *testing.T) {
 	srv := newClientBranchAPIServer(t, clientID10Branches)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makeClientBranchRepo(t, db, apiClient, false)
+	repo := makeClientBranchRepo(t, db, apiClient)
 	got, err := repo.Search(context.Background(), boardapi.ClientBranchListOptions{ClientIDEq: 10}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
@@ -280,7 +238,7 @@ func TestClientBranchRepository_Search_NameContFilter(t *testing.T) {
 	srv := newClientBranchAPIServerWithFilter(t, sampleClientBranches)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makeClientBranchRepo(t, db, apiClient, false)
+	repo := makeClientBranchRepo(t, db, apiClient)
 	got, err := repo.Search(context.Background(), boardapi.ClientBranchListOptions{NameCont: "Tokyo"}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
@@ -299,7 +257,7 @@ func TestClientBranchRepository_GetByID_CacheHit(t *testing.T) {
 	srv := newClientBranchAPIServer(t, nil)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makeClientBranchRepo(t, db, apiClient, false)
+	repo := makeClientBranchRepo(t, db, apiClient)
 	got, err := repo.GetByID(context.Background(), 1, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
@@ -324,7 +282,7 @@ func TestClientBranchRepository_GetByID_CacheMiss_APISuccess(t *testing.T) {
 
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makeClientBranchRepo(t, db, apiClient, false)
+	repo := makeClientBranchRepo(t, db, apiClient)
 	got, err := repo.GetByID(context.Background(), 99, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
@@ -342,7 +300,7 @@ func TestClientBranchRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	srv := newErrorAPIServer(t)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makeClientBranchRepo(t, db, apiClient, false)
+	repo := makeClientBranchRepo(t, db, apiClient)
 	_, err := repo.GetByID(context.Background(), 999, repository.ReadOptions{})
 	if err == nil {
 		t.Fatal("expected error, got nil")
@@ -358,7 +316,7 @@ func TestClientBranchRepository_List_NoLimit(t *testing.T) {
 	srv := newClientBranchAPIServer(t, nil)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makeClientBranchRepo(t, db, apiClient, false)
+	repo := makeClientBranchRepo(t, db, apiClient)
 	got, err := repo.List(context.Background(), repository.ReadOptions{Limit: 0}, boardapi.ClientBranchListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)

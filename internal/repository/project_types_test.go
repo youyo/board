@@ -16,13 +16,13 @@ import (
 	"github.com/youyo/board/internal/repository"
 )
 
-func makeProjectTypeRepo(t *testing.T, db *cache.DB, apiClient *boardapi.Client, autoRefresh bool) *repository.ProjectTypeRepository {
+func makeProjectTypeRepo(t *testing.T, db *cache.DB, apiClient *boardapi.Client) *repository.ProjectTypeRepository {
 	t.Helper()
 	rc := cache.NewResourceCache(db)
 	ss := cache.NewSyncStateStore(db)
 	refresher := refresh.NewRefresher(rc, ss)
 	lm := refresh.NewLockManager(ss, "test-owner")
-	return repository.NewProjectTypeRepository("default", apiClient, rc, ss, refresher, lm, time.UTC, autoRefresh)
+	return repository.NewProjectTypeRepository("default", apiClient, rc, ss, refresher, lm, time.UTC)
 }
 
 func seedProjectTypeCache(t *testing.T, db *cache.DB, entities []boardapi.ProjectTypeEntity) {
@@ -75,24 +75,7 @@ func TestProjectTypeRepository_List_CacheHit(t *testing.T) {
 	srv := newProjectTypeAPIServer(t, nil)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makeProjectTypeRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{}, boardapi.ProjectTypeListOptions{})
-	if err != nil {
-		t.Fatalf("List: %v", err)
-	}
-	if len(got.Items) != len(sampleProjectTypes) {
-		t.Errorf("len(got.Items) = %d, want %d", len(got.Items), len(sampleProjectTypes))
-	}
-}
-
-// T_PRT02: List - no cache (initial load) -> returns data after ForceRefresh
-func TestProjectTypeRepository_List_InitialLoad(t *testing.T) {
-	db := newTestDB(t)
-
-	srv := newProjectTypeAPIServer(t, sampleProjectTypes)
-	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
-
-	repo := makeProjectTypeRepo(t, db, apiClient, false)
+	repo := makeProjectTypeRepo(t, db, apiClient)
 	got, err := repo.List(context.Background(), repository.ReadOptions{}, boardapi.ProjectTypeListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
@@ -111,7 +94,7 @@ func TestProjectTypeRepository_GetByID_CacheHit(t *testing.T) {
 	srv := newProjectTypeAPIServer(t, nil)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makeProjectTypeRepo(t, db, apiClient, false)
+	repo := makeProjectTypeRepo(t, db, apiClient)
 	got, err := repo.GetByID(context.Background(), 1, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
@@ -136,7 +119,7 @@ func TestProjectTypeRepository_GetByID_CacheMiss_APISuccess(t *testing.T) {
 
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makeProjectTypeRepo(t, db, apiClient, false)
+	repo := makeProjectTypeRepo(t, db, apiClient)
 	got, err := repo.GetByID(context.Background(), 99, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
@@ -154,7 +137,7 @@ func TestProjectTypeRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	srv := newErrorAPIServer(t)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makeProjectTypeRepo(t, db, apiClient, false)
+	repo := makeProjectTypeRepo(t, db, apiClient)
 	_, err := repo.GetByID(context.Background(), 999, repository.ReadOptions{})
 	if err == nil {
 		t.Fatal("expected error, got nil")
@@ -173,7 +156,7 @@ func TestProjectTypeRepository_Search_NameFilter(t *testing.T) {
 	srv := newProjectTypeAPIServer(t, filtered)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makeProjectTypeRepo(t, db, apiClient, false)
+	repo := makeProjectTypeRepo(t, db, apiClient)
 	got, err := repo.Search(context.Background(), boardapi.ProjectTypeListOptions{NameCont: "Contract Development"}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
@@ -192,7 +175,7 @@ func TestProjectTypeRepository_Search_NoFilter(t *testing.T) {
 	srv := newProjectTypeAPIServer(t, nil)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makeProjectTypeRepo(t, db, apiClient, false)
+	repo := makeProjectTypeRepo(t, db, apiClient)
 	got, err := repo.Search(context.Background(), boardapi.ProjectTypeListOptions{}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)

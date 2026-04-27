@@ -16,13 +16,13 @@ import (
 	"github.com/youyo/board/internal/repository"
 )
 
-func makePaymentRepo(t *testing.T, db *cache.DB, apiClient *boardapi.Client, autoRefresh bool) *repository.PaymentRepository {
+func makePaymentRepo(t *testing.T, db *cache.DB, apiClient *boardapi.Client) *repository.PaymentRepository {
 	t.Helper()
 	rc := cache.NewResourceCache(db)
 	ss := cache.NewSyncStateStore(db)
 	refresher := refresh.NewRefresher(rc, ss)
 	lm := refresh.NewLockManager(ss, "test-owner")
-	return repository.NewPaymentRepository("default", apiClient, rc, ss, refresher, lm, time.UTC, autoRefresh)
+	return repository.NewPaymentRepository("default", apiClient, rc, ss, refresher, lm, time.UTC)
 }
 
 func seedPaymentCache(t *testing.T, db *cache.DB, entities []boardapi.PaymentEntity) {
@@ -75,24 +75,7 @@ func TestPaymentRepository_List_CacheHit(t *testing.T) {
 	srv := newPaymentAPIServer(t, nil)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makePaymentRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{}, boardapi.PaymentListOptions{})
-	if err != nil {
-		t.Fatalf("List: %v", err)
-	}
-	if len(got.Items) != len(samplePayments) {
-		t.Errorf("len(got.Items) = %d, want %d", len(got.Items), len(samplePayments))
-	}
-}
-
-// T_PAY02: List - no cache (initial load) -> returns data after ForceRefresh
-func TestPaymentRepository_List_InitialLoad(t *testing.T) {
-	db := newTestDB(t)
-
-	srv := newPaymentAPIServer(t, samplePayments)
-	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
-
-	repo := makePaymentRepo(t, db, apiClient, false)
+	repo := makePaymentRepo(t, db, apiClient)
 	got, err := repo.List(context.Background(), repository.ReadOptions{}, boardapi.PaymentListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
@@ -111,7 +94,7 @@ func TestPaymentRepository_GetByID_CacheHit(t *testing.T) {
 	srv := newPaymentAPIServer(t, nil)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makePaymentRepo(t, db, apiClient, false)
+	repo := makePaymentRepo(t, db, apiClient)
 	got, err := repo.GetByID(context.Background(), 1, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
@@ -136,7 +119,7 @@ func TestPaymentRepository_GetByID_CacheMiss_APISuccess(t *testing.T) {
 
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makePaymentRepo(t, db, apiClient, false)
+	repo := makePaymentRepo(t, db, apiClient)
 	got, err := repo.GetByID(context.Background(), 99, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
@@ -154,7 +137,7 @@ func TestPaymentRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	srv := newErrorAPIServer(t)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makePaymentRepo(t, db, apiClient, false)
+	repo := makePaymentRepo(t, db, apiClient)
 	_, err := repo.GetByID(context.Background(), 999, repository.ReadOptions{})
 	if err == nil {
 		t.Fatal("expected error, got nil")
@@ -174,7 +157,7 @@ func TestPaymentRepository_Search_VendorIDFilter(t *testing.T) {
 	srv := newPaymentAPIServer(t, filtered)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makePaymentRepo(t, db, apiClient, false)
+	repo := makePaymentRepo(t, db, apiClient)
 	got, err := repo.Search(context.Background(), boardapi.PaymentListOptions{VendorIDEq: 10}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
@@ -196,7 +179,7 @@ func TestPaymentRepository_Search_StatusFilter(t *testing.T) {
 	srv := newPaymentAPIServer(t, pending)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makePaymentRepo(t, db, apiClient, false)
+	repo := makePaymentRepo(t, db, apiClient)
 	got, err := repo.Search(context.Background(), boardapi.PaymentListOptions{StatusEq: "pending"}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
@@ -215,7 +198,7 @@ func TestPaymentRepository_Search_NoFilter(t *testing.T) {
 	srv := newPaymentAPIServer(t, nil)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makePaymentRepo(t, db, apiClient, false)
+	repo := makePaymentRepo(t, db, apiClient)
 	got, err := repo.Search(context.Background(), boardapi.PaymentListOptions{}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)

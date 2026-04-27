@@ -14,7 +14,6 @@ type ProfileConfig struct {
 	BaseURL               string `toml:"base_url"`
 	APIKey                string `toml:"api_key"`
 	APIToken              string `toml:"api_token"`
-	DailyAutoRefresh      bool   `toml:"daily_auto_refresh"`
 	RequestTimeoutSeconds int    `toml:"request_timeout_seconds"`
 	RetryMax              int    `toml:"retry_max"`
 	PrettyDefault         bool   `toml:"pretty_default"`
@@ -48,7 +47,6 @@ func DefaultConfig() Config {
 func DefaultProfileConfig() ProfileConfig {
 	return ProfileConfig{
 		BaseURL:               "https://api.the-board.jp",
-		DailyAutoRefresh:      true,
 		RequestTimeoutSeconds: 30,
 		RetryMax:              5,
 		PrettyDefault:         false,

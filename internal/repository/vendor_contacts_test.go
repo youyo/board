@@ -16,13 +16,13 @@ import (
 	"github.com/youyo/board/internal/repository"
 )
 
-func makeVendorContactRepo(t *testing.T, db *cache.DB, apiClient *boardapi.Client, autoRefresh bool) *repository.VendorContactRepository {
+func makeVendorContactRepo(t *testing.T, db *cache.DB, apiClient *boardapi.Client) *repository.VendorContactRepository {
 	t.Helper()
 	rc := cache.NewResourceCache(db)
 	ss := cache.NewSyncStateStore(db)
 	refresher := refresh.NewRefresher(rc, ss)
 	lm := refresh.NewLockManager(ss, "test-owner")
-	return repository.NewVendorContactRepository("default", apiClient, rc, ss, refresher, lm, time.UTC, autoRefresh)
+	return repository.NewVendorContactRepository("default", apiClient, rc, ss, refresher, lm, time.UTC)
 }
 
 func seedVendorContactCache(t *testing.T, db *cache.DB, entities []boardapi.VendorContactEntity) {
@@ -75,24 +75,7 @@ func TestVendorContactRepository_List_CacheHit(t *testing.T) {
 	srv := newVendorContactAPIServer(t, nil)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makeVendorContactRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{}, boardapi.VendorContactListOptions{})
-	if err != nil {
-		t.Fatalf("List: %v", err)
-	}
-	if len(got.Items) != len(sampleVendorContacts) {
-		t.Errorf("len(got.Items) = %d, want %d", len(got.Items), len(sampleVendorContacts))
-	}
-}
-
-// T_VCO02: List - no cache (initial load) -> returns data after ForceRefresh
-func TestVendorContactRepository_List_InitialLoad(t *testing.T) {
-	db := newTestDB(t)
-
-	srv := newVendorContactAPIServer(t, sampleVendorContacts)
-	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
-
-	repo := makeVendorContactRepo(t, db, apiClient, false)
+	repo := makeVendorContactRepo(t, db, apiClient)
 	got, err := repo.List(context.Background(), repository.ReadOptions{}, boardapi.VendorContactListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
@@ -111,7 +94,7 @@ func TestVendorContactRepository_GetByID_CacheHit(t *testing.T) {
 	srv := newVendorContactAPIServer(t, nil)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makeVendorContactRepo(t, db, apiClient, false)
+	repo := makeVendorContactRepo(t, db, apiClient)
 	got, err := repo.GetByID(context.Background(), 1, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
@@ -136,7 +119,7 @@ func TestVendorContactRepository_GetByID_CacheMiss_APISuccess(t *testing.T) {
 
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makeVendorContactRepo(t, db, apiClient, false)
+	repo := makeVendorContactRepo(t, db, apiClient)
 	got, err := repo.GetByID(context.Background(), 99, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
@@ -154,7 +137,7 @@ func TestVendorContactRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	srv := newErrorAPIServer(t)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makeVendorContactRepo(t, db, apiClient, false)
+	repo := makeVendorContactRepo(t, db, apiClient)
 	_, err := repo.GetByID(context.Background(), 999, repository.ReadOptions{})
 	if err == nil {
 		t.Fatal("expected error, got nil")
@@ -174,7 +157,7 @@ func TestVendorContactRepository_Search_PayeeIDEqFilter(t *testing.T) {
 	srv := newVendorContactAPIServer(t, filtered)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makeVendorContactRepo(t, db, apiClient, false)
+	repo := makeVendorContactRepo(t, db, apiClient)
 	got, err := repo.Search(context.Background(), boardapi.VendorContactListOptions{PayeeIDEq: 10}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
@@ -195,7 +178,7 @@ func TestVendorContactRepository_Search_EmailContFilter(t *testing.T) {
 	srv := newVendorContactAPIServer(t, filtered)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makeVendorContactRepo(t, db, apiClient, false)
+	repo := makeVendorContactRepo(t, db, apiClient)
 	got, err := repo.Search(context.Background(), boardapi.VendorContactListOptions{EmailCont: "a@vendor.com"}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
@@ -214,7 +197,7 @@ func TestVendorContactRepository_Search_NoFilter(t *testing.T) {
 	srv := newVendorContactAPIServer(t, nil)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makeVendorContactRepo(t, db, apiClient, false)
+	repo := makeVendorContactRepo(t, db, apiClient)
 	got, err := repo.Search(context.Background(), boardapi.VendorContactListOptions{}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)

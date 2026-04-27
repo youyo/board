@@ -65,8 +65,8 @@ func NewRootCmd(version string) *cobra.Command {
 	// Common flags (inherited by all subcommands).
 	pf := rootCmd.PersistentFlags()
 	pf.StringVarP(&gf.profile, "profile", "p", "", "Profile name to use (default: current_profile)")
-	pf.BoolVar(&gf.refresh, "refresh", false, "Force incremental refresh")
-	pf.BoolVar(&gf.forceRefresh, "force-refresh", false, "Force full refresh")
+	pf.BoolVar(&gf.refresh, "refresh", false, "Trigger incremental (delta) refresh before reading cache")
+	pf.BoolVar(&gf.forceRefresh, "refresh-full", false, "Trigger full refresh (re-fetch + clean stale entities). Takes priority over --refresh.")
 	pf.BoolVar(&gf.pretty, "pretty", false, "Pretty-print JSON output")
 	pf.IntVar(&gf.limit, "limit", 0, "Maximum number of results to return (0 = unlimited)")
 

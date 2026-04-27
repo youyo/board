@@ -60,12 +60,6 @@ func setField(cfg *config.Config, key string, value string) error {
 			prof.APIKey = value
 		case "api_token":
 			prof.APIToken = value
-		case "daily_auto_refresh":
-			b, err := strconv.ParseBool(value)
-			if err != nil {
-				return fmt.Errorf("invalid value for %q: %w", key, err)
-			}
-			prof.DailyAutoRefresh = b
 		case "request_timeout_seconds":
 			n, err := strconv.Atoi(value)
 			if err != nil {

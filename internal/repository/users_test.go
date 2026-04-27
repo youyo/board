@@ -16,13 +16,13 @@ import (
 	"github.com/youyo/board/internal/repository"
 )
 
-func makeUserRepo(t *testing.T, db *cache.DB, apiClient *boardapi.Client, autoRefresh bool) *repository.UserRepository {
+func makeUserRepo(t *testing.T, db *cache.DB, apiClient *boardapi.Client) *repository.UserRepository {
 	t.Helper()
 	rc := cache.NewResourceCache(db)
 	ss := cache.NewSyncStateStore(db)
 	refresher := refresh.NewRefresher(rc, ss)
 	lm := refresh.NewLockManager(ss, "test-owner")
-	return repository.NewUserRepository("default", apiClient, rc, ss, refresher, lm, time.UTC, autoRefresh)
+	return repository.NewUserRepository("default", apiClient, rc, ss, refresher, lm, time.UTC)
 }
 
 func seedUserCache(t *testing.T, db *cache.DB, entities []boardapi.UserEntity) {
@@ -75,24 +75,7 @@ func TestUserRepository_List_CacheHit(t *testing.T) {
 	srv := newUserAPIServer(t, nil)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makeUserRepo(t, db, apiClient, false)
-	got, err := repo.List(context.Background(), repository.ReadOptions{}, boardapi.UserListOptions{})
-	if err != nil {
-		t.Fatalf("List: %v", err)
-	}
-	if len(got.Items) != len(sampleUsers) {
-		t.Errorf("len(got.Items) = %d, want %d", len(got.Items), len(sampleUsers))
-	}
-}
-
-// T_USR02: List - no cache (initial load) -> returns data after ForceRefresh
-func TestUserRepository_List_InitialLoad(t *testing.T) {
-	db := newTestDB(t)
-
-	srv := newUserAPIServer(t, sampleUsers)
-	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
-
-	repo := makeUserRepo(t, db, apiClient, false)
+	repo := makeUserRepo(t, db, apiClient)
 	got, err := repo.List(context.Background(), repository.ReadOptions{}, boardapi.UserListOptions{})
 	if err != nil {
 		t.Fatalf("List: %v", err)
@@ -111,7 +94,7 @@ func TestUserRepository_GetByID_CacheHit(t *testing.T) {
 	srv := newUserAPIServer(t, nil)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makeUserRepo(t, db, apiClient, false)
+	repo := makeUserRepo(t, db, apiClient)
 	got, err := repo.GetByID(context.Background(), 1, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
@@ -136,7 +119,7 @@ func TestUserRepository_GetByID_CacheMiss_APISuccess(t *testing.T) {
 
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makeUserRepo(t, db, apiClient, false)
+	repo := makeUserRepo(t, db, apiClient)
 	got, err := repo.GetByID(context.Background(), 99, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("GetByID: %v", err)
@@ -154,7 +137,7 @@ func TestUserRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	srv := newErrorAPIServer(t)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makeUserRepo(t, db, apiClient, false)
+	repo := makeUserRepo(t, db, apiClient)
 	_, err := repo.GetByID(context.Background(), 999, repository.ReadOptions{})
 	if err == nil {
 		t.Fatal("expected error, got nil")
@@ -173,7 +156,7 @@ func TestUserRepository_Search_NameFilter(t *testing.T) {
 	srv := newUserAPIServer(t, filtered)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makeUserRepo(t, db, apiClient, false)
+	repo := makeUserRepo(t, db, apiClient)
 	got, err := repo.Search(context.Background(), boardapi.UserListOptions{NameCont: "Taro Tanaka"}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
@@ -195,7 +178,7 @@ func TestUserRepository_Search_EmailFilter(t *testing.T) {
 	srv := newUserAPIServer(t, filtered)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makeUserRepo(t, db, apiClient, false)
+	repo := makeUserRepo(t, db, apiClient)
 	got, err := repo.Search(context.Background(), boardapi.UserListOptions{EmailCont: "suzuki@example.com"}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
@@ -214,7 +197,7 @@ func TestUserRepository_Search_NoFilter(t *testing.T) {
 	srv := newUserAPIServer(t, nil)
 	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 
-	repo := makeUserRepo(t, db, apiClient, false)
+	repo := makeUserRepo(t, db, apiClient)
 	got, err := repo.Search(context.Background(), boardapi.UserListOptions{}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
