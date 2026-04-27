@@ -8,11 +8,11 @@ func TestNameFold(t *testing.T) {
 	}{
 		{"COI", "coi"},
 		{"coi", "coi"},
-		{"ＣＯＩ", "coi"},        // full-width ASCII → half-width + lower
-		{"  COI  ", "coi"},     // trim
-		{"株式会社", "株式会社"},     // 漢字はそのまま
-		{"カイシャ", "カイシャ"},     // カナはそのまま (NFKC は kata→kata)
-		{"ｶﾌﾞｼｷ", "カブシキ"},      // half-width katakana → full-width
+		{"ＣＯＩ", "coi"},     // full-width ASCII → half-width + lower
+		{"  COI  ", "coi"}, // trim
+		{"株式会社", "株式会社"},   // 漢字はそのまま
+		{"カイシャ", "カイシャ"},   // カナはそのまま (NFKC は kata→kata)
+		{"ｶﾌﾞｼｷ", "カブシキ"},  // half-width katakana → full-width
 		{"", ""},
 		{" \t\n ", ""},
 	}

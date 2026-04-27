@@ -62,7 +62,7 @@ func NewFindInvoiceCmd() *cobra.Command {
 				return err
 			}
 
-			return output.Write(os.Stdout, results, prettyFromCmd(cmd))
+			return output.Write(os.Stdout, wrapFindOutput(cmd.Context(), "invoice", results), prettyFromCmd(cmd))
 		},
 	}
 

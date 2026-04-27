@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/youyo/board/internal/app"
 	"github.com/youyo/board/internal/mcpserver"
 	idproxy "github.com/youyo/idproxy"
 )
@@ -47,7 +48,12 @@ func newMCPServeCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			srv := mcpserver.New(findSvc)
+			a, _ := app.AppFromContext(cmd.Context())
+			var opts []mcpserver.Option
+			if a != nil {
+				opts = append(opts, mcpserver.WithCacheInfo(a.ProfileName, a.SyncStore))
+			}
+			srv := mcpserver.New(findSvc, opts...)
 
 			addr := net.JoinHostPort(host, strconv.Itoa(port))
 

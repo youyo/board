@@ -7,6 +7,7 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"github.com/youyo/board/internal/cache"
 	"github.com/youyo/board/internal/repository"
 	"github.com/youyo/board/internal/service/find"
 )
@@ -131,6 +132,42 @@ func marshalResult(v any) (*mcp.CallToolResult, error) {
 	return mcp.NewToolResultText(string(data)), nil
 }
 
+// findResourceMap は各 find tool が触りうる resource 名を返す。
+// CLI の findResourceMap と同期している必要がある。
+var findResourceMap = map[string][]string{
+	"client":         {"clients", "client_branches", "contacts"},
+	"vendor":         {"vendors", "vendor_branches", "vendor_contacts"},
+	"user":           {"users"},
+	"project":        {"projects", "clients"},
+	"estimate":       {"clients", "projects", "estimates"},
+	"invoice":        {"invoices", "clients", "projects"},
+	"order":          {"clients", "projects", "orders"},
+	"delivery":       {"clients", "projects", "deliveries"},
+	"receipt":        {"clients", "projects", "receipts"},
+	"purchase_order": {"purchase_orders", "vendors", "projects"},
+	"payment":        {"payments", "vendors"},
+}
+
+// findOutput は MCP find tool の統一レスポンス形式。
+// CLI 側 cli.FindOutput と同等の構造（json タグも一致）。
+type findOutput[T any] struct {
+	Items []T          `json:"items"`
+	Cache []cache.Info `json:"cache"`
+}
+
+// wrapAndMarshal は find 結果と該当 resource の cache info を同梱して JSON にする。
+// items が nil の場合は空配列で表現する。SyncStore 未設定時 cache は空配列。
+func wrapAndMarshal[T any](ctx context.Context, srv *Server, kind string, items []T) (*mcp.CallToolResult, error) {
+	if items == nil {
+		items = []T{}
+	}
+	out := findOutput[T]{Items: items, Cache: []cache.Info{}}
+	if resources, ok := findResourceMap[kind]; ok && srv != nil && srv.SyncStore() != nil {
+		out.Cache = cache.LoadInfos(ctx, srv.SyncStore(), srv.Profile(), resources)
+	}
+	return marshalResult(out)
+}
+
 // errorResult returns a tool error result from an error.
 func errorResult(err error) *mcp.CallToolResult {
 	return mcp.NewToolResultError(err.Error())
@@ -156,7 +193,7 @@ func findClientsTool(srv *Server) server.ServerTool {
 			if err != nil {
 				return errorResult(err), nil
 			}
-			return marshalResult(results)
+			return wrapAndMarshal(ctx, srv, "client", results)
 		},
 	}
 }
@@ -179,7 +216,7 @@ func findVendorsTool(srv *Server) server.ServerTool {
 			if err != nil {
 				return errorResult(err), nil
 			}
-			return marshalResult(results)
+			return wrapAndMarshal(ctx, srv, "vendor", results)
 		},
 	}
 }
@@ -202,7 +239,7 @@ func findUsersTool(srv *Server) server.ServerTool {
 			if err != nil {
 				return errorResult(err), nil
 			}
-			return marshalResult(results)
+			return wrapAndMarshal(ctx, srv, "user", results)
 		},
 	}
 }
@@ -242,7 +279,7 @@ func findProjectsTool(srv *Server) server.ServerTool {
 			if err != nil {
 				return errorResult(err), nil
 			}
-			return marshalResult(results)
+			return wrapAndMarshal(ctx, srv, "project", results)
 		},
 	}
 }
@@ -273,7 +310,7 @@ func findEstimatesTool(srv *Server) server.ServerTool {
 			if err != nil {
 				return errorResult(err), nil
 			}
-			return marshalResult(results)
+			return wrapAndMarshal(ctx, srv, "estimate", results)
 		},
 	}
 }
@@ -311,7 +348,7 @@ func findInvoicesTool(srv *Server) server.ServerTool {
 			if err != nil {
 				return errorResult(err), nil
 			}
-			return marshalResult(results)
+			return wrapAndMarshal(ctx, srv, "invoice", results)
 		},
 	}
 }
@@ -341,7 +378,7 @@ func findOrdersTool(srv *Server) server.ServerTool {
 			if err != nil {
 				return errorResult(err), nil
 			}
-			return marshalResult(results)
+			return wrapAndMarshal(ctx, srv, "order", results)
 		},
 	}
 }
@@ -371,7 +408,7 @@ func findDeliveriesTool(srv *Server) server.ServerTool {
 			if err != nil {
 				return errorResult(err), nil
 			}
-			return marshalResult(results)
+			return wrapAndMarshal(ctx, srv, "delivery", results)
 		},
 	}
 }
@@ -401,7 +438,7 @@ func findReceiptsTool(srv *Server) server.ServerTool {
 			if err != nil {
 				return errorResult(err), nil
 			}
-			return marshalResult(results)
+			return wrapAndMarshal(ctx, srv, "receipt", results)
 		},
 	}
 }
@@ -439,7 +476,7 @@ func findPurchaseOrdersTool(srv *Server) server.ServerTool {
 			if err != nil {
 				return errorResult(err), nil
 			}
-			return marshalResult(results)
+			return wrapAndMarshal(ctx, srv, "purchase_order", results)
 		},
 	}
 }
@@ -477,7 +514,7 @@ func findPaymentsTool(srv *Server) server.ServerTool {
 			if err != nil {
 				return errorResult(err), nil
 			}
-			return marshalResult(results)
+			return wrapAndMarshal(ctx, srv, "payment", results)
 		},
 	}
 }

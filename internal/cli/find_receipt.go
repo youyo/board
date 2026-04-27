@@ -57,7 +57,7 @@ func NewFindReceiptCmd() *cobra.Command {
 				return err
 			}
 
-			return output.Write(os.Stdout, results, prettyFromCmd(cmd))
+			return output.Write(os.Stdout, wrapFindOutput(cmd.Context(), "receipt", results), prettyFromCmd(cmd))
 		},
 	}
 
