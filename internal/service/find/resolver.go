@@ -2,12 +2,98 @@ package find
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/youyo/board/internal/boardapi"
 	"github.com/youyo/board/internal/repository"
 	"golang.org/x/sync/errgroup"
 )
+
+// resolverCandidatesMax は重複ヒット時のエラーメッセージで列挙する候補の上限件数。
+const resolverCandidatesMax = 5
+
+// ResolveClientByName は client name (NameCont 部分一致) から ClientID を解決する。
+//
+// セマンティクス（N07c D2）:
+//   - name == "" → error（呼び出し側のバグ防止）
+//   - 0 件 → error: "no client matches name <name>"
+//   - 1 件 → ID を返す（error nil）
+//   - 複数 → error + 候補列挙（最大 resolverCandidatesMax 件、超過分は省略表記）
+//
+// silent take-first は明示的に禁止する（CLI ツールの典型的バグ）。
+// 複数ヒット時は呼び出し側に --id 等で曖昧性を解消するよう促す。
+func (s *Service) ResolveClientByName(ctx context.Context, name string, opts repository.ReadOptions) (int, error) {
+	if name == "" {
+		return 0, errors.New("client name is empty")
+	}
+	list, err := s.clients.Search(ctx, boardapi.ClientListOptions{NameCont: name}, opts)
+	if err != nil {
+		return 0, fmt.Errorf("resolve client by name %q: %w", name, err)
+	}
+	switch len(list) {
+	case 0:
+		return 0, fmt.Errorf("no client matches name %q", name)
+	case 1:
+		return list[0].ID, nil
+	default:
+		return 0, errors.New(formatClientCandidates(name, list))
+	}
+}
+
+// ResolveVendorByName は vendor name (NameCont 部分一致) から VendorID を解決する。
+// セマンティクスは ResolveClientByName と同等（D2）。
+func (s *Service) ResolveVendorByName(ctx context.Context, name string, opts repository.ReadOptions) (int, error) {
+	if name == "" {
+		return 0, errors.New("vendor name is empty")
+	}
+	list, err := s.vendors.Search(ctx, boardapi.VendorListOptions{NameCont: name}, opts)
+	if err != nil {
+		return 0, fmt.Errorf("resolve vendor by name %q: %w", name, err)
+	}
+	switch len(list) {
+	case 0:
+		return 0, fmt.Errorf("no vendor matches name %q", name)
+	case 1:
+		return list[0].ID, nil
+	default:
+		return 0, errors.New(formatVendorCandidates(name, list))
+	}
+}
+
+func formatClientCandidates(name string, list []boardapi.ClientEntity) string {
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "multiple clients match name %q (%d hits); use --id to disambiguate:", name, len(list))
+	n := len(list)
+	if n > resolverCandidatesMax {
+		n = resolverCandidatesMax
+	}
+	for i := 0; i < n; i++ {
+		fmt.Fprintf(&sb, "\n  - id=%d name=%q", list[i].ID, list[i].Name)
+	}
+	if rem := len(list) - n; rem > 0 {
+		fmt.Fprintf(&sb, "\n  ... (%d more)", rem)
+	}
+	return sb.String()
+}
+
+func formatVendorCandidates(name string, list []boardapi.VendorEntity) string {
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "multiple vendors match name %q (%d hits); use --id to disambiguate:", name, len(list))
+	n := len(list)
+	if n > resolverCandidatesMax {
+		n = resolverCandidatesMax
+	}
+	for i := 0; i < n; i++ {
+		fmt.Fprintf(&sb, "\n  - id=%d name=%q", list[i].ID, list[i].Name)
+	}
+	if rem := len(list) - n; rem > 0 {
+		fmt.Fprintf(&sb, "\n  ... (%d more)", rem)
+	}
+	return sb.String()
+}
 
 // resolveClientAndProject は clientID / projectID を並列で解決し enrichment 結果を返す。
 // エラーは非致命として swallow し slog.Warn を出力する（N02 §4.3）。

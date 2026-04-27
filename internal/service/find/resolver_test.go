@@ -3,6 +3,7 @@ package find
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -258,4 +259,163 @@ func TestResolveClientAndProject_DeadlineExceeded_Returns(t *testing.T) {
 	case <-time.After(100 * time.Millisecond):
 		t.Fatal("resolveClientAndProject did not return promptly after deadline exceeded")
 	}
+}
+
+// ========== N07c: ResolveClientByName / ResolveVendorByName ==========
+
+func TestResolveClientByName_EmptyName(t *testing.T) {
+	repos := newTestRepos()
+	svc := New(repos)
+	id, err := svc.ResolveClientByName(context.Background(), "", repository.ReadOptions{})
+	if err == nil {
+		t.Fatal("expected error for empty name, got nil")
+	}
+	if id != 0 {
+		t.Errorf("id = %d, want 0", id)
+	}
+}
+
+func TestResolveClientByName_NotFound(t *testing.T) {
+	repos := newTestRepos()
+	repos.Clients = &stubClientRepo{searchResult: []boardapi.ClientEntity{}}
+	svc := New(repos)
+	_, err := svc.ResolveClientByName(context.Background(), "Acme", repository.ReadOptions{})
+	if err == nil {
+		t.Fatal("expected error for not-found, got nil")
+	}
+	if msg := err.Error(); !contains(msg, "no client matches") || !contains(msg, "Acme") {
+		t.Errorf("error message = %q, want to contain 'no client matches' and 'Acme'", msg)
+	}
+}
+
+func TestResolveClientByName_SingleHit(t *testing.T) {
+	repos := newTestRepos()
+	repos.Clients = &stubClientRepo{
+		searchResult: []boardapi.ClientEntity{{ID: 42, Name: "Acme Inc"}},
+	}
+	svc := New(repos)
+	id, err := svc.ResolveClientByName(context.Background(), "Acme", repository.ReadOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if id != 42 {
+		t.Errorf("id = %d, want 42", id)
+	}
+}
+
+func TestResolveClientByName_MultipleHits(t *testing.T) {
+	repos := newTestRepos()
+	repos.Clients = &stubClientRepo{
+		searchResult: []boardapi.ClientEntity{
+			{ID: 1, Name: "Acme A"},
+			{ID: 2, Name: "Acme B"},
+			{ID: 3, Name: "Acme C"},
+		},
+	}
+	svc := New(repos)
+	id, err := svc.ResolveClientByName(context.Background(), "Acme", repository.ReadOptions{})
+	if err == nil {
+		t.Fatal("expected error for multiple hits, got nil")
+	}
+	if id != 0 {
+		t.Errorf("id = %d, want 0", id)
+	}
+	msg := err.Error()
+	for _, want := range []string{"multiple clients match", "Acme", "id=1", "id=2", "id=3", "use --id"} {
+		if !contains(msg, want) {
+			t.Errorf("error message %q does not contain %q", msg, want)
+		}
+	}
+}
+
+func TestResolveClientByName_MultipleHitsTruncated(t *testing.T) {
+	// >5 hits → 5 件まで列挙し、残りは省略表記する
+	hits := make([]boardapi.ClientEntity, 7)
+	for i := range hits {
+		hits[i] = boardapi.ClientEntity{ID: i + 1, Name: "Acme"}
+	}
+	repos := newTestRepos()
+	repos.Clients = &stubClientRepo{searchResult: hits}
+	svc := New(repos)
+	_, err := svc.ResolveClientByName(context.Background(), "Acme", repository.ReadOptions{})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	msg := err.Error()
+	if !contains(msg, "id=5") {
+		t.Errorf("expected id=5 in message: %q", msg)
+	}
+	if contains(msg, "id=6") || contains(msg, "id=7") {
+		t.Errorf("expected truncation, but found id=6 or id=7 in: %q", msg)
+	}
+	if !contains(msg, "2 more") {
+		t.Errorf("expected '2 more' truncation hint in: %q", msg)
+	}
+}
+
+func TestResolveClientByName_RepoError(t *testing.T) {
+	repos := newTestRepos()
+	repos.Clients = &stubClientRepo{
+		searchFunc: func(_ context.Context, _ boardapi.ClientListOptions, _ repository.ReadOptions) ([]boardapi.ClientEntity, error) {
+			return nil, errors.New("boom")
+		},
+	}
+	svc := New(repos)
+	_, err := svc.ResolveClientByName(context.Background(), "Acme", repository.ReadOptions{})
+	if err == nil {
+		t.Fatal("expected error from underlying repo, got nil")
+	}
+}
+
+func TestResolveVendorByName_NotFound(t *testing.T) {
+	repos := newTestRepos()
+	repos.Vendors = &stubVendorRepo{searchResult: []boardapi.VendorEntity{}}
+	svc := New(repos)
+	_, err := svc.ResolveVendorByName(context.Background(), "Globex", repository.ReadOptions{})
+	if err == nil {
+		t.Fatal("expected error for not-found, got nil")
+	}
+	if !contains(err.Error(), "no vendor matches") {
+		t.Errorf("error message %q does not contain 'no vendor matches'", err.Error())
+	}
+}
+
+func TestResolveVendorByName_SingleHit(t *testing.T) {
+	repos := newTestRepos()
+	repos.Vendors = &stubVendorRepo{
+		searchResult: []boardapi.VendorEntity{{ID: 99, Name: "Globex"}},
+	}
+	svc := New(repos)
+	id, err := svc.ResolveVendorByName(context.Background(), "Globex", repository.ReadOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if id != 99 {
+		t.Errorf("id = %d, want 99", id)
+	}
+}
+
+func TestResolveVendorByName_MultipleHits(t *testing.T) {
+	repos := newTestRepos()
+	repos.Vendors = &stubVendorRepo{
+		searchResult: []boardapi.VendorEntity{
+			{ID: 10, Name: "Globex A"},
+			{ID: 11, Name: "Globex B"},
+		},
+	}
+	svc := New(repos)
+	_, err := svc.ResolveVendorByName(context.Background(), "Globex", repository.ReadOptions{})
+	if err == nil {
+		t.Fatal("expected error for multiple hits, got nil")
+	}
+	for _, want := range []string{"multiple vendors match", "id=10", "id=11"} {
+		if !contains(err.Error(), want) {
+			t.Errorf("error message %q does not contain %q", err.Error(), want)
+		}
+	}
+}
+
+// contains は文字列内に substr が含まれるかを返す（テスト用ヘルパー）。
+func contains(s, sub string) bool {
+	return strings.Contains(s, sub)
 }
