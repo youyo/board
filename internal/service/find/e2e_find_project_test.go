@@ -48,26 +48,35 @@ func TestE2E_FindProject_ByClientID_Returns_NonEmpty(t *testing.T) {
 	}
 }
 
-// T06: ClientName 逆引き経由（CLI/MCP では resolver を使うため、ここでは ClientID 経路で代替）
-// Service 直接呼びでは ClientName フィールドが Query に存在しないため、
-// resolver 経由は MCP handler テスト (T45) で検証する。
-// 本ケースは「Name (project name) 単体検索」で代替。
-func TestE2E_FindProject_ByName_Returns_NonEmpty(t *testing.T) {
+// T06: Project Search via ClientID seed
+// project name 自身に "株" が含まれる前提を避けるため、client → ClientID 経由で取得する。
+func TestE2E_FindProject_ByClientSeeded_Returns_NonEmpty(t *testing.T) {
 	svc := newE2EService(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	ps, err := svc.FindProject(ctx, find.FindProjectQuery{
-		FindCommonOpts: find.FindCommonOpts{Limit: 5},
+	cs, err := svc.FindClient(ctx, find.FindClientQuery{
+		FindCommonOpts: find.FindCommonOpts{Limit: 1},
 		Name:           "株",
 	})
 	if skipIfRateLimit(t, err) {
 		return
 	}
-	if err != nil {
-		t.Fatalf("FindProject(Name): %v", err)
+	if err != nil || len(cs) == 0 {
+		t.Skipf("[SKIP:no-data] client seed: err=%v rs=%d", err, len(cs))
 	}
-	skipIfNoData(t, "projects", len(ps), 1)
+
+	ps, err := svc.FindProject(ctx, find.FindProjectQuery{
+		FindCommonOpts: find.FindCommonOpts{Limit: 5},
+		ClientID:       cs[0].Client.ID,
+	})
+	if skipIfRateLimit(t, err) {
+		return
+	}
+	if err != nil {
+		t.Fatalf("FindProject(ClientID): %v", err)
+	}
+	skipIfNoData(t, "projects for client", len(ps), 1)
 }
 
 // T07: Statuses post-filter (OR 評価) — smoke test
@@ -79,9 +88,20 @@ func TestE2E_FindProject_StatusesPostFilter(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
+	cs, err := svc.FindClient(ctx, find.FindClientQuery{
+		FindCommonOpts: find.FindCommonOpts{Limit: 1},
+		Name:           "株",
+	})
+	if skipIfRateLimit(t, err) {
+		return
+	}
+	if err != nil || len(cs) == 0 {
+		t.Skipf("[SKIP:no-data] client seed: err=%v rs=%d", err, len(cs))
+	}
+
 	ps, err := svc.FindProject(ctx, find.FindProjectQuery{
 		FindCommonOpts: find.FindCommonOpts{Limit: 5},
-		Name:           "株",
+		ClientID:       cs[0].Client.ID,
 		Statuses:       []string{"受注", "完了"},
 	})
 	if skipIfRateLimit(t, err) {

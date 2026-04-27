@@ -22,9 +22,17 @@ func findProjectWithDoc(t *testing.T, svc *find.Service, docType string) (int, i
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
+	// seed: client → ClientID 経由で project を取得（project name に "株" が含まれる前提を回避）
+	cs, err := svc.FindClient(ctx, find.FindClientQuery{
+		FindCommonOpts: find.FindCommonOpts{Limit: 1},
+		Name:           "株",
+	})
+	if err != nil || len(cs) == 0 {
+		return 0, 0
+	}
 	ps, err := svc.FindProject(ctx, find.FindProjectQuery{
 		FindCommonOpts: find.FindCommonOpts{Limit: 3},
-		Name:           "株",
+		ClientID:       cs[0].Client.ID,
 	})
 	if err != nil || len(ps) == 0 {
 		return 0, 0
