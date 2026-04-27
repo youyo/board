@@ -142,7 +142,7 @@ mise run clean
 | 変数 | デフォルト | 説明 |
 |------|-----------|------|
 | `AWS_REGION` | `ap-northeast-1` | デプロイ先リージョン |
-| `BOARD_VERSION` | `0.10.0` | GitHub Release バージョン |
+| `BOARD_VERSION` | `0.11.0` | GitHub Release バージョン |
 | `LAMBDA_ARCH` | `arm64` | `arm64` または `x86_64` |
 | `BOARD_MCP_ALLOWED_DOMAINS` | （無制限） | 許可するメールドメイン（カンマ区切り） |
 | `BOARD_MCP_ALLOWED_EMAILS` | （無制限） | 許可するメールアドレス（カンマ区切り） |
