@@ -28,9 +28,6 @@ func NewFindProjectCmd() *cobra.Command {
 			if id == 0 && clientName == "" && name == "" && text == "" && status == "" {
 				return fmt.Errorf("at least one of --id, --client-name, --name, --text, or --status must be specified")
 			}
-			if clientName != "" {
-				return fmt.Errorf("--client-name is not supported in v0.7.0 service rename (N07b); will be wired in N07c")
-			}
 
 			svc, err := findServiceFromCmd(cmd)
 			if err != nil {
@@ -38,18 +35,26 @@ func NewFindProjectCmd() *cobra.Command {
 			}
 
 			opts := readOptionsFromCmd(cmd)
+			readOpts := repository.ReadOptions{Refresh: opts.Refresh, ForceRefresh: opts.ForceRefresh}
+
+			var clientID int
+			if clientName != "" {
+				clientID, err = svc.ResolveClientByName(cmd.Context(), clientName, readOpts)
+				if err != nil {
+					return err
+				}
+			}
+
 			q := find.FindProjectQuery{
 				FindCommonOpts: find.FindCommonOpts{
 					Limit: opts.Limit,
-					Opts: repository.ReadOptions{
-						Refresh:      opts.Refresh,
-						ForceRefresh: opts.ForceRefresh,
-					},
+					Opts:  readOpts,
 				},
-				ID:     id,
-				Name:   name,
-				Text:   text,
-				Status: status,
+				ID:       id,
+				ClientID: clientID,
+				Name:     name,
+				Text:     text,
+				Status:   status,
 			}
 
 			results, err := svc.FindProject(cmd.Context(), q)

@@ -1,6 +1,7 @@
 package cli_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -318,3 +319,76 @@ func TestFindUserCmdRequiresAtLeastOneFlag(t *testing.T) {
 
 // TestNewFindGroupCmd / TestFindGroupCmdRequiresAtLeastOneFlag are removed in N07b
 // because the find_group command is removed (ADR-001 Group 削除確定、find2 では FindGroup なし)。
+
+// ========== N07c: 構造的未対応 / 将来拡張 reject フラグの最終エラー文言確認 ==========
+
+// rejectCases は CLI 側で resolver 経路に到達する前に reject されるべきフラグ組み合わせを確認する。
+// 各 case は flag を 1 つだけ追加して実行し、エラーに含まれるべき substring を検証する。
+// resolver 経路（--client-name / --vendor-name）は app context 経由で実行される必要があり
+// 単体 cmd.Execute() ではテストできないため、ここでは「reject だけで完結する」フラグのみ扱う。
+func TestFindCmd_RejectFlagErrorMessages(t *testing.T) {
+	cases := []struct {
+		name    string
+		newCmd  func() *cobra.Command
+		args    []string
+		wantSub string
+	}{
+		{
+			"estimate --id+--status",
+			cli.NewFindEstimateCmd,
+			[]string{"estimate", "--id", "1", "--status", "draft"},
+			"--status filtering is not supported for documents",
+		},
+		{
+			"order --id+--status",
+			cli.NewFindOrderCmd,
+			[]string{"order", "--id", "1", "--status", "x"},
+			"--status filtering is not supported for documents",
+		},
+		{
+			"delivery --id+--status",
+			cli.NewFindDeliveryCmd,
+			[]string{"delivery", "--id", "1", "--status", "x"},
+			"--status filtering is not supported for documents",
+		},
+		{
+			"receipt --id+--status",
+			cli.NewFindReceiptCmd,
+			[]string{"receipt", "--id", "1", "--status", "x"},
+			"--status filtering is not supported for documents",
+		},
+		{
+			"invoice --id+--project-name",
+			cli.NewFindInvoiceCmd,
+			[]string{"invoice", "--id", "1", "--project-name", "x"},
+			"--project-name is not yet supported for invoices",
+		},
+		{
+			"purchase-order --id+--project-name",
+			cli.NewFindPurchaseOrderCmd,
+			[]string{"purchase-order", "--id", "1", "--project-name", "x"},
+			"--project-name is not yet supported for purchase orders",
+		},
+		{
+			"payment --id+--purchase-order-id",
+			cli.NewFindPaymentCmd,
+			[]string{"payment", "--id", "1", "--purchase-order-id", "1"},
+			"--purchase-order-id is not yet supported",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cmd := tc.newCmd()
+			root := &cobra.Command{Use: "board"}
+			root.AddCommand(cmd)
+			root.SetArgs(tc.args)
+			err := root.Execute()
+			if err == nil {
+				t.Fatalf("expected error, got nil")
+			}
+			if !strings.Contains(err.Error(), tc.wantSub) {
+				t.Errorf("error %q does not contain %q", err.Error(), tc.wantSub)
+			}
+		})
+	}
+}

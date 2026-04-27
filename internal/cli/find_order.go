@@ -28,11 +28,8 @@ func NewFindOrderCmd() *cobra.Command {
 			if id == 0 && projectID == 0 && clientName == "" && projectName == "" {
 				return fmt.Errorf("at least one of --id, --project-id, --client-name, or --project-name must be specified")
 			}
-			if clientName != "" || projectName != "" {
-				return fmt.Errorf("--client-name / --project-name are not supported in v0.7.0 service rename (N07b); will be wired in N07c")
-			}
 			if status != "" {
-				return fmt.Errorf("--status is not supported in v0.7.0 service rename (N07b); will be wired in N07c")
+				return fmt.Errorf("--status filtering is not supported for documents (no Status field on entity)")
 			}
 
 			svc, err := findServiceFromCmd(cmd)
@@ -49,8 +46,10 @@ func NewFindOrderCmd() *cobra.Command {
 						ForceRefresh: opts.ForceRefresh,
 					},
 				},
-				ID:        id,
-				ProjectID: projectID,
+				ID:          id,
+				ProjectID:   projectID,
+				ClientName:  clientName,
+				ProjectName: projectName,
 			}
 
 			results, err := svc.FindOrder(cmd.Context(), q)

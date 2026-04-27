@@ -28,8 +28,8 @@ func NewFindPaymentCmd() *cobra.Command {
 			if id == 0 && vendorName == "" && purchaseOrderID == 0 && text == "" && status == "" {
 				return fmt.Errorf("at least one of --id, --vendor-name, --purchase-order-id, --text, or --status must be specified")
 			}
-			if vendorName != "" || purchaseOrderID != 0 {
-				return fmt.Errorf("--vendor-name / --purchase-order-id are not supported in v0.7.0 service rename (N07b); will be wired in N07c")
+			if purchaseOrderID != 0 {
+				return fmt.Errorf("--purchase-order-id is not yet supported (tracked for future enhancement)")
 			}
 
 			svc, err := findServiceFromCmd(cmd)
@@ -38,17 +38,25 @@ func NewFindPaymentCmd() *cobra.Command {
 			}
 
 			opts := readOptionsFromCmd(cmd)
+			readOpts := repository.ReadOptions{Refresh: opts.Refresh, ForceRefresh: opts.ForceRefresh}
+
+			var vendorID int
+			if vendorName != "" {
+				vendorID, err = svc.ResolveVendorByName(cmd.Context(), vendorName, readOpts)
+				if err != nil {
+					return err
+				}
+			}
+
 			q := find.FindPaymentQuery{
 				FindCommonOpts: find.FindCommonOpts{
 					Limit: opts.Limit,
-					Opts: repository.ReadOptions{
-						Refresh:      opts.Refresh,
-						ForceRefresh: opts.ForceRefresh,
-					},
+					Opts:  readOpts,
 				},
-				ID:     id,
-				Text:   text,
-				Status: status,
+				ID:       id,
+				VendorID: vendorID,
+				Text:     text,
+				Status:   status,
 			}
 
 			results, err := svc.FindPayment(cmd.Context(), q)
