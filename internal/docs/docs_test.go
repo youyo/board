@@ -35,6 +35,7 @@ func TestList(t *testing.T) {
 		"installation.md",
 		"installation_ja.md",
 		"migration/v0.7.0.md",
+		"usage/maintenance-contract-search.md",
 	}
 	if len(entries) != len(wantPaths) {
 		t.Fatalf("len(entries)=%d, want %d (%v)", len(entries), len(wantPaths), entries)
