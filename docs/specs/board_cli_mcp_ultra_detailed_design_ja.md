@@ -1217,10 +1217,25 @@ resource ごとに変える。
 
 ### 23.2 ツール一覧
 
-- `find_deals`
-- `find_projects`
-- `find_tickets`
-- `find_customers`
+> **Phase N（N08, 2026-04-27）更新**: ADR-001 ゼロベース再設計の結果、MCP tool は **11 件**で確定（`find_groups` は ADR-001 で削除確定、N07b で実装削除済）。下記 4 件は旧設計時のスケッチであり、現行実装ではない。
+
+**現行 11 tool（N08 確定）**:
+
+| カテゴリ | tool 名 | disambiguation policy | 備考 |
+|---------|---------|----------------------|------|
+| simple | `find_clients` | - | id / name / text / limit |
+| simple | `find_vendors` | - | id / name / text / limit |
+| simple | `find_users` | - | id / name / text / limit |
+| project | `find_projects` | client_name → ambiguity error | status は narrowing 必須（N05） |
+| client-document (fanout) | `find_estimates` | fanout (no disambiguation) | status プロパティなし（D1） |
+| client-document (fanout) | `find_orders` | fanout | status プロパティなし |
+| client-document (fanout) | `find_deliveries` | fanout | status プロパティなし |
+| client-document (fanout) | `find_receipts` | fanout | status プロパティなし |
+| client-document (resolver) | `find_invoices` | client_name → ambiguity error | project_name は NOT YET SUPPORTED |
+| vendor-document | `find_purchase_orders` | vendor_name → ambiguity error | project_name は NOT YET SUPPORTED |
+| payment | `find_payments` | vendor_name → ambiguity error | purchase_order_id は NOT YET SUPPORTED |
+
+**旧設計（参考、未実装）**: ~~`find_deals`~~ / ~~`find_tickets`~~ / ~~`find_customers`~~
 
 ### 23.3 ツール名命名原則
 
@@ -1247,11 +1262,14 @@ resource ごとに変える。
 
 ### 23.5 入力方針
 
-- すべて optional
-- ID も string
+- すべて optional（`required = []` を全 tool で維持）
+- ID は number（旧仕様の string から JSON Schema 整合のため変更）
 - status も string
 - バリデーションはサーバー側で吸収
 - `limit` はデフォルト 50、最大 100
+- **refresh / force_refresh は MCP では未公開（N08 で deferred）**: MCP の典型ユースケース（LLM 検索）は cache hit 前提で十分。stale data は CLI 側 `--refresh` で予熱する運用。N09+ で再評価
+- **構造的不可フラグ（D1）は schema から削除**: Document 4 種の `status` は Entity 不存在のため schema 削除（primary defense として handler reject 残置、mark3labs/mcp-go は server-level schema validation を強制しないため）
+- **契約上未実装フラグ（D4）は schema 残置 + `(NOT YET SUPPORTED)` description**: 将来追加時の互換性確保
 
 ### 23.6 出力方針
 
@@ -1289,6 +1307,17 @@ JSON を返す。
   }
 }
 ```
+
+**N08 確定: 3 種類のエラーカテゴリ**:
+
+1. **ambiguity error（disambiguate-required tool）**: `client_name` / `vendor_name` の部分一致が複数ヒットした場合
+   - 文言: `multiple X match name <q> (N hits); use --id to disambiguate:\n  - id=<id> name=<name>\n ...`（最大 5 件、残数は `(M more)`）
+2. **does not support（structurally impossible）**: `find_estimates/orders/deliveries/receipts --status` 等
+   - 文言: `status filtering is not supported for documents (no Status field on entity)`
+   - schema からも削除（D1）
+3. **not yet supported（contingently unimplemented）**: `find_invoices.project_name` / `find_purchase_orders.project_name` / `find_payments.purchase_order_id`
+   - 文言: `<field> is not yet supported (...) (tracked for future enhancement)`
+   - schema は残置、property description で `(NOT YET SUPPORTED)` 警告（D4）
 
 ### 23.9 CLI との対応
 

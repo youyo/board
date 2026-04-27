@@ -170,6 +170,8 @@ E2E SKIP の仕分けのみを実施する。新規削除・再設計は行わ�
 - N07a 完了（2026-04-27）: FindInvoice/PurchaseOrder/Payment/User 実装
 - N07b 完了（2026-04-27）: 旧 find/ 削除 + find2/ → find/ rename、Group 削除確定
 - **N07c 完了（2026-04-27）**: CLI/MCP の name → ID 解決配線（`ResolveClientByName` / `ResolveVendorByName`）、構造的未対応フラグの最終エラー文言確定、enrichment non-fatal の breaking change を CHANGELOG / api-reference に告知
+- **N08 完了（2026-04-27）**: MCP tools schema 刷新（11 tool）。Document 4 種の `status` プロパティを構造的不可（D1, never-implementable）として schema 削除（primary defense として handler reject 残置）、契約上未実装フラグ（D4: `find_invoices.project_name` / `find_purchase_orders.project_name` / `find_payments.purchase_order_id`）は schema 残置 + property description で `(NOT YET SUPPORTED)` 警告。`find_projects.status` は narrowing 必須（N05 確立、API delegation 不可）を description に明記。disambiguate 系 4 tool（find_projects/invoices/purchase_orders/payments）と fanout 系 4 tool（find_estimates/orders/deliveries/receipts）の挙動差を description で峻別。
+  - **MCP の refresh / force_refresh 未公開（意図的設計）**: handler は resolver に空 `repository.ReadOptions{}` を渡し、cache hit 前提で動作する。LLM 検索の典型ユースケース（短時間 N 連投）には cache が有効であり、refresh パラメタは tool 設計を複雑化させ LLM の選択精度を低下させるため敢えて公開しない。stale data は CLI 側 `--refresh` で予熱する運用とし、N09 以降の E2E 実機観測で cache miss 多発時に再判断する。
 
 ## References
 

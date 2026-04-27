@@ -876,6 +876,18 @@ enrichment 用 API 呼び出しが失敗した場合に `nil` または空配列
 | `find purchase-order --project-name` | not yet supported | 同上 |
 | `find payment --purchase-order-id` | not yet supported | 同上 |
 
+### MCP tool schema の方針（N08 以降）
+
+MCP 11 tool（`find_groups` は ADR-001 で削除確定済）の schema 設計方針は以下の通り。CLI と挙動は同一だが、schema レベルで差分があります。
+
+| 区分 | フラグ | MCP schema | 挙動 |
+|------|--------|------------|------|
+| 構造的不可（D1） | `find_estimates/orders/deliveries/receipts` の `status` | **schema から削除** | handler reject（primary defense） |
+| 契約上未実装（D4） | `find_invoices.project_name` / `find_purchase_orders.project_name` / `find_payments.purchase_order_id` | schema 残置 + `(NOT YET SUPPORTED)` description | handler reject |
+| narrowing 必須（N05） | `find_projects.status` | schema 残置 + 「must be combined with id/client_name/name/text」description | service 層で reject |
+
+**MCP の refresh パラメタは未公開（N08 で意図的に deferred）**: handler は resolver に空 `ReadOptions{}` を渡し、cache hit 前提で動作します。stale data は CLI 側 `board ... --refresh` で予熱する運用としてください。N09 以降で実機観測時に再評価予定。
+
 ---
 
 ## 関連ドキュメント

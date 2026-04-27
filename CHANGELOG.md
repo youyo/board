@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed (Breaking)
 
+- **MCP tool schema から Document 4 種の `status` プロパティを削除（N08）**
+  - 対象: `find_estimates` / `find_orders` / `find_deliveries` / `find_receipts`
+  - 理由: BOARD の Estimate/Order/Delivery/Receipt Entity には Status フィールドが**構造的に存在しない**（恒久的に追加されない）。schema に残すと LLM が「使える」と誤認するため削除。
+  - 旧プロンプトで `status` を渡していた場合、handler reject により `status filtering is not supported for documents (no Status field on entity)` を返します（primary defense として handler reject を残置）。
+  - **D1/D4 の非対称性**: 構造的不可（D1）は schema 削除、契約上未実装（D4: `find_invoices.project_name` 等）は schema 残置 + description で `(NOT YET SUPPORTED)` と警告。
+
+### Changed
+
+- **MCP tool description / property description を LLM 向けに刷新（N08）**
+  - 全 11 tool の description を統一フォーマット（用途・disambiguate vs fanout・unsupported flag 警告）に書き直し
+  - **disambiguate 挙動の明示**: `find_projects` / `find_invoices` / `find_purchase_orders` / `find_payments` の `client_name` / `vendor_name` は重複ヒット時に ambiguity error + 候補列挙（最大 5 件）
+  - **fanout 挙動の明示**: Document 4 種（`find_estimates` / `find_orders` / `find_deliveries` / `find_receipts`）の `client_name` / `project_name` は disambiguation を行わず全マッチ entity を集約検索。1 件に絞る場合は `project_id` を使用
+  - **`find_projects.status` の narrowing 必須化を明示**: status-only クエリは reject される（API delegation 不可、N05）。`id` / `client_name` / `name` / `text` のいずれかと組み合わせ必須
+  - **将来拡張フラグ（contingently unimplemented）の警告**: `find_invoices.project_name` / `find_purchase_orders.project_name` / `find_payments.purchase_order_id` の property description に `(NOT YET SUPPORTED)` を明記
+
 - **`board find` の enrichment は non-fatal セマンティクス**（Phase N ゼロベース再設計の一環）
   - `find` 系結果の補助フィールド（`Project` / `Client` / `Vendor` / `Branches` / `Contacts` 等）は、
     enrichment API 呼び出しが失敗した場合に `nil` または空配列で返ります。主検索 entity 自体は fail-fast で確実に返ります。
