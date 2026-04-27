@@ -1,6 +1,11 @@
 # Go binary (root directory only)
 /board
 
+# lambroll example artifacts
+/examples/lambroll/board
+/examples/lambroll/function.zip
+/examples/lambroll/signing.pem
+
 # E2E raw API response artifacts (may contain customer data; never commit)
 tmp/
 

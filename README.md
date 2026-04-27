@@ -224,6 +224,17 @@ Available MCP tools mirror `board find` (11 tools): `find_client`, `find_project
 
 **Maintenance contract search**: For step-by-step searches like "verify a customer's maintenance contract", `find_projects` (MCP) and `board find project` (CLI) accept a `contract_status` alias (`active` / `ended` / `prospect` / `all`) and a `statuses[]` / `--statuses` list. See [docs/usage/maintenance-contract-search.md](docs/usage/maintenance-contract-search.md).
 
+### Remote MCP with OIDC auth (Lambda)
+
+`board mcp serve --auth` enables OIDC authentication via [idproxy](https://github.com/youyo/idproxy). Combined with AWS Lambda Function URL + Lambda Web Adapter, you can host a remote MCP server that:
+
+- Authenticates browser sessions via your existing OIDC provider (Google / Entra ID / Auth0 etc.)
+- Issues OAuth 2.1 Bearer Tokens for MCP clients (Dynamic Client Registration supported)
+- Persists session/token state in DynamoDB (required for multi-container Lambda)
+- Forwards requests to the BOARD API using a single shared API key (Lambda env vars)
+
+See [examples/lambroll/](examples/lambroll/) for a complete deployment example with `mise` tasks for `deploy` / `dynamodb-create` / `dynamodb-delete`.
+
 ## Architecture
 
 ```

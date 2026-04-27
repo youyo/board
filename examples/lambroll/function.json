@@ -1,0 +1,32 @@
+{
+  "FunctionName": "board-mcp",
+  "Description": "board MCP server on Lambda Function URL with idproxy OIDC auth",
+  "Runtime": "provided.al2023",
+  "Handler": "bootstrap",
+  "Architectures": ["{{ must_env `LAMBDA_ARCH` }}"],
+  "MemorySize": 256,
+  "Timeout": 900,
+  "Role": "{{ must_env `ROLE_ARN` }}",
+  "Layers": [
+    "arn:aws:lambda:{{ must_env `AWS_REGION` }}:753240598075:layer:LambdaAdapterLayerArm64:27"
+  ],
+  "Environment": {
+    "Variables": {
+      "BOARD_API_KEY":                              "{{ must_env `BOARD_API_KEY` }}",
+      "BOARD_API_TOKEN":                            "{{ must_env `BOARD_API_TOKEN` }}",
+
+      "BOARD_MCP_AUTH":                             "true",
+      "BOARD_MCP_EXTERNAL_URL":                     "{{ must_env `BOARD_MCP_EXTERNAL_URL` }}",
+      "BOARD_MCP_OIDC_ISSUER":                      "{{ must_env `BOARD_MCP_OIDC_ISSUER` }}",
+      "BOARD_MCP_OIDC_CLIENT_ID":                   "{{ must_env `BOARD_MCP_OIDC_CLIENT_ID` }}",
+      "BOARD_MCP_OIDC_CLIENT_SECRET":               "{{ must_env `BOARD_MCP_OIDC_CLIENT_SECRET` }}",
+      "BOARD_MCP_COOKIE_SECRET":                    "{{ must_env `BOARD_MCP_COOKIE_SECRET` }}",
+      "BOARD_MCP_ALLOWED_DOMAINS":                  "{{ env `BOARD_MCP_ALLOWED_DOMAINS` `` }}",
+      "BOARD_MCP_ALLOWED_EMAILS":                   "{{ env `BOARD_MCP_ALLOWED_EMAILS` `` }}",
+      "BOARD_MCP_SIGNING_KEY":                      "{{ must_env `BOARD_MCP_SIGNING_KEY` }}",
+      "BOARD_MCP_IDPROXY_STORE":                    "dynamodb",
+      "BOARD_MCP_IDPROXY_STORE_DYNAMODB_TABLE":     "{{ must_env `BOARD_MCP_IDPROXY_STORE_DYNAMODB_TABLE` }}",
+      "BOARD_MCP_IDPROXY_STORE_DYNAMODB_REGION":    "{{ env `BOARD_MCP_IDPROXY_STORE_DYNAMODB_REGION` `ap-northeast-1` }}"
+    }
+  }
+}

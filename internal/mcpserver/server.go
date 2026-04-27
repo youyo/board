@@ -77,6 +77,16 @@ func (s *Server) FindService() *find.Service {
 	return s.findSvc
 }
 
+// MCPHTTPHandler returns the StreamableHTTP handler for mounting at "/mcp".
+// 外部の http.ServeMux に組み込んで idproxy 等で wrap する場合に使用する。
+// Start() を使わない場合の代替経路。
+func (s *Server) MCPHTTPHandler() http.Handler {
+	if s.httpServer == nil {
+		s.httpServer = server.NewStreamableHTTPServer(s.mcpServer)
+	}
+	return s.httpServer
+}
+
 // Addr returns the listener address after Start has been called.
 // Returns "" if the server has not started.
 func (s *Server) Addr() string {
