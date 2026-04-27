@@ -1874,3 +1874,26 @@ board-compliance roadmap（M01-M38）により、本設計を実 API に照合�
 - Phase G 追補（M35-M38）: Document 系 Entity 根本修正 4 マイルストーン完了
 - 総計: 38 マイルストーン、BOARD API 準拠検証・修正サイクル確立
 - 詳細は `plans/board-compliance-roadmap.md` および各 M の plan ファイル参照
+
+### Phase N find 層 E2E 再構築（N09、2026-04-27）
+
+旧 `internal/service/find/` E2E（47 関数 / 193 ケース）は N07b で完全削除済。N09 で**実 API 感応する代表ケースのみ**を再構築:
+
+- `internal/service/find/e2e_*_test.go`: 41 ケース（11 Find メソッド × 正常 / 境界 / 異常系）
+- `internal/mcpserver/e2e_handler_test.go`: 5 ケース（in-process MCP handler 経由で reject / disambiguate / fanout を検証、T42-T46）
+- 計 46 ケース（N02 §8.3 上限 41 は Service 層に限定したものとして再解釈、MCP handler 5 を別カテゴリで追加）
+
+**SKIP 統一テンプレート 4 種**:
+
+| カテゴリ | フォーマット | 用途 |
+|---|---|---|
+| `[SKIP:no-creds]` | `BOARD_API_KEY and BOARD_API_TOKEN required` | credentials 未設定 |
+| `[SKIP:no-data]` | `{label} got=N want>=M` | アカウントにデータ不在 |
+| `[SKIP:cache-warm]` | `{reason}` | キャッシュ事前投入が必要 |
+| `[SKIP:rate-limit]` | `{err}` | 429 検出時の自動 skip |
+
+**実行ポリシー**: per-batch（Find メソッド単位）。CI では実行せず、ローカル開発者のみが手動で `BOARD_API_KEY` + `BOARD_API_TOKEN` 設定下に実行する（README "Testing" 参照）。
+
+**削減根拠**: 旧 193 ケースのうち SKIP 68 件（no-data 21 + pending 20 + API 不明 3 + データ不足 4 + cache-warm 4 + 重複 16）は環境依存 / データセット依存で感応性なし。残り 125 ケースのうち、5 特化機能 × 11 メソッド = 41 件で代表性が確保できる（advocate H5 評価軸、N02 §8.3 参照）。
+
+**Payment.Project = nil 仮説 (D1)** の検証は T37（`TestE2E_FindPayment_Search_Smoke`）で実施: 実 API 取得結果の全件で `Result.Project == nil` を assert。データ件数 0 の場合は `[SKIP:no-data]`。

@@ -224,6 +224,27 @@ CLI / MCP
   → boardapi (HTTP client, auth, retry, pagination)
 ```
 
+## Testing
+
+Unit tests are run on every change. E2E tests that hit the real BOARD API are gated by the `e2e` build tag and **must be executed per-batch** (one Find method at a time) due to the BOARD API rate limit (3 req/sec, 3000/day).
+
+```bash
+# Unit tests (CI default)
+go test ./...
+
+# Compile-only check for e2e files (no credentials needed)
+go vet -tags e2e ./...
+go test -tags e2e -run '^$' ./internal/service/find/ ./internal/mcpserver/
+
+# E2E per-batch (requires BOARD_API_KEY + BOARD_API_TOKEN, do NOT run all at once)
+go test -tags e2e -v -count=1 -run TestE2E_FindClient   ./internal/service/find/
+go test -tags e2e -v -count=1 -run TestE2E_FindProject  ./internal/service/find/
+# … 11 batches for service layer + 1 batch for mcpserver
+go test -tags e2e -v -count=1 -run TestE2E_MCPHandler   ./internal/mcpserver/
+```
+
+Skipped tests use a unified `[SKIP:category] message` log format (categories: `no-creds`, `no-data`, `cache-warm`, `rate-limit`) so CI/log analysis can grep them. The 41 service-layer + 5 MCP-handler representative cases (down from the legacy 193) intentionally tolerate `[SKIP:no-data]` in environments where vendors/payments/etc. are empty; in such cases the *effective* coverage may fall below 33. See `docs/specs/board_cli_mcp_ultra_detailed_design_ja.md §39` for the rationale.
+
 ## License
 
 [MIT](LICENSE)

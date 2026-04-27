@@ -30,6 +30,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 旧実装の「全 enrichment が成功するまで全体 error」とは挙動が異なります。LLM/CLI 利用側で nil チェックの導入をお願いします。
   - 詳細: `docs/adr/ADR-001-find-layer.md`
 
+### Tests
+
+- **E2E テスト再構築（N09）**: 旧 `internal/service/find/` E2E（47 関数 / 193 ケース）を全削除し、実 API 感応する代表ケースのみを再構築。Service 層 41 ケース + MCP in-process handler 経由 5 ケース = **計 46 ケース**（78% 削減）。
+  - SKIP 統一テンプレート 4 種: `[SKIP:no-creds|no-data|cache-warm|rate-limit] msg`（CI/log grep 集計対応）
+  - per-batch 実行（Find メソッド単位、rate-limit 配慮）+ CI 非実行（ローカル開発者手動）の運用に変更
+  - 構造的不可フラグ（D1）/ 契約上未実装フラグ（D4）の handler reject、disambiguate vs fanout の挙動差を MCP handler 経由 5 ケース (T42-T46) で実機検証
+  - Payment.Project = nil 仮説 (D1) の E2E 再確認: T37 で `Result.Project == nil` を全件 assert
+  - 詳細: `docs/specs/board_cli_mcp_ultra_detailed_design_ja.md §39` / README "Testing"
+
 ### Added
 
 - **`board find <sub>` の name → ID 解決配線（N07c）**

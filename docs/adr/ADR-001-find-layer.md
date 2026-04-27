@@ -172,6 +172,9 @@ E2E SKIP の仕分けのみを実施する。新規削除・再設計は行わ�
 - **N07c 完了（2026-04-27）**: CLI/MCP の name → ID 解決配線（`ResolveClientByName` / `ResolveVendorByName`）、構造的未対応フラグの最終エラー文言確定、enrichment non-fatal の breaking change を CHANGELOG / api-reference に告知
 - **N08 完了（2026-04-27）**: MCP tools schema 刷新（11 tool）。Document 4 種の `status` プロパティを構造的不可（D1, never-implementable）として schema 削除（primary defense として handler reject 残置）、契約上未実装フラグ（D4: `find_invoices.project_name` / `find_purchase_orders.project_name` / `find_payments.purchase_order_id`）は schema 残置 + property description で `(NOT YET SUPPORTED)` 警告。`find_projects.status` は narrowing 必須（N05 確立、API delegation 不可）を description に明記。disambiguate 系 4 tool（find_projects/invoices/purchase_orders/payments）と fanout 系 4 tool（find_estimates/orders/deliveries/receipts）の挙動差を description で峻別。
   - **MCP の refresh / force_refresh 未公開（意図的設計）**: handler は resolver に空 `repository.ReadOptions{}` を渡し、cache hit 前提で動作する。LLM 検索の典型ユースケース（短時間 N 連投）には cache が有効であり、refresh パラメタは tool 設計を複雑化させ LLM の選択精度を低下させるため敢えて公開しない。stale data は CLI 側 `--refresh` で予熱する運用とし、N09 以降の E2E 実機観測で cache miss 多発時に再判断する。
+- **N09 完了（2026-04-27）**: E2E テスト再構築。旧 193 ケースから Service 層 41 ケース + MCP handler 経由 5 ケース = **計 46 ケース**へ削減。SKIP 統一テンプレート 4 種（`[SKIP:no-creds|no-data|cache-warm|rate-limit] msg`）で grep 集計可能化。実 API 感応するケースのみを残し、per-batch 実行（rate-limit 配慮）+ CI 非実行（ローカル開発者手動）の運用に移行。
+  - **MCP refresh 未公開の再判断（D6）**: 本 N09 では handler 経由 5 ケース (T42-T46) で挙動を確認。cache miss 頻度が観測時に高ければ ADR-002 起票候補（リリース前 N10 で再判断）。
+  - **Payment.Project = nil 仮説の E2E 確認（D1）**: T37 (`TestE2E_FindPayment_Search_Smoke`) で実 API 取得結果の全件 `Result.Project == nil` を assert。データ 0 件 (E2E dump 0 件と整合) なら `[SKIP:no-data]`、件数 > 0 で nil 違反検出時はテスト fail → ADR-002 起票が必要。N09 時点では実環境にデータ無しが前提のため D1 仮定維持。
 
 ## References
 
