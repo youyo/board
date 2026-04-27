@@ -128,7 +128,15 @@ board find vendor --name "Supplier"
 board find purchase-order --vendor-name "Supplier" --status open
 ```
 
-**Available resources** (12): `client`, `project`, `estimate`, `invoice`, `order`, `delivery`, `receipt`, `vendor`, `purchase-order`, `payment`, `user`, `group`
+**Available resources** (11): `client`, `project`, `estimate`, `invoice`, `order`, `delivery`, `receipt`, `vendor`, `purchase-order`, `payment`, `user`
+
+**Behavior notes** (v0.7.0+):
+
+- **Disambiguate vs fanout**: `find project` / `find invoice` / `find purchase-order` / `find payment` resolve `--client-name` / `--vendor-name` to a single ID (ambiguity error + up to 5 candidates if multiple matches; supply `--id` to disambiguate). Document tools (`find estimate` / `find order` / `find delivery` / `find receipt`) instead **fanout** — they search across all matching clients/projects. Use `--project-id` to narrow.
+- **Status narrowing**: `find project --status` requires another narrowing flag (`--id` / `--client-name` / `--name` / `--text`) to avoid full-scan. `find invoice / purchase-order / payment` accept single `--status` (delegated to BOARD API) but reject `--statuses[]` alone.
+- **Enrichment is non-fatal**: `Result.Project` / `Result.Client` / `Result.Vendor` may be `nil` if enrichment fails (warn logged, primary entity still returned). Check for nil in your client code.
+
+See [docs/migration/v0.7.0.md](docs/migration/v0.7.0.md) for the v0.6.0 → v0.7.0 migration guide.
 
 ### `board cache`
 
@@ -212,7 +220,7 @@ Multiple profiles are supported. Switch with `board configure use <profile>` or 
 }
 ```
 
-Available MCP tools mirror `board find`: `find_client`, `find_project`, `find_estimate`, `find_invoice`, `find_order`, `find_delivery`, `find_receipt`, `find_vendor`, `find_purchase_order`, `find_payment`, `find_user`, `find_group`.
+Available MCP tools mirror `board find` (11 tools): `find_client`, `find_project`, `find_estimate`, `find_invoice`, `find_order`, `find_delivery`, `find_receipt`, `find_vendor`, `find_purchase_order`, `find_payment`, `find_user`. (`find_groups` was removed in v0.7.0; use `board api groups list --name-cont <name>` instead.)
 
 ## Architecture
 

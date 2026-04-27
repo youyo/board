@@ -129,7 +129,15 @@ board find vendor --name "仕入先"
 board find purchase-order --vendor-name "仕入先" --status open
 ```
 
-**利用可能なリソース**（12 種）: `client`、`project`、`estimate`、`invoice`、`order`、`delivery`、`receipt`、`vendor`、`purchase-order`、`payment`、`user`、`group`
+**利用可能なリソース**（11 種）: `client`、`project`、`estimate`、`invoice`、`order`、`delivery`、`receipt`、`vendor`、`purchase-order`、`payment`、`user`
+
+**挙動メモ**（v0.7.0+）:
+
+- **disambiguate vs fanout**: `find project` / `find invoice` / `find purchase-order` / `find payment` は `--client-name` / `--vendor-name` を単一 ID に解決します（複数ヒット時は曖昧性 error + 候補上限 5 件、`--id` で解消）。一方 Document 4 種（`find estimate` / `find order` / `find delivery` / `find receipt`）は **fanout 検索**（マッチした全 client / project から集約）で、`--project-id` で絞り込み可能。
+- **status の narrowing 必須**: `find project --status` は `--id` / `--client-name` / `--name` / `--text` のいずれかと併用必須（full-scan 抑止）。`find invoice / purchase-order / payment` は単一 `--status` のみ許可（API delegation）、`--statuses[]` 単独は reject。
+- **enrichment は non-fatal**: `Result.Project` / `Result.Client` / `Result.Vendor` は enrichment 失敗時 `nil` になる可能性あり（警告ログ + 主 entity は確実に返る）。クライアント側で nil チェック必須。
+
+詳細マイグレーションガイド: [docs/migration/v0.7.0.md](docs/migration/v0.7.0.md)
 
 ### `board cache`
 
@@ -213,7 +221,7 @@ pretty_default = false
 }
 ```
 
-利用可能な MCP ツールは `board find` に対応: `find_client`、`find_project`、`find_estimate`、`find_invoice`、`find_order`、`find_delivery`、`find_receipt`、`find_vendor`、`find_purchase_order`、`find_payment`、`find_user`、`find_group`
+利用可能な MCP ツールは `board find` に対応（11 ツール）: `find_client`、`find_project`、`find_estimate`、`find_invoice`、`find_order`、`find_delivery`、`find_receipt`、`find_vendor`、`find_purchase_order`、`find_payment`、`find_user`。（`find_groups` は v0.7.0 で削除されました。`board api groups list --name-cont <name>` で代替してください。）
 
 ## アーキテクチャ
 
