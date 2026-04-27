@@ -43,5 +43,8 @@ func (s *Service) FindClient(ctx context.Context, q FindClientQuery) ([]ClientRe
 			break
 		}
 	}
+	for i := range results {
+		results[i].URL = clientURL(s.uiBaseURL, results[i].Client.ID)
+	}
 	return results, nil
 }

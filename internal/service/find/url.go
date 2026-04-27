@@ -31,3 +31,19 @@ func documentURL(uiBase string, id int) string {
 	}
 	return fmt.Sprintf("%s/documents/%d/edit", uiBase, id)
 }
+
+// clientURL は clients/{id}/edit の編集ページ URL を返す。
+func clientURL(uiBase string, id int) string {
+	if id == 0 || uiBase == "" {
+		return ""
+	}
+	return fmt.Sprintf("%s/clients/%d/edit", uiBase, id)
+}
+
+// vendorURL は payees/{id}/edit の編集ページ URL を返す（BOARD UI は /payees）。
+func vendorURL(uiBase string, id int) string {
+	if id == 0 || uiBase == "" {
+		return ""
+	}
+	return fmt.Sprintf("%s/payees/%d/edit", uiBase, id)
+}

@@ -43,5 +43,8 @@ func (s *Service) FindVendor(ctx context.Context, q FindVendorQuery) ([]VendorRe
 			break
 		}
 	}
+	for i := range results {
+		results[i].URL = vendorURL(s.uiBaseURL, results[i].Vendor.ID)
+	}
 	return results, nil
 }

@@ -277,6 +277,7 @@ type ClientResult struct {
 	Client   boardapi.ClientEntity
 	Branches []boardapi.ClientBranchEntity
 	Contacts []boardapi.ContactEntity
+	URL      string `json:"url,omitempty"`
 }
 
 // ProjectResult はプロジェクト検索結果。
@@ -341,6 +342,7 @@ type VendorResult struct {
 	Vendor   boardapi.VendorEntity
 	Branches []boardapi.VendorBranchEntity
 	Contacts []boardapi.VendorContactEntity
+	URL      string `json:"url,omitempty"`
 }
 
 // PurchaseOrderResult は発注書検索結果。
