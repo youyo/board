@@ -28,14 +28,13 @@ func (s *Service) FindInvoice(ctx context.Context, q FindInvoiceQuery) ([]Invoic
 	opts := repoOpts(q.FindCommonOpts)
 
 	var invoices []boardapi.InvoiceEntity
-	switch {
-	case q.ID != 0:
+	if q.ID != 0 {
 		i, err := s.invoices.GetByID(ctx, q.ID, opts)
 		if err != nil {
 			return nil, err
 		}
 		invoices = []boardapi.InvoiceEntity{*i}
-	case q.ClientID != 0:
+	} else {
 		list, err := s.invoices.Search(ctx, boardapi.InvoiceListOptions{
 			ClientIDEq: q.ClientID,
 			StatusEq:   q.Status,
@@ -43,22 +42,14 @@ func (s *Service) FindInvoice(ctx context.Context, q FindInvoiceQuery) ([]Invoic
 		if err != nil {
 			return nil, err
 		}
-		invoices = list
-	case q.Status != "":
-		list, err := s.invoices.Search(ctx, boardapi.InvoiceListOptions{StatusEq: q.Status}, opts)
-		if err != nil {
-			return nil, err
-		}
-		invoices = list
-	case q.Text != "":
-		all, err := s.invoices.Search(ctx, boardapi.InvoiceListOptions{StatusEq: q.Status}, opts)
-		if err != nil {
-			return nil, err
-		}
-		for _, x := range all {
-			if containsText(q.Text, x.Title, x.Memo) {
-				invoices = append(invoices, x)
+		if q.Text != "" {
+			for _, x := range list {
+				if containsText(q.Text, x.Title, x.Memo) {
+					invoices = append(invoices, x)
+				}
 			}
+		} else {
+			invoices = list
 		}
 	}
 

@@ -89,7 +89,7 @@ func (s *Service) FindDelivery(ctx context.Context, q FindDeliveryQuery) ([]Deli
 		}
 		for _, c := range clients {
 			c2 := c
-			projects, err := s.projects.Search(ctx, boardapi.ProjectListOptions{ClientIDEq: c.ID, ResponseGroup: "delivery"}, opts)
+			projects, err := s.projects.Search(ctx, boardapi.ProjectListOptions{ClientIDEq: c.ID, NameCont: q.ProjectName, ResponseGroup: "delivery"}, opts)
 			if err != nil {
 				return nil, err
 			}

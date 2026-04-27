@@ -87,7 +87,7 @@ func (s *Service) FindReceipt(ctx context.Context, q FindReceiptQuery) ([]Receip
 		}
 		for _, c := range clients {
 			c2 := c
-			projects, err := s.projects.Search(ctx, boardapi.ProjectListOptions{ClientIDEq: c.ID, ResponseGroup: "receipt"}, opts)
+			projects, err := s.projects.Search(ctx, boardapi.ProjectListOptions{ClientIDEq: c.ID, NameCont: q.ProjectName, ResponseGroup: "receipt"}, opts)
 			if err != nil {
 				return nil, err
 			}

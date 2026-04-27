@@ -85,7 +85,7 @@ func (s *Service) FindOrder(ctx context.Context, q FindOrderQuery) ([]OrderResul
 		}
 		for _, c := range clients {
 			c2 := c
-			projects, err := s.projects.Search(ctx, boardapi.ProjectListOptions{ClientIDEq: c.ID, ResponseGroup: "order"}, opts)
+			projects, err := s.projects.Search(ctx, boardapi.ProjectListOptions{ClientIDEq: c.ID, NameCont: q.ProjectName, ResponseGroup: "order"}, opts)
 			if err != nil {
 				return nil, err
 			}

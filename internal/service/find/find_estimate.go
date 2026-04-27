@@ -100,7 +100,7 @@ func (s *Service) FindEstimate(ctx context.Context, q FindEstimateQuery) ([]Esti
 		}
 		for _, c := range clients {
 			c2 := c
-			projects, err := s.projects.Search(ctx, boardapi.ProjectListOptions{ClientIDEq: c.ID, ResponseGroup: "estimate"}, opts)
+			projects, err := s.projects.Search(ctx, boardapi.ProjectListOptions{ClientIDEq: c.ID, NameCont: q.ProjectName, ResponseGroup: "estimate"}, opts)
 			if err != nil {
 				return nil, err
 			}

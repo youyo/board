@@ -28,14 +28,13 @@ func (s *Service) FindPurchaseOrder(ctx context.Context, q FindPurchaseOrderQuer
 	opts := repoOpts(q.FindCommonOpts)
 
 	var pos []boardapi.PurchaseOrderEntity
-	switch {
-	case q.ID != 0:
+	if q.ID != 0 {
 		po, err := s.purchaseOrders.GetByID(ctx, q.ID, opts)
 		if err != nil {
 			return nil, err
 		}
 		pos = []boardapi.PurchaseOrderEntity{*po}
-	case q.VendorID != 0:
+	} else {
 		list, err := s.purchaseOrders.Search(ctx, boardapi.PurchaseOrderListOptions{
 			VendorIDEq: q.VendorID,
 			StatusEq:   q.Status,
@@ -43,22 +42,14 @@ func (s *Service) FindPurchaseOrder(ctx context.Context, q FindPurchaseOrderQuer
 		if err != nil {
 			return nil, err
 		}
-		pos = list
-	case q.Status != "":
-		list, err := s.purchaseOrders.Search(ctx, boardapi.PurchaseOrderListOptions{StatusEq: q.Status}, opts)
-		if err != nil {
-			return nil, err
-		}
-		pos = list
-	case q.Text != "":
-		all, err := s.purchaseOrders.Search(ctx, boardapi.PurchaseOrderListOptions{StatusEq: q.Status}, opts)
-		if err != nil {
-			return nil, err
-		}
-		for _, x := range all {
-			if containsText(q.Text, x.Title, x.Memo) {
-				pos = append(pos, x)
+		if q.Text != "" {
+			for _, x := range list {
+				if containsText(q.Text, x.Title, x.Memo) {
+					pos = append(pos, x)
+				}
 			}
+		} else {
+			pos = list
 		}
 	}
 
