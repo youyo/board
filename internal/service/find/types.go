@@ -283,6 +283,8 @@ type ClientResult struct {
 type ProjectResult struct {
 	Project boardapi.ProjectEntity
 	Client  *boardapi.ClientEntity
+	// URL は BOARD UI のプロジェクト編集ページ URL。
+	URL string `json:"url,omitempty"`
 }
 
 // EstimateResult は見積書検索結果。
@@ -293,6 +295,7 @@ type EstimateResult struct {
 	ClientID  int
 	Project   *boardapi.ProjectEntity
 	Client    *boardapi.ClientEntity
+	URL       string `json:"url,omitempty"`
 }
 
 // OrderResult は注文書検索結果。
@@ -302,6 +305,7 @@ type OrderResult struct {
 	ClientID  int
 	Project   *boardapi.ProjectEntity
 	Client    *boardapi.ClientEntity
+	URL       string `json:"url,omitempty"`
 }
 
 // DeliveryResult は納品書検索結果。
@@ -311,6 +315,7 @@ type DeliveryResult struct {
 	ClientID  int
 	Project   *boardapi.ProjectEntity
 	Client    *boardapi.ClientEntity
+	URL       string `json:"url,omitempty"`
 }
 
 // ReceiptResult は領収書検索結果。
@@ -320,6 +325,7 @@ type ReceiptResult struct {
 	ClientID  int
 	Project   *boardapi.ProjectEntity
 	Client    *boardapi.ClientEntity
+	URL       string `json:"url,omitempty"`
 }
 
 // InvoiceResult は請求書検索結果。
@@ -327,6 +333,7 @@ type InvoiceResult struct {
 	Invoice boardapi.InvoiceEntity
 	Project *boardapi.ProjectEntity
 	Client  *boardapi.ClientEntity
+	URL     string `json:"url,omitempty"`
 }
 
 // VendorResult は仕入先検索結果。
@@ -341,6 +348,7 @@ type PurchaseOrderResult struct {
 	PurchaseOrder boardapi.PurchaseOrderEntity
 	Vendor        *boardapi.VendorEntity
 	Project       *boardapi.ProjectEntity
+	URL           string `json:"url,omitempty"`
 }
 
 // PaymentResult は支払検索結果。
@@ -348,6 +356,7 @@ type PaymentResult struct {
 	Payment boardapi.PaymentEntity
 	Vendor  *boardapi.VendorEntity
 	Project *boardapi.ProjectEntity
+	URL     string `json:"url,omitempty"`
 }
 
 // UserResult はユーザー検索結果。

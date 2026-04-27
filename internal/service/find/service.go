@@ -134,8 +134,19 @@ type Service struct {
 	payments       PaymentRepo
 	users          UserRepo
 
+	// uiBaseURL は BOARD UI ベース URL（例: "https://the-board.jp"）。
+	// Result.URL の組み立てに使う。空文字なら URL は組み立てない。
+	uiBaseURL string
+
 	// Document 4 種の逆マッピングキャッシュ（lazy build、N04 以降で registration）
 	reverseMappers map[string]*reverseMapper
+}
+
+// WithUIBaseURL は Result の URL フィールド組み立てに使う UI ベース URL を上書きする。
+// 未指定時は空文字（URL は組み立てない）。
+func (s *Service) WithUIBaseURL(url string) *Service {
+	s.uiBaseURL = url
+	return s
 }
 
 // New は新しい find Service を生成する。

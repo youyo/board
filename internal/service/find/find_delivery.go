@@ -151,5 +151,8 @@ func (s *Service) FindDelivery(ctx context.Context, q FindDeliveryQuery) ([]Deli
 		}
 	}
 
+	for i := range results {
+		results[i].URL = documentURL(s.uiBaseURL, results[i].Delivery.ID)
+	}
 	return results, nil
 }

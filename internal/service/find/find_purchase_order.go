@@ -58,5 +58,8 @@ func (s *Service) FindPurchaseOrder(ctx context.Context, q FindPurchaseOrderQuer
 			break
 		}
 	}
+	for i := range results {
+		results[i].URL = documentURL(s.uiBaseURL, results[i].PurchaseOrder.ID)
+	}
 	return results, nil
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/youyo/board/internal/boardapi"
@@ -119,8 +120,11 @@ func New(profileName string) (*App, error) {
 // FindService returns a high-level find service (Phase N ゼロベース再設計版).
 //
 // Groups は除外（ADR-001 Group 削除確定、api_groups_list で代替）。
+//
+// UI base URL は BOARD_UI_BASE_URL 環境変数で上書き可能。
+// 未指定時は profile.BaseURL から "://api." を "://" に置換して導出する。
 func (a *App) FindService() *find.Service {
-	return find.New(find.Repos{
+	svc := find.New(find.Repos{
 		Clients:        a.Repos.Clients,
 		ClientBranches: a.Repos.ClientBranches,
 		Contacts:       a.Repos.Contacts,
@@ -137,6 +141,11 @@ func (a *App) FindService() *find.Service {
 		Payments:       a.Repos.Payments,
 		Users:          a.Repos.Users,
 	})
+	uiBase := os.Getenv("BOARD_UI_BASE_URL")
+	if uiBase == "" {
+		uiBase = strings.Replace(a.Profile.BaseURL, "://api.", "://", 1)
+	}
+	return svc.WithUIBaseURL(uiBase)
 }
 
 // Close closes the DB connection.

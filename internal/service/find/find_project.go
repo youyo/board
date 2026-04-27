@@ -60,5 +60,8 @@ func (s *Service) FindProject(ctx context.Context, q FindProjectQuery) ([]Projec
 			break
 		}
 	}
+	for i := range results {
+		results[i].URL = projectURL(s.uiBaseURL, results[i].Project.ID)
+	}
 	return results, nil
 }

@@ -68,5 +68,8 @@ func (s *Service) FindPayment(ctx context.Context, q FindPaymentQuery) ([]Paymen
 			break
 		}
 	}
+	for i := range results {
+		results[i].URL = documentURL(s.uiBaseURL, results[i].Payment.ID)
+	}
 	return results, nil
 }

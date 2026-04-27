@@ -58,5 +58,8 @@ func (s *Service) FindInvoice(ctx context.Context, q FindInvoiceQuery) ([]Invoic
 			break
 		}
 	}
+	for i := range results {
+		results[i].URL = documentURL(s.uiBaseURL, results[i].Invoice.ID)
+	}
 	return results, nil
 }

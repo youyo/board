@@ -149,5 +149,8 @@ func (s *Service) FindReceipt(ctx context.Context, q FindReceiptQuery) ([]Receip
 		}
 	}
 
+	for i := range results {
+		results[i].URL = documentURL(s.uiBaseURL, results[i].Receipt.ID)
+	}
 	return results, nil
 }
