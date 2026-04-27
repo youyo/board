@@ -13,6 +13,11 @@ import (
 
 // RegisterTools registers all 11 MCP tool definitions with real handlers.
 // find_groups は ADR-001 (Group 削除確定) により削除（N07b）。
+// N08: 全 tool description / property description を LLM 向けに刷新。
+//   - disambiguate（client_name / vendor_name → ambiguity error）と fanout（Document 系は no disambiguation）を明示
+//   - Document 4 種の status は構造的不可のため schema 削除（D1, primary defense として handler reject 残置）
+//   - 将来拡張フラグ（contingently unimplemented）は schema 残し description で警告（D4）
+//   - find_projects.status は narrowing 必須（N05、API delegation 不可）を description で警告
 func RegisterTools(s *Server) {
 	s.MCPServer().AddTools(
 		// --- Simple tools (id, name, text, limit) ---
@@ -23,7 +28,7 @@ func RegisterTools(s *Server) {
 		// --- Project tool (id, client_name, name, text, status, limit) ---
 		findProjectsTool(s),
 
-		// --- Client-document tools (id, client_name, project_name, text, status, limit) ---
+		// --- Client-document tools (fanout: id, project_id, client_name, project_name, limit) ---
 		findEstimatesTool(s),
 		findInvoicesTool(s),
 		findOrdersTool(s),
@@ -47,6 +52,29 @@ func readOnlyAnnotation() mcp.ToolOption {
 }
 
 func boolPtr(b bool) *bool { return &b }
+
+// --- Description helpers (N08) ---
+
+// disambiguateNameDesc は name → ID 解決系プロパティの description を生成する。
+// 重複ヒット時は ambiguity error + 候補列挙を返す挙動を明示。
+func disambiguateNameDesc(target, entity string) string {
+	return fmt.Sprintf("Resolve %s name (substring match) to filter %s. Returns an ambiguity error with up to 5 candidates if multiple %ss match; use id to disambiguate.", target, entity, target)
+}
+
+// fanoutNameDesc は Document 4 種の name 系プロパティ description を生成する。
+// disambiguation を行わず全マッチ entity を fanout 検索することを明示。
+func fanoutNameDesc(target, entity, narrowProp string) string {
+	return fmt.Sprintf("Resolve %s name (substring match) and fanout-search across all matching %ss (no disambiguation). Use %s to narrow to a single document.", target, target, narrowProp)
+}
+
+// notYetSupportedDesc は contingently unimplemented なフラグの description を生成する。
+func notYetSupportedDesc(field, scope string) string {
+	return fmt.Sprintf("(NOT YET SUPPORTED) Will filter %s by %s in a future release. Currently returns an error.", scope, field)
+}
+
+func limitDesc() string {
+	return "Max results to return (default: 50, max: 100)."
+}
 
 // getStringArg extracts a string argument from a CallToolRequest.
 // Returns "" if the key is missing or not a string.
@@ -113,11 +141,11 @@ func errorResult(err error) *mcp.CallToolResult {
 func findClientsTool(srv *Server) server.ServerTool {
 	return server.ServerTool{
 		Tool: mcp.NewTool("find_clients",
-			mcp.WithDescription("Search for clients by ID, name, or free text. Returns client details with branches and contacts."),
-			mcp.WithNumber("id", mcp.Description("Client ID for direct lookup (highest priority, ignores name/text)")),
-			mcp.WithString("name", mcp.Description("Substring match on client name (ignores text)")),
-			mcp.WithString("text", mcp.Description("Free-text search across name, code, memo (lowest priority)")),
-			mcp.WithNumber("limit", mcp.Description("Max results to return (default: unlimited)")),
+			mcp.WithDescription("Search BOARD clients by ID, name, or free text. Returns client entities with branches and contacts. Priority: id > name > text."),
+			mcp.WithNumber("id", mcp.Description("Client ID for direct lookup (highest priority; ignores name/text).")),
+			mcp.WithString("name", mcp.Description("Substring match on client name (ignores text).")),
+			mcp.WithString("text", mcp.Description("Free-text search across name, code, memo (lowest priority).")),
+			mcp.WithNumber("limit", mcp.Description(limitDesc())),
 			readOnlyAnnotation(),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -138,11 +166,11 @@ func findClientsTool(srv *Server) server.ServerTool {
 func findVendorsTool(srv *Server) server.ServerTool {
 	return server.ServerTool{
 		Tool: mcp.NewTool("find_vendors",
-			mcp.WithDescription("Search for vendors by ID, name, or free text. Returns vendor details with branches and contacts."),
-			mcp.WithNumber("id", mcp.Description("Vendor ID for direct lookup (highest priority, ignores name/text)")),
-			mcp.WithString("name", mcp.Description("Substring match on vendor name (ignores text)")),
-			mcp.WithString("text", mcp.Description("Free-text search across name, code, memo (lowest priority)")),
-			mcp.WithNumber("limit", mcp.Description("Max results to return (default: unlimited)")),
+			mcp.WithDescription("Search BOARD vendors by ID, name, or free text. Returns vendor entities with branches and contacts. Priority: id > name > text."),
+			mcp.WithNumber("id", mcp.Description("Vendor ID for direct lookup (highest priority; ignores name/text).")),
+			mcp.WithString("name", mcp.Description("Substring match on vendor name (ignores text).")),
+			mcp.WithString("text", mcp.Description("Free-text search across name, code, memo (lowest priority).")),
+			mcp.WithNumber("limit", mcp.Description(limitDesc())),
 			readOnlyAnnotation(),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -163,11 +191,11 @@ func findVendorsTool(srv *Server) server.ServerTool {
 func findUsersTool(srv *Server) server.ServerTool {
 	return server.ServerTool{
 		Tool: mcp.NewTool("find_users",
-			mcp.WithDescription("Search for users by ID, name, or free text. Returns user details."),
-			mcp.WithNumber("id", mcp.Description("User ID for direct lookup (highest priority, ignores name/text)")),
-			mcp.WithString("name", mcp.Description("Substring match on user name (ignores text)")),
-			mcp.WithString("text", mcp.Description("Free-text search across name, email (lowest priority)")),
-			mcp.WithNumber("limit", mcp.Description("Max results to return (default: unlimited)")),
+			mcp.WithDescription("Search BOARD users by ID, name, or free text. Returns user entities. Priority: id > name > text."),
+			mcp.WithNumber("id", mcp.Description("User ID for direct lookup (highest priority; ignores name/text).")),
+			mcp.WithString("name", mcp.Description("Substring match on user name (ignores text).")),
+			mcp.WithString("text", mcp.Description("Free-text search across name, email (lowest priority).")),
+			mcp.WithNumber("limit", mcp.Description(limitDesc())),
 			readOnlyAnnotation(),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -188,13 +216,13 @@ func findUsersTool(srv *Server) server.ServerTool {
 func findProjectsTool(srv *Server) server.ServerTool {
 	return server.ServerTool{
 		Tool: mcp.NewTool("find_projects",
-			mcp.WithDescription("Search for projects by ID, client name, project name, or free text. Supports status filtering."),
-			mcp.WithNumber("id", mcp.Description("Project ID for direct lookup (highest priority)")),
-			mcp.WithString("client_name", mcp.Description("Resolve client name to filter projects by client")),
-			mcp.WithString("name", mcp.Description("Substring match on project name")),
-			mcp.WithString("text", mcp.Description("Free-text search across name, code, memo (lowest priority)")),
-			mcp.WithString("status", mcp.Description("Filter by project status")),
-			mcp.WithNumber("limit", mcp.Description("Max results to return (default: unlimited)")),
+			mcp.WithDescription("Search BOARD projects by ID, client name, project name, or free text. Returns project entities with enriched client info. client_name resolves with ambiguity error on multiple matches. status filtering requires narrowing (must combine with id/client_name/name/text)."),
+			mcp.WithNumber("id", mcp.Description("Project ID for direct lookup (highest priority; ignores other filters).")),
+			mcp.WithString("client_name", mcp.Description(disambiguateNameDesc("client", "project"))),
+			mcp.WithString("name", mcp.Description("Substring match on project name.")),
+			mcp.WithString("text", mcp.Description("Free-text search across name, code, memo (lowest priority).")),
+			mcp.WithString("status", mcp.Description("Filter by project status (e.g. 受注, 完了). MUST be combined with id/client_name/name/text — status-only query is rejected (API delegation not possible, narrowing required per N05).")),
+			mcp.WithNumber("limit", mcp.Description(limitDesc())),
 			readOnlyAnnotation(),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -226,16 +254,16 @@ func findProjectsTool(srv *Server) server.ServerTool {
 func findEstimatesTool(srv *Server) server.ServerTool {
 	return server.ServerTool{
 		Tool: mcp.NewTool("find_estimates",
-			mcp.WithDescription("Search for estimates by ID, project ID, client name, or project name. Supports status post-filtering."),
-			mcp.WithNumber("id", mcp.Description("Estimate document ID for direct lookup (highest priority)")),
-			mcp.WithNumber("project_id", mcp.Description("Project ID to find its estimate")),
-			mcp.WithString("client_name", mcp.Description("Resolve client name to find estimates via projects")),
-			mcp.WithString("project_name", mcp.Description("Resolve project name to find estimates")),
-			mcp.WithString("status", mcp.Description("Post-filter by estimate status")),
-			mcp.WithNumber("limit", mcp.Description("Max results to return (default: unlimited)")),
+			mcp.WithDescription("Search BOARD estimate documents by ID, project ID, client name, or project name. Returns estimate entities (no Status field on entity, hence no status filter). client_name/project_name perform fanout search across all matching entities (no disambiguation)."),
+			mcp.WithNumber("id", mcp.Description("Estimate document ID for direct lookup (highest priority).")),
+			mcp.WithNumber("project_id", mcp.Description("Project ID to find its estimate (use to narrow to a single document).")),
+			mcp.WithString("client_name", mcp.Description(fanoutNameDesc("client", "estimate", "project_id"))),
+			mcp.WithString("project_name", mcp.Description(fanoutNameDesc("project", "estimate", "project_id"))),
+			mcp.WithNumber("limit", mcp.Description(limitDesc())),
 			readOnlyAnnotation(),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			// N08 D1: status は schema 削除済だが primary defense として handler reject 残置。
 			if getStringArg(req, "status") != "" {
 				return errorResult(fmt.Errorf("status filtering is not supported for documents (no Status field on entity)")), nil
 			}
@@ -257,13 +285,13 @@ func findEstimatesTool(srv *Server) server.ServerTool {
 func findInvoicesTool(srv *Server) server.ServerTool {
 	return server.ServerTool{
 		Tool: mcp.NewTool("find_invoices",
-			mcp.WithDescription("Search for invoices by ID, client name, project name, or free text. Supports status filtering."),
-			mcp.WithNumber("id", mcp.Description("Invoice ID for direct lookup (highest priority)")),
-			mcp.WithString("client_name", mcp.Description("Resolve client name to filter invoices by client")),
-			mcp.WithString("project_name", mcp.Description("Resolve project name to filter invoices by project")),
-			mcp.WithString("text", mcp.Description("Free-text search across title, memo (lowest priority)")),
-			mcp.WithString("status", mcp.Description("Filter by invoice status")),
-			mcp.WithNumber("limit", mcp.Description("Max results to return (default: unlimited)")),
+			mcp.WithDescription("Search BOARD invoices by ID, client name, project name, or free text. Returns invoice entities. client_name resolves with ambiguity error on multiple matches. status accepts a single status (API delegated; no narrowing required). project_name is not yet supported."),
+			mcp.WithNumber("id", mcp.Description("Invoice ID for direct lookup (highest priority).")),
+			mcp.WithString("client_name", mcp.Description(disambiguateNameDesc("client", "invoice"))),
+			mcp.WithString("project_name", mcp.Description(notYetSupportedDesc("project name", "invoices"))),
+			mcp.WithString("text", mcp.Description("Free-text search across title, memo (lowest priority).")),
+			mcp.WithString("status", mcp.Description("Filter by invoice status (single value; API delegated, no narrowing required).")),
+			mcp.WithNumber("limit", mcp.Description(limitDesc())),
 			readOnlyAnnotation(),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -297,13 +325,12 @@ func findInvoicesTool(srv *Server) server.ServerTool {
 func findOrdersTool(srv *Server) server.ServerTool {
 	return server.ServerTool{
 		Tool: mcp.NewTool("find_orders",
-			mcp.WithDescription("Search for orders by ID, project ID, client name, or project name. Supports status post-filtering."),
-			mcp.WithNumber("id", mcp.Description("Order document ID for direct lookup (highest priority)")),
-			mcp.WithNumber("project_id", mcp.Description("Project ID to find its order")),
-			mcp.WithString("client_name", mcp.Description("Resolve client name to find orders via projects")),
-			mcp.WithString("project_name", mcp.Description("Resolve project name to find orders")),
-			mcp.WithString("status", mcp.Description("Post-filter by order status")),
-			mcp.WithNumber("limit", mcp.Description("Max results to return (default: unlimited)")),
+			mcp.WithDescription("Search BOARD order documents by ID, project ID, client name, or project name. Returns order entities (no Status field on entity, hence no status filter). client_name/project_name perform fanout search across all matching entities (no disambiguation)."),
+			mcp.WithNumber("id", mcp.Description("Order document ID for direct lookup (highest priority).")),
+			mcp.WithNumber("project_id", mcp.Description("Project ID to find its order (use to narrow to a single document).")),
+			mcp.WithString("client_name", mcp.Description(fanoutNameDesc("client", "order", "project_id"))),
+			mcp.WithString("project_name", mcp.Description(fanoutNameDesc("project", "order", "project_id"))),
+			mcp.WithNumber("limit", mcp.Description(limitDesc())),
 			readOnlyAnnotation(),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -328,13 +355,12 @@ func findOrdersTool(srv *Server) server.ServerTool {
 func findDeliveriesTool(srv *Server) server.ServerTool {
 	return server.ServerTool{
 		Tool: mcp.NewTool("find_deliveries",
-			mcp.WithDescription("Search for deliveries by ID, project ID, client name, or project name. Supports status post-filtering."),
-			mcp.WithNumber("id", mcp.Description("Delivery document ID for direct lookup (highest priority)")),
-			mcp.WithNumber("project_id", mcp.Description("Project ID to find its delivery")),
-			mcp.WithString("client_name", mcp.Description("Resolve client name to find deliveries via projects")),
-			mcp.WithString("project_name", mcp.Description("Resolve project name to find deliveries")),
-			mcp.WithString("status", mcp.Description("Post-filter by delivery status")),
-			mcp.WithNumber("limit", mcp.Description("Max results to return (default: unlimited)")),
+			mcp.WithDescription("Search BOARD delivery documents by ID, project ID, client name, or project name. Returns delivery entities (no Status field on entity, hence no status filter). client_name/project_name perform fanout search across all matching entities (no disambiguation)."),
+			mcp.WithNumber("id", mcp.Description("Delivery document ID for direct lookup (highest priority).")),
+			mcp.WithNumber("project_id", mcp.Description("Project ID to find its deliveries (use to narrow to a single project).")),
+			mcp.WithString("client_name", mcp.Description(fanoutNameDesc("client", "delivery", "project_id"))),
+			mcp.WithString("project_name", mcp.Description(fanoutNameDesc("project", "delivery", "project_id"))),
+			mcp.WithNumber("limit", mcp.Description(limitDesc())),
 			readOnlyAnnotation(),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -359,13 +385,12 @@ func findDeliveriesTool(srv *Server) server.ServerTool {
 func findReceiptsTool(srv *Server) server.ServerTool {
 	return server.ServerTool{
 		Tool: mcp.NewTool("find_receipts",
-			mcp.WithDescription("Search for receipts by ID, project ID, client name, or project name. Supports status post-filtering."),
-			mcp.WithNumber("id", mcp.Description("Receipt document ID for direct lookup (highest priority)")),
-			mcp.WithNumber("project_id", mcp.Description("Project ID to find its receipt")),
-			mcp.WithString("client_name", mcp.Description("Resolve client name to find receipts via projects")),
-			mcp.WithString("project_name", mcp.Description("Resolve project name to find receipts")),
-			mcp.WithString("status", mcp.Description("Post-filter by receipt status")),
-			mcp.WithNumber("limit", mcp.Description("Max results to return (default: unlimited)")),
+			mcp.WithDescription("Search BOARD receipt documents by ID, project ID, client name, or project name. Returns receipt entities (no Status field on entity, hence no status filter). client_name/project_name perform fanout search across all matching entities (no disambiguation)."),
+			mcp.WithNumber("id", mcp.Description("Receipt document ID for direct lookup (highest priority).")),
+			mcp.WithNumber("project_id", mcp.Description("Project ID to find its receipts (use to narrow to a single project).")),
+			mcp.WithString("client_name", mcp.Description(fanoutNameDesc("client", "receipt", "project_id"))),
+			mcp.WithString("project_name", mcp.Description(fanoutNameDesc("project", "receipt", "project_id"))),
+			mcp.WithNumber("limit", mcp.Description(limitDesc())),
 			readOnlyAnnotation(),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -390,13 +415,13 @@ func findReceiptsTool(srv *Server) server.ServerTool {
 func findPurchaseOrdersTool(srv *Server) server.ServerTool {
 	return server.ServerTool{
 		Tool: mcp.NewTool("find_purchase_orders",
-			mcp.WithDescription("Search for purchase orders by ID, vendor name, project name, or free text. Supports status filtering."),
-			mcp.WithNumber("id", mcp.Description("Purchase order ID for direct lookup (highest priority)")),
-			mcp.WithString("vendor_name", mcp.Description("Resolve vendor name to filter purchase orders by vendor")),
-			mcp.WithString("project_name", mcp.Description("Resolve project name to filter purchase orders by project")),
-			mcp.WithString("text", mcp.Description("Free-text search across title, memo (lowest priority)")),
-			mcp.WithString("status", mcp.Description("Filter by purchase order status")),
-			mcp.WithNumber("limit", mcp.Description("Max results to return (default: unlimited)")),
+			mcp.WithDescription("Search BOARD purchase orders by ID, vendor name, project name, or free text. Returns purchase order entities. vendor_name resolves with ambiguity error on multiple matches. status accepts a single status (API delegated; no narrowing required). project_name is not yet supported."),
+			mcp.WithNumber("id", mcp.Description("Purchase order ID for direct lookup (highest priority).")),
+			mcp.WithString("vendor_name", mcp.Description(disambiguateNameDesc("vendor", "purchase order"))),
+			mcp.WithString("project_name", mcp.Description(notYetSupportedDesc("project name", "purchase orders"))),
+			mcp.WithString("text", mcp.Description("Free-text search across title, memo (lowest priority).")),
+			mcp.WithString("status", mcp.Description("Filter by purchase order status (single value; API delegated, no narrowing required).")),
+			mcp.WithNumber("limit", mcp.Description(limitDesc())),
 			readOnlyAnnotation(),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -430,13 +455,13 @@ func findPurchaseOrdersTool(srv *Server) server.ServerTool {
 func findPaymentsTool(srv *Server) server.ServerTool {
 	return server.ServerTool{
 		Tool: mcp.NewTool("find_payments",
-			mcp.WithDescription("Search for payments by ID, vendor name, purchase order ID, or free text. Supports status filtering."),
-			mcp.WithNumber("id", mcp.Description("Payment ID for direct lookup (highest priority)")),
-			mcp.WithString("vendor_name", mcp.Description("Resolve vendor name to filter payments by vendor")),
-			mcp.WithNumber("purchase_order_id", mcp.Description("Filter payments by purchase order ID")),
-			mcp.WithString("text", mcp.Description("Free-text search across memo (lowest priority)")),
-			mcp.WithString("status", mcp.Description("Filter by payment status")),
-			mcp.WithNumber("limit", mcp.Description("Max results to return (default: unlimited)")),
+			mcp.WithDescription("Search BOARD payments by ID, vendor name, or free text. Returns payment entities. vendor_name resolves with ambiguity error on multiple matches. status accepts a single status (API delegated; no narrowing required). purchase_order_id is not yet supported."),
+			mcp.WithNumber("id", mcp.Description("Payment ID for direct lookup (highest priority).")),
+			mcp.WithString("vendor_name", mcp.Description(disambiguateNameDesc("vendor", "payment"))),
+			mcp.WithNumber("purchase_order_id", mcp.Description(notYetSupportedDesc("purchase order ID", "payments"))),
+			mcp.WithString("text", mcp.Description("Free-text search across memo (lowest priority).")),
+			mcp.WithString("status", mcp.Description("Filter by payment status (single value; API delegated, no narrowing required).")),
+			mcp.WithNumber("limit", mcp.Description(limitDesc())),
 			readOnlyAnnotation(),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {

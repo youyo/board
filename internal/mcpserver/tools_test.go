@@ -106,9 +106,10 @@ func TestRegisterTools_InputSchemaProperties(t *testing.T) {
 		}
 	}
 
-	// Estimate/Order/Delivery/Receipt tools use project_id instead of text
+	// Estimate/Order/Delivery/Receipt tools use project_id instead of text.
+	// status is structurally not supported (no Status field on Document entities) and removed from schema (N08).
 	docTools := []string{"find_estimates", "find_orders", "find_deliveries", "find_receipts"}
-	docProps := []string{"id", "project_id", "client_name", "project_name", "status", "limit"}
+	docProps := []string{"id", "project_id", "client_name", "project_name", "limit"}
 	for _, toolName := range docTools {
 		tool, ok := tools[toolName]
 		if !ok {
@@ -119,6 +120,10 @@ func TestRegisterTools_InputSchemaProperties(t *testing.T) {
 			if _, exists := tool.Tool.InputSchema.Properties[prop]; !exists {
 				t.Errorf("tool %q missing property %q", toolName, prop)
 			}
+		}
+		// status must NOT be in schema for Document tools (N08 D1)
+		if _, exists := tool.Tool.InputSchema.Properties["status"]; exists {
+			t.Errorf("tool %q must NOT have 'status' property (N08: structurally unsupported)", toolName)
 		}
 	}
 
@@ -141,6 +146,117 @@ func TestRegisterTools_InputSchemaProperties(t *testing.T) {
 			}
 		}
 	}
+}
+
+// N08: disambiguate を行うリゾルバ系 tool description が曖昧性挙動に言及していること。
+func TestRegisterTools_DescriptionMentionsDisambiguation(t *testing.T) {
+	s := New(nil)
+	tools := s.MCPServer().ListTools()
+
+	disambiguateTools := []string{"find_projects", "find_invoices", "find_purchase_orders", "find_payments"}
+	for _, name := range disambiguateTools {
+		tool, ok := tools[name]
+		if !ok {
+			t.Errorf("tool %q not found", name)
+			continue
+		}
+		desc := tool.Tool.Description
+		if !containsAny(desc, "ambiguity", "ambiguous", "disambiguate") {
+			t.Errorf("tool %q description must mention disambiguation behavior, got: %q", name, desc)
+		}
+	}
+}
+
+// N08: Document 4 種は fanout 検索（disambiguate なし）であることを description で明示。
+func TestRegisterTools_DescriptionMentionsFanout(t *testing.T) {
+	s := New(nil)
+	tools := s.MCPServer().ListTools()
+
+	fanoutTools := []string{"find_estimates", "find_orders", "find_deliveries", "find_receipts"}
+	for _, name := range fanoutTools {
+		tool, ok := tools[name]
+		if !ok {
+			t.Errorf("tool %q not found", name)
+			continue
+		}
+		desc := tool.Tool.Description
+		if !containsAny(desc, "fanout", "fan-out") {
+			t.Errorf("tool %q description must mention fanout behavior, got: %q", name, desc)
+		}
+	}
+}
+
+// N08: 将来拡張フラグ（contingently unimplemented）の property description で警告。
+func TestRegisterTools_DescriptionMentionsNotYetSupported(t *testing.T) {
+	s := New(nil)
+	tools := s.MCPServer().ListTools()
+
+	cases := []struct {
+		toolName string
+		propName string
+	}{
+		{"find_invoices", "project_name"},
+		{"find_purchase_orders", "project_name"},
+		{"find_payments", "purchase_order_id"},
+	}
+	for _, c := range cases {
+		tool, ok := tools[c.toolName]
+		if !ok {
+			t.Errorf("tool %q not found", c.toolName)
+			continue
+		}
+		propAny, ok := tool.Tool.InputSchema.Properties[c.propName]
+		if !ok {
+			t.Errorf("tool %q missing property %q", c.toolName, c.propName)
+			continue
+		}
+		propMap, ok := propAny.(map[string]any)
+		if !ok {
+			t.Errorf("tool %q property %q is not a map: %T", c.toolName, c.propName, propAny)
+			continue
+		}
+		desc, _ := propMap["description"].(string)
+		if !containsAny(desc, "NOT YET SUPPORTED", "not yet supported") {
+			t.Errorf("tool %q.%q description must mention 'not yet supported', got: %q", c.toolName, c.propName, desc)
+		}
+	}
+}
+
+// N08: find_projects の status は narrowing 必須（N05 確立、API delegation 不可）。
+// description で narrowing 要件を明示し LLM の status-only クエリを抑止する。
+func TestRegisterTools_FindProjectsStatusMentionsNarrowing(t *testing.T) {
+	s := New(nil)
+	tools := s.MCPServer().ListTools()
+
+	tool, ok := tools["find_projects"]
+	if !ok {
+		t.Fatal("tool find_projects not found")
+	}
+	propAny, ok := tool.Tool.InputSchema.Properties["status"]
+	if !ok {
+		t.Fatal("find_projects missing 'status' property")
+	}
+	propMap, ok := propAny.(map[string]any)
+	if !ok {
+		t.Fatalf("find_projects.status is not a map: %T", propAny)
+	}
+	desc, _ := propMap["description"].(string)
+	if !containsAny(desc, "narrow", "status-only", "must be combined") {
+		t.Errorf("find_projects.status description must mention narrowing requirement, got: %q", desc)
+	}
+}
+
+func containsAny(s string, subs ...string) bool {
+	for _, sub := range subs {
+		if len(sub) > 0 && len(s) >= len(sub) {
+			for i := 0; i+len(sub) <= len(s); i++ {
+				if s[i:i+len(sub)] == sub {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 func TestRegisterTools_NoRequiredFields(t *testing.T) {
