@@ -114,49 +114,7 @@ func TestService_FindProject_ByName_DelegatesNameCont(t *testing.T) {
 	if capturedFilter.NameCont != "Acme" {
 		t.Errorf("expected NameCont=Acme, got %q", capturedFilter.NameCont)
 	}
-}
-
-// N05-T05: Text 指定、Name/ManagementNo のいずれかにマッチする件を返す
-func TestService_FindProject_ByText_FiltersInProcess(t *testing.T) {
-	pr := &stubProjectRepo{
-		searchResult: []boardapi.ProjectEntity{
-			{ID: 1, Name: "Alpha P"},
-			{ID: 2, Name: "Beta"},
-			{ID: 3, Name: "Gamma", ManagementNo: strPtr("ALPHA-1")},
-		},
-	}
-	cr := &stubClientRepo{}
-	svc := newProjectTestService(pr, cr)
-
-	results, err := svc.FindProject(testCtx, FindProjectQuery{Text: "alpha"})
-	assertNoError(t, err)
-	if len(results) != 2 {
-		t.Fatalf("expected 2 results, got %d", len(results))
-	}
-}
-
-// N05-T06: Text 指定、InHouseMemo にマッチ
-func TestService_FindProject_ByText_MatchesInHouseMemo(t *testing.T) {
-	pr := &stubProjectRepo{
-		searchResult: []boardapi.ProjectEntity{
-			{ID: 1, Name: "P1", InHouseMemo: strPtr("urgent customer")},
-			{ID: 2, Name: "P2"},
-		},
-	}
-	cr := &stubClientRepo{}
-	svc := newProjectTestService(pr, cr)
-
-	results, err := svc.FindProject(testCtx, FindProjectQuery{Text: "urgent"})
-	assertNoError(t, err)
-	if len(results) != 1 {
-		t.Fatalf("expected 1 result, got %d", len(results))
-	}
-	if results[0].Project.ID != 1 {
-		t.Errorf("expected ID=1, got %d", results[0].Project.ID)
-	}
-}
-
-// N05-T07: ID 優先 — ClientID/Name があっても Search は呼ばれない
+} // N05-T07: ID 優先 — ClientID/Name があっても Search は呼ばれない
 func TestService_FindProject_PriorityIDOverridesOthers(t *testing.T) {
 	pr := &stubProjectRepo{
 		getResult: &boardapi.ProjectEntity{ID: 10},
@@ -530,30 +488,6 @@ func TestService_FindProject_ContractStatusWithClientID_Flow(t *testing.T) {
 
 	results, err := svc.FindProject(testCtx, FindProjectQuery{
 		ClientID:       5,
-		ContractStatus: "active",
-	})
-	assertNoError(t, err)
-	if len(results) != 1 {
-		t.Fatalf("expected 1 result, got %d", len(results))
-	}
-	if results[0].Project.ID != 1 {
-		t.Errorf("expected ID=1, got %d", results[0].Project.ID)
-	}
-}
-
-// F-T06: ContractStatus + Text フロー
-func TestService_FindProject_ContractStatusWithText_Flow(t *testing.T) {
-	pr := &stubProjectRepo{
-		searchResult: []boardapi.ProjectEntity{
-			{ID: 1, Name: "保守テスト", DeliveryStatusName: "未着手"},
-			{ID: 2, Name: "その他案件", DeliveryStatusName: "未着手"},
-		},
-	}
-	cr := &stubClientRepo{}
-	svc := newProjectTestService(pr, cr)
-
-	results, err := svc.FindProject(testCtx, FindProjectQuery{
-		Text:           "保守",
 		ContractStatus: "active",
 	})
 	assertNoError(t, err)

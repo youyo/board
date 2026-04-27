@@ -16,7 +16,6 @@ func NewFindProjectCmd() *cobra.Command {
 		id             int
 		clientName     string
 		name           string
-		text           string
 		status         string
 		statuses       []string
 		contractStatus string
@@ -25,11 +24,11 @@ func NewFindProjectCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "project",
 		Short: "Search projects with client resolution",
-		Long:  "Search for projects by ID, client name, project name, free text, or status. Returns projects with their associated client.",
+		Long:  "Search for projects by ID, client name, project name or status. Returns projects with their associated client.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if id == 0 && clientName == "" && name == "" && text == "" &&
+			if id == 0 && clientName == "" && name == "" &&
 				status == "" && len(statuses) == 0 && contractStatus == "" {
-				return fmt.Errorf("at least one of --id, --client-name, --name, --text, --status, --statuses, or --contract-status must be specified")
+				return fmt.Errorf("at least one of --id, --client-name, --name, --status, --statuses, or --contract-status must be specified")
 			}
 
 			// 3-way 排他チェック: status / statuses / contract-status は相互排他。
@@ -71,7 +70,6 @@ func NewFindProjectCmd() *cobra.Command {
 				ID:             id,
 				ClientID:       clientID,
 				Name:           name,
-				Text:           text,
 				Status:         status,
 				Statuses:       statuses,
 				ContractStatus: contractStatus,
@@ -89,7 +87,6 @@ func NewFindProjectCmd() *cobra.Command {
 	cmd.Flags().IntVar(&id, "id", 0, "Project ID (direct lookup, highest priority)")
 	cmd.Flags().StringVar(&clientName, "client-name", "", "Client name to resolve projects for")
 	cmd.Flags().StringVar(&name, "name", "", "Project name substring search")
-	cmd.Flags().StringVar(&text, "text", "", "Free-text search across name, code, memo")
 	cmd.Flags().StringVar(&status, "status", "", "Filter by project status. Mutually exclusive with --statuses / --contract-status.")
 	cmd.Flags().StringSliceVar(&statuses, "statuses", nil, "Filter by multiple project statuses (OR). Mutually exclusive with --status / --contract-status. Same narrowing rules apply. Max 10 items.")
 	cmd.Flags().StringVar(&contractStatus, "contract-status", "", "Contract status alias (active/ended/prospect/all). Mutually exclusive with --status / --statuses. Same narrowing rules apply.")

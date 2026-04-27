@@ -77,68 +77,7 @@ func TestService_FindVendor_ByName_DelegatesNameCont(t *testing.T) {
 	if capturedOpts.NameCont != "Acme" {
 		t.Errorf("NameCont not set: %+v", capturedOpts)
 	}
-}
-
-// N04-T13: FindVendor by Text — in-process フィルタ（Name マッチ）
-func TestService_FindVendor_ByText_FiltersInProcess(t *testing.T) {
-	vendors := &stubVendorRepo{
-		searchResult: []boardapi.VendorEntity{
-			{ID: 1, Name: "Acme Vendor"},
-			{ID: 2, Name: "BetaSupply"},
-		},
-	}
-	svc := newVendorTestService(vendors, &stubVendorBranchRepo{}, &stubVendorContactRepo{})
-
-	results, err := svc.FindVendor(testCtx, FindVendorQuery{Text: "acme"})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(results) != 1 {
-		t.Errorf("expected 1 result, got %d", len(results))
-	}
-	if results[0].Vendor.Name != "Acme Vendor" {
-		t.Errorf("wrong vendor: %s", results[0].Vendor.Name)
-	}
-}
-
-// N04-T14: FindVendor by Text — Code マッチ（非ポインタ string）
-func TestService_FindVendor_ByText_MatchesCode(t *testing.T) {
-	vendors := &stubVendorRepo{
-		searchResult: []boardapi.VendorEntity{
-			{ID: 1, Name: "SomeCo", Code: "V-001"},
-			{ID: 2, Name: "OtherCo", Code: "V-999"},
-		},
-	}
-	svc := newVendorTestService(vendors, &stubVendorBranchRepo{}, &stubVendorContactRepo{})
-
-	results, err := svc.FindVendor(testCtx, FindVendorQuery{Text: "V-001"})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(results) != 1 {
-		t.Errorf("expected 1 result, got %d", len(results))
-	}
-}
-
-// N04-T15: FindVendor by Text — Memo マッチ（非ポインタ string）
-func TestService_FindVendor_ByText_MatchesMemo(t *testing.T) {
-	vendors := &stubVendorRepo{
-		searchResult: []boardapi.VendorEntity{
-			{ID: 1, Name: "SomeCo", Memo: "important supplier"},
-			{ID: 2, Name: "OtherCo", Memo: ""},
-		},
-	}
-	svc := newVendorTestService(vendors, &stubVendorBranchRepo{}, &stubVendorContactRepo{})
-
-	results, err := svc.FindVendor(testCtx, FindVendorQuery{Text: "important"})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(results) != 1 {
-		t.Errorf("expected 1 result, got %d", len(results))
-	}
-}
-
+} // N04-T15: FindVendor by Text — Memo マッチ（非ポインタ string）
 // N04-T16: FindVendor — ID が優先され、Name が設定されていても Search は呼ばれない
 func TestService_FindVendor_PriorityIDOverridesName(t *testing.T) {
 	vendors := &stubVendorRepo{
@@ -177,7 +116,7 @@ func TestService_FindVendor_LimitTwo_StopsEnrichment(t *testing.T) {
 	svc := newVendorTestService(vendors, branches, &stubVendorContactRepo{})
 
 	results, err := svc.FindVendor(testCtx, FindVendorQuery{
-		Text:           "x",
+		Name:           "x",
 		FindCommonOpts: FindCommonOpts{Limit: 2},
 	})
 	if err != nil {
@@ -203,7 +142,7 @@ func TestService_FindVendor_LimitZero_NoLimit(t *testing.T) {
 	svc := newVendorTestService(vendors, &stubVendorBranchRepo{}, &stubVendorContactRepo{})
 
 	results, err := svc.FindVendor(testCtx, FindVendorQuery{
-		Text:           "x",
+		Name:           "x",
 		FindCommonOpts: FindCommonOpts{Limit: 0},
 	})
 	if err != nil {

@@ -238,18 +238,6 @@ func TestService_FindOrder_LimitNegative_Error(t *testing.T) {
 	}
 }
 
-func TestService_FindOrder_TextOnly_ReturnsEmpty(t *testing.T) {
-	or := &stubOrderRepo{}
-	pr := &stubProjectRepo{}
-	cr := &stubClientRepo{}
-	svc := newOrderTestService(or, pr, cr)
-	results, err := svc.FindOrder(testCtx, FindOrderQuery{Text: "abc"})
-	assertNoError(t, err)
-	if len(results) != 0 {
-		t.Errorf("expected 0, got %d", len(results))
-	}
-}
-
 func TestService_FindOrder_PriorityIDOverridesProjectID(t *testing.T) {
 	or := &stubOrderRepo{getByDocIDResult: &boardapi.OrderEntity{ID: 200}}
 	pr := &stubProjectRepo{searchResult: []boardapi.ProjectEntity{}}

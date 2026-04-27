@@ -133,23 +133,6 @@ func TestService_FindPayment_ByStatus_Only_AllowedAndDelegated(t *testing.T) {
 	}
 }
 
-// M05: ByText — Memo マッチ（Title 無し）
-func TestService_FindPayment_ByText_MatchesMemo(t *testing.T) {
-	payments := &stubPaymentRepo{
-		searchResult: []boardapi.PaymentEntity{
-			{ID: 1, Memo: "urgent payment"},
-			{ID: 2, Memo: "regular"},
-		},
-	}
-	svc := newPaymentTestService(payments, &stubVendorRepo{})
-
-	results, err := svc.FindPayment(testCtx, FindPaymentQuery{Text: "urgent"})
-	assertNoError(t, err)
-	if len(results) != 1 {
-		t.Errorf("expected 1 result, got %d", len(results))
-	}
-}
-
 // M06: ByStatuses + VendorID — post-filter
 func TestService_FindPayment_ByStatuses_PostFilters(t *testing.T) {
 	payments := &stubPaymentRepo{
@@ -222,28 +205,6 @@ func TestService_FindPayment_StatusesOnly_RejectedByValidate(t *testing.T) {
 	}
 	if payments.searchCount != 0 {
 		t.Errorf("Search should not be called on validation error, got %d", payments.searchCount)
-	}
-}
-
-// M06b: ByText + Statuses — Text マッチしたサブセットに Statuses post-filter
-func TestService_FindPayment_ByTextAndStatuses_PostFiltersTextMatched(t *testing.T) {
-	payments := &stubPaymentRepo{
-		searchResult: []boardapi.PaymentEntity{
-			{ID: 1, Memo: "urgent A", Status: "paid"},
-			{ID: 2, Memo: "urgent B", Status: "pending"},
-			{ID: 3, Memo: "urgent C", Status: "failed"},
-			{ID: 4, Memo: "regular", Status: "paid"},
-		},
-	}
-	svc := newPaymentTestService(payments, &stubVendorRepo{})
-
-	results, err := svc.FindPayment(testCtx, FindPaymentQuery{
-		Text:     "urgent",
-		Statuses: []string{"paid", "failed"},
-	})
-	assertNoError(t, err)
-	if len(results) != 2 {
-		t.Fatalf("expected 2 results (Text=urgent ∩ Statuses={paid,failed}), got %d", len(results))
 	}
 }
 

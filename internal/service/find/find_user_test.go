@@ -53,77 +53,7 @@ func TestService_FindUser_ByName_DelegatesNameCont(t *testing.T) {
 	if captured.NameCont != "Ali" {
 		t.Errorf("NameCont=%q, want 'Ali'", captured.NameCont)
 	}
-}
-
-// U03: ByText — Name マッチ
-func TestService_FindUser_ByText_MatchesName(t *testing.T) {
-	users := &stubUserRepo{
-		searchResult: []boardapi.UserEntity{
-			{ID: 1, Name: "Alice"},
-			{ID: 2, Name: "Bob"},
-		},
-	}
-	svc := newUserTestService(users)
-
-	results, err := svc.FindUser(testCtx, FindUserQuery{Text: "alice"})
-	assertNoError(t, err)
-	if len(results) != 1 {
-		t.Errorf("expected 1 result, got %d", len(results))
-	}
-}
-
-// U04: ByText — LastName マッチ
-func TestService_FindUser_ByText_MatchesLastName(t *testing.T) {
-	users := &stubUserRepo{
-		searchResult: []boardapi.UserEntity{
-			{ID: 1, LastName: "Tanaka"},
-			{ID: 2, LastName: "Suzuki"},
-		},
-	}
-	svc := newUserTestService(users)
-
-	results, err := svc.FindUser(testCtx, FindUserQuery{Text: "tanaka"})
-	assertNoError(t, err)
-	if len(results) != 1 {
-		t.Errorf("expected 1 result, got %d", len(results))
-	}
-}
-
-// U05: ByText — FirstName マッチ
-func TestService_FindUser_ByText_MatchesFirstName(t *testing.T) {
-	users := &stubUserRepo{
-		searchResult: []boardapi.UserEntity{
-			{ID: 1, FirstName: "Taro"},
-			{ID: 2, FirstName: "Jiro"},
-		},
-	}
-	svc := newUserTestService(users)
-
-	results, err := svc.FindUser(testCtx, FindUserQuery{Text: "taro"})
-	assertNoError(t, err)
-	if len(results) != 1 {
-		t.Errorf("expected 1 result, got %d", len(results))
-	}
-}
-
-// U06: ByText — Email マッチ
-func TestService_FindUser_ByText_MatchesEmail(t *testing.T) {
-	users := &stubUserRepo{
-		searchResult: []boardapi.UserEntity{
-			{ID: 1, Email: "alice@example.com"},
-			{ID: 2, Email: "bob@example.com"},
-		},
-	}
-	svc := newUserTestService(users)
-
-	results, err := svc.FindUser(testCtx, FindUserQuery{Text: "alice@"})
-	assertNoError(t, err)
-	if len(results) != 1 {
-		t.Errorf("expected 1 result, got %d", len(results))
-	}
-}
-
-// U07: Limit=2 — 3 件中 2 件で打ち切り
+} // U05: ByText — FirstName マッチ// U07: Limit=2 — 3 件中 2 件で打ち切り
 func TestService_FindUser_LimitTwo_StopsLoop(t *testing.T) {
 	users := &stubUserRepo{
 		searchResult: []boardapi.UserEntity{
@@ -135,7 +65,7 @@ func TestService_FindUser_LimitTwo_StopsLoop(t *testing.T) {
 	svc := newUserTestService(users)
 
 	results, err := svc.FindUser(testCtx, FindUserQuery{
-		Text:           "user",
+		Name:           "user",
 		FindCommonOpts: FindCommonOpts{Limit: 2},
 	})
 	assertNoError(t, err)

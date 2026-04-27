@@ -8,11 +8,9 @@ import (
 
 // FindVendor は仕入先を検索し、enrichment 済みの結果を返す。
 //
-// 検索優先順位: ID > Name > Text（排他、上位が設定されていれば下位は使用しない）。
+// 検索優先順位: ID > Name（ID 指定時は Name を無視、直接 lookup）。
 // Limit > 0 の場合、enrichment 後の件数が Limit に達したらループを打ち切る。
 // enrichment（branches / contacts 取得）の失敗は non-fatal（resolveVendorDetails 参照）。
-//
-// Text マッチ対象: Vendor.Name、Vendor.Code、Vendor.Memo（非ポインタ string）。
 func (s *Service) FindVendor(ctx context.Context, q FindVendorQuery) ([]VendorResult, error) {
 	// 規約: 全 Find メソッドは validateQuery(q.FindCommonOpts, q) を最初に呼ぶ。
 	// q.validate() 単体では FindCommonOpts.validate が走らないため。
@@ -35,17 +33,6 @@ func (s *Service) FindVendor(ctx context.Context, q FindVendorQuery) ([]VendorRe
 			return nil, err
 		}
 		vendors = list
-	case q.Text != "":
-		all, err := s.vendors.Search(ctx, boardapi.VendorListOptions{}, opts)
-		if err != nil {
-			return nil, err
-		}
-		for _, v := range all {
-			// VendorEntity.Code / Memo は非ポインタ string のため derefString 不要
-			if containsText(q.Text, v.Name, v.Code, v.Memo) {
-				vendors = append(vendors, v)
-			}
-		}
 	}
 
 	results := make([]VendorResult, 0, len(vendors))

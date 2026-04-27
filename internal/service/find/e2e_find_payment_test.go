@@ -15,35 +15,6 @@ import (
 	"github.com/youyo/board/internal/service/find"
 )
 
-// T37: ID/Search lookup
-func TestE2E_FindPayment_Search_Smoke(t *testing.T) {
-	svc := newE2EService(t)
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	rs, err := svc.FindPayment(ctx, find.FindPaymentQuery{
-		FindCommonOpts: find.FindCommonOpts{Limit: 5},
-		Text:           "株",
-	})
-	if skipIfRateLimit(t, err) {
-		return
-	}
-	if err != nil {
-		t.Fatalf("FindPayment: %v", err)
-	}
-	if len(rs) == 0 {
-		t.Skipf("[SKIP:no-data] payments not present (E2E dump 0 件確認済、D1 維持)")
-	}
-
-	// Payment.Project = nil 仮説 (D1) の検証
-	for i, r := range rs {
-		if r.Project != nil {
-			t.Errorf("D1 violation at [%d]: Payment.Project should be nil, got=%+v", i, r.Project)
-		}
-	}
-	t.Logf("payments count=%d, all Project==nil verified (D1)", len(rs))
-}
-
 // T38: VendorID lookup
 func TestE2E_FindPayment_ByVendorID(t *testing.T) {
 	svc := newE2EService(t)

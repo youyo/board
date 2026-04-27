@@ -15,15 +15,14 @@ func NewFindVendorCmd() *cobra.Command {
 	var (
 		id   int
 		name string
-		text string
 	)
 
 	cmd := &cobra.Command{
 		Use:   "vendor",
 		Short: "Search vendors with branches and contacts",
-		Long:  "Search for vendors by ID, name, or free text. Returns vendors with their associated branches and contacts.",
+		Long:  "Search for vendors by ID, name. Returns vendors with their associated branches and contacts.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if id == 0 && name == "" && text == "" {
+			if id == 0 && name == "" {
 				return fmt.Errorf("at least one of --id, --name, or --text must be specified")
 			}
 
@@ -43,7 +42,6 @@ func NewFindVendorCmd() *cobra.Command {
 				},
 				ID:   id,
 				Name: name,
-				Text: text,
 			}
 
 			results, err := svc.FindVendor(cmd.Context(), q)
@@ -57,7 +55,6 @@ func NewFindVendorCmd() *cobra.Command {
 
 	cmd.Flags().IntVar(&id, "id", 0, "Vendor ID (direct lookup, highest priority)")
 	cmd.Flags().StringVar(&name, "name", "", "Vendor name substring search")
-	cmd.Flags().StringVar(&text, "text", "", "Free-text search across name, code, memo")
 
 	return cmd
 }

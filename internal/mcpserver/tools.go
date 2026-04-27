@@ -141,10 +141,9 @@ func errorResult(err error) *mcp.CallToolResult {
 func findClientsTool(srv *Server) server.ServerTool {
 	return server.ServerTool{
 		Tool: mcp.NewTool("find_clients",
-			mcp.WithDescription("Search BOARD clients by ID, name, or free text. Returns client entities with branches and contacts. Priority: id > name > text."),
+			mcp.WithDescription("Search BOARD clients by ID or name. Returns client entities with branches and contacts. Priority: id > name."),
 			mcp.WithNumber("id", mcp.Description("Client ID for direct lookup (highest priority; ignores name/text).")),
 			mcp.WithString("name", mcp.Description("Substring match on client name (ignores text).")),
-			mcp.WithString("text", mcp.Description("Free-text search across name, code, memo (lowest priority).")),
 			mcp.WithNumber("limit", mcp.Description(limitDesc())),
 			readOnlyAnnotation(),
 		),
@@ -153,7 +152,6 @@ func findClientsTool(srv *Server) server.ServerTool {
 				FindCommonOpts: find.FindCommonOpts{Limit: getIntArg(req, "limit")},
 				ID:             getIntArg(req, "id"),
 				Name:           getStringArg(req, "name"),
-				Text:           getStringArg(req, "text"),
 			})
 			if err != nil {
 				return errorResult(err), nil
@@ -166,10 +164,9 @@ func findClientsTool(srv *Server) server.ServerTool {
 func findVendorsTool(srv *Server) server.ServerTool {
 	return server.ServerTool{
 		Tool: mcp.NewTool("find_vendors",
-			mcp.WithDescription("Search BOARD vendors by ID, name, or free text. Returns vendor entities with branches and contacts. Priority: id > name > text."),
+			mcp.WithDescription("Search BOARD vendors by ID or name. Returns vendor entities with branches and contacts. Priority: id > name."),
 			mcp.WithNumber("id", mcp.Description("Vendor ID for direct lookup (highest priority; ignores name/text).")),
 			mcp.WithString("name", mcp.Description("Substring match on vendor name (ignores text).")),
-			mcp.WithString("text", mcp.Description("Free-text search across name, code, memo (lowest priority).")),
 			mcp.WithNumber("limit", mcp.Description(limitDesc())),
 			readOnlyAnnotation(),
 		),
@@ -178,7 +175,6 @@ func findVendorsTool(srv *Server) server.ServerTool {
 				FindCommonOpts: find.FindCommonOpts{Limit: getIntArg(req, "limit")},
 				ID:             getIntArg(req, "id"),
 				Name:           getStringArg(req, "name"),
-				Text:           getStringArg(req, "text"),
 			})
 			if err != nil {
 				return errorResult(err), nil
@@ -191,10 +187,9 @@ func findVendorsTool(srv *Server) server.ServerTool {
 func findUsersTool(srv *Server) server.ServerTool {
 	return server.ServerTool{
 		Tool: mcp.NewTool("find_users",
-			mcp.WithDescription("Search BOARD users by ID, name, or free text. Returns user entities. Priority: id > name > text."),
+			mcp.WithDescription("Search BOARD users by ID or name. Returns user entities. Priority: id > name."),
 			mcp.WithNumber("id", mcp.Description("User ID for direct lookup (highest priority; ignores name/text).")),
 			mcp.WithString("name", mcp.Description("Substring match on user name (ignores text).")),
-			mcp.WithString("text", mcp.Description("Free-text search across name, email (lowest priority).")),
 			mcp.WithNumber("limit", mcp.Description(limitDesc())),
 			readOnlyAnnotation(),
 		),
@@ -203,7 +198,6 @@ func findUsersTool(srv *Server) server.ServerTool {
 				FindCommonOpts: find.FindCommonOpts{Limit: getIntArg(req, "limit")},
 				ID:             getIntArg(req, "id"),
 				Name:           getStringArg(req, "name"),
-				Text:           getStringArg(req, "text"),
 			})
 			if err != nil {
 				return errorResult(err), nil
@@ -220,7 +214,6 @@ func findProjectsTool(srv *Server) server.ServerTool {
 			mcp.WithNumber("id", mcp.Description("Project ID for direct lookup (highest priority; ignores other filters).")),
 			mcp.WithString("client_name", mcp.Description(disambiguateNameDesc("client", "project"))),
 			mcp.WithString("name", mcp.Description("Substring match on project name.")),
-			mcp.WithString("text", mcp.Description("Free-text search across name, code, memo (lowest priority).")),
 			mcp.WithString("status", mcp.Description("Filter by project status (e.g. 受注, 完了). MUST be combined with id/client_name/name/text — status-only query is rejected (API delegation not possible, narrowing required per N05). Mutually exclusive with statuses / contract_status.")),
 			mcp.WithArray("statuses", mcp.WithStringItems(), mcp.Description("Filter by multiple project statuses (OR). Mutually exclusive with status / contract_status. Same narrowing rules apply. Max 10 items.")),
 			mcp.WithString("contract_status", mcp.Description("Contract status alias. Valid values: active (in-progress: 未着手/着手中/納品済), ended (検収済), prospect (見積中*), all. Mutually exclusive with status / statuses. Same narrowing rules apply. See docs/usage/maintenance-contract-search.md.")),
@@ -242,7 +235,6 @@ func findProjectsTool(srv *Server) server.ServerTool {
 				ID:             getIntArg(req, "id"),
 				ClientID:       clientID,
 				Name:           getStringArg(req, "name"),
-				Text:           getStringArg(req, "text"),
 				Status:         getStringArg(req, "status"),
 				Statuses:       getStringArrayArg(req, "statuses"),
 				ContractStatus: getStringArg(req, "contract_status"),
@@ -293,7 +285,6 @@ func findInvoicesTool(srv *Server) server.ServerTool {
 			mcp.WithNumber("id", mcp.Description("Invoice ID for direct lookup (highest priority).")),
 			mcp.WithString("client_name", mcp.Description(disambiguateNameDesc("client", "invoice"))),
 			mcp.WithString("project_name", mcp.Description(notYetSupportedDesc("project name", "invoices"))),
-			mcp.WithString("text", mcp.Description("Free-text search across title, memo (lowest priority).")),
 			mcp.WithString("status", mcp.Description("Filter by invoice status (single value; API delegated, no narrowing required).")),
 			mcp.WithNumber("limit", mcp.Description(limitDesc())),
 			readOnlyAnnotation(),
@@ -315,7 +306,6 @@ func findInvoicesTool(srv *Server) server.ServerTool {
 				FindCommonOpts: find.FindCommonOpts{Limit: getIntArg(req, "limit")},
 				ID:             getIntArg(req, "id"),
 				ClientID:       clientID,
-				Text:           getStringArg(req, "text"),
 				Status:         getStringArg(req, "status"),
 			})
 			if err != nil {
@@ -423,7 +413,6 @@ func findPurchaseOrdersTool(srv *Server) server.ServerTool {
 			mcp.WithNumber("id", mcp.Description("Purchase order ID for direct lookup (highest priority).")),
 			mcp.WithString("vendor_name", mcp.Description(disambiguateNameDesc("vendor", "purchase order"))),
 			mcp.WithString("project_name", mcp.Description(notYetSupportedDesc("project name", "purchase orders"))),
-			mcp.WithString("text", mcp.Description("Free-text search across title, memo (lowest priority).")),
 			mcp.WithString("status", mcp.Description("Filter by purchase order status (single value; API delegated, no narrowing required).")),
 			mcp.WithNumber("limit", mcp.Description(limitDesc())),
 			readOnlyAnnotation(),
@@ -445,7 +434,6 @@ func findPurchaseOrdersTool(srv *Server) server.ServerTool {
 				FindCommonOpts: find.FindCommonOpts{Limit: getIntArg(req, "limit")},
 				ID:             getIntArg(req, "id"),
 				VendorID:       vendorID,
-				Text:           getStringArg(req, "text"),
 				Status:         getStringArg(req, "status"),
 			})
 			if err != nil {
@@ -463,7 +451,6 @@ func findPaymentsTool(srv *Server) server.ServerTool {
 			mcp.WithNumber("id", mcp.Description("Payment ID for direct lookup (highest priority).")),
 			mcp.WithString("vendor_name", mcp.Description(disambiguateNameDesc("vendor", "payment"))),
 			mcp.WithNumber("purchase_order_id", mcp.Description(notYetSupportedDesc("purchase order ID", "payments"))),
-			mcp.WithString("text", mcp.Description("Free-text search across memo (lowest priority).")),
 			mcp.WithString("status", mcp.Description("Filter by payment status (single value; API delegated, no narrowing required).")),
 			mcp.WithNumber("limit", mcp.Description(limitDesc())),
 			readOnlyAnnotation(),
@@ -485,7 +472,6 @@ func findPaymentsTool(srv *Server) server.ServerTool {
 				FindCommonOpts: find.FindCommonOpts{Limit: getIntArg(req, "limit")},
 				ID:             getIntArg(req, "id"),
 				VendorID:       vendorID,
-				Text:           getStringArg(req, "text"),
 				Status:         getStringArg(req, "status"),
 			})
 			if err != nil {

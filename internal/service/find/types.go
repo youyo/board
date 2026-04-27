@@ -66,11 +66,10 @@ type FindClientQuery struct {
 	FindCommonOpts
 	ID   int
 	Name string
-	Text string
 }
 
 func (q FindClientQuery) validate() error {
-	if q.ID == 0 && q.Name == "" && q.Text == "" {
+	if q.ID == 0 && q.Name == "" {
 		return errors.New("at least one field required")
 	}
 	return nil
@@ -82,7 +81,6 @@ type FindProjectQuery struct {
 	ID             int
 	Name           string
 	ClientID       int
-	Text           string
 	Status         string
 	Statuses       []string
 	ContractStatus string // alias: active / ended / prospect / all
@@ -92,17 +90,16 @@ func (q FindProjectQuery) validate() error {
 	if err := validateStatusGroup(q.Status, q.Statuses, q.ContractStatus); err != nil {
 		return err
 	}
-	if q.ID == 0 && q.Name == "" && q.ClientID == 0 && q.Text == "" &&
+	if q.ID == 0 && q.Name == "" && q.ClientID == 0 &&
 		q.Status == "" && len(q.Statuses) == 0 && q.ContractStatus == "" {
 		return errors.New("at least one field required")
 	}
-	// advisor R3: Status/Statuses-only は API delegation 不可で全件取得を要するため reject。
-	// ContractStatus も同様に narrowing が必須。
-	// Status/Statuses/ContractStatus を使う場合は ID/Name/ClientID/Text のいずれかが必要。
-	hasNarrow := q.ID != 0 || q.Name != "" || q.ClientID != 0 || q.Text != ""
+	// Status/Statuses/ContractStatus を使う場合は ID/Name/ClientID のいずれかが必要。
+	// API delegation 不可で全件取得を要するため status-only クエリは reject。
+	hasNarrow := q.ID != 0 || q.Name != "" || q.ClientID != 0
 	hasStatus := q.Status != "" || len(q.Statuses) > 0 || q.ContractStatus != ""
 	if hasStatus && !hasNarrow {
-		return errors.New("Status/Statuses requires at least one of ID, Name, ClientID, or Text to narrow results")
+		return errors.New("Status/Statuses requires at least one of ID, Name, or ClientID to narrow results")
 	}
 	return nil
 }
@@ -116,12 +113,10 @@ type FindEstimateQuery struct {
 	ProjectID   int
 	ClientName  string
 	ProjectName string
-	Text        string
 }
 
 func (q FindEstimateQuery) validate() error {
-	if q.ID == 0 && q.ProjectID == 0 && q.ClientName == "" &&
-		q.ProjectName == "" && q.Text == "" {
+	if q.ID == 0 && q.ProjectID == 0 && q.ClientName == "" && q.ProjectName == "" {
 		return errors.New("at least one field required")
 	}
 	return nil
@@ -134,12 +129,10 @@ type FindOrderQuery struct {
 	ProjectID   int
 	ClientName  string
 	ProjectName string
-	Text        string
 }
 
 func (q FindOrderQuery) validate() error {
-	if q.ID == 0 && q.ProjectID == 0 && q.ClientName == "" &&
-		q.ProjectName == "" && q.Text == "" {
+	if q.ID == 0 && q.ProjectID == 0 && q.ClientName == "" && q.ProjectName == "" {
 		return errors.New("at least one field required")
 	}
 	return nil
@@ -152,12 +145,10 @@ type FindDeliveryQuery struct {
 	ProjectID   int
 	ClientName  string
 	ProjectName string
-	Text        string
 }
 
 func (q FindDeliveryQuery) validate() error {
-	if q.ID == 0 && q.ProjectID == 0 && q.ClientName == "" &&
-		q.ProjectName == "" && q.Text == "" {
+	if q.ID == 0 && q.ProjectID == 0 && q.ClientName == "" && q.ProjectName == "" {
 		return errors.New("at least one field required")
 	}
 	return nil
@@ -170,12 +161,10 @@ type FindReceiptQuery struct {
 	ProjectID   int
 	ClientName  string
 	ProjectName string
-	Text        string
 }
 
 func (q FindReceiptQuery) validate() error {
-	if q.ID == 0 && q.ProjectID == 0 && q.ClientName == "" &&
-		q.ProjectName == "" && q.Text == "" {
+	if q.ID == 0 && q.ProjectID == 0 && q.ClientName == "" && q.ProjectName == "" {
 		return errors.New("at least one field required")
 	}
 	return nil
@@ -186,7 +175,6 @@ type FindInvoiceQuery struct {
 	FindCommonOpts
 	ID       int
 	ClientID int
-	Text     string
 	Status   string
 	Statuses []string
 }
@@ -195,16 +183,13 @@ func (q FindInvoiceQuery) validate() error {
 	if err := validateStatusGroup(q.Status, q.Statuses, ""); err != nil {
 		return err
 	}
-	if q.ID == 0 && q.ClientID == 0 && q.Text == "" &&
-		q.Status == "" && len(q.Statuses) == 0 {
+	if q.ID == 0 && q.ClientID == 0 && q.Status == "" && len(q.Statuses) == 0 {
 		return errors.New("at least one field required")
 	}
-	// N07a D2: Statuses (multi) only は API delegation 不可で full-scan を要するため reject。
-	// Status (single) は StatusEq で API delegation 可のため allow。
-	// Status は validateStatusGroup で Statuses と相互排他 → narrowing オプションとして列挙しない。
-	hasNarrow := q.ID != 0 || q.ClientID != 0 || q.Text != ""
+	// Statuses (multi) only は API delegation 不可で full-scan を要するため reject。
+	hasNarrow := q.ID != 0 || q.ClientID != 0
 	if len(q.Statuses) > 0 && !hasNarrow {
-		return errors.New("invalid query: Statuses requires one of ID, ClientID, or Text to narrow results")
+		return errors.New("invalid query: Statuses requires one of ID or ClientID to narrow results")
 	}
 	return nil
 }
@@ -214,11 +199,10 @@ type FindVendorQuery struct {
 	FindCommonOpts
 	ID   int
 	Name string
-	Text string
 }
 
 func (q FindVendorQuery) validate() error {
-	if q.ID == 0 && q.Name == "" && q.Text == "" {
+	if q.ID == 0 && q.Name == "" {
 		return errors.New("at least one field required")
 	}
 	return nil
@@ -229,7 +213,6 @@ type FindPurchaseOrderQuery struct {
 	FindCommonOpts
 	ID       int
 	VendorID int
-	Text     string
 	Status   string
 	Statuses []string
 }
@@ -238,16 +221,13 @@ func (q FindPurchaseOrderQuery) validate() error {
 	if err := validateStatusGroup(q.Status, q.Statuses, ""); err != nil {
 		return err
 	}
-	if q.ID == 0 && q.VendorID == 0 && q.Text == "" &&
-		q.Status == "" && len(q.Statuses) == 0 {
+	if q.ID == 0 && q.VendorID == 0 && q.Status == "" && len(q.Statuses) == 0 {
 		return errors.New("at least one field required")
 	}
-	// N07a D2: Statuses (multi) only は API delegation 不可で full-scan を要するため reject。
-	// Status (single) は StatusEq で API delegation 可のため allow。
-	// Status は validateStatusGroup で Statuses と相互排他 → narrowing オプションとして列挙しない。
-	hasNarrow := q.ID != 0 || q.VendorID != 0 || q.Text != ""
+	// Statuses (multi) only は API delegation 不可で full-scan を要するため reject。
+	hasNarrow := q.ID != 0 || q.VendorID != 0
 	if len(q.Statuses) > 0 && !hasNarrow {
-		return errors.New("invalid query: Statuses requires one of ID, VendorID, or Text to narrow results")
+		return errors.New("invalid query: Statuses requires one of ID or VendorID to narrow results")
 	}
 	return nil
 }
@@ -257,7 +237,6 @@ type FindPaymentQuery struct {
 	FindCommonOpts
 	ID       int
 	VendorID int
-	Text     string
 	Status   string
 	Statuses []string
 }
@@ -266,16 +245,13 @@ func (q FindPaymentQuery) validate() error {
 	if err := validateStatusGroup(q.Status, q.Statuses, ""); err != nil {
 		return err
 	}
-	if q.ID == 0 && q.VendorID == 0 && q.Text == "" &&
-		q.Status == "" && len(q.Statuses) == 0 {
+	if q.ID == 0 && q.VendorID == 0 && q.Status == "" && len(q.Statuses) == 0 {
 		return errors.New("at least one field required")
 	}
-	// N07a D2: Statuses (multi) only は API delegation 不可で full-scan を要するため reject。
-	// Status (single) は StatusEq で API delegation 可のため allow。
-	// Status は validateStatusGroup で Statuses と相互排他 → narrowing オプションとして列挙しない。
-	hasNarrow := q.ID != 0 || q.VendorID != 0 || q.Text != ""
+	// Statuses (multi) only は API delegation 不可で full-scan を要するため reject。
+	hasNarrow := q.ID != 0 || q.VendorID != 0
 	if len(q.Statuses) > 0 && !hasNarrow {
-		return errors.New("invalid query: Statuses requires one of ID, VendorID, or Text to narrow results")
+		return errors.New("invalid query: Statuses requires one of ID or VendorID to narrow results")
 	}
 	return nil
 }
@@ -285,11 +261,10 @@ type FindUserQuery struct {
 	FindCommonOpts
 	ID   int
 	Name string
-	Text string
 }
 
 func (q FindUserQuery) validate() error {
-	if q.ID == 0 && q.Name == "" && q.Text == "" {
+	if q.ID == 0 && q.Name == "" {
 		return errors.New("at least one field required")
 	}
 	return nil

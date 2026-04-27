@@ -33,7 +33,7 @@ func TestNewFindClientCmd(t *testing.T) {
 		t.Errorf("Use = %q, want %q", cmd.Use, "client")
 	}
 
-	for _, flagName := range []string{"id", "name", "text"} {
+	for _, flagName := range []string{"id", "name"} {
 		if f := cmd.Flags().Lookup(flagName); f == nil {
 			t.Errorf("--%s flag not defined", flagName)
 		}
@@ -46,7 +46,7 @@ func TestNewFindProjectCmd(t *testing.T) {
 		t.Errorf("Use = %q, want %q", cmd.Use, "project")
 	}
 
-	for _, flagName := range []string{"id", "client-name", "name", "text", "status"} {
+	for _, flagName := range []string{"id", "client-name", "name", "status"} {
 		if f := cmd.Flags().Lookup(flagName); f == nil {
 			t.Errorf("--%s flag not defined", flagName)
 		}
@@ -123,7 +123,7 @@ func TestNewFindInvoiceCmd(t *testing.T) {
 		t.Errorf("Use = %q, want %q", cmd.Use, "invoice")
 	}
 
-	for _, flagName := range []string{"id", "client-name", "project-name", "text", "status"} {
+	for _, flagName := range []string{"id", "client-name", "project-name", "status"} {
 		if f := cmd.Flags().Lookup(flagName); f == nil {
 			t.Errorf("--%s flag not defined", flagName)
 		}
@@ -223,7 +223,7 @@ func TestNewFindVendorCmd(t *testing.T) {
 		t.Errorf("Use = %q, want %q", cmd.Use, "vendor")
 	}
 
-	for _, flagName := range []string{"id", "name", "text"} {
+	for _, flagName := range []string{"id", "name"} {
 		if f := cmd.Flags().Lookup(flagName); f == nil {
 			t.Errorf("--%s flag not defined", flagName)
 		}
@@ -248,7 +248,7 @@ func TestNewFindPurchaseOrderCmd(t *testing.T) {
 		t.Errorf("Use = %q, want %q", cmd.Use, "purchase-order")
 	}
 
-	for _, flagName := range []string{"id", "vendor-name", "project-name", "text", "status"} {
+	for _, flagName := range []string{"id", "vendor-name", "project-name", "status"} {
 		if f := cmd.Flags().Lookup(flagName); f == nil {
 			t.Errorf("--%s flag not defined", flagName)
 		}
@@ -273,7 +273,7 @@ func TestNewFindPaymentCmd(t *testing.T) {
 		t.Errorf("Use = %q, want %q", cmd.Use, "payment")
 	}
 
-	for _, flagName := range []string{"id", "vendor-name", "purchase-order-id", "text", "status"} {
+	for _, flagName := range []string{"id", "vendor-name", "purchase-order-id", "status"} {
 		if f := cmd.Flags().Lookup(flagName); f == nil {
 			t.Errorf("--%s flag not defined", flagName)
 		}
@@ -298,7 +298,7 @@ func TestNewFindUserCmd(t *testing.T) {
 		t.Errorf("Use = %q, want %q", cmd.Use, "user")
 	}
 
-	for _, flagName := range []string{"id", "name", "text"} {
+	for _, flagName := range []string{"id", "name"} {
 		if f := cmd.Flags().Lookup(flagName); f == nil {
 			t.Errorf("--%s flag not defined", flagName)
 		}

@@ -16,17 +16,16 @@ func NewFindInvoiceCmd() *cobra.Command {
 		id          int
 		clientName  string
 		projectName string
-		text        string
 		status      string
 	)
 
 	cmd := &cobra.Command{
 		Use:   "invoice",
 		Short: "Search invoices with client/project resolution",
-		Long:  "Search for invoices by ID, client name, project name, free text, or status. Returns invoices with their associated client and project.",
+		Long:  "Search for invoices by ID, client name, project name or status. Returns invoices with their associated client and project.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if id == 0 && clientName == "" && projectName == "" && text == "" && status == "" {
-				return fmt.Errorf("at least one of --id, --client-name, --project-name, --text, or --status must be specified")
+			if id == 0 && clientName == "" && projectName == "" && status == "" {
+				return fmt.Errorf("at least one of --id, --client-name, --project-name, or --status must be specified")
 			}
 			if projectName != "" {
 				return fmt.Errorf("--project-name is not yet supported for invoices (tracked for future enhancement)")
@@ -55,7 +54,6 @@ func NewFindInvoiceCmd() *cobra.Command {
 				},
 				ID:       id,
 				ClientID: clientID,
-				Text:     text,
 				Status:   status,
 			}
 
@@ -71,7 +69,6 @@ func NewFindInvoiceCmd() *cobra.Command {
 	cmd.Flags().IntVar(&id, "id", 0, "Invoice ID (direct lookup, highest priority)")
 	cmd.Flags().StringVar(&clientName, "client-name", "", "Client name to resolve invoices for")
 	cmd.Flags().StringVar(&projectName, "project-name", "", "Project name to resolve invoices for")
-	cmd.Flags().StringVar(&text, "text", "", "Free-text search across title, memo")
 	cmd.Flags().StringVar(&status, "status", "", "Filter by invoice status")
 
 	return cmd

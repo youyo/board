@@ -162,46 +162,7 @@ func TestService_FindInvoice_ByStatus_Only_AllowedAndDelegated(t *testing.T) {
 	if captured.ClientIDEq != 0 {
 		t.Errorf("ClientIDEq should be 0, got %d", captured.ClientIDEq)
 	}
-}
-
-// I07: ByText — Title マッチ
-func TestService_FindInvoice_ByText_MatchesTitle(t *testing.T) {
-	invoices := &stubInvoiceRepo{
-		searchResult: []boardapi.InvoiceEntity{
-			{ID: 1, Title: "Acme Invoice"},
-			{ID: 2, Title: "Beta Receipt"},
-		},
-	}
-	svc := newInvoiceTestService(invoices, &stubClientRepo{}, &stubProjectRepo{})
-
-	results, err := svc.FindInvoice(testCtx, FindInvoiceQuery{Text: "acme"})
-	assertNoError(t, err)
-	if len(results) != 1 {
-		t.Errorf("expected 1 result, got %d", len(results))
-	}
-	if results[0].Invoice.Title != "Acme Invoice" {
-		t.Errorf("wrong invoice: %+v", results[0].Invoice)
-	}
-}
-
-// I08: ByText — Memo マッチ
-func TestService_FindInvoice_ByText_MatchesMemo(t *testing.T) {
-	invoices := &stubInvoiceRepo{
-		searchResult: []boardapi.InvoiceEntity{
-			{ID: 1, Title: "x", Memo: "important payment"},
-			{ID: 2, Title: "y", Memo: "other"},
-		},
-	}
-	svc := newInvoiceTestService(invoices, &stubClientRepo{}, &stubProjectRepo{})
-
-	results, err := svc.FindInvoice(testCtx, FindInvoiceQuery{Text: "important"})
-	assertNoError(t, err)
-	if len(results) != 1 {
-		t.Errorf("expected 1 result, got %d", len(results))
-	}
-}
-
-// I09: ByStatuses (multi) + ClientID — post-filter で 2/3 残る
+} // I09: ByStatuses (multi) + ClientID — post-filter で 2/3 残る
 func TestService_FindInvoice_ByStatuses_PostFilters(t *testing.T) {
 	invoices := &stubInvoiceRepo{
 		searchResult: []boardapi.InvoiceEntity{
@@ -292,38 +253,7 @@ func TestService_FindInvoice_GetByIDError_Bubbles(t *testing.T) {
 	}
 }
 
-// I13b: ByText + Statuses — Text branch で Title マッチした 3 件のうち
-// Statuses post-filter で 2 件残る（advisor 指摘の Text+Statuses コンボ穴埋め）
-func TestService_FindInvoice_ByTextAndStatuses_PostFiltersTextMatched(t *testing.T) {
-	invoices := &stubInvoiceRepo{
-		searchResult: []boardapi.InvoiceEntity{
-			{ID: 1, Title: "Acme A", Status: "sent"},
-			{ID: 2, Title: "Acme B", Status: "draft"},
-			{ID: 3, Title: "Acme C", Status: "approved"},
-			{ID: 4, Title: "Beta", Status: "sent"}, // Text マッチしない
-		},
-	}
-	svc := newInvoiceTestService(invoices, &stubClientRepo{}, &stubProjectRepo{})
-
-	results, err := svc.FindInvoice(testCtx, FindInvoiceQuery{
-		Text:     "acme",
-		Statuses: []string{"sent", "approved"},
-	})
-	assertNoError(t, err)
-	if len(results) != 2 {
-		t.Fatalf("expected 2 results (Text=acme ∩ Statuses={sent,approved}), got %d", len(results))
-	}
-	for _, r := range results {
-		if r.Invoice.Status != "sent" && r.Invoice.Status != "approved" {
-			t.Errorf("unexpected status passed through filter: %q", r.Invoice.Status)
-		}
-		if !strings.Contains(strings.ToLower(r.Invoice.Title), "acme") {
-			t.Errorf("unexpected title passed through Text filter: %q", r.Invoice.Title)
-		}
-	}
-}
-
-// I14: PriorityIDOverridesClientID — ID が優先されると Search は呼ばれない
+// I13b: ByText + Statuses — Text branch で Title マッチした 3 件のうち// I14: PriorityIDOverridesClientID — ID が優先されると Search は呼ばれない
 func TestService_FindInvoice_Priority_IDOverridesClientID(t *testing.T) {
 	invoices := &stubInvoiceRepo{
 		getResult: &boardapi.InvoiceEntity{ID: 100},

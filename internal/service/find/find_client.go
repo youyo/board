@@ -8,7 +8,7 @@ import (
 
 // FindClient はクライアントを検索し、enrichment 済みの結果を返す。
 //
-// 検索優先順位: ID > Name > Text（排他、上位が設定されていれば下位は使用しない）。
+// 検索優先順位: ID > Name（ID 指定時は Name を無視、直接 lookup）。
 // Limit > 0 の場合、enrichment 後の件数が Limit に達したらループを打ち切る。
 // enrichment（branches / contacts 取得）の失敗は non-fatal（resolveClientDetails 参照）。
 func (s *Service) FindClient(ctx context.Context, q FindClientQuery) ([]ClientResult, error) {
@@ -33,16 +33,6 @@ func (s *Service) FindClient(ctx context.Context, q FindClientQuery) ([]ClientRe
 			return nil, err
 		}
 		clients = list
-	case q.Text != "":
-		all, err := s.clients.Search(ctx, boardapi.ClientListOptions{}, opts)
-		if err != nil {
-			return nil, err
-		}
-		for _, c := range all {
-			if containsText(q.Text, c.Name, derefString(c.CustomNo), derefString(c.Note)) {
-				clients = append(clients, c)
-			}
-		}
 	}
 
 	results := make([]ClientResult, 0, len(clients))

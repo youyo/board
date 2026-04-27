@@ -79,70 +79,7 @@ func TestService_FindClient_ByName_DelegatesNameCont(t *testing.T) {
 	if capturedOpts.NameCont != "Acme" {
 		t.Errorf("NameCont not set: %+v", capturedOpts)
 	}
-}
-
-// N04-T03: FindClient by Text — in-process フィルタ
-func TestService_FindClient_ByText_FiltersInProcess(t *testing.T) {
-	clients := &stubClientRepo{
-		searchResult: []boardapi.ClientEntity{
-			{ID: 1, Name: "Acme Corp"},
-			{ID: 2, Name: "BetaCo"},
-		},
-	}
-	svc := newClientTestService(clients, &stubClientBranchRepo{}, &stubContactRepo{})
-
-	results, err := svc.FindClient(testCtx, FindClientQuery{Text: "acme"})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(results) != 1 {
-		t.Errorf("expected 1 result, got %d", len(results))
-	}
-	if results[0].Client.Name != "Acme Corp" {
-		t.Errorf("wrong client: %s", results[0].Client.Name)
-	}
-}
-
-// N04-T04: FindClient by Text — CustomNo マッチ
-func TestService_FindClient_ByText_MatchesCustomNo(t *testing.T) {
-	customNo := "C-001"
-	clients := &stubClientRepo{
-		searchResult: []boardapi.ClientEntity{
-			{ID: 1, Name: "SomeCo", CustomNo: &customNo},
-			{ID: 2, Name: "OtherCo"},
-		},
-	}
-	svc := newClientTestService(clients, &stubClientBranchRepo{}, &stubContactRepo{})
-
-	results, err := svc.FindClient(testCtx, FindClientQuery{Text: "C-001"})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(results) != 1 {
-		t.Errorf("expected 1 result, got %d", len(results))
-	}
-}
-
-// N04-T05: FindClient by Text — Note マッチ
-func TestService_FindClient_ByText_MatchesNote(t *testing.T) {
-	note := "urgent customer"
-	clients := &stubClientRepo{
-		searchResult: []boardapi.ClientEntity{
-			{ID: 1, Name: "SomeCo", Note: &note},
-			{ID: 2, Name: "OtherCo"},
-		},
-	}
-	svc := newClientTestService(clients, &stubClientBranchRepo{}, &stubContactRepo{})
-
-	results, err := svc.FindClient(testCtx, FindClientQuery{Text: "urgent"})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(results) != 1 {
-		t.Errorf("expected 1 result, got %d", len(results))
-	}
-}
-
+} // N04-T05: FindClient by Text — Note マッチ
 // N04-T06: FindClient — ID が優先され、Name が設定されていても Search は呼ばれない
 func TestService_FindClient_PriorityIDOverridesName(t *testing.T) {
 	clients := &stubClientRepo{
@@ -181,7 +118,7 @@ func TestService_FindClient_LimitTwo_StopsEnrichment(t *testing.T) {
 	svc := newClientTestService(clients, branches, &stubContactRepo{})
 
 	results, err := svc.FindClient(testCtx, FindClientQuery{
-		Text:           "x",
+		Name:           "x",
 		FindCommonOpts: FindCommonOpts{Limit: 2},
 	})
 	if err != nil {
@@ -207,7 +144,7 @@ func TestService_FindClient_LimitZero_NoLimit(t *testing.T) {
 	svc := newClientTestService(clients, &stubClientBranchRepo{}, &stubContactRepo{})
 
 	results, err := svc.FindClient(testCtx, FindClientQuery{
-		Text:           "x",
+		Name:           "x",
 		FindCommonOpts: FindCommonOpts{Limit: 0},
 	})
 	if err != nil {

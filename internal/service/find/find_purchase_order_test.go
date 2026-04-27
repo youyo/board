@@ -161,43 +161,7 @@ func TestService_FindPurchaseOrder_ByStatus_Only_AllowedAndDelegated(t *testing.
 	if captured.VendorIDEq != 0 {
 		t.Errorf("VendorIDEq should be 0, got %d", captured.VendorIDEq)
 	}
-}
-
-// P07: ByText — Title マッチ
-func TestService_FindPurchaseOrder_ByText_MatchesTitle(t *testing.T) {
-	pos := &stubPurchaseOrderRepo{
-		searchResult: []boardapi.PurchaseOrderEntity{
-			{ID: 1, Title: "Acme PO"},
-			{ID: 2, Title: "Beta PO"},
-		},
-	}
-	svc := newPOTestService(pos, &stubVendorRepo{}, &stubProjectRepo{})
-
-	results, err := svc.FindPurchaseOrder(testCtx, FindPurchaseOrderQuery{Text: "acme"})
-	assertNoError(t, err)
-	if len(results) != 1 {
-		t.Errorf("expected 1 result, got %d", len(results))
-	}
-}
-
-// P08: ByText — Memo マッチ
-func TestService_FindPurchaseOrder_ByText_MatchesMemo(t *testing.T) {
-	pos := &stubPurchaseOrderRepo{
-		searchResult: []boardapi.PurchaseOrderEntity{
-			{ID: 1, Memo: "urgent procurement"},
-			{ID: 2, Memo: "normal"},
-		},
-	}
-	svc := newPOTestService(pos, &stubVendorRepo{}, &stubProjectRepo{})
-
-	results, err := svc.FindPurchaseOrder(testCtx, FindPurchaseOrderQuery{Text: "urgent"})
-	assertNoError(t, err)
-	if len(results) != 1 {
-		t.Errorf("expected 1 result, got %d", len(results))
-	}
-}
-
-// P09: ByStatuses (multi) + VendorID — post-filter
+} // P09: ByStatuses (multi) + VendorID — post-filter
 func TestService_FindPurchaseOrder_ByStatuses_PostFilters(t *testing.T) {
 	pos := &stubPurchaseOrderRepo{
 		searchResult: []boardapi.PurchaseOrderEntity{
@@ -269,28 +233,6 @@ func TestService_FindPurchaseOrder_StatusesOnly_RejectedByValidate(t *testing.T)
 	}
 	if pos.searchCount != 0 {
 		t.Errorf("Search should not be called on validation error, got %d", pos.searchCount)
-	}
-}
-
-// P09b: ByText + Statuses — Text マッチしたサブセットに Statuses post-filter
-func TestService_FindPurchaseOrder_ByTextAndStatuses_PostFiltersTextMatched(t *testing.T) {
-	pos := &stubPurchaseOrderRepo{
-		searchResult: []boardapi.PurchaseOrderEntity{
-			{ID: 1, Title: "Urgent A", Status: "sent"},
-			{ID: 2, Title: "Urgent B", Status: "draft"},
-			{ID: 3, Title: "Urgent C", Status: "approved"},
-			{ID: 4, Title: "Normal", Status: "sent"},
-		},
-	}
-	svc := newPOTestService(pos, &stubVendorRepo{}, &stubProjectRepo{})
-
-	results, err := svc.FindPurchaseOrder(testCtx, FindPurchaseOrderQuery{
-		Text:     "urgent",
-		Statuses: []string{"sent", "approved"},
-	})
-	assertNoError(t, err)
-	if len(results) != 2 {
-		t.Fatalf("expected 2 results (Text=urgent ∩ Statuses={sent,approved}), got %d", len(results))
 	}
 }
 

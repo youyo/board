@@ -281,18 +281,6 @@ func TestService_FindReceipt_LimitNegative_Error(t *testing.T) {
 	}
 }
 
-func TestService_FindReceipt_TextOnly_ReturnsEmpty(t *testing.T) {
-	rr := &stubReceiptRepo{}
-	pr := &stubProjectRepo{}
-	cr := &stubClientRepo{}
-	svc := newReceiptTestService(rr, pr, cr)
-	results, err := svc.FindReceipt(testCtx, FindReceiptQuery{Text: "abc"})
-	assertNoError(t, err)
-	if len(results) != 0 {
-		t.Errorf("got %d", len(results))
-	}
-}
-
 func TestService_FindReceipt_PriorityIDOverridesProjectID(t *testing.T) {
 	rr := &stubReceiptRepo{getByDocIDResult: &boardapi.ReceiptEntity{ID: 400}}
 	pr := &stubProjectRepo{searchResult: []boardapi.ProjectEntity{}}

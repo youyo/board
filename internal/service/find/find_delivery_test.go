@@ -303,18 +303,6 @@ func TestService_FindDelivery_LimitNegative_Error(t *testing.T) {
 	}
 }
 
-func TestService_FindDelivery_TextOnly_ReturnsEmpty(t *testing.T) {
-	dr := &stubDeliveryRepo{}
-	pr := &stubProjectRepo{}
-	cr := &stubClientRepo{}
-	svc := newDeliveryTestService(dr, pr, cr)
-	results, err := svc.FindDelivery(testCtx, FindDeliveryQuery{Text: "abc"})
-	assertNoError(t, err)
-	if len(results) != 0 {
-		t.Errorf("got %d", len(results))
-	}
-}
-
 func TestService_FindDelivery_PriorityIDOverridesProjectID(t *testing.T) {
 	dr := &stubDeliveryRepo{getByDocIDResult: &boardapi.DeliveryEntity{ID: 300}}
 	pr := &stubProjectRepo{searchResult: []boardapi.ProjectEntity{}}

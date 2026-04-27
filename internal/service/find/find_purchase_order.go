@@ -6,12 +6,12 @@ import (
 	"github.com/youyo/board/internal/boardapi"
 )
 
-// FindPurchaseOrder は ID / VendorID / Status / Text による発注書横断検索を行う。
-// 検索フィールド優先順位: ID > VendorID > Status > Text。
+// FindPurchaseOrder は ID / VendorID / Status による発注書横断検索を行う。
+// ID 指定時は他を無視し直接 lookup。それ以外は VendorID + Status を
+// API 側 (VendorIDEq + StatusEq) で AND 評価する。
 //
 // Status / Statuses の扱い:
 //   - Status (single) は StatusEq で API delegation 可（full-scan 不要）
-//   - VendorID branch / Text branch でも q.Status を Search filter に同梱して narrowing
 //   - Statuses (multi) は API 側 StatusIn[] が不在のため post-filter（filterByStatuses）
 //   - Statuses-only クエリは validate() で reject 済（N07a D2）
 //
@@ -19,7 +19,6 @@ import (
 //   - 主検索（purchaseOrders.GetByID / Search）失敗は fail-fast
 //   - resolveVendorAndProject の失敗は non-fatal（slog.Warn + nil でフィールド埋め）
 //
-// Text マッチ対象: Title, Memo（非ポインタ string、derefString 不要）。
 // ID 検索時は Status post-filter を skip（N05 踏襲、UX 配慮）。
 func (s *Service) FindPurchaseOrder(ctx context.Context, q FindPurchaseOrderQuery) ([]PurchaseOrderResult, error) {
 	if err := validateQuery(q.FindCommonOpts, q); err != nil {
@@ -42,15 +41,7 @@ func (s *Service) FindPurchaseOrder(ctx context.Context, q FindPurchaseOrderQuer
 		if err != nil {
 			return nil, err
 		}
-		if q.Text != "" {
-			for _, x := range list {
-				if containsText(q.Text, x.Title, x.Memo) {
-					pos = append(pos, x)
-				}
-			}
-		} else {
-			pos = list
-		}
+		pos = list
 	}
 
 	// post-filter: Statuses (multi) のみ。Status (single) は API delegation 済。

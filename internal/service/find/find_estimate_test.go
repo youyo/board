@@ -341,24 +341,6 @@ func TestService_FindEstimate_LimitNegative_Error(t *testing.T) {
 	}
 }
 
-// N06-V03-E: Text のみ → 0 件、error なし（N06 で Text 未対応）。
-func TestService_FindEstimate_TextOnly_ReturnsEmpty(t *testing.T) {
-	er := &stubEstimateRepo{}
-	pr := &stubProjectRepo{}
-	cr := &stubClientRepo{}
-	svc := newEstimateTestService(er, pr, cr)
-
-	results, err := svc.FindEstimate(testCtx, FindEstimateQuery{Text: "abc"})
-	assertNoError(t, err)
-	if len(results) != 0 {
-		t.Errorf("expected 0 results (Text not yet supported), got %d", len(results))
-	}
-	if er.getByDocIDCount != 0 || pr.searchCount != 0 || pr.getCount != 0 || pr.getWithGroupCount != 0 || cr.searchCount != 0 || cr.getCount != 0 {
-		t.Errorf("expected no upstream calls, got est=%d psearch=%d pget=%d pgwg=%d csearch=%d cget=%d",
-			er.getByDocIDCount, pr.searchCount, pr.getCount, pr.getWithGroupCount, cr.searchCount, cr.getCount)
-	}
-}
-
 // N06-V04-E: ID > ProjectID 優先順位。ID branch のみ走り、getWithGroupCount==0。
 func TestService_FindEstimate_PriorityIDOverridesProjectID(t *testing.T) {
 	er := &stubEstimateRepo{getByDocIDResult: &boardapi.EstimateEntity{ID: 100}}

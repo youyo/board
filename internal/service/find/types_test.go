@@ -148,15 +148,6 @@ func TestQueryValidate_ContractStatusWithID_OK(t *testing.T) {
 	assertNoError(t, q.validate())
 }
 
-// V-T08: ContractStatus + Text → nil error
-func TestQueryValidate_ContractStatusWithText_OK(t *testing.T) {
-	q := FindProjectQuery{
-		Text:           "保守",
-		ContractStatus: "active",
-	}
-	assertNoError(t, q.validate())
-}
-
 // V-T09: ContractStatus が " ACTIVE " (trim + case-insensitive) でも nil error
 func TestQueryValidate_ContractStatusTrimAndCase_OK(t *testing.T) {
 	q := FindProjectQuery{

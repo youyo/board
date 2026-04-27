@@ -15,28 +15,6 @@ import (
 	"github.com/youyo/board/internal/service/find"
 )
 
-// T33: ID lookup
-func TestE2E_FindPurchaseOrder_Search_Smoke(t *testing.T) {
-	svc := newE2EService(t)
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	rs, err := svc.FindPurchaseOrder(ctx, find.FindPurchaseOrderQuery{
-		FindCommonOpts: find.FindCommonOpts{Limit: 5},
-		Text:           "株",
-	})
-	if skipIfRateLimit(t, err) {
-		return
-	}
-	if err != nil {
-		t.Fatalf("FindPurchaseOrder: %v", err)
-	}
-	if len(rs) == 0 {
-		t.Skipf("[SKIP:no-data] purchase orders not present")
-	}
-	t.Logf("purchase orders count=%d", len(rs))
-}
-
 // T34: VendorName resolver (Service には VendorID 渡しなので resolver は MCP 経由 T46 で検証)
 func TestE2E_FindPurchaseOrder_ByVendorID(t *testing.T) {
 	svc := newE2EService(t)

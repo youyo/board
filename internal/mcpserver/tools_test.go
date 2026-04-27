@@ -65,9 +65,9 @@ func TestRegisterTools_InputSchemaProperties(t *testing.T) {
 
 	// Simple tools (clients, vendors, users, groups) should have: id, name, text, limit
 	simpleCases := map[string][]string{
-		"find_clients": {"id", "name", "text", "limit"},
-		"find_vendors": {"id", "name", "text", "limit"},
-		"find_users":   {"id", "name", "text", "limit"},
+		"find_clients": {"id", "name", "limit"},
+		"find_vendors": {"id", "name", "limit"},
+		"find_users":   {"id", "name", "limit"},
 	}
 	for toolName, expectedProps := range simpleCases {
 		tool, ok := tools[toolName]
@@ -84,7 +84,7 @@ func TestRegisterTools_InputSchemaProperties(t *testing.T) {
 	}
 
 	// Project tool should have: id, client_name, name, text, status, limit
-	projectProps := []string{"id", "client_name", "name", "text", "status", "limit"}
+	projectProps := []string{"id", "client_name", "name", "status", "limit"}
 	if tool, ok := tools["find_projects"]; ok {
 		for _, prop := range projectProps {
 			if _, exists := tool.Tool.InputSchema.Properties[prop]; !exists {
@@ -94,7 +94,7 @@ func TestRegisterTools_InputSchemaProperties(t *testing.T) {
 	}
 
 	// Invoice tool should have: id, client_name, project_name, text, status, limit
-	invoiceProps := []string{"id", "client_name", "project_name", "text", "status", "limit"}
+	invoiceProps := []string{"id", "client_name", "project_name", "status", "limit"}
 	for _, prop := range invoiceProps {
 		tool, ok := tools["find_invoices"]
 		if !ok {
@@ -128,7 +128,7 @@ func TestRegisterTools_InputSchemaProperties(t *testing.T) {
 	}
 
 	// Vendor-doc: find_purchase_orders
-	vendorDocProps := []string{"id", "vendor_name", "project_name", "text", "status", "limit"}
+	vendorDocProps := []string{"id", "vendor_name", "project_name", "status", "limit"}
 	if tool, ok := tools["find_purchase_orders"]; ok {
 		for _, prop := range vendorDocProps {
 			if _, exists := tool.Tool.InputSchema.Properties[prop]; !exists {
@@ -138,7 +138,7 @@ func TestRegisterTools_InputSchemaProperties(t *testing.T) {
 	}
 
 	// Payment: find_payments
-	paymentProps := []string{"id", "vendor_name", "purchase_order_id", "text", "status", "limit"}
+	paymentProps := []string{"id", "vendor_name", "purchase_order_id", "status", "limit"}
 	if tool, ok := tools["find_payments"]; ok {
 		for _, prop := range paymentProps {
 			if _, exists := tool.Tool.InputSchema.Properties[prop]; !exists {
@@ -449,7 +449,7 @@ func TestFindProjectsTool_ExistingPropertiesStillPresent(t *testing.T) {
 	if !ok {
 		t.Fatal("tool find_projects not found")
 	}
-	for _, prop := range []string{"id", "client_name", "name", "text", "status", "limit", "statuses", "contract_status"} {
+	for _, prop := range []string{"id", "client_name", "name", "status", "limit", "statuses", "contract_status"} {
 		if _, exists := tool.Tool.InputSchema.Properties[prop]; !exists {
 			t.Errorf("find_projects missing property %q", prop)
 		}

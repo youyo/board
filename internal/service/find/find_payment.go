@@ -7,12 +7,11 @@ import (
 	"github.com/youyo/board/internal/boardapi"
 )
 
-// FindPayment は ID / VendorID / Status / Text による支払検索を行う。
-// 検索フィールド優先順位: ID > VendorID > Status > Text。
+// FindPayment は ID / VendorID / Status による支払検索を行う。
+// ID 指定時は他を無視し直接 lookup。それ以外は VendorID + Status を AND 評価。
 //
 // Status / Statuses の扱い:
 //   - Status (single) は StatusEq で API delegation 可（full-scan 不要）
-//   - VendorID branch / Text branch でも q.Status を Search filter に同梱して narrowing
 //   - Statuses (multi) は API 側 StatusIn[] が不在のため post-filter（filterByStatuses）
 //   - Statuses-only クエリは validate() で reject 済（N07a D2）
 //
@@ -21,9 +20,6 @@ import (
 //   - E2E dump（payments_*.json = null）で実データ 0 件のため 3-hop 検証不可
 //   - PaymentResult.Project は常に nil（schema は維持、N09 E2E 再構築時に 3-hop 再検討）
 //   - Vendor のみ enrichment（vendors.GetByID 失敗は non-fatal、slog.Warn + Vendor=nil）
-//
-// Text マッチ対象: Memo のみ（PaymentEntity に Title 無し）。
-// ID 検索時は Status post-filter を skip（N05 踏襲、UX 配慮）。
 func (s *Service) FindPayment(ctx context.Context, q FindPaymentQuery) ([]PaymentResult, error) {
 	if err := validateQuery(q.FindCommonOpts, q); err != nil {
 		return nil, err
@@ -31,14 +27,13 @@ func (s *Service) FindPayment(ctx context.Context, q FindPaymentQuery) ([]Paymen
 	opts := repoOpts(q.FindCommonOpts)
 
 	var payments []boardapi.PaymentEntity
-	switch {
-	case q.ID != 0:
+	if q.ID != 0 {
 		p, err := s.payments.GetByID(ctx, q.ID, opts)
 		if err != nil {
 			return nil, err
 		}
 		payments = []boardapi.PaymentEntity{*p}
-	case q.VendorID != 0:
+	} else {
 		list, err := s.payments.Search(ctx, boardapi.PaymentListOptions{
 			VendorIDEq: q.VendorID,
 			StatusEq:   q.Status,
@@ -47,22 +42,6 @@ func (s *Service) FindPayment(ctx context.Context, q FindPaymentQuery) ([]Paymen
 			return nil, err
 		}
 		payments = list
-	case q.Status != "":
-		list, err := s.payments.Search(ctx, boardapi.PaymentListOptions{StatusEq: q.Status}, opts)
-		if err != nil {
-			return nil, err
-		}
-		payments = list
-	case q.Text != "":
-		all, err := s.payments.Search(ctx, boardapi.PaymentListOptions{StatusEq: q.Status}, opts)
-		if err != nil {
-			return nil, err
-		}
-		for _, x := range all {
-			if containsText(q.Text, x.Memo) {
-				payments = append(payments, x)
-			}
-		}
 	}
 
 	// post-filter: Statuses (multi) のみ。Status (single) は API delegation 済。

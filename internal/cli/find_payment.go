@@ -16,17 +16,16 @@ func NewFindPaymentCmd() *cobra.Command {
 		id              int
 		vendorName      string
 		purchaseOrderID int
-		text            string
 		status          string
 	)
 
 	cmd := &cobra.Command{
 		Use:   "payment",
 		Short: "Search payments with vendor resolution",
-		Long:  "Search for payments by ID, vendor name, purchase order ID, free text, or status. Returns payments with their associated vendor.",
+		Long:  "Search for payments by ID, vendor name, purchase order ID or status. Returns payments with their associated vendor.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if id == 0 && vendorName == "" && purchaseOrderID == 0 && text == "" && status == "" {
-				return fmt.Errorf("at least one of --id, --vendor-name, --purchase-order-id, --text, or --status must be specified")
+			if id == 0 && vendorName == "" && purchaseOrderID == 0 && status == "" {
+				return fmt.Errorf("at least one of --id, --vendor-name, --purchase-order-id, or --status must be specified")
 			}
 			if purchaseOrderID != 0 {
 				return fmt.Errorf("--purchase-order-id is not yet supported (tracked for future enhancement)")
@@ -55,7 +54,6 @@ func NewFindPaymentCmd() *cobra.Command {
 				},
 				ID:       id,
 				VendorID: vendorID,
-				Text:     text,
 				Status:   status,
 			}
 
@@ -71,7 +69,6 @@ func NewFindPaymentCmd() *cobra.Command {
 	cmd.Flags().IntVar(&id, "id", 0, "Payment ID (direct lookup, highest priority)")
 	cmd.Flags().StringVar(&vendorName, "vendor-name", "", "Vendor name to resolve payments for")
 	cmd.Flags().IntVar(&purchaseOrderID, "purchase-order-id", 0, "Purchase order ID to resolve payments for")
-	cmd.Flags().StringVar(&text, "text", "", "Free-text search across memo")
 	cmd.Flags().StringVar(&status, "status", "", "Filter by payment status")
 
 	return cmd
