@@ -23,11 +23,15 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/youyo/board/internal/app"
 )
+
+// e2eHandlerTimeout は callTool 単位の上限。fanout 暴発時の無限待ちを防ぐ。
+const e2eHandlerTimeout = 60 * time.Second
 
 func skipIfNoCreds(t *testing.T) {
 	t.Helper()
@@ -72,7 +76,9 @@ func callTool(t *testing.T, name string, args map[string]any) (*mcp.CallToolResu
 	}
 	tool := f(srv)
 	req := mcp.CallToolRequest{Params: mcp.CallToolParams{Arguments: args}}
-	return tool.Handler(context.Background(), req)
+	ctx, cancel := context.WithTimeout(context.Background(), e2eHandlerTimeout)
+	defer cancel()
+	return tool.Handler(ctx, req)
 }
 
 // resultErrorMessage extracts the error message from a CallToolResult.IsError result.
@@ -141,9 +147,9 @@ func TestE2E_MCPHandler_FindPayments_PurchaseOrderIDRejected(t *testing.T) {
 
 // T45: find_projects.client_name resolver 経路（disambiguate）
 func TestE2E_MCPHandler_FindProjects_ClientNameResolver(t *testing.T) {
-	// "株" は通常複数 client にマッチするため ambiguity error を期待
+	// "COI" は固有名詞で fanout 暴発を避けつつ resolver 経路を踏む
 	res, err := callTool(t, "find_projects", map[string]any{
-		"client_name": "株",
+		"client_name": "COI",
 	})
 	if err != nil {
 		t.Fatalf("callTool: %v", err)
@@ -166,7 +172,7 @@ func TestE2E_MCPHandler_FindProjects_ClientNameResolver(t *testing.T) {
 func TestE2E_MCPHandler_FindOrders_ClientNameFanout(t *testing.T) {
 	// fanout 系は「複数マッチでも error にせず横断検索」する仕様
 	res, err := callTool(t, "find_orders", map[string]any{
-		"client_name": "株",
+		"client_name": "COI",
 	})
 	if err != nil {
 		t.Fatalf("callTool: %v", err)
