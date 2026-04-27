@@ -236,10 +236,6 @@ func TestSearch_ConsecutiveMerged(t *testing.T) {
 		t.Fatalf("Search err: %v", err)
 	}
 	// 各マッチの (File, Line) が個別であることを検証（間隔 2 以下の重複が無い）
-	type key struct {
-		file string
-		line int
-	}
 	seen := map[string]int{}
 	for _, m := range matches {
 		// 同一ファイル内で前の Match と Line 差が 2 以下にならないことを検証

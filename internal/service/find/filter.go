@@ -57,12 +57,3 @@ func filterByStatuses[T any](items []T, getStatus func(T) string, statuses []str
 	}
 	return out
 }
-
-// filterByStatus は単一のステータス文字列で items を絞り込む。
-// status が空の場合は items をそのまま返す（no-op）。
-func filterByStatus[T any](items []T, getStatus func(T) string, status string) []T {
-	if status == "" {
-		return items
-	}
-	return filterByStatuses(items, getStatus, []string{status})
-}

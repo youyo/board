@@ -40,7 +40,7 @@ func validateQuery(common FindCommonOpts, specific validatable) error {
 // validateStatusFields は Status/Statuses 排他チェックと Statuses 上限チェックを行う。
 func validateStatusFields(status string, statuses []string) error {
 	if status != "" && len(statuses) > 0 {
-		return errors.New("Status and Statuses are mutually exclusive")
+		return errors.New("invalid query: Status and Statuses are mutually exclusive")
 	}
 	if len(statuses) > 10 {
 		return errors.New("at most 10 statuses allowed")
@@ -191,7 +191,7 @@ func (q FindInvoiceQuery) validate() error {
 	// Status は validateStatusFields で Statuses と相互排他 → narrowing オプションとして列挙しない。
 	hasNarrow := q.ID != 0 || q.ClientID != 0 || q.Text != ""
 	if len(q.Statuses) > 0 && !hasNarrow {
-		return errors.New("Statuses requires one of ID, ClientID, or Text to narrow results")
+		return errors.New("invalid query: Statuses requires one of ID, ClientID, or Text to narrow results")
 	}
 	return nil
 }
@@ -234,7 +234,7 @@ func (q FindPurchaseOrderQuery) validate() error {
 	// Status は validateStatusFields で Statuses と相互排他 → narrowing オプションとして列挙しない。
 	hasNarrow := q.ID != 0 || q.VendorID != 0 || q.Text != ""
 	if len(q.Statuses) > 0 && !hasNarrow {
-		return errors.New("Statuses requires one of ID, VendorID, or Text to narrow results")
+		return errors.New("invalid query: Statuses requires one of ID, VendorID, or Text to narrow results")
 	}
 	return nil
 }
@@ -262,7 +262,7 @@ func (q FindPaymentQuery) validate() error {
 	// Status は validateStatusFields で Statuses と相互排他 → narrowing オプションとして列挙しない。
 	hasNarrow := q.ID != 0 || q.VendorID != 0 || q.Text != ""
 	if len(q.Statuses) > 0 && !hasNarrow {
-		return errors.New("Statuses requires one of ID, VendorID, or Text to narrow results")
+		return errors.New("invalid query: Statuses requires one of ID, VendorID, or Text to narrow results")
 	}
 	return nil
 }
