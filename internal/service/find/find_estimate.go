@@ -95,6 +95,9 @@ func (s *Service) FindEstimate(ctx context.Context, q FindEstimateQuery) ([]Esti
 		if err != nil {
 			return nil, err
 		}
+		if len(clients) > fanoutResolveCap {
+			return nil, errFanoutTooMany("client_name", q.ClientName, len(clients))
+		}
 		for _, c := range clients {
 			c2 := c
 			projects, err := s.projects.Search(ctx, boardapi.ProjectListOptions{ClientIDEq: c.ID, ResponseGroup: "estimate"}, opts)
@@ -130,6 +133,9 @@ func (s *Service) FindEstimate(ctx context.Context, q FindEstimateQuery) ([]Esti
 		projects, err := s.projects.Search(ctx, boardapi.ProjectListOptions{NameCont: q.ProjectName, ResponseGroup: "estimate"}, opts)
 		if err != nil {
 			return nil, err
+		}
+		if len(projects) > fanoutResolveCap {
+			return nil, errFanoutTooMany("project_name", q.ProjectName, len(projects))
 		}
 		for _, p := range projects {
 			if p.Estimate == nil {

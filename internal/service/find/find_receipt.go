@@ -82,6 +82,9 @@ func (s *Service) FindReceipt(ctx context.Context, q FindReceiptQuery) ([]Receip
 		if err != nil {
 			return nil, err
 		}
+		if len(clients) > fanoutResolveCap {
+			return nil, errFanoutTooMany("client_name", q.ClientName, len(clients))
+		}
 		for _, c := range clients {
 			c2 := c
 			projects, err := s.projects.Search(ctx, boardapi.ProjectListOptions{ClientIDEq: c.ID, ResponseGroup: "receipt"}, opts)
@@ -116,6 +119,9 @@ func (s *Service) FindReceipt(ctx context.Context, q FindReceiptQuery) ([]Receip
 		projects, err := s.projects.Search(ctx, boardapi.ProjectListOptions{NameCont: q.ProjectName, ResponseGroup: "receipt"}, opts)
 		if err != nil {
 			return nil, err
+		}
+		if len(projects) > fanoutResolveCap {
+			return nil, errFanoutTooMany("project_name", q.ProjectName, len(projects))
 		}
 		for _, p := range projects {
 			p2 := p

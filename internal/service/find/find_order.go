@@ -80,6 +80,9 @@ func (s *Service) FindOrder(ctx context.Context, q FindOrderQuery) ([]OrderResul
 		if err != nil {
 			return nil, err
 		}
+		if len(clients) > fanoutResolveCap {
+			return nil, errFanoutTooMany("client_name", q.ClientName, len(clients))
+		}
 		for _, c := range clients {
 			c2 := c
 			projects, err := s.projects.Search(ctx, boardapi.ProjectListOptions{ClientIDEq: c.ID, ResponseGroup: "order"}, opts)
@@ -115,6 +118,9 @@ func (s *Service) FindOrder(ctx context.Context, q FindOrderQuery) ([]OrderResul
 		projects, err := s.projects.Search(ctx, boardapi.ProjectListOptions{NameCont: q.ProjectName, ResponseGroup: "order"}, opts)
 		if err != nil {
 			return nil, err
+		}
+		if len(projects) > fanoutResolveCap {
+			return nil, errFanoutTooMany("project_name", q.ProjectName, len(projects))
 		}
 		for _, p := range projects {
 			if p.Order == nil {
