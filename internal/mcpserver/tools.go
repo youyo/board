@@ -7,6 +7,7 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"github.com/youyo/board/internal/repository"
 	"github.com/youyo/board/internal/service/find"
 )
 
@@ -197,12 +198,19 @@ func findProjectsTool(srv *Server) server.ServerTool {
 			readOnlyAnnotation(),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			if getStringArg(req, "client_name") != "" {
-				return errorResult(fmt.Errorf("client_name is not supported in v0.7.0 service rename (N07b); will be wired in N07c")), nil
+			svc := srv.FindService()
+			var clientID int
+			if cn := getStringArg(req, "client_name"); cn != "" {
+				id, err := svc.ResolveClientByName(ctx, cn, repository.ReadOptions{})
+				if err != nil {
+					return errorResult(err), nil
+				}
+				clientID = id
 			}
-			results, err := srv.FindService().FindProject(ctx, find.FindProjectQuery{
+			results, err := svc.FindProject(ctx, find.FindProjectQuery{
 				FindCommonOpts: find.FindCommonOpts{Limit: getIntArg(req, "limit")},
 				ID:             getIntArg(req, "id"),
+				ClientID:       clientID,
 				Name:           getStringArg(req, "name"),
 				Text:           getStringArg(req, "text"),
 				Status:         getStringArg(req, "status"),
@@ -228,13 +236,15 @@ func findEstimatesTool(srv *Server) server.ServerTool {
 			readOnlyAnnotation(),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			if getStringArg(req, "client_name") != "" || getStringArg(req, "project_name") != "" || getStringArg(req, "status") != "" {
-				return errorResult(fmt.Errorf("client_name / project_name / status are not supported in v0.7.0 service rename (N07b); will be wired in N07c")), nil
+			if getStringArg(req, "status") != "" {
+				return errorResult(fmt.Errorf("status filtering is not supported for documents (no Status field on entity)")), nil
 			}
 			results, err := srv.FindService().FindEstimate(ctx, find.FindEstimateQuery{
 				FindCommonOpts: find.FindCommonOpts{Limit: getIntArg(req, "limit")},
 				ID:             getIntArg(req, "id"),
 				ProjectID:      getIntArg(req, "project_id"),
+				ClientName:     getStringArg(req, "client_name"),
+				ProjectName:    getStringArg(req, "project_name"),
 			})
 			if err != nil {
 				return errorResult(err), nil
@@ -257,12 +267,22 @@ func findInvoicesTool(srv *Server) server.ServerTool {
 			readOnlyAnnotation(),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			if getStringArg(req, "client_name") != "" || getStringArg(req, "project_name") != "" {
-				return errorResult(fmt.Errorf("client_name / project_name are not supported in v0.7.0 service rename (N07b); will be wired in N07c")), nil
+			if getStringArg(req, "project_name") != "" {
+				return errorResult(fmt.Errorf("project_name is not yet supported for invoices (tracked for future enhancement)")), nil
 			}
-			results, err := srv.FindService().FindInvoice(ctx, find.FindInvoiceQuery{
+			svc := srv.FindService()
+			var clientID int
+			if cn := getStringArg(req, "client_name"); cn != "" {
+				id, err := svc.ResolveClientByName(ctx, cn, repository.ReadOptions{})
+				if err != nil {
+					return errorResult(err), nil
+				}
+				clientID = id
+			}
+			results, err := svc.FindInvoice(ctx, find.FindInvoiceQuery{
 				FindCommonOpts: find.FindCommonOpts{Limit: getIntArg(req, "limit")},
 				ID:             getIntArg(req, "id"),
+				ClientID:       clientID,
 				Text:           getStringArg(req, "text"),
 				Status:         getStringArg(req, "status"),
 			})
@@ -287,13 +307,15 @@ func findOrdersTool(srv *Server) server.ServerTool {
 			readOnlyAnnotation(),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			if getStringArg(req, "client_name") != "" || getStringArg(req, "project_name") != "" || getStringArg(req, "status") != "" {
-				return errorResult(fmt.Errorf("client_name / project_name / status are not supported in v0.7.0 service rename (N07b); will be wired in N07c")), nil
+			if getStringArg(req, "status") != "" {
+				return errorResult(fmt.Errorf("status filtering is not supported for documents (no Status field on entity)")), nil
 			}
 			results, err := srv.FindService().FindOrder(ctx, find.FindOrderQuery{
 				FindCommonOpts: find.FindCommonOpts{Limit: getIntArg(req, "limit")},
 				ID:             getIntArg(req, "id"),
 				ProjectID:      getIntArg(req, "project_id"),
+				ClientName:     getStringArg(req, "client_name"),
+				ProjectName:    getStringArg(req, "project_name"),
 			})
 			if err != nil {
 				return errorResult(err), nil
@@ -316,13 +338,15 @@ func findDeliveriesTool(srv *Server) server.ServerTool {
 			readOnlyAnnotation(),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			if getStringArg(req, "client_name") != "" || getStringArg(req, "project_name") != "" || getStringArg(req, "status") != "" {
-				return errorResult(fmt.Errorf("client_name / project_name / status are not supported in v0.7.0 service rename (N07b); will be wired in N07c")), nil
+			if getStringArg(req, "status") != "" {
+				return errorResult(fmt.Errorf("status filtering is not supported for documents (no Status field on entity)")), nil
 			}
 			results, err := srv.FindService().FindDelivery(ctx, find.FindDeliveryQuery{
 				FindCommonOpts: find.FindCommonOpts{Limit: getIntArg(req, "limit")},
 				ID:             getIntArg(req, "id"),
 				ProjectID:      getIntArg(req, "project_id"),
+				ClientName:     getStringArg(req, "client_name"),
+				ProjectName:    getStringArg(req, "project_name"),
 			})
 			if err != nil {
 				return errorResult(err), nil
@@ -345,13 +369,15 @@ func findReceiptsTool(srv *Server) server.ServerTool {
 			readOnlyAnnotation(),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			if getStringArg(req, "client_name") != "" || getStringArg(req, "project_name") != "" || getStringArg(req, "status") != "" {
-				return errorResult(fmt.Errorf("client_name / project_name / status are not supported in v0.7.0 service rename (N07b); will be wired in N07c")), nil
+			if getStringArg(req, "status") != "" {
+				return errorResult(fmt.Errorf("status filtering is not supported for documents (no Status field on entity)")), nil
 			}
 			results, err := srv.FindService().FindReceipt(ctx, find.FindReceiptQuery{
 				FindCommonOpts: find.FindCommonOpts{Limit: getIntArg(req, "limit")},
 				ID:             getIntArg(req, "id"),
 				ProjectID:      getIntArg(req, "project_id"),
+				ClientName:     getStringArg(req, "client_name"),
+				ProjectName:    getStringArg(req, "project_name"),
 			})
 			if err != nil {
 				return errorResult(err), nil
@@ -374,12 +400,22 @@ func findPurchaseOrdersTool(srv *Server) server.ServerTool {
 			readOnlyAnnotation(),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			if getStringArg(req, "vendor_name") != "" || getStringArg(req, "project_name") != "" {
-				return errorResult(fmt.Errorf("vendor_name / project_name are not supported in v0.7.0 service rename (N07b); will be wired in N07c")), nil
+			if getStringArg(req, "project_name") != "" {
+				return errorResult(fmt.Errorf("project_name is not yet supported for purchase orders (tracked for future enhancement)")), nil
 			}
-			results, err := srv.FindService().FindPurchaseOrder(ctx, find.FindPurchaseOrderQuery{
+			svc := srv.FindService()
+			var vendorID int
+			if vn := getStringArg(req, "vendor_name"); vn != "" {
+				id, err := svc.ResolveVendorByName(ctx, vn, repository.ReadOptions{})
+				if err != nil {
+					return errorResult(err), nil
+				}
+				vendorID = id
+			}
+			results, err := svc.FindPurchaseOrder(ctx, find.FindPurchaseOrderQuery{
 				FindCommonOpts: find.FindCommonOpts{Limit: getIntArg(req, "limit")},
 				ID:             getIntArg(req, "id"),
+				VendorID:       vendorID,
 				Text:           getStringArg(req, "text"),
 				Status:         getStringArg(req, "status"),
 			})
@@ -404,12 +440,22 @@ func findPaymentsTool(srv *Server) server.ServerTool {
 			readOnlyAnnotation(),
 		),
 		Handler: func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			if getStringArg(req, "vendor_name") != "" || getIntArg(req, "purchase_order_id") != 0 {
-				return errorResult(fmt.Errorf("vendor_name / purchase_order_id are not supported in v0.7.0 service rename (N07b); will be wired in N07c")), nil
+			if getIntArg(req, "purchase_order_id") != 0 {
+				return errorResult(fmt.Errorf("purchase_order_id is not yet supported (tracked for future enhancement)")), nil
 			}
-			results, err := srv.FindService().FindPayment(ctx, find.FindPaymentQuery{
+			svc := srv.FindService()
+			var vendorID int
+			if vn := getStringArg(req, "vendor_name"); vn != "" {
+				id, err := svc.ResolveVendorByName(ctx, vn, repository.ReadOptions{})
+				if err != nil {
+					return errorResult(err), nil
+				}
+				vendorID = id
+			}
+			results, err := svc.FindPayment(ctx, find.FindPaymentQuery{
 				FindCommonOpts: find.FindCommonOpts{Limit: getIntArg(req, "limit")},
 				ID:             getIntArg(req, "id"),
+				VendorID:       vendorID,
 				Text:           getStringArg(req, "text"),
 				Status:         getStringArg(req, "status"),
 			})
