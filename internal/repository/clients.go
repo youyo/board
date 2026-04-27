@@ -8,6 +8,7 @@ import (
 
 	"github.com/youyo/board/internal/boardapi"
 	"github.com/youyo/board/internal/cache"
+	"github.com/youyo/board/internal/cache/fold"
 	"github.com/youyo/board/internal/refresh"
 )
 
@@ -47,8 +48,8 @@ const clientsResource = "clients"
 
 // clientFilterIsZero reports whether the given filter is empty (all fields
 // are zero values / nil). A zero filter routes through the local cache; a
-// non-zero filter bypasses the cache and calls the API directly because
-// filtered results must not poison the full-entity cache.
+// non-zero filter is dispatched to either cache-first filter or API direct
+// depending on whether the filter is server-only (cacheableClientFilter).
 func clientFilterIsZero(f boardapi.ClientListOptions) bool {
 	return f.Page == 0 &&
 		f.PerPage == 0 &&
@@ -61,6 +62,49 @@ func clientFilterIsZero(f boardapi.ClientListOptions) bool {
 		f.CustomNoEq == "" &&
 		len(f.Tags) == 0 &&
 		f.ResponseGroup == ""
+}
+
+// cacheableClientFilter は cache + Go-side filter で代替できるフィルタかを判定する。
+// Page/PerPage/UpdatedAt*/Tags/ResponseGroup/IncludeArchiveFlg はサーバー側専用フィールド
+// のため含まれていれば API 直叩きにフォールバックする。
+func cacheableClientFilter(f boardapi.ClientListOptions) bool {
+	return f.Page == 0 &&
+		f.PerPage == 0 &&
+		f.UpdatedAtGteq == "" &&
+		f.UpdatedAtLteq == "" &&
+		f.IncludeArchiveFlg == nil &&
+		len(f.Tags) == 0 &&
+		f.ResponseGroup == ""
+}
+
+// matchClientFilter は ClientEntity が filter に合致するかを Go-side で判定する。
+// BOARD API の Ransack 挙動 (NFKC + ToLower + TrimSpace、name_cont は name のみ対象) を近似する。
+func matchClientFilter(c boardapi.ClientEntity, f boardapi.ClientListOptions) bool {
+	if f.NameCont != "" && !fold.Contains(c.Name, f.NameCont) {
+		return false
+	}
+	if f.NameDispCont != "" && !fold.Contains(c.NameDisp, f.NameDispCont) {
+		return false
+	}
+	if f.InvoiceSystemNumberEq != "" {
+		num := ""
+		if c.InvoiceSystemNumber != nil {
+			num = *c.InvoiceSystemNumber
+		}
+		if num != f.InvoiceSystemNumberEq {
+			return false
+		}
+	}
+	if f.CustomNoEq != "" {
+		num := ""
+		if c.CustomNo != nil {
+			num = *c.CustomNo
+		}
+		if num != f.CustomNoEq {
+			return false
+		}
+	}
+	return true
 }
 
 // List returns clients.
@@ -76,8 +120,30 @@ func clientFilterIsZero(f boardapi.ClientListOptions) bool {
 //
 // Limit from readOpts is applied to the final result in either path.
 func (r *ClientRepository) List(ctx context.Context, readOpts ReadOptions, filter boardapi.ClientListOptions) (*boardapi.ListResult[boardapi.ClientEntity], error) {
+	fetcher := &clientsFetcher{api: r.api}
+	now := time.Now()
+
+	// 共通の refresh フェーズ（明示 refresh 指示がある場合のみ動く）
+	state, err := r.syncStore.Get(ctx, r.profile, clientsResource)
+	if err != nil {
+		return nil, err
+	}
+	if err := maybeRefresh(ctx, r.profile, clientsResource, readOpts, state, false, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
+		return nil, err
+	}
+
+	// 非ゼロフィルタ: cache-first → API fallback。
+	// cache 可能な filter は Go-side で適用、サーバー専用フィールド (Page/Tags/ResponseGroup 等)
+	// が含まれていれば API 直叩きする。
 	if !clientFilterIsZero(filter) {
-		// API 直接呼び出し（cache bypass）: フィルタ結果でキャッシュを汚染しない。
+		if cacheableClientFilter(filter) {
+			if entities, ok := tryCacheFilter[boardapi.ClientEntity](
+				ctx, r.cache, r.syncStore, r.profile, clientsResource,
+				func(c boardapi.ClientEntity) bool { return matchClientFilter(c, filter) },
+			); ok {
+				return &boardapi.ListResult[boardapi.ClientEntity]{Items: applyLimit(entities, readOpts.Limit)}, nil
+			}
+		}
 		result, err := r.api.ListClients(ctx, filter)
 		if err != nil {
 			return nil, err
@@ -86,17 +152,7 @@ func (r *ClientRepository) List(ctx context.Context, readOpts ReadOptions, filte
 		return result, nil
 	}
 
-	// ゼロフィルタ: 既存の cache → refresh → API fallback 経路
-	fetcher := &clientsFetcher{api: r.api}
-	now := time.Now()
-
-	state, err := r.syncStore.Get(ctx, r.profile, clientsResource)
-	if err != nil {
-		return nil, err
-	}
-	if err := maybeRefresh(ctx, r.profile, clientsResource, readOpts, state, false, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
-		return nil, err
-	}
+	// ゼロフィルタ: cache 全件返却（state があれば）。state が無ければ空。
 	entries, err := r.cache.List(ctx, r.profile, clientsResource)
 	if err != nil {
 		return nil, err

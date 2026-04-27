@@ -45,10 +45,7 @@ func NewInvoiceRepository(
 
 const invoicesResource = "invoices"
 
-// invoiceFilterIsZero reports whether the given filter is empty (all fields
-// are zero values / nil). A zero filter routes through the local cache; a
-// non-zero filter bypasses the cache and calls the API directly because
-// filtered results must not poison the full-entity cache.
+// invoiceFilterIsZero reports whether the given filter is empty.
 func invoiceFilterIsZero(f boardapi.InvoiceListOptions) bool {
 	return f.Page == 0 &&
 		f.PerPage == 0 &&
@@ -59,6 +56,30 @@ func invoiceFilterIsZero(f boardapi.InvoiceListOptions) bool {
 		f.ProjectIDEq == 0 &&
 		f.StatusEq == "" &&
 		f.ResponseGroup == ""
+}
+
+// cacheableInvoiceFilter は cache + Go-side filter で代替できるフィルタかを判定する。
+func cacheableInvoiceFilter(f boardapi.InvoiceListOptions) bool {
+	return f.Page == 0 &&
+		f.PerPage == 0 &&
+		f.UpdatedAtGteq == "" &&
+		f.UpdatedAtLteq == "" &&
+		f.IncludeArchiveFlg == nil &&
+		f.ResponseGroup == ""
+}
+
+// matchInvoiceFilter は InvoiceEntity が filter に合致するかを Go-side で判定する。
+func matchInvoiceFilter(i boardapi.InvoiceEntity, f boardapi.InvoiceListOptions) bool {
+	if f.ClientIDEq != 0 && i.ClientID != f.ClientIDEq {
+		return false
+	}
+	if f.ProjectIDEq != 0 && i.ProjectID != f.ProjectIDEq {
+		return false
+	}
+	if f.StatusEq != "" && i.Status != f.StatusEq {
+		return false
+	}
+	return true
 }
 
 // List returns invoices.
@@ -73,17 +94,6 @@ func invoiceFilterIsZero(f boardapi.InvoiceListOptions) bool {
 //
 // Limit from readOpts is applied to the final result in either path.
 func (r *InvoiceRepository) List(ctx context.Context, readOpts ReadOptions, filter boardapi.InvoiceListOptions) (*boardapi.ListResult[boardapi.InvoiceEntity], error) {
-	if !invoiceFilterIsZero(filter) {
-		// API 直接呼び出し（cache bypass）: フィルタ結果でキャッシュを汚染しない。
-		result, err := r.api.ListInvoices(ctx, filter)
-		if err != nil {
-			return nil, err
-		}
-		result.Items = applyLimit(result.Items, readOpts.Limit)
-		return result, nil
-	}
-
-	// ゼロフィルタ: 既存の cache → refresh → API fallback 経路
 	fetcher := &invoicesFetcher{api: r.api}
 	now := time.Now()
 
@@ -94,6 +104,24 @@ func (r *InvoiceRepository) List(ctx context.Context, readOpts ReadOptions, filt
 	if err := maybeRefresh(ctx, r.profile, invoicesResource, readOpts, state, false, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
 		return nil, err
 	}
+
+	if !invoiceFilterIsZero(filter) {
+		if cacheableInvoiceFilter(filter) {
+			if entities, ok := tryCacheFilter[boardapi.InvoiceEntity](
+				ctx, r.cache, r.syncStore, r.profile, invoicesResource,
+				func(i boardapi.InvoiceEntity) bool { return matchInvoiceFilter(i, filter) },
+			); ok {
+				return &boardapi.ListResult[boardapi.InvoiceEntity]{Items: applyLimit(entities, readOpts.Limit)}, nil
+			}
+		}
+		result, err := r.api.ListInvoices(ctx, filter)
+		if err != nil {
+			return nil, err
+		}
+		result.Items = applyLimit(result.Items, readOpts.Limit)
+		return result, nil
+	}
+
 	entries, err := r.cache.List(ctx, r.profile, invoicesResource)
 	if err != nil {
 		return nil, err

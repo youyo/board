@@ -8,6 +8,7 @@ import (
 
 	"github.com/youyo/board/internal/boardapi"
 	"github.com/youyo/board/internal/cache"
+	"github.com/youyo/board/internal/cache/fold"
 	"github.com/youyo/board/internal/refresh"
 )
 
@@ -46,7 +47,6 @@ func NewUserRepository(
 const usersResource = "users"
 
 // userFilterIsZero は filter が空（全フィールドがゼロ値 / nil）かどうかを返す。
-// ゼロフィルタはローカルキャッシュ経路を使い、非ゼロフィルタは cache bypass で API を直呼びする。
 func userFilterIsZero(f boardapi.UserListOptions) bool {
 	return f.Page == 0 &&
 		f.PerPage == 0 &&
@@ -55,6 +55,26 @@ func userFilterIsZero(f boardapi.UserListOptions) bool {
 		f.IncludeArchiveFlg == nil &&
 		f.NameCont == "" &&
 		f.EmailCont == ""
+}
+
+// cacheableUserFilter は cache + Go-side filter で代替できるフィルタかを判定する。
+func cacheableUserFilter(f boardapi.UserListOptions) bool {
+	return f.Page == 0 &&
+		f.PerPage == 0 &&
+		f.UpdatedAtGteq == "" &&
+		f.UpdatedAtLteq == "" &&
+		f.IncludeArchiveFlg == nil
+}
+
+// matchUserFilter は UserEntity が filter に合致するかを Go-side で判定する。
+func matchUserFilter(u boardapi.UserEntity, f boardapi.UserListOptions) bool {
+	if f.NameCont != "" && !fold.Contains(u.Name, f.NameCont) {
+		return false
+	}
+	if f.EmailCont != "" && !fold.Contains(u.Email, f.EmailCont) {
+		return false
+	}
+	return true
 }
 
 // List はユーザーを返す。
@@ -68,17 +88,6 @@ func userFilterIsZero(f boardapi.UserListOptions) bool {
 //
 // readOpts.Limit は両経路の最終結果に適用される。
 func (r *UserRepository) List(ctx context.Context, readOpts ReadOptions, filter boardapi.UserListOptions) (*boardapi.ListResult[boardapi.UserEntity], error) {
-	if !userFilterIsZero(filter) {
-		// API 直接呼び出し（cache bypass）: フィルタ結果でキャッシュを汚染しない。
-		result, err := r.api.ListUsers(ctx, filter)
-		if err != nil {
-			return nil, err
-		}
-		result.Items = applyLimit(result.Items, readOpts.Limit)
-		return result, nil
-	}
-
-	// ゼロフィルタ: 既存の cache → refresh → API fallback 経路
 	fetcher := &usersFetcher{api: r.api}
 	now := time.Now()
 
@@ -89,6 +98,24 @@ func (r *UserRepository) List(ctx context.Context, readOpts ReadOptions, filter 
 	if err := maybeRefresh(ctx, r.profile, usersResource, readOpts, state, false, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
 		return nil, err
 	}
+
+	if !userFilterIsZero(filter) {
+		if cacheableUserFilter(filter) {
+			if entities, ok := tryCacheFilter[boardapi.UserEntity](
+				ctx, r.cache, r.syncStore, r.profile, usersResource,
+				func(u boardapi.UserEntity) bool { return matchUserFilter(u, filter) },
+			); ok {
+				return &boardapi.ListResult[boardapi.UserEntity]{Items: applyLimit(entities, readOpts.Limit)}, nil
+			}
+		}
+		result, err := r.api.ListUsers(ctx, filter)
+		if err != nil {
+			return nil, err
+		}
+		result.Items = applyLimit(result.Items, readOpts.Limit)
+		return result, nil
+	}
+
 	entries, err := r.cache.List(ctx, r.profile, usersResource)
 	if err != nil {
 		return nil, err

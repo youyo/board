@@ -144,18 +144,16 @@ func TestUserRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	}
 }
 
-// T_USR06: Search - Name filter -> bypasses cache, returns data from API
+// T_USR06: Search - Name filter -> uses cache + Go-side filter (cache-first).
 func TestUserRepository_Search_NameFilter(t *testing.T) {
 	db := newTestDB(t)
+	seedUserCache(t, db, []boardapi.UserEntity{
+		{ID: 1, Name: "Taro Tanaka", Email: "tanaka@example.com", UpdatedAt: "2026-01-01T00:00:00Z"},
+		{ID: 2, Name: "Hanako Suzuki", Email: "suzuki@example.com", UpdatedAt: "2026-01-02T00:00:00Z"},
+	})
 	markSynced(t, db, "users")
 
-	// API サーバーは name_cont=Taro Tanaka に合致する 1 件を返すと想定
-	filtered := []boardapi.UserEntity{
-		{ID: 1, Name: "Taro Tanaka", Email: "tanaka@example.com", UpdatedAt: "2026-01-01T00:00:00Z"},
-	}
-	srv := newUserAPIServer(t, filtered)
-	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
-
+	apiClient := boardapi.New("", "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 	repo := makeUserRepo(t, db, apiClient)
 	got, err := repo.Search(context.Background(), boardapi.UserListOptions{NameCont: "Taro Tanaka"}, repository.ReadOptions{})
 	if err != nil {
@@ -166,18 +164,16 @@ func TestUserRepository_Search_NameFilter(t *testing.T) {
 	}
 }
 
-// T_USR07: Search - Email filter -> bypasses cache, returns data from API
+// T_USR07: Search - Email filter -> uses cache + Go-side filter.
 func TestUserRepository_Search_EmailFilter(t *testing.T) {
 	db := newTestDB(t)
+	seedUserCache(t, db, []boardapi.UserEntity{
+		{ID: 1, Name: "Taro Tanaka", Email: "tanaka@example.com", UpdatedAt: "2026-01-01T00:00:00Z"},
+		{ID: 2, Name: "Hanako Suzuki", Email: "suzuki@example.com", UpdatedAt: "2026-01-02T00:00:00Z"},
+	})
 	markSynced(t, db, "users")
 
-	// API サーバーは email_cont=suzuki@example.com に合致する 1 件を返すと想定
-	filtered := []boardapi.UserEntity{
-		{ID: 2, Name: "Hanako Suzuki", Email: "suzuki@example.com", UpdatedAt: "2026-01-02T00:00:00Z"},
-	}
-	srv := newUserAPIServer(t, filtered)
-	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
-
+	apiClient := boardapi.New("", "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 	repo := makeUserRepo(t, db, apiClient)
 	got, err := repo.Search(context.Background(), boardapi.UserListOptions{EmailCont: "suzuki@example.com"}, repository.ReadOptions{})
 	if err != nil {

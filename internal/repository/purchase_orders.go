@@ -45,10 +45,7 @@ func NewPurchaseOrderRepository(
 
 const purchaseOrdersResource = "purchase_orders"
 
-// purchaseOrderFilterIsZero reports whether the given filter is empty (all fields
-// are zero values / nil). A zero filter routes through the local cache; a
-// non-zero filter bypasses the cache and calls the API directly because
-// filtered results must not poison the full-entity cache.
+// purchaseOrderFilterIsZero reports whether the given filter is empty.
 func purchaseOrderFilterIsZero(f boardapi.PurchaseOrderListOptions) bool {
 	return f.Page == 0 &&
 		f.PerPage == 0 &&
@@ -59,6 +56,30 @@ func purchaseOrderFilterIsZero(f boardapi.PurchaseOrderListOptions) bool {
 		f.ProjectIDEq == 0 &&
 		f.StatusEq == "" &&
 		f.ResponseGroup == ""
+}
+
+// cacheablePurchaseOrderFilter は cache + Go-side filter で代替できるフィルタかを判定する。
+func cacheablePurchaseOrderFilter(f boardapi.PurchaseOrderListOptions) bool {
+	return f.Page == 0 &&
+		f.PerPage == 0 &&
+		f.UpdatedAtGteq == "" &&
+		f.UpdatedAtLteq == "" &&
+		f.IncludeArchiveFlg == nil &&
+		f.ResponseGroup == ""
+}
+
+// matchPurchaseOrderFilter は PurchaseOrderEntity が filter に合致するかを Go-side で判定する。
+func matchPurchaseOrderFilter(p boardapi.PurchaseOrderEntity, f boardapi.PurchaseOrderListOptions) bool {
+	if f.VendorIDEq != 0 && p.VendorID != f.VendorIDEq {
+		return false
+	}
+	if f.ProjectIDEq != 0 && p.ProjectID != f.ProjectIDEq {
+		return false
+	}
+	if f.StatusEq != "" && p.Status != f.StatusEq {
+		return false
+	}
+	return true
 }
 
 // List returns purchase orders.
@@ -73,17 +94,6 @@ func purchaseOrderFilterIsZero(f boardapi.PurchaseOrderListOptions) bool {
 //
 // Limit from readOpts is applied to the final result in either path.
 func (r *PurchaseOrderRepository) List(ctx context.Context, readOpts ReadOptions, filter boardapi.PurchaseOrderListOptions) (*boardapi.ListResult[boardapi.PurchaseOrderEntity], error) {
-	if !purchaseOrderFilterIsZero(filter) {
-		// API 直接呼び出し（cache bypass）: フィルタ結果でキャッシュを汚染しない。
-		result, err := r.api.ListPurchaseOrders(ctx, filter)
-		if err != nil {
-			return nil, err
-		}
-		result.Items = applyLimit(result.Items, readOpts.Limit)
-		return result, nil
-	}
-
-	// ゼロフィルタ: 既存の cache → refresh → API fallback 経路
 	fetcher := &purchaseOrdersFetcher{api: r.api}
 	now := time.Now()
 
@@ -94,6 +104,24 @@ func (r *PurchaseOrderRepository) List(ctx context.Context, readOpts ReadOptions
 	if err := maybeRefresh(ctx, r.profile, purchaseOrdersResource, readOpts, state, false, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
 		return nil, err
 	}
+
+	if !purchaseOrderFilterIsZero(filter) {
+		if cacheablePurchaseOrderFilter(filter) {
+			if entities, ok := tryCacheFilter[boardapi.PurchaseOrderEntity](
+				ctx, r.cache, r.syncStore, r.profile, purchaseOrdersResource,
+				func(p boardapi.PurchaseOrderEntity) bool { return matchPurchaseOrderFilter(p, filter) },
+			); ok {
+				return &boardapi.ListResult[boardapi.PurchaseOrderEntity]{Items: applyLimit(entities, readOpts.Limit)}, nil
+			}
+		}
+		result, err := r.api.ListPurchaseOrders(ctx, filter)
+		if err != nil {
+			return nil, err
+		}
+		result.Items = applyLimit(result.Items, readOpts.Limit)
+		return result, nil
+	}
+
 	entries, err := r.cache.List(ctx, r.profile, purchaseOrdersResource)
 	if err != nil {
 		return nil, err

@@ -45,10 +45,7 @@ func NewPaymentRepository(
 
 const paymentsResource = "payments"
 
-// paymentFilterIsZero reports whether the given filter is empty (all fields
-// are zero values / nil). A zero filter routes through the local cache; a
-// non-zero filter bypasses the cache and calls the API directly because
-// filtered results must not poison the full-entity cache.
+// paymentFilterIsZero reports whether the given filter is empty.
 func paymentFilterIsZero(f boardapi.PaymentListOptions) bool {
 	return f.Page == 0 &&
 		f.PerPage == 0 &&
@@ -59,6 +56,30 @@ func paymentFilterIsZero(f boardapi.PaymentListOptions) bool {
 		f.PurchaseOrderIDEq == 0 &&
 		f.StatusEq == "" &&
 		f.ResponseGroup == ""
+}
+
+// cacheablePaymentFilter は cache + Go-side filter で代替できるフィルタかを判定する。
+func cacheablePaymentFilter(f boardapi.PaymentListOptions) bool {
+	return f.Page == 0 &&
+		f.PerPage == 0 &&
+		f.UpdatedAtGteq == "" &&
+		f.UpdatedAtLteq == "" &&
+		f.IncludeArchiveFlg == nil &&
+		f.ResponseGroup == ""
+}
+
+// matchPaymentFilter は PaymentEntity が filter に合致するかを Go-side で判定する。
+func matchPaymentFilter(p boardapi.PaymentEntity, f boardapi.PaymentListOptions) bool {
+	if f.VendorIDEq != 0 && p.VendorID != f.VendorIDEq {
+		return false
+	}
+	if f.PurchaseOrderIDEq != 0 && p.PurchaseOrderID != f.PurchaseOrderIDEq {
+		return false
+	}
+	if f.StatusEq != "" && p.Status != f.StatusEq {
+		return false
+	}
+	return true
 }
 
 // List returns payments.
@@ -73,17 +94,6 @@ func paymentFilterIsZero(f boardapi.PaymentListOptions) bool {
 //
 // Limit from readOpts is applied to the final result in either path.
 func (r *PaymentRepository) List(ctx context.Context, readOpts ReadOptions, filter boardapi.PaymentListOptions) (*boardapi.ListResult[boardapi.PaymentEntity], error) {
-	if !paymentFilterIsZero(filter) {
-		// API 直接呼び出し（cache bypass）: フィルタ結果でキャッシュを汚染しない。
-		result, err := r.api.ListPayments(ctx, filter)
-		if err != nil {
-			return nil, err
-		}
-		result.Items = applyLimit(result.Items, readOpts.Limit)
-		return result, nil
-	}
-
-	// ゼロフィルタ: 既存の cache → refresh → API fallback 経路
 	fetcher := &paymentsFetcher{api: r.api}
 	now := time.Now()
 
@@ -94,6 +104,24 @@ func (r *PaymentRepository) List(ctx context.Context, readOpts ReadOptions, filt
 	if err := maybeRefresh(ctx, r.profile, paymentsResource, readOpts, state, false, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
 		return nil, err
 	}
+
+	if !paymentFilterIsZero(filter) {
+		if cacheablePaymentFilter(filter) {
+			if entities, ok := tryCacheFilter[boardapi.PaymentEntity](
+				ctx, r.cache, r.syncStore, r.profile, paymentsResource,
+				func(p boardapi.PaymentEntity) bool { return matchPaymentFilter(p, filter) },
+			); ok {
+				return &boardapi.ListResult[boardapi.PaymentEntity]{Items: applyLimit(entities, readOpts.Limit)}, nil
+			}
+		}
+		result, err := r.api.ListPayments(ctx, filter)
+		if err != nil {
+			return nil, err
+		}
+		result.Items = applyLimit(result.Items, readOpts.Limit)
+		return result, nil
+	}
+
 	entries, err := r.cache.List(ctx, r.profile, paymentsResource)
 	if err != nil {
 		return nil, err

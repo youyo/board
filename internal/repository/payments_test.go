@@ -147,16 +147,15 @@ func TestPaymentRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 // T_PAY06: Search - VendorIDEq filter -> non-zero filter bypasses cache, calls API directly
 func TestPaymentRepository_Search_VendorIDFilter(t *testing.T) {
 	db := newTestDB(t)
+	seed := []boardapi.PaymentEntity{
+		{ID: 1, VendorID: 10, PurchaseOrderID: 100, Status: "draft", UpdatedAt: "2026-01-01T00:00:00Z"},
+		{ID: 2, VendorID: 10, PurchaseOrderID: 101, Status: "sent", UpdatedAt: "2026-01-02T00:00:00Z"},
+		{ID: 3, VendorID: 99, PurchaseOrderID: 102, Status: "paid", UpdatedAt: "2026-01-03T00:00:00Z"},
+	}
+	seedPaymentCache(t, db, seed)
 	markSynced(t, db, "payments")
 
-	// API returns 2 payments with vendor_id=10
-	filtered := []boardapi.PaymentEntity{
-		{ID: 1, VendorID: 10, PurchaseOrderID: 100, Amount: 10000, Status: "pending", UpdatedAt: "2026-01-01T00:00:00Z"},
-		{ID: 2, VendorID: 10, PurchaseOrderID: 101, Amount: 20000, Status: "paid", UpdatedAt: "2026-01-02T00:00:00Z"},
-	}
-	srv := newPaymentAPIServer(t, filtered)
-	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
-
+	apiClient := boardapi.New("", "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 	repo := makePaymentRepo(t, db, apiClient)
 	got, err := repo.Search(context.Background(), boardapi.PaymentListOptions{VendorIDEq: 10}, repository.ReadOptions{})
 	if err != nil {
@@ -170,21 +169,21 @@ func TestPaymentRepository_Search_VendorIDFilter(t *testing.T) {
 // T_PAY07: Search - StatusEq filter -> non-zero filter bypasses cache, calls API directly
 func TestPaymentRepository_Search_StatusFilter(t *testing.T) {
 	db := newTestDB(t)
+	seed := []boardapi.PaymentEntity{
+		{ID: 1, VendorID: 10, PurchaseOrderID: 100, Status: "draft", UpdatedAt: "2026-01-01T00:00:00Z"},
+		{ID: 2, VendorID: 10, PurchaseOrderID: 101, Status: "sent", UpdatedAt: "2026-01-02T00:00:00Z"},
+		{ID: 3, VendorID: 99, PurchaseOrderID: 102, Status: "paid", UpdatedAt: "2026-01-03T00:00:00Z"},
+	}
+	seedPaymentCache(t, db, seed)
 	markSynced(t, db, "payments")
 
-	// API returns 1 payment with status=pending
-	pending := []boardapi.PaymentEntity{
-		{ID: 1, VendorID: 10, PurchaseOrderID: 100, Amount: 10000, Status: "pending", UpdatedAt: "2026-01-01T00:00:00Z"},
-	}
-	srv := newPaymentAPIServer(t, pending)
-	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
-
+	apiClient := boardapi.New("", "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 	repo := makePaymentRepo(t, db, apiClient)
-	got, err := repo.Search(context.Background(), boardapi.PaymentListOptions{StatusEq: "pending"}, repository.ReadOptions{})
+	got, err := repo.Search(context.Background(), boardapi.PaymentListOptions{StatusEq: "paid"}, repository.ReadOptions{})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
 	}
-	if len(got) != 1 || got[0].Status != "pending" {
+	if len(got) != 1 || got[0].Status != "paid" {
 		t.Errorf("unexpected result: %+v", got)
 	}
 }

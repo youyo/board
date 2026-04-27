@@ -144,18 +144,16 @@ func TestVendorRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	}
 }
 
-// T_VEN06: Search - NameCont filter -> bypasses cache, returns data from API
+// T_VEN06: Search - NameCont filter -> uses cache + Go-side filter (cache-first).
 func TestVendorRepository_Search_NameContFilter(t *testing.T) {
 	db := newTestDB(t)
+	seedVendorCache(t, db, []boardapi.VendorEntity{
+		{ID: 1, Name: "VendorA", UpdatedAt: "2026-01-01T00:00:00Z"},
+		{ID: 2, Name: "VendorB", UpdatedAt: "2026-01-01T00:00:00Z"},
+	})
 	markSynced(t, db, "vendors")
 
-	// API サーバーは name_cont=VendorA に合致する 1 件を返すと想定
-	filtered := []boardapi.VendorEntity{
-		{ID: 1, Name: "VendorA", UpdatedAt: "2026-01-01T00:00:00Z"},
-	}
-	srv := newVendorAPIServer(t, filtered)
-	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
-
+	apiClient := boardapi.New("", "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 	repo := makeVendorRepo(t, db, apiClient)
 	got, err := repo.Search(context.Background(), boardapi.VendorListOptions{NameCont: "VendorA"}, repository.ReadOptions{})
 	if err != nil {

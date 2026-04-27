@@ -8,6 +8,7 @@ import (
 
 	"github.com/youyo/board/internal/boardapi"
 	"github.com/youyo/board/internal/cache"
+	"github.com/youyo/board/internal/cache/fold"
 	"github.com/youyo/board/internal/refresh"
 )
 
@@ -45,10 +46,69 @@ func NewProjectRepository(
 
 const projectsResource = "projects"
 
+// cacheableProjectFilter は cache + Go-side filter で代替できるフィルタかを判定する。
+// ResponseGroup が含まれる場合は埋め込み entity (Estimate / Order 等) の再現が
+// flat な cache では不可能なため API fallback する。
+// OrderStatusIn / DeliveryStatusIn は ProjectEntity に整数フィールドが無いため不可。
+func cacheableProjectFilter(f boardapi.ProjectListOptions) bool {
+	return f.Page == 0 &&
+		f.PerPage == 0 &&
+		f.UpdatedAtGteq == "" &&
+		f.UpdatedAtLteq == "" &&
+		f.CreatedAtGteq == "" &&
+		f.CreatedAtLteq == "" &&
+		f.IncludeArchiveFlg == nil &&
+		f.IncludeLostFlg == nil &&
+		len(f.OrderStatusIn) == 0 &&
+		len(f.DeliveryStatusIn) == 0 &&
+		f.DeliveryDateGteq == "" &&
+		f.DeliveryDateLteq == "" &&
+		f.InvoiceDateGteq == "" &&
+		f.InvoiceDateLteq == "" &&
+		len(f.InvoiceTimingKbnIn) == 0 &&
+		len(f.Tags) == 0 &&
+		f.ResponseGroup == ""
+}
+
+// matchProjectFilter は ProjectEntity が filter に合致するかを Go-side で判定する。
+func matchProjectFilter(p boardapi.ProjectEntity, f boardapi.ProjectListOptions) bool {
+	if f.NameCont != "" && !fold.Contains(p.Name, f.NameCont) {
+		return false
+	}
+	if f.ClientIDEq != 0 {
+		if p.Client == nil || p.Client.ID != f.ClientIDEq {
+			return false
+		}
+	}
+	if f.ClientNameCont != "" {
+		if p.Client == nil || !fold.Contains(p.Client.Name, f.ClientNameCont) {
+			return false
+		}
+	}
+	if f.ProjectNoEq != "" {
+		if p.ProjectNo == nil {
+			return false
+		}
+		if strconv.Itoa(*p.ProjectNo) != f.ProjectNoEq {
+			return false
+		}
+	}
+	if f.ManagementNoEq != "" {
+		mn := ""
+		if p.ManagementNo != nil {
+			mn = *p.ManagementNo
+		}
+		if mn != f.ManagementNoEq {
+			return false
+		}
+	}
+	return true
+}
+
 // projectFilterIsZero reports whether the given filter is empty (all fields
 // are zero values / nil). A zero filter routes through the local cache; a
-// non-zero filter bypasses the cache and calls the API directly because
-// filtered results must not poison the full-entity cache.
+// non-zero filter is dispatched to either cache-first filter or API direct
+// depending on whether the filter is cacheable.
 func projectFilterIsZero(f boardapi.ProjectListOptions) bool {
 	return f.Page == 0 &&
 		f.PerPage == 0 &&
@@ -87,17 +147,6 @@ func projectFilterIsZero(f boardapi.ProjectListOptions) bool {
 //
 // Limit from readOpts is applied to the final result in either path.
 func (r *ProjectRepository) List(ctx context.Context, readOpts ReadOptions, filter boardapi.ProjectListOptions) (*boardapi.ListResult[boardapi.ProjectEntity], error) {
-	if !projectFilterIsZero(filter) {
-		// API 直接呼び出し（cache bypass）: フィルタ結果でキャッシュを汚染しない。
-		result, err := r.api.ListProjects(ctx, filter)
-		if err != nil {
-			return nil, err
-		}
-		result.Items = applyLimit(result.Items, readOpts.Limit)
-		return result, nil
-	}
-
-	// ゼロフィルタ: 既存の cache → refresh → API fallback 経路
 	fetcher := &projectsFetcher{api: r.api}
 	now := time.Now()
 
@@ -108,6 +157,24 @@ func (r *ProjectRepository) List(ctx context.Context, readOpts ReadOptions, filt
 	if err := maybeRefresh(ctx, r.profile, projectsResource, readOpts, state, false, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
 		return nil, err
 	}
+
+	if !projectFilterIsZero(filter) {
+		if cacheableProjectFilter(filter) {
+			if entities, ok := tryCacheFilter[boardapi.ProjectEntity](
+				ctx, r.cache, r.syncStore, r.profile, projectsResource,
+				func(p boardapi.ProjectEntity) bool { return matchProjectFilter(p, filter) },
+			); ok {
+				return &boardapi.ListResult[boardapi.ProjectEntity]{Items: applyLimit(entities, readOpts.Limit)}, nil
+			}
+		}
+		result, err := r.api.ListProjects(ctx, filter)
+		if err != nil {
+			return nil, err
+		}
+		result.Items = applyLimit(result.Items, readOpts.Limit)
+		return result, nil
+	}
+
 	entries, err := r.cache.List(ctx, r.profile, projectsResource)
 	if err != nil {
 		return nil, err

@@ -144,19 +144,17 @@ func TestInvoiceRepository_GetByID_CacheMiss_APIError(t *testing.T) {
 	}
 }
 
-// T_INV06: Search - ClientIDEq filter -> non-zero filter bypasses cache, calls API directly
+// Search ClientIDEq -> cache-first Go-side filter.
 func TestInvoiceRepository_Search_ClientIDFilter(t *testing.T) {
 	db := newTestDB(t)
-	markSynced(t, db, "invoices")
-
-	// API returns 2 invoices with client_id=10
-	filtered := []boardapi.InvoiceEntity{
+	seedInvoiceCache(t, db, []boardapi.InvoiceEntity{
 		{ID: 1, ClientID: 10, ProjectID: 100, Title: "InvoiceA", Status: "draft", UpdatedAt: "2026-01-01T00:00:00Z"},
 		{ID: 2, ClientID: 10, ProjectID: 101, Title: "InvoiceB", Status: "sent", UpdatedAt: "2026-01-02T00:00:00Z"},
-	}
-	srv := newInvoiceAPIServer(t, filtered)
-	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
+		{ID: 3, ClientID: 99, ProjectID: 102, Title: "Other", Status: "draft", UpdatedAt: "2026-01-03T00:00:00Z"},
+	})
+	markSynced(t, db, "invoices")
 
+	apiClient := boardapi.New("", "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 	repo := makeInvoiceRepo(t, db, apiClient)
 	got, err := repo.Search(context.Background(), boardapi.InvoiceListOptions{ClientIDEq: 10}, repository.ReadOptions{})
 	if err != nil {
@@ -167,18 +165,16 @@ func TestInvoiceRepository_Search_ClientIDFilter(t *testing.T) {
 	}
 }
 
-// T_INV07: Search - StatusEq filter -> non-zero filter bypasses cache, calls API directly
+// Search StatusEq -> cache-first Go-side filter.
 func TestInvoiceRepository_Search_StatusFilter(t *testing.T) {
 	db := newTestDB(t)
+	seedInvoiceCache(t, db, []boardapi.InvoiceEntity{
+		{ID: 1, ClientID: 10, ProjectID: 100, Title: "InvoiceA", Status: "draft", UpdatedAt: "2026-01-01T00:00:00Z"},
+		{ID: 3, ClientID: 20, ProjectID: 102, Title: "InvoiceC", Status: "paid", UpdatedAt: "2026-01-03T00:00:00Z"},
+	})
 	markSynced(t, db, "invoices")
 
-	// API returns 1 invoice with status=paid
-	paid := []boardapi.InvoiceEntity{
-		{ID: 3, ClientID: 20, ProjectID: 102, Title: "InvoiceC", Status: "paid", UpdatedAt: "2026-01-03T00:00:00Z"},
-	}
-	srv := newInvoiceAPIServer(t, paid)
-	apiClient := boardapi.New(srv.URL, "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
-
+	apiClient := boardapi.New("", "key", "token", 5*time.Second, boardapi.WithRetryMax(0))
 	repo := makeInvoiceRepo(t, db, apiClient)
 	got, err := repo.Search(context.Background(), boardapi.InvoiceListOptions{StatusEq: "paid"}, repository.ReadOptions{})
 	if err != nil {

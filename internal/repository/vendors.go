@@ -8,6 +8,7 @@ import (
 
 	"github.com/youyo/board/internal/boardapi"
 	"github.com/youyo/board/internal/cache"
+	"github.com/youyo/board/internal/cache/fold"
 	"github.com/youyo/board/internal/refresh"
 )
 
@@ -46,7 +47,6 @@ func NewVendorRepository(
 const vendorsResource = "vendors"
 
 // vendorFilterIsZero は filter が空（全フィールドがゼロ値 / nil）かどうかを返す。
-// ゼロフィルタはローカルキャッシュ経路を使い、非ゼロフィルタは cache bypass で API を直呼びする。
 func vendorFilterIsZero(f boardapi.VendorListOptions) bool {
 	return f.Page == 0 &&
 		f.PerPage == 0 &&
@@ -54,6 +54,23 @@ func vendorFilterIsZero(f boardapi.VendorListOptions) bool {
 		f.UpdatedAtLteq == "" &&
 		f.IncludeArchiveFlg == nil &&
 		f.NameCont == ""
+}
+
+// cacheableVendorFilter は cache + Go-side filter で代替できるフィルタかを判定する。
+func cacheableVendorFilter(f boardapi.VendorListOptions) bool {
+	return f.Page == 0 &&
+		f.PerPage == 0 &&
+		f.UpdatedAtGteq == "" &&
+		f.UpdatedAtLteq == "" &&
+		f.IncludeArchiveFlg == nil
+}
+
+// matchVendorFilter は VendorEntity が filter に合致するかを Go-side で判定する。
+func matchVendorFilter(v boardapi.VendorEntity, f boardapi.VendorListOptions) bool {
+	if f.NameCont != "" && !fold.Contains(v.Name, f.NameCont) {
+		return false
+	}
+	return true
 }
 
 // List は仕入先を返す。
@@ -67,17 +84,6 @@ func vendorFilterIsZero(f boardapi.VendorListOptions) bool {
 //
 // readOpts.Limit は両経路の最終結果に適用される。
 func (r *VendorRepository) List(ctx context.Context, readOpts ReadOptions, filter boardapi.VendorListOptions) (*boardapi.ListResult[boardapi.VendorEntity], error) {
-	if !vendorFilterIsZero(filter) {
-		// API 直接呼び出し（cache bypass）: フィルタ結果でキャッシュを汚染しない。
-		result, err := r.api.ListVendors(ctx, filter)
-		if err != nil {
-			return nil, err
-		}
-		result.Items = applyLimit(result.Items, readOpts.Limit)
-		return result, nil
-	}
-
-	// ゼロフィルタ: 既存の cache → refresh → API fallback 経路
 	fetcher := &vendorsFetcher{api: r.api}
 	now := time.Now()
 
@@ -88,6 +94,24 @@ func (r *VendorRepository) List(ctx context.Context, readOpts ReadOptions, filte
 	if err := maybeRefresh(ctx, r.profile, vendorsResource, readOpts, state, false, r.tz, r.lockManager, r.refresher, fetcher, now); err != nil {
 		return nil, err
 	}
+
+	if !vendorFilterIsZero(filter) {
+		if cacheableVendorFilter(filter) {
+			if entities, ok := tryCacheFilter[boardapi.VendorEntity](
+				ctx, r.cache, r.syncStore, r.profile, vendorsResource,
+				func(v boardapi.VendorEntity) bool { return matchVendorFilter(v, filter) },
+			); ok {
+				return &boardapi.ListResult[boardapi.VendorEntity]{Items: applyLimit(entities, readOpts.Limit)}, nil
+			}
+		}
+		result, err := r.api.ListVendors(ctx, filter)
+		if err != nil {
+			return nil, err
+		}
+		result.Items = applyLimit(result.Items, readOpts.Limit)
+		return result, nil
+	}
+
 	entries, err := r.cache.List(ctx, r.profile, vendorsResource)
 	if err != nil {
 		return nil, err
