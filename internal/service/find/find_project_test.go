@@ -419,6 +419,193 @@ func TestService_FindProject_SearchError_Bubbles(t *testing.T) {
 	}
 }
 
+// --- F-T01〜F-T08: ContractStatus フィルタ統合テスト ---
+
+// F-T01: ContractStatus="active" + Name → DeliveryStatusName が active の案件のみ返す
+func TestService_FindProject_ContractStatusActive_FiltersByDelivery(t *testing.T) {
+	pr := &stubProjectRepo{
+		searchResult: []boardapi.ProjectEntity{
+			{ID: 1, Name: "P1", DeliveryStatusName: "未着手"}, // active
+			{ID: 2, Name: "P2", DeliveryStatusName: "検収済"}, // ended
+			{ID: 3, Name: "P3", OrderStatusName: "見積中(中)"}, // prospect
+		},
+	}
+	cr := &stubClientRepo{}
+	svc := newProjectTestService(pr, cr)
+
+	results, err := svc.FindProject(testCtx, FindProjectQuery{
+		Name:           "保守",
+		ContractStatus: "active",
+	})
+	assertNoError(t, err)
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if results[0].Project.ID != 1 {
+		t.Errorf("expected ID=1, got %d", results[0].Project.ID)
+	}
+}
+
+// F-T02: ContractStatus="ended" + Name → DeliveryStatusName=検収済 のみ返す
+func TestService_FindProject_ContractStatusEnded_FiltersByDelivery(t *testing.T) {
+	pr := &stubProjectRepo{
+		searchResult: []boardapi.ProjectEntity{
+			{ID: 1, Name: "P1", DeliveryStatusName: "未着手"},
+			{ID: 2, Name: "P2", DeliveryStatusName: "検収済"},
+		},
+	}
+	cr := &stubClientRepo{}
+	svc := newProjectTestService(pr, cr)
+
+	results, err := svc.FindProject(testCtx, FindProjectQuery{
+		Name:           "保守",
+		ContractStatus: "ended",
+	})
+	assertNoError(t, err)
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if results[0].Project.ID != 2 {
+		t.Errorf("expected ID=2, got %d", results[0].Project.ID)
+	}
+}
+
+// F-T03: ContractStatus="prospect" + Name → OrderStatusName が見積中の案件のみ返す
+func TestService_FindProject_ContractStatusProspect_FiltersByOrder(t *testing.T) {
+	pr := &stubProjectRepo{
+		searchResult: []boardapi.ProjectEntity{
+			{ID: 1, Name: "P1", OrderStatusName: "見積中(中)"},
+			{ID: 2, Name: "P2", OrderStatusName: "受注確定"},
+		},
+	}
+	cr := &stubClientRepo{}
+	svc := newProjectTestService(pr, cr)
+
+	results, err := svc.FindProject(testCtx, FindProjectQuery{
+		Name:           "保守",
+		ContractStatus: "prospect",
+	})
+	assertNoError(t, err)
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if results[0].Project.ID != 1 {
+		t.Errorf("expected ID=1, got %d", results[0].Project.ID)
+	}
+}
+
+// F-T04: ContractStatus="all" + Name → active∪ended∪prospect 全部返す
+func TestService_FindProject_ContractStatusAll_ReturnsAll(t *testing.T) {
+	pr := &stubProjectRepo{
+		searchResult: []boardapi.ProjectEntity{
+			{ID: 1, Name: "P1", DeliveryStatusName: "未着手"}, // active
+			{ID: 2, Name: "P2", DeliveryStatusName: "検収済"}, // ended
+			{ID: 3, Name: "P3", OrderStatusName: "見積中(中)"}, // prospect
+			{ID: 4, Name: "P4", OrderStatusName: "受注済"},    // none
+		},
+	}
+	cr := &stubClientRepo{}
+	svc := newProjectTestService(pr, cr)
+
+	results, err := svc.FindProject(testCtx, FindProjectQuery{
+		Name:           "保守",
+		ContractStatus: "all",
+	})
+	assertNoError(t, err)
+	if len(results) != 3 {
+		t.Fatalf("expected 3 results, got %d", len(results))
+	}
+}
+
+// F-T05: ContractStatus + ClientID フロー — ClientID で Search、その後 ContractStatus フィルタ
+func TestService_FindProject_ContractStatusWithClientID_Flow(t *testing.T) {
+	pr := &stubProjectRepo{
+		searchResult: []boardapi.ProjectEntity{
+			{ID: 1, Name: "P1", DeliveryStatusName: "着手中"},
+			{ID: 2, Name: "P2", DeliveryStatusName: "検収済"},
+		},
+	}
+	cr := &stubClientRepo{getResult: &boardapi.ClientEntity{ID: 5}}
+	svc := newProjectTestService(pr, cr)
+
+	results, err := svc.FindProject(testCtx, FindProjectQuery{
+		ClientID:       5,
+		ContractStatus: "active",
+	})
+	assertNoError(t, err)
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if results[0].Project.ID != 1 {
+		t.Errorf("expected ID=1, got %d", results[0].Project.ID)
+	}
+}
+
+// F-T06: ContractStatus + Text フロー
+func TestService_FindProject_ContractStatusWithText_Flow(t *testing.T) {
+	pr := &stubProjectRepo{
+		searchResult: []boardapi.ProjectEntity{
+			{ID: 1, Name: "保守テスト", DeliveryStatusName: "未着手"},
+			{ID: 2, Name: "その他案件", DeliveryStatusName: "未着手"},
+		},
+	}
+	cr := &stubClientRepo{}
+	svc := newProjectTestService(pr, cr)
+
+	results, err := svc.FindProject(testCtx, FindProjectQuery{
+		Text:           "保守",
+		ContractStatus: "active",
+	})
+	assertNoError(t, err)
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if results[0].Project.ID != 1 {
+		t.Errorf("expected ID=1, got %d", results[0].Project.ID)
+	}
+}
+
+// F-T07: ID 検索時は ContractStatus post-filter をスキップ（ID が優先、フィルタなし）
+func TestService_FindProject_IDSearch_ContractStatusSkipped(t *testing.T) {
+	pr := &stubProjectRepo{
+		// DeliveryStatusName が "検収済"（ended）でも ContractStatus="active" でスキップ
+		getResult: &boardapi.ProjectEntity{ID: 10, DeliveryStatusName: "検収済"},
+	}
+	cr := &stubClientRepo{}
+	svc := newProjectTestService(pr, cr)
+
+	results, err := svc.FindProject(testCtx, FindProjectQuery{
+		ID:             10,
+		ContractStatus: "active",
+	})
+	assertNoError(t, err)
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result (ID search skips ContractStatus filter), got %d", len(results))
+	}
+}
+
+// F-T08: Statuses 直接指定（ContractStatus なし）が既存通り動作することを regression 確認
+func TestService_FindProject_StatusesDirect_Regression(t *testing.T) {
+	pr := &stubProjectRepo{
+		searchResult: []boardapi.ProjectEntity{
+			{ID: 1, Name: "P1", OrderStatusName: "受注済"},
+			{ID: 2, Name: "P2", DeliveryStatusName: "納品済"},
+			{ID: 3, Name: "P3", OrderStatusName: "見積中"},
+		},
+	}
+	cr := &stubClientRepo{}
+	svc := newProjectTestService(pr, cr)
+
+	results, err := svc.FindProject(testCtx, FindProjectQuery{
+		Name:     "x",
+		Statuses: []string{"受注済", "納品済"},
+	})
+	assertNoError(t, err)
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+}
+
 // N05-T22: client enrichment 失敗は non-fatal — 1 件返却 + slog.Warn 1 回
 func TestService_FindProject_ClientEnrichmentFails_NonFatal_LogsWarn(t *testing.T) {
 	h := withRecordedSlog(t)

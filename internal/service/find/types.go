@@ -37,10 +37,21 @@ func validateQuery(common FindCommonOpts, specific validatable) error {
 	return specific.validate()
 }
 
-// validateStatusFields は Status/Statuses 排他チェックと Statuses 上限チェックを行う。
-func validateStatusFields(status string, statuses []string) error {
-	if status != "" && len(statuses) > 0 {
-		return errors.New("invalid query: Status and Statuses are mutually exclusive")
+// validateStatusGroup は Status / Statuses / ContractStatus の 3-way 排他チェックと
+// Statuses 上限チェックを行う。ContractStatus を持たないクエリ型は contractStatus="" を渡す。
+func validateStatusGroup(status string, statuses []string, contractStatus string) error {
+	setCount := 0
+	if status != "" {
+		setCount++
+	}
+	if len(statuses) > 0 {
+		setCount++
+	}
+	if contractStatus != "" {
+		setCount++
+	}
+	if setCount > 1 {
+		return errors.New("invalid query: status / statuses / contract_status are mutually exclusive")
 	}
 	if len(statuses) > 10 {
 		return errors.New("at most 10 statuses allowed")
@@ -68,26 +79,28 @@ func (q FindClientQuery) validate() error {
 // FindProjectQuery はプロジェクト検索クエリ。
 type FindProjectQuery struct {
 	FindCommonOpts
-	ID       int
-	Name     string
-	ClientID int
-	Text     string
-	Status   string
-	Statuses []string
+	ID             int
+	Name           string
+	ClientID       int
+	Text           string
+	Status         string
+	Statuses       []string
+	ContractStatus string // alias: active / ended / prospect / all
 }
 
 func (q FindProjectQuery) validate() error {
-	if err := validateStatusFields(q.Status, q.Statuses); err != nil {
+	if err := validateStatusGroup(q.Status, q.Statuses, q.ContractStatus); err != nil {
 		return err
 	}
 	if q.ID == 0 && q.Name == "" && q.ClientID == 0 && q.Text == "" &&
-		q.Status == "" && len(q.Statuses) == 0 {
+		q.Status == "" && len(q.Statuses) == 0 && q.ContractStatus == "" {
 		return errors.New("at least one field required")
 	}
 	// advisor R3: Status/Statuses-only は API delegation 不可で全件取得を要するため reject。
-	// Status/Statuses を使う場合は ID/Name/ClientID/Text のいずれかによる narrowing が必須。
+	// ContractStatus も同様に narrowing が必須。
+	// Status/Statuses/ContractStatus を使う場合は ID/Name/ClientID/Text のいずれかが必要。
 	hasNarrow := q.ID != 0 || q.Name != "" || q.ClientID != 0 || q.Text != ""
-	hasStatus := q.Status != "" || len(q.Statuses) > 0
+	hasStatus := q.Status != "" || len(q.Statuses) > 0 || q.ContractStatus != ""
 	if hasStatus && !hasNarrow {
 		return errors.New("Status/Statuses requires at least one of ID, Name, ClientID, or Text to narrow results")
 	}
@@ -179,7 +192,7 @@ type FindInvoiceQuery struct {
 }
 
 func (q FindInvoiceQuery) validate() error {
-	if err := validateStatusFields(q.Status, q.Statuses); err != nil {
+	if err := validateStatusGroup(q.Status, q.Statuses, ""); err != nil {
 		return err
 	}
 	if q.ID == 0 && q.ClientID == 0 && q.Text == "" &&
@@ -188,7 +201,7 @@ func (q FindInvoiceQuery) validate() error {
 	}
 	// N07a D2: Statuses (multi) only は API delegation 不可で full-scan を要するため reject。
 	// Status (single) は StatusEq で API delegation 可のため allow。
-	// Status は validateStatusFields で Statuses と相互排他 → narrowing オプションとして列挙しない。
+	// Status は validateStatusGroup で Statuses と相互排他 → narrowing オプションとして列挙しない。
 	hasNarrow := q.ID != 0 || q.ClientID != 0 || q.Text != ""
 	if len(q.Statuses) > 0 && !hasNarrow {
 		return errors.New("invalid query: Statuses requires one of ID, ClientID, or Text to narrow results")
@@ -222,7 +235,7 @@ type FindPurchaseOrderQuery struct {
 }
 
 func (q FindPurchaseOrderQuery) validate() error {
-	if err := validateStatusFields(q.Status, q.Statuses); err != nil {
+	if err := validateStatusGroup(q.Status, q.Statuses, ""); err != nil {
 		return err
 	}
 	if q.ID == 0 && q.VendorID == 0 && q.Text == "" &&
@@ -231,7 +244,7 @@ func (q FindPurchaseOrderQuery) validate() error {
 	}
 	// N07a D2: Statuses (multi) only は API delegation 不可で full-scan を要するため reject。
 	// Status (single) は StatusEq で API delegation 可のため allow。
-	// Status は validateStatusFields で Statuses と相互排他 → narrowing オプションとして列挙しない。
+	// Status は validateStatusGroup で Statuses と相互排他 → narrowing オプションとして列挙しない。
 	hasNarrow := q.ID != 0 || q.VendorID != 0 || q.Text != ""
 	if len(q.Statuses) > 0 && !hasNarrow {
 		return errors.New("invalid query: Statuses requires one of ID, VendorID, or Text to narrow results")
@@ -250,7 +263,7 @@ type FindPaymentQuery struct {
 }
 
 func (q FindPaymentQuery) validate() error {
-	if err := validateStatusFields(q.Status, q.Statuses); err != nil {
+	if err := validateStatusGroup(q.Status, q.Statuses, ""); err != nil {
 		return err
 	}
 	if q.ID == 0 && q.VendorID == 0 && q.Text == "" &&
@@ -259,7 +272,7 @@ func (q FindPaymentQuery) validate() error {
 	}
 	// N07a D2: Statuses (multi) only は API delegation 不可で full-scan を要するため reject。
 	// Status (single) は StatusEq で API delegation 可のため allow。
-	// Status は validateStatusFields で Statuses と相互排他 → narrowing オプションとして列挙しない。
+	// Status は validateStatusGroup で Statuses と相互排他 → narrowing オプションとして列挙しない。
 	hasNarrow := q.ID != 0 || q.VendorID != 0 || q.Text != ""
 	if len(q.Statuses) > 0 && !hasNarrow {
 		return errors.New("invalid query: Statuses requires one of ID, VendorID, or Text to narrow results")

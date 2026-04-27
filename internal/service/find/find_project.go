@@ -50,11 +50,19 @@ func (s *Service) FindProject(ctx context.Context, q FindProjectQuery) ([]Projec
 	// Status/Statuses-only ケースは types.go の validate() で reject 済（advisor R3）。
 	// ここに到達した時点で必ず ID/ClientID/Name/Text のいずれかが処理されている。
 
-	// Status post-filter: ID 検索時はスキップ（旧 find_project.go 踏襲、UX 配慮）。
+	// Status/ContractStatus post-filter: ID 検索時はスキップ（旧 find_project.go 踏襲、UX 配慮）。
+	// ContractStatus → Statuses → Status の優先順で評価（validateStatusGroup で排他保証済）。
 	if q.ID == 0 {
-		if len(q.Statuses) > 0 {
+		switch {
+		case q.ContractStatus != "":
+			filtered, err := filterProjectsByContractStatus(projects, q.ContractStatus)
+			if err != nil {
+				return nil, err
+			}
+			projects = filtered
+		case len(q.Statuses) > 0:
 			projects = filterProjectsByStatuses(projects, q.Statuses)
-		} else if q.Status != "" {
+		case q.Status != "":
 			projects = filterProjectsByStatus(projects, q.Status)
 		}
 	}
