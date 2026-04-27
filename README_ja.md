@@ -223,6 +223,12 @@ pretty_default = false
 
 利用可能な MCP ツールは `board find` に対応（11 ツール）: `find_client`、`find_project`、`find_estimate`、`find_invoice`、`find_order`、`find_delivery`、`find_receipt`、`find_vendor`、`find_purchase_order`、`find_payment`、`find_user`。（`find_groups` は v0.7.0 で削除されました。`board api groups list --name-cont <name>` で代替してください。）
 
+**保守契約検索**: 「特定顧客の保守契約の有効性確認」のような段階的検索向けに、
+`find_projects` (MCP) と `board find project` (CLI) は
+`contract_status` alias（`active` / `ended` / `prospect` / `all`）と
+`statuses[]` / `--statuses` リストを受け付けます。
+詳細は [docs/usage/maintenance-contract-search.md](docs/usage/maintenance-contract-search.md) 参照。
+
 ## アーキテクチャ
 
 ```

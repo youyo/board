@@ -222,6 +222,8 @@ Multiple profiles are supported. Switch with `board configure use <profile>` or 
 
 Available MCP tools mirror `board find` (11 tools): `find_client`, `find_project`, `find_estimate`, `find_invoice`, `find_order`, `find_delivery`, `find_receipt`, `find_vendor`, `find_purchase_order`, `find_payment`, `find_user`. (`find_groups` was removed in v0.7.0; use `board api groups list --name-cont <name>` instead.)
 
+**Maintenance contract search**: For step-by-step searches like "verify a customer's maintenance contract", `find_projects` (MCP) and `board find project` (CLI) accept a `contract_status` alias (`active` / `ended` / `prospect` / `all`) and a `statuses[]` / `--statuses` list. See [docs/usage/maintenance-contract-search.md](docs/usage/maintenance-contract-search.md).
+
 ## Architecture
 
 ```

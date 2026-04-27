@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `find_projects` MCP tool / `board find project` CLI に `contract_status` (active/ended/prospect/all) と `statuses[]` (`--statuses`) を追加
+  - 業務用語 alias で保守契約検索が 1 呼び出しで可能
+  - statuses は service 層既存実装を schema / CLI flag に露出（最大 10 件、status と相互排他）
+  - 段階的検索 (active → ended) は LLM 側ループで実現（サーバーはステートレス）
+  - alias 仕様: docs/usage/maintenance-contract-search.md 参照、後方互換性あり
+
 ## [0.7.0] - 2026-04-27
 
 Phase N: find 層ゼロベース再設計 + MCP schema 刷新（v0.7.0 minor bump、複数 breaking changes 含む）
