@@ -357,3 +357,163 @@ func TestErrorResult(t *testing.T) {
 		t.Error("errorResult should set IsError=true")
 	}
 }
+
+// ========== M-T01〜M-T09: statuses / contract_status パラメータ ==========
+
+// M-T01: find_projects スキーマに statuses (array) が露出していること。
+func TestFindProjectsTool_HasStatusesProperty(t *testing.T) {
+	s := New(nil)
+	tools := s.MCPServer().ListTools()
+	tool, ok := tools["find_projects"]
+	if !ok {
+		t.Fatal("tool find_projects not found")
+	}
+	propAny, ok := tool.Tool.InputSchema.Properties["statuses"]
+	if !ok {
+		t.Fatal("find_projects missing 'statuses' property")
+	}
+	propMap, ok := propAny.(map[string]any)
+	if !ok {
+		t.Fatalf("find_projects.statuses is not a map: %T", propAny)
+	}
+	typ, _ := propMap["type"].(string)
+	if typ != "array" {
+		t.Errorf("find_projects.statuses type = %q, want %q", typ, "array")
+	}
+}
+
+// M-T02: find_projects スキーマに contract_status (string) が露出していること。
+func TestFindProjectsTool_HasContractStatusProperty(t *testing.T) {
+	s := New(nil)
+	tools := s.MCPServer().ListTools()
+	tool, ok := tools["find_projects"]
+	if !ok {
+		t.Fatal("tool find_projects not found")
+	}
+	if _, ok := tool.Tool.InputSchema.Properties["contract_status"]; !ok {
+		t.Fatal("find_projects missing 'contract_status' property")
+	}
+}
+
+// M-T03: statuses の description に narrowing ルール言及があること。
+func TestFindProjectsTool_StatusesDescriptionMentionsNarrowing(t *testing.T) {
+	s := New(nil)
+	tools := s.MCPServer().ListTools()
+	tool, ok := tools["find_projects"]
+	if !ok {
+		t.Fatal("tool find_projects not found")
+	}
+	propAny, ok := tool.Tool.InputSchema.Properties["statuses"]
+	if !ok {
+		t.Fatal("find_projects missing 'statuses' property")
+	}
+	propMap, ok := propAny.(map[string]any)
+	if !ok {
+		t.Fatalf("find_projects.statuses is not a map: %T", propAny)
+	}
+	desc, _ := propMap["description"].(string)
+	if !containsAny(desc, "narrow", "Mutually exclusive", "mutually exclusive") {
+		t.Errorf("find_projects.statuses description must mention narrowing or mutual exclusion, got: %q", desc)
+	}
+}
+
+// M-T04: contract_status の description に valid alias 値列挙があること。
+func TestFindProjectsTool_ContractStatusDescriptionMentionsValidAliases(t *testing.T) {
+	s := New(nil)
+	tools := s.MCPServer().ListTools()
+	tool, ok := tools["find_projects"]
+	if !ok {
+		t.Fatal("tool find_projects not found")
+	}
+	propAny, ok := tool.Tool.InputSchema.Properties["contract_status"]
+	if !ok {
+		t.Fatal("find_projects missing 'contract_status' property")
+	}
+	propMap, ok := propAny.(map[string]any)
+	if !ok {
+		t.Fatalf("find_projects.contract_status is not a map: %T", propAny)
+	}
+	desc, _ := propMap["description"].(string)
+	for _, alias := range []string{"active", "ended", "prospect", "all"} {
+		if !containsAny(desc, alias) {
+			t.Errorf("find_projects.contract_status description must mention alias %q, got: %q", alias, desc)
+		}
+	}
+}
+
+// M-T05: find_projects の既存プロパティ（id/client_name/name/text/status/limit）が引き続き存在すること。
+func TestFindProjectsTool_ExistingPropertiesStillPresent(t *testing.T) {
+	s := New(nil)
+	tools := s.MCPServer().ListTools()
+	tool, ok := tools["find_projects"]
+	if !ok {
+		t.Fatal("tool find_projects not found")
+	}
+	for _, prop := range []string{"id", "client_name", "name", "text", "status", "limit", "statuses", "contract_status"} {
+		if _, exists := tool.Tool.InputSchema.Properties[prop]; !exists {
+			t.Errorf("find_projects missing property %q", prop)
+		}
+	}
+}
+
+// M-T06: getStringArrayArg — nil args で nil 返却。
+func TestGetStringArrayArg_NilArgs(t *testing.T) {
+	req := mcp.CallToolRequest{
+		Params: mcp.CallToolParams{Arguments: nil},
+	}
+	got := getStringArrayArg(req, "statuses")
+	if got != nil {
+		t.Errorf("getStringArrayArg with nil args = %v, want nil", got)
+	}
+}
+
+// M-T07: getStringArrayArg — []any の文字列要素を []string に変換。
+func TestGetStringArrayArg_SliceOfAny(t *testing.T) {
+	req := mcp.CallToolRequest{
+		Params: mcp.CallToolParams{Arguments: map[string]any{
+			"statuses": []any{"受注済", "納品済"},
+		}},
+	}
+	got := getStringArrayArg(req, "statuses")
+	want := []string{"受注済", "納品済"}
+	if len(got) != len(want) {
+		t.Fatalf("getStringArrayArg len = %d, want %d", len(got), len(want))
+	}
+	for i, w := range want {
+		if got[i] != w {
+			t.Errorf("getStringArrayArg[%d] = %q, want %q", i, got[i], w)
+		}
+	}
+}
+
+// M-T08: getStringArrayArg — 非 string 要素は skip。
+func TestGetStringArrayArg_SkipsNonString(t *testing.T) {
+	req := mcp.CallToolRequest{
+		Params: mcp.CallToolParams{Arguments: map[string]any{
+			"statuses": []any{"受注済", 42, "納品済", true},
+		}},
+	}
+	got := getStringArrayArg(req, "statuses")
+	want := []string{"受注済", "納品済"}
+	if len(got) != len(want) {
+		t.Fatalf("getStringArrayArg len = %d, want %d (non-strings should be skipped)", len(got), len(want))
+	}
+	for i, w := range want {
+		if got[i] != w {
+			t.Errorf("getStringArrayArg[%d] = %q, want %q", i, got[i], w)
+		}
+	}
+}
+
+// M-T09: getStringArrayArg — 型が []any でなければ nil 返却。
+func TestGetStringArrayArg_WrongType(t *testing.T) {
+	req := mcp.CallToolRequest{
+		Params: mcp.CallToolParams{Arguments: map[string]any{
+			"statuses": "not-an-array",
+		}},
+	}
+	got := getStringArrayArg(req, "statuses")
+	if got != nil {
+		t.Errorf("getStringArrayArg with wrong type = %v, want nil", got)
+	}
+}

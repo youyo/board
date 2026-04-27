@@ -216,12 +216,14 @@ func findUsersTool(srv *Server) server.ServerTool {
 func findProjectsTool(srv *Server) server.ServerTool {
 	return server.ServerTool{
 		Tool: mcp.NewTool("find_projects",
-			mcp.WithDescription("Search BOARD projects by ID, client name, project name, or free text. Returns project entities with enriched client info. client_name resolves with ambiguity error on multiple matches. status filtering requires narrowing (must combine with id/client_name/name/text)."),
+			mcp.WithDescription("Search BOARD projects by ID, client name, project name, or free text. Returns project entities with enriched client info. client_name resolves with ambiguity error on multiple matches. status/statuses/contract_status filtering requires narrowing (must combine with id/client_name/name/text). status, statuses, contract_status are mutually exclusive."),
 			mcp.WithNumber("id", mcp.Description("Project ID for direct lookup (highest priority; ignores other filters).")),
 			mcp.WithString("client_name", mcp.Description(disambiguateNameDesc("client", "project"))),
 			mcp.WithString("name", mcp.Description("Substring match on project name.")),
 			mcp.WithString("text", mcp.Description("Free-text search across name, code, memo (lowest priority).")),
-			mcp.WithString("status", mcp.Description("Filter by project status (e.g. 受注, 完了). MUST be combined with id/client_name/name/text — status-only query is rejected (API delegation not possible, narrowing required per N05).")),
+			mcp.WithString("status", mcp.Description("Filter by project status (e.g. 受注, 完了). MUST be combined with id/client_name/name/text — status-only query is rejected (API delegation not possible, narrowing required per N05). Mutually exclusive with statuses / contract_status.")),
+			mcp.WithArray("statuses", mcp.WithStringItems(), mcp.Description("Filter by multiple project statuses (OR). Mutually exclusive with status / contract_status. Same narrowing rules apply. Max 10 items.")),
+			mcp.WithString("contract_status", mcp.Description("Contract status alias. Valid values: active (in-progress: 未着手/着手中/納品済), ended (検収済), prospect (見積中*), all. Mutually exclusive with status / statuses. Same narrowing rules apply. See docs/usage/maintenance-contract-search.md.")),
 			mcp.WithNumber("limit", mcp.Description(limitDesc())),
 			readOnlyAnnotation(),
 		),
@@ -242,6 +244,8 @@ func findProjectsTool(srv *Server) server.ServerTool {
 				Name:           getStringArg(req, "name"),
 				Text:           getStringArg(req, "text"),
 				Status:         getStringArg(req, "status"),
+				Statuses:       getStringArrayArg(req, "statuses"),
+				ContractStatus: getStringArg(req, "contract_status"),
 			})
 			if err != nil {
 				return errorResult(err), nil
@@ -490,4 +494,29 @@ func findPaymentsTool(srv *Server) server.ServerTool {
 			return marshalResult(results)
 		},
 	}
+}
+
+// getStringArrayArg extracts a []string argument from a CallToolRequest.
+// JSON arrays arrive as []any; non-string elements are silently skipped.
+// Returns nil if the key is missing, the args map is nil, or the value is not a []any.
+func getStringArrayArg(req mcp.CallToolRequest, key string) []string {
+	args := req.GetArguments()
+	if args == nil {
+		return nil
+	}
+	v, ok := args[key]
+	if !ok {
+		return nil
+	}
+	raw, ok := v.([]any)
+	if !ok {
+		return nil
+	}
+	out := make([]string, 0, len(raw))
+	for _, elem := range raw {
+		if s, ok := elem.(string); ok {
+			out = append(out, s)
+		}
+	}
+	return out
 }
