@@ -175,6 +175,10 @@ E2E SKIP の仕分けのみを実施する。新規削除・再設計は行わ�
 - **N09 完了（2026-04-27）**: E2E テスト再構築。旧 193 ケースから Service 層 41 ケース + MCP handler 経由 5 ケース = **計 46 ケース**へ削減。SKIP 統一テンプレート 4 種（`[SKIP:no-creds|no-data|cache-warm|rate-limit] msg`）で grep 集計可能化。実 API 感応するケースのみを残し、per-batch 実行（rate-limit 配慮）+ CI 非実行（ローカル開発者手動）の運用に移行。
   - **MCP refresh 未公開の再判断（D6）**: 本 N09 では handler 経由 5 ケース (T42-T46) で挙動を確認。cache miss 頻度が観測時に高ければ ADR-002 起票候補（リリース前 N10 で再判断）。
   - **Payment.Project = nil 仮説の E2E 確認（D1）**: T37 (`TestE2E_FindPayment_Search_Smoke`) で実 API 取得結果の全件 `Result.Project == nil` を assert。データ 0 件 (E2E dump 0 件と整合) なら `[SKIP:no-data]`、件数 > 0 で nil 違反検出時はテスト fail → ADR-002 起票が必要。N09 時点では実環境にデータ無しが前提のため D1 仮定維持。
+- **N10 完了（2026-04-27）**: v0.7.0 リリース準備完了。CHANGELOG / README / マイグレーションガイド (`docs/migration/v0.7.0.md`) 最終化、`.claude-plugin/plugin.json` を 0.7.0 に bump、`git tag v0.7.0` をローカル作成（push は待機）。production code は 0 行変更（docs / chore のみ）。
+  - **N06 deferred review trigger（再掲）**: N08 完了（2026-04-27）+ 2 週間後 ≈ **2026-05-11** に find 層呼び出し実績 / LLM 利用パターンを再評価。50% 以下なら ADR-002 起票候補。
+  - **Payment.Project = nil 仮説（D1）**: 実環境データ 0 件のため N09 T37 検証保留。本番でデータ蓄積後再評価。
+  - **MCP refresh 公開判断（D6）**: T45/T46 で cache miss 頻度未観測（[SKIP:no-creds] 想定）。本番運用後実測して再判断。
 
 ## References
 

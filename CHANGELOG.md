@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-04-27
+
+Phase N: find 層ゼロベース再設計 + MCP schema 刷新（v0.7.0 minor bump、複数 breaking changes 含む）
+
+詳細マイグレーションガイド: [docs/migration/v0.7.0.md](docs/migration/v0.7.0.md)
+
+### Breaking Changes (まとめ)
+
+- find 層を Phase H 仕様から完全ゼロベース再設計（N01-N07）
+- MCP tool 数: 12 → 11（`find_groups` 削除、N07b）
+- MCP `find_estimates/orders/deliveries/receipts.status` schema 削除（構造的不可、N08）
+- `find_projects` の `status` / `statuses[]` 単独クエリを reject（narrowing 必須、N05）
+- `find_invoices/purchase_orders/payments` の `statuses[]` 単独クエリを reject（N07a）
+- enrichment 失敗時のセマンティクスを非致命に変更（旧: 全体 error → 新: nil + warn + 主 entity 返却、N04）
+- name → ID 解決の重複ヒットは silent take-first → ambiguity error（候補上限 5 件、N07c）
+
 ### Changed (Breaking)
 
 - **MCP tool schema から Document 4 種の `status` プロパティを削除（N08）**
@@ -54,6 +70,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `find estimate/order/delivery/receipt --status`: `--status filtering is not supported for documents (no Status field on entity)`
   - `find payment --project-name`: `not supported for payments (no project_id on entity)`（PaymentEntity に ProjectID なし）
   - 将来拡張予定（`find invoice/purchase-order --project-name`、`find payment --purchase-order-id`）は `not yet supported (tracked for future enhancement)` と明示。
+
+### Removed
+
+- 旧 `internal/service/find/`（Phase H 産物、47 E2E + 旧 unit、N07b で全削除）
+- `find_groups` MCP tool / `cli/find_group.go`（ADR-001 forced、N07b）
+- 旧 E2E 193 ケース（N09）
+
+### Internal
+
+- find 層実装新規 LOC: 約 +3,000（find2/ → find/ rename 含む）
+- Phase N コミット数: 30+
+- ADR-001 (find layer) Status: Accepted（B 採択、ゼロベース再設計）
+- ADR-001 N06 deferred review trigger: ≈ 2026-05-11（N08 完了 + 2 週間後）に find 層呼び出し実績 / LLM 利用パターンを再評価。50% 以下なら ADR-002 起票候補。
+- Payment.Project = nil 仮説（D1）の本番再評価は実環境データ蓄積後（T37 結果次第）
+- MCP refresh 公開判断（D6）は T45/T46 cache miss 頻度実測後（本番運用後再判断）
+- `.claude-plugin/plugin.json` version を 0.6.0 → 0.7.0 に bump
+
+### Migration
+
+`docs/migration/v0.7.0.md` を新規追加。breaking changes ごとの対処手順を 8 章構成で網羅。
 
 ## [0.6.0] - 2026-04-24
 
