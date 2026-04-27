@@ -320,6 +320,72 @@ func TestFindUserCmdRequiresAtLeastOneFlag(t *testing.T) {
 // TestNewFindGroupCmd / TestFindGroupCmdRequiresAtLeastOneFlag are removed in N07b
 // because the find_group command is removed (ADR-001 Group 削除確定、find2 では FindGroup なし)。
 
+// ========== CLI-T01〜T05: --statuses / --contract-status フラグ ==========
+
+// CLI-T01: find project コマンドに --statuses フラグが定義されていること。
+func TestFindProjectCmd_HasStatusesFlag(t *testing.T) {
+	cmd := cli.NewFindProjectCmd()
+	if f := cmd.Flags().Lookup("statuses"); f == nil {
+		t.Error("--statuses flag not defined")
+	}
+}
+
+// CLI-T02: find project コマンドに --contract-status フラグが定義されていること。
+func TestFindProjectCmd_HasContractStatusFlag(t *testing.T) {
+	cmd := cli.NewFindProjectCmd()
+	if f := cmd.Flags().Lookup("contract-status"); f == nil {
+		t.Error("--contract-status flag not defined")
+	}
+}
+
+// CLI-T03: --statuses=受注済 で no-flag バリデーションを通過すること（フラグが「at least one of」に加算される）。
+// (app context がないため実際のサービス呼び出し前に errNoApp が返る)
+func TestFindProjectCmd_StatusesFlagCountsAsNarrow(t *testing.T) {
+	cmd := cli.NewFindProjectCmd()
+	root := &cobra.Command{Use: "board"}
+	root.AddCommand(cmd)
+	root.SetArgs([]string{"project", "--statuses", "受注済"})
+	err := root.Execute()
+	// errNoApp か service エラーが期待される（"at least one of" ではない）
+	if err == nil {
+		t.Fatal("expected error (no app context), got nil")
+	}
+	if strings.Contains(err.Error(), "at least one of") {
+		t.Errorf("--statuses should count as a narrowing flag, but got: %v", err)
+	}
+}
+
+// CLI-T04: --contract-status=active で no-flag バリデーションを通過すること。
+func TestFindProjectCmd_ContractStatusFlagCountsAsNarrow(t *testing.T) {
+	cmd := cli.NewFindProjectCmd()
+	root := &cobra.Command{Use: "board"}
+	root.AddCommand(cmd)
+	root.SetArgs([]string{"project", "--contract-status", "active"})
+	err := root.Execute()
+	// errNoApp か service エラーが期待される（"at least one of" ではない）
+	if err == nil {
+		t.Fatal("expected error (no app context), got nil")
+	}
+	if strings.Contains(err.Error(), "at least one of") {
+		t.Errorf("--contract-status should count as a narrowing flag, but got: %v", err)
+	}
+}
+
+// CLI-T05: --status=受注済 --contract-status=active で 3-way 排他エラーが返ること（CLI 側チェック）。
+func TestFindProjectCmd_StatusAndContractStatusAreMutuallyExclusive(t *testing.T) {
+	cmd := cli.NewFindProjectCmd()
+	root := &cobra.Command{Use: "board"}
+	root.AddCommand(cmd)
+	root.SetArgs([]string{"project", "--name", "保守", "--status", "受注済", "--contract-status", "active"})
+	err := root.Execute()
+	if err == nil {
+		t.Fatal("expected mutually exclusive error, got nil")
+	}
+	if !strings.Contains(err.Error(), "mutually exclusive") {
+		t.Errorf("expected 'mutually exclusive' in error, got: %v", err)
+	}
+}
+
 // ========== N07c: 構造的未対応 / 将来拡張 reject フラグの最終エラー文言確認 ==========
 
 // rejectCases は CLI 側で resolver 経路に到達する前に reject されるべきフラグ組み合わせを確認する。
