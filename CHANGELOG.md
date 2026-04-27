@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed (Breaking)
+
+- **`board find` の enrichment は non-fatal セマンティクス**（Phase N ゼロベース再設計の一環）
+  - `find` 系結果の補助フィールド（`Project` / `Client` / `Vendor` / `Branches` / `Contacts` 等）は、
+    enrichment API 呼び出しが失敗した場合に `nil` または空配列で返ります。主検索 entity 自体は fail-fast で確実に返ります。
+  - 旧実装の「全 enrichment が成功するまで全体 error」とは挙動が異なります。LLM/CLI 利用側で nil チェックの導入をお願いします。
+  - 詳細: `docs/adr/ADR-001-find-layer.md`
+
+### Added
+
+- **`board find <sub>` の name → ID 解決配線（N07c）**
+  - `find project --client-name <name>`: client name → ClientID を解決して検索
+  - `find invoice --client-name <name>`: 同上
+  - `find purchase-order --vendor-name <name>`: vendor name → VendorID を解決
+  - `find payment --vendor-name <name>`: 同上
+  - 部分一致（NameCont）が複数ヒットした場合は曖昧性 error + 候補上限 5 件列挙し、`--id` 指定を促します（silent take-first しません）。
+  - Document 4 種（estimate/order/delivery/receipt）の `--client-name` / `--project-name` も配線完了。
+    ただしこれら Document 系は **fanout 検索**（マッチした全 client / project から集約）であり、
+    上記の disambiguate（曖昧性 error）は行いません。1 件に絞りたい場合は `--id` / `--project-id` を使用してください。
+- **構造的に未対応のフラグは最終エラー文言に統一**
+  - `find estimate/order/delivery/receipt --status`: `--status filtering is not supported for documents (no Status field on entity)`
+  - `find payment --project-name`: `not supported for payments (no project_id on entity)`（PaymentEntity に ProjectID なし）
+  - 将来拡張予定（`find invoice/purchase-order --project-name`、`find payment --purchase-order-id`）は `not yet supported (tracked for future enhancement)` と明示。
+
 ## [0.6.0] - 2026-04-24
 
 Phase M: CLI / ドキュメント / LLM 連携の拡充（v0.6.0 minor bump）

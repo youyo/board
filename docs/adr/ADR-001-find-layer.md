@@ -161,6 +161,16 @@ E2E SKIP の仕分けのみを実施する。新規削除・再設計は行わ�
 
 - **B 採択（確定）**: N02 = 新 find 層仕様策定（Query/Result 型・5 件特化 API 設計）→ N03-N07 = リソース別実装（client / project / document / vendor / master）→ N08 = MCP tools 刷新 → N09 = E2E テスト再構築 → N10 = v0.7.0 リリース
 
+## Implementation Status
+
+- N03 完了（2026-04-25）: find2/ パッケージ骨格 + 共通ヘルパー + helpers_test
+- N04 完了（2026-04-25）: FindClient + FindVendor 具象実装、non-fatal enrichment 規約確立
+- N05 完了（2026-04-26）: FindProject 実装、Status/Statuses-only validation reject
+- N06 完了（2026-04-26）: Document 4 種実装、reverseMapper 初実用
+- N07a 完了（2026-04-27）: FindInvoice/PurchaseOrder/Payment/User 実装
+- N07b 完了（2026-04-27）: 旧 find/ 削除 + find2/ → find/ rename、Group 削除確定
+- **N07c 完了（2026-04-27）**: CLI/MCP の name → ID 解決配線（`ResolveClientByName` / `ResolveVendorByName`）、構造的未対応フラグの最終エラー文言確定、enrichment non-fatal の breaking change を CHANGELOG / api-reference に告知
+
 ## References
 
 - 調査レポート: [plans/board-phase-n-m01-find-rationale.md](../../plans/board-phase-n-m01-find-rationale.md)

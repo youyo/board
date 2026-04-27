@@ -838,6 +838,44 @@ board docs --search "Ransack" --format json | jq '.results[0]'
 
 `board find` は複数リソースを組み合わせてより便利な検索を提供します。詳細は [クイックスタート](guides/getting-started.md) を参照してください。
 
+### name → ID 解決の挙動（N07c 以降）
+
+以下のフラグは name の部分一致（Ransack `_cont`）で対象 ID を解決します。
+
+- `find project --client-name <name>` → ClientID
+- `find invoice --client-name <name>` → ClientID
+- `find purchase-order --vendor-name <name>` → VendorID
+- `find payment --vendor-name <name>` → VendorID
+
+**重複ヒット時の挙動**:
+
+- 0 件 → `no client matches name "<name>"` のエラー
+- 1 件 → ID 採用、検索続行
+- 複数 → 曖昧性エラー + 候補上限 5 件列挙（`use --id to disambiguate`）。silent take-first はしません。
+
+**Document 4 種（estimate / order / delivery / receipt）は別挙動**:
+`find estimate/order/delivery/receipt --client-name <name>` および `--project-name <name>` は
+fanout 検索であり、複数ヒット時の disambiguate は行いません（マッチした全 client / project から
+集約検索します）。曖昧性 error は出ません。1 件に絞りたい場合は `--id` または `--project-id` を使用してください。
+
+### enrichment は non-fatal
+
+`find` 系結果の補助フィールド（`Project` / `Client` / `Vendor` / `Branches` / `Contacts` 等）は、
+enrichment 用 API 呼び出しが失敗した場合に `nil` または空配列で返ります。
+主検索 entity 自体は fail-fast で確実に返ります。
+
+詳細: `docs/adr/ADR-001-find-layer.md`
+
+### 構造的に未対応のフラグ
+
+| フラグ | 状態 | 理由 |
+|--------|------|------|
+| `find estimate/order/delivery/receipt --status` | does not support | Document Entity に Status フィールドなし |
+| `find payment --project-name` | does not support | PaymentEntity に project_id なし |
+| `find invoice --project-name` | not yet supported | service Query 拡張で対応可能（将来） |
+| `find purchase-order --project-name` | not yet supported | 同上 |
+| `find payment --purchase-order-id` | not yet supported | 同上 |
+
 ---
 
 ## 関連ドキュメント
