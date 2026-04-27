@@ -165,7 +165,7 @@ func (s *Service) FindEstimate(ctx context.Context, q FindEstimateQuery) ([]Esti
 	}
 
 	for i := range results {
-		results[i].URL = documentURL(s.uiBaseURL, results[i].Estimate.ID)
+		results[i].URL = documentURL(s.uiBaseURL, results[i].ProjectID)
 	}
 	return results, nil
 }

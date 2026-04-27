@@ -150,7 +150,7 @@ func (s *Service) FindReceipt(ctx context.Context, q FindReceiptQuery) ([]Receip
 	}
 
 	for i := range results {
-		results[i].URL = documentURL(s.uiBaseURL, results[i].Receipt.ID)
+		results[i].URL = documentURL(s.uiBaseURL, results[i].ProjectID)
 	}
 	return results, nil
 }

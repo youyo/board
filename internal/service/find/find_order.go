@@ -150,7 +150,7 @@ func (s *Service) FindOrder(ctx context.Context, q FindOrderQuery) ([]OrderResul
 	}
 
 	for i := range results {
-		results[i].URL = documentURL(s.uiBaseURL, results[i].Order.ID)
+		results[i].URL = documentURL(s.uiBaseURL, results[i].ProjectID)
 	}
 	return results, nil
 }

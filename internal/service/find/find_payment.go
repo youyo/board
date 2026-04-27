@@ -68,8 +68,6 @@ func (s *Service) FindPayment(ctx context.Context, q FindPaymentQuery) ([]Paymen
 			break
 		}
 	}
-	for i := range results {
-		results[i].URL = documentURL(s.uiBaseURL, results[i].Payment.ID)
-	}
+	// Payment は ProjectID を持たない (D1) ため URL は組み立てない（空文字）。
 	return results, nil
 }
