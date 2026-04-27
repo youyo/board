@@ -20,12 +20,12 @@ import (
 //   - find_projects.status は narrowing 必須（N05、API delegation 不可）を description で警告
 func RegisterTools(s *Server) {
 	s.MCPServer().AddTools(
-		// --- Simple tools (id, name, text, limit) ---
+		// --- Simple tools (id, name, limit) ---
 		findClientsTool(s),
 		findVendorsTool(s),
 		findUsersTool(s),
 
-		// --- Project tool (id, client_name, name, text, status, limit) ---
+		// --- Project tool (id, client_name, name, status, limit) ---
 		findProjectsTool(s),
 
 		// --- Client-document tools (fanout: id, project_id, client_name, project_name, limit) ---
@@ -35,10 +35,10 @@ func RegisterTools(s *Server) {
 		findDeliveriesTool(s),
 		findReceiptsTool(s),
 
-		// --- Vendor-document tool (id, vendor_name, project_name, text, status, limit) ---
+		// --- Vendor-document tool (id, vendor_name, project_name, status, limit) ---
 		findPurchaseOrdersTool(s),
 
-		// --- Payment tool (id, vendor_name, purchase_order_id, text, status, limit) ---
+		// --- Payment tool (id, vendor_name, purchase_order_id, status, limit) ---
 		findPaymentsTool(s),
 	)
 }
@@ -142,8 +142,8 @@ func findClientsTool(srv *Server) server.ServerTool {
 	return server.ServerTool{
 		Tool: mcp.NewTool("find_clients",
 			mcp.WithDescription("Search BOARD clients by ID or name. Returns client entities with branches and contacts. Priority: id > name."),
-			mcp.WithNumber("id", mcp.Description("Client ID for direct lookup (highest priority; ignores name/text).")),
-			mcp.WithString("name", mcp.Description("Substring match on client name (ignores text).")),
+			mcp.WithNumber("id", mcp.Description("Client ID for direct lookup (highest priority; ignores name).")),
+			mcp.WithString("name", mcp.Description("Substring match on client name.")),
 			mcp.WithNumber("limit", mcp.Description(limitDesc())),
 			readOnlyAnnotation(),
 		),
@@ -165,8 +165,8 @@ func findVendorsTool(srv *Server) server.ServerTool {
 	return server.ServerTool{
 		Tool: mcp.NewTool("find_vendors",
 			mcp.WithDescription("Search BOARD vendors by ID or name. Returns vendor entities with branches and contacts. Priority: id > name."),
-			mcp.WithNumber("id", mcp.Description("Vendor ID for direct lookup (highest priority; ignores name/text).")),
-			mcp.WithString("name", mcp.Description("Substring match on vendor name (ignores text).")),
+			mcp.WithNumber("id", mcp.Description("Vendor ID for direct lookup (highest priority; ignores name).")),
+			mcp.WithString("name", mcp.Description("Substring match on vendor name.")),
 			mcp.WithNumber("limit", mcp.Description(limitDesc())),
 			readOnlyAnnotation(),
 		),
@@ -188,8 +188,8 @@ func findUsersTool(srv *Server) server.ServerTool {
 	return server.ServerTool{
 		Tool: mcp.NewTool("find_users",
 			mcp.WithDescription("Search BOARD users by ID or name. Returns user entities. Priority: id > name."),
-			mcp.WithNumber("id", mcp.Description("User ID for direct lookup (highest priority; ignores name/text).")),
-			mcp.WithString("name", mcp.Description("Substring match on user name (ignores text).")),
+			mcp.WithNumber("id", mcp.Description("User ID for direct lookup (highest priority; ignores name).")),
+			mcp.WithString("name", mcp.Description("Substring match on user name.")),
 			mcp.WithNumber("limit", mcp.Description(limitDesc())),
 			readOnlyAnnotation(),
 		),
@@ -210,11 +210,11 @@ func findUsersTool(srv *Server) server.ServerTool {
 func findProjectsTool(srv *Server) server.ServerTool {
 	return server.ServerTool{
 		Tool: mcp.NewTool("find_projects",
-			mcp.WithDescription("Search BOARD projects by ID, client name, project name, or free text. Returns project entities with enriched client info. client_name resolves with ambiguity error on multiple matches. status/statuses/contract_status filtering requires narrowing (must combine with id/client_name/name/text). status, statuses, contract_status are mutually exclusive."),
+			mcp.WithDescription("Search BOARD projects by ID, client name, or project name. Fields combine with AND (ID overrides others). Returns project entities with enriched client info. client_name resolves with ambiguity error on multiple matches. status/statuses/contract_status filtering requires narrowing (must combine with id/client_name/name). status, statuses, contract_status are mutually exclusive."),
 			mcp.WithNumber("id", mcp.Description("Project ID for direct lookup (highest priority; ignores other filters).")),
 			mcp.WithString("client_name", mcp.Description(disambiguateNameDesc("client", "project"))),
 			mcp.WithString("name", mcp.Description("Substring match on project name.")),
-			mcp.WithString("status", mcp.Description("Filter by project status (e.g. 受注, 完了). MUST be combined with id/client_name/name/text — status-only query is rejected (API delegation not possible, narrowing required per N05). Mutually exclusive with statuses / contract_status.")),
+			mcp.WithString("status", mcp.Description("Filter by project status (e.g. 受注, 完了). MUST be combined with id/client_name/name — status-only query is rejected (API delegation not possible, narrowing required). Mutually exclusive with statuses / contract_status.")),
 			mcp.WithArray("statuses", mcp.WithStringItems(), mcp.Description("Filter by multiple project statuses (OR). Mutually exclusive with status / contract_status. Same narrowing rules apply. Max 10 items.")),
 			mcp.WithString("contract_status", mcp.Description("Contract status alias. Valid values: active (in-progress: 未着手/着手中/納品済), ended (検収済), prospect (見積中*), all. Mutually exclusive with status / statuses. Same narrowing rules apply. See docs/usage/maintenance-contract-search.md.")),
 			mcp.WithNumber("limit", mcp.Description(limitDesc())),
@@ -281,7 +281,7 @@ func findEstimatesTool(srv *Server) server.ServerTool {
 func findInvoicesTool(srv *Server) server.ServerTool {
 	return server.ServerTool{
 		Tool: mcp.NewTool("find_invoices",
-			mcp.WithDescription("Search BOARD invoices by ID, client name, project name, or free text. Returns invoice entities. client_name resolves with ambiguity error on multiple matches. status accepts a single status (API delegated; no narrowing required). project_name is not yet supported."),
+			mcp.WithDescription("Search BOARD invoices by ID, client name, or status. Fields combine with AND (ID overrides others). Returns invoice entities. client_name resolves with ambiguity error on multiple matches. status accepts a single status (API delegated; no narrowing required). project_name is not yet supported."),
 			mcp.WithNumber("id", mcp.Description("Invoice ID for direct lookup (highest priority).")),
 			mcp.WithString("client_name", mcp.Description(disambiguateNameDesc("client", "invoice"))),
 			mcp.WithString("project_name", mcp.Description(notYetSupportedDesc("project name", "invoices"))),
@@ -409,7 +409,7 @@ func findReceiptsTool(srv *Server) server.ServerTool {
 func findPurchaseOrdersTool(srv *Server) server.ServerTool {
 	return server.ServerTool{
 		Tool: mcp.NewTool("find_purchase_orders",
-			mcp.WithDescription("Search BOARD purchase orders by ID, vendor name, project name, or free text. Returns purchase order entities. vendor_name resolves with ambiguity error on multiple matches. status accepts a single status (API delegated; no narrowing required). project_name is not yet supported."),
+			mcp.WithDescription("Search BOARD purchase orders by ID, vendor name, or status. Fields combine with AND (ID overrides others). Returns purchase order entities. vendor_name resolves with ambiguity error on multiple matches. status accepts a single status (API delegated; no narrowing required). project_name is not yet supported."),
 			mcp.WithNumber("id", mcp.Description("Purchase order ID for direct lookup (highest priority).")),
 			mcp.WithString("vendor_name", mcp.Description(disambiguateNameDesc("vendor", "purchase order"))),
 			mcp.WithString("project_name", mcp.Description(notYetSupportedDesc("project name", "purchase orders"))),
@@ -447,7 +447,7 @@ func findPurchaseOrdersTool(srv *Server) server.ServerTool {
 func findPaymentsTool(srv *Server) server.ServerTool {
 	return server.ServerTool{
 		Tool: mcp.NewTool("find_payments",
-			mcp.WithDescription("Search BOARD payments by ID, vendor name, or free text. Returns payment entities. vendor_name resolves with ambiguity error on multiple matches. status accepts a single status (API delegated; no narrowing required). purchase_order_id is not yet supported."),
+			mcp.WithDescription("Search BOARD payments by ID, vendor name, or status. Fields combine with AND (ID overrides others). Returns payment entities. vendor_name resolves with ambiguity error on multiple matches. status accepts a single status (API delegated; no narrowing required). purchase_order_id is not yet supported."),
 			mcp.WithNumber("id", mcp.Description("Payment ID for direct lookup (highest priority).")),
 			mcp.WithString("vendor_name", mcp.Description(disambiguateNameDesc("vendor", "payment"))),
 			mcp.WithNumber("purchase_order_id", mcp.Description(notYetSupportedDesc("purchase order ID", "payments"))),
