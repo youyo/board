@@ -84,7 +84,7 @@ func (c *Client) DoFull(req *http.Request) ([]byte, http.Header, error) {
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 32*1024*1024))
 	if err != nil {
 		return nil, nil, &APIError{
 			Code:    APIErrorNetwork,
@@ -114,7 +114,7 @@ func (c *Client) Do(req *http.Request) ([]byte, error) {
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 32*1024*1024))
 	if err != nil {
 		return nil, &APIError{
 			Code:    APIErrorNetwork,

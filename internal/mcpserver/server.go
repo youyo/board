@@ -138,7 +138,12 @@ func (s *Server) Start(ctx context.Context, host string, port int) error {
 	s.mu.Unlock()
 
 	// Build the StreamableHTTP server with a custom http.Server that uses our listener.
-	httpSrv := &http.Server{}
+	httpSrv := &http.Server{
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
 	s.httpServer = server.NewStreamableHTTPServer(
 		s.mcpServer,
 		server.WithStreamableHTTPServer(httpSrv),
