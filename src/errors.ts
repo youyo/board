@@ -1,0 +1,65 @@
+/**
+ * ツールのエラー。エンベロープ `{"schema_version":"1","error":{"code","message","retryable"}}` に変換する。
+ */
+
+export const ERROR_CODES = [
+  "argument_error",
+  "authentication_error",
+  "permission_error",
+  "not_found",
+  "api_error",
+  "rate_limited",
+  "response_too_large",
+  "generic_error",
+] as const;
+export type ErrorCode = (typeof ERROR_CODES)[number];
+
+/** ツールの応答に載せてよいエラー。message は利用者(AI)にそのまま見える。API キー・トークンを含めないこと。 */
+export class BoardError extends Error {
+  constructor(
+    readonly code: ErrorCode,
+    message: string,
+    readonly retryable = false,
+  ) {
+    super(message);
+    this.name = new.target.name;
+  }
+}
+
+/** 入力が不正(スキーマでは表せない検証)。 */
+export class ArgumentError extends BoardError {
+  constructor(message: string) {
+    super("argument_error", message, false);
+  }
+}
+
+/**
+ * 応答が上限(ツール引数 max_response_tokens)を超えた。切り詰めずにエラーにする。
+ * 絞り込んでも同じ条件では直らないので retryable は false。
+ */
+export class ResponseTooLargeError extends BoardError {
+  constructor(estimatedTokens: number, limit: number) {
+    super(
+      "response_too_large",
+      `Response is too large: estimated size ${estimatedTokens} tokens exceeds the limit of ${limit} tokens. ` +
+        "Narrow the request and retry (e.g. use filters or a smaller page size), " +
+        "or raise max_response_tokens (0 disables the limit).",
+      false,
+    );
+  }
+}
+
+export interface ErrorEnvelope {
+  schema_version: "1";
+  error: { code: ErrorCode; message: string; retryable: boolean };
+}
+
+export function errorEnvelope(code: ErrorCode, message: string, retryable: boolean): ErrorEnvelope {
+  return { schema_version: "1", error: { code, message, retryable } };
+}
+
+export function toErrorEnvelope(e: unknown): ErrorEnvelope {
+  if (e instanceof BoardError) return errorEnvelope(e.code, e.message, e.retryable);
+  // 想定外の例外は内部情報を漏らさない。
+  return errorEnvelope("generic_error", "Unexpected error.", false);
+}

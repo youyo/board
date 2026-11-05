@@ -1,0 +1,23 @@
+[
+  {
+    "name": "server_info",
+    "title": "サーバー情報",
+    "description": "Returns the name and version of this MCP server. Use it to check connectivity.",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      }
+    },
+    "annotations": {
+      "title": "サーバー情報",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  }
+]
