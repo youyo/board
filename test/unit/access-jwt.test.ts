@@ -130,6 +130,24 @@ describe("verifyAccessJwt", () => {
     }
   });
 
+  it("未知の kid の JWT が同時に多数届いても、強制再取得は 1 回にまとめる(実行中の取得を共有する)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      const unknown = await createTestKey("kid-unknown");
+      const m = mockOutboundFetch({ [CERTS]: () => jwksResponse(key) });
+      await verifyAccessJwt(await signAccessJwt(key), cfg); // 取得 1 回
+      vi.setSystemTime(Date.now() + 61_000);
+      const token = await signAccessJwt(unknown);
+      const results = await Promise.allSettled(
+        Array.from({ length: 10 }, () => verifyAccessJwt(token, cfg)),
+      );
+      expect(results.every((r) => r.status === "rejected")).toBe(true);
+      expect(m.callsTo(CERTS)).toHaveLength(2); // 初回 + 強制再取得 1 回(10 回ではない)
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("キャッシュ取得から 60 秒未満なら、未知の kid でも強制再取得しない(取得直後の再取得を省く)", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     try {

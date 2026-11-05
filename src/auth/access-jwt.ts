@@ -50,9 +50,24 @@ const cache = new Map<string, CachedJwks>();
 
 export function clearJwksCache(): void {
   cache.clear();
+  inflight.clear();
 }
 
-async function fetchJwks(teamDomain: string): Promise<JSONWebKeySet> {
+/**
+ * 実行中の JWKS 取得。同時に届いたリクエスト(未知の kid の JWT の連投など)が、
+ * キャッシュの更新前にそろって取得を始めないよう、取得中はその Promise を共有する。
+ */
+const inflight = new Map<string, Promise<JSONWebKeySet>>();
+
+function fetchJwks(teamDomain: string): Promise<JSONWebKeySet> {
+  const running = inflight.get(teamDomain);
+  if (running) return running;
+  const p = fetchJwksOnce(teamDomain).finally(() => inflight.delete(teamDomain));
+  inflight.set(teamDomain, p);
+  return p;
+}
+
+async function fetchJwksOnce(teamDomain: string): Promise<JSONWebKeySet> {
   let res: Response;
   try {
     res = await fetch(`https://${teamDomain}/cdn-cgi/access/certs`);
