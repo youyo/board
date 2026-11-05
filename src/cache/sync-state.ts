@@ -1,7 +1,7 @@
 /**
  * sync_state(Go 版 `internal/cache/sync_state.go`)。リソースごとの同期状態・ロック・full の進捗。
  * Go から外した列: profile_name / last_daily_refresh_date(daily auto-refresh の廃止)/ cache_version / schema_version。
- * 足した列: full_generation / full_next_page / full_started_at / full_max_updated_at(full の再開)。
+ * 足した列: full_generation / full_next_page / full_started_at / full_max_updated_at(full の再開)、delta_next_page / delta_started_at / delta_max_updated_at(delta の再開。v3)。
  */
 
 import { ensureSchema } from "./schema";
@@ -32,6 +32,11 @@ export interface SyncState {
   full_max_updated_at: string | null;
   /** 直近の full の完了時に、件数の照合に通らず旧世代を消さなかった(1)。次の full で取り直す。 */
   full_prune_skipped: number;
+  /** 進行中の delta の次に取るページ。NULL なら delta は進行していない。カーソルは完了するまで動かさない。 */
+  delta_next_page: number | null;
+  delta_started_at: string | null;
+  /** 進行中の delta で見た updated_at の最大値(完了時のカーソルの元)。 */
+  delta_max_updated_at: string | null;
 }
 
 export async function getSyncState(db: D1Database, resource: string): Promise<SyncState | null> {

@@ -37,6 +37,13 @@ describe("ツール定義", () => {
     });
   });
 
+  it("cache 系は D1 だけを扱うので openWorldHint=false、ほかの全ツールは true", () => {
+    for (const t of ALL_TOOLS) {
+      const isCache = t.name === "cache_status" || t.name === "cache_clear";
+      expect(t.annotations.openWorldHint, t.name).toBe(!isCache);
+    }
+  });
+
   it("cache_expire は作らない(読み取りに影響しないため)", () => {
     expect(byName.has("cache_expire")).toBe(false);
   });

@@ -6,7 +6,7 @@
  * - 版の管理は `cache_meta.db_schema_version`。将来の変更は MIGRATIONS に版を足す(各版は冪等に書く)。
  */
 
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 const DDL_V1: string[] = [
   // エンティティ単位の JSON。generation は full refresh の世代(古い世代の行は full の完了時に消す)。
@@ -72,9 +72,39 @@ const DDL_V2: string[] = [
   )`,
 ];
 
-const MIGRATIONS: Array<{ version: number; ddl: string[] }> = [
+// v3: delta の再開(full と同じ方式)。進行中の delta の次のページ・開始時刻・見た updated_at の最大値。
+// SQLite の ADD COLUMN には IF NOT EXISTS がないので、既にある列は無視して冪等にする。
+const DELTA_RESUME_COLUMNS = [
+  "delta_next_page INTEGER",
+  "delta_started_at TEXT",
+  "delta_max_updated_at TEXT",
+];
+
+async function applyV3(db: D1Database): Promise<void> {
+  for (const col of DELTA_RESUME_COLUMNS) {
+    try {
+      await db.prepare(`ALTER TABLE sync_state ADD COLUMN ${col}`).run();
+    } catch (e) {
+      // 適用済み(または同時に別の isolate が追加した)なら問題ない。
+      if (
+        !/duplicate column name/i.test(
+          String(e instanceof Error ? `${e.message} ${e.cause ?? ""}` : e),
+        )
+      ) {
+        throw e;
+      }
+    }
+  }
+}
+
+const MIGRATIONS: Array<{
+  version: number;
+  ddl?: string[];
+  apply?: (db: D1Database) => Promise<void>;
+}> = [
   { version: 1, ddl: DDL_V1 },
   { version: 2, ddl: DDL_V2 },
+  { version: 3, apply: applyV3 },
 ];
 
 const VERSION_KEY = "db_schema_version";
@@ -100,7 +130,8 @@ export async function applySchema(db: D1Database): Promise<void> {
   if (current >= SCHEMA_VERSION) return;
   for (const m of MIGRATIONS) {
     if (m.version <= current) continue;
-    await db.batch(m.ddl.map((sql) => db.prepare(sql)));
+    if (m.ddl) await db.batch(m.ddl.map((sql) => db.prepare(sql)));
+    if (m.apply) await m.apply(db);
   }
   await db.batch([
     db

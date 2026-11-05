@@ -484,6 +484,129 @@ describe("delta refresh", () => {
     expect((await getSyncState(db, "clients"))?.cursor_updated_at).toBe(before);
   });
 
+  describe("再開(full と同じ方式)", () => {
+    /** 差分 n 件。先頭ページ(item 0)の updated_at が最大で、後ろほど古い。 */
+    const diffOf = (n: number, base = "2026-05-01T12:00:00") =>
+      Array.from({ length: n }, (_, i) => ({
+        id: 1000 + i,
+        name: `d${i}`,
+        updated_at: `${base}.${String(999 - i).padStart(3, "0")}+09:00`,
+      }));
+
+    /** 1 ページ 4 秒かかり、締め切り 10 秒: 2 ページ取って partial になる。 */
+    function slowPages(clock: ReturnType<typeof fakeClock>, rows: () => unknown[]) {
+      return mockOutboundFetch({
+        [KEY]: pagedHandler(rows, () => {
+          clock.advance(4_000);
+          return undefined;
+        }),
+      });
+    }
+    const pagesOf = (api: { calls: { url: string }[] }) =>
+      api.calls.map((c) => Number(new URL(c.url).searchParams.get("page")));
+
+    it("partial になったら進捗(次のページ・開始時刻・見た updated_at の最大値)を保存し、カーソルは動かさない", async () => {
+      const { db, deps, clock } = setup();
+      await seedCompleted(deps);
+      const before = await getSyncState(db, "clients");
+      clock.advance(60_000);
+      const startMs = clock.now();
+      const diff = diffOf(450);
+      slowPages(clock, () => diff);
+      const out = await refreshResource(deps, clients, "delta", { deadline: clock.now() + 10_000 });
+      expect(out).toMatchObject({ mode: "delta", state: "partial", fetched: 200, pages: 2 });
+      expect(await getSyncState(db, "clients")).toMatchObject({
+        cursor_updated_at: before?.cursor_updated_at,
+        delta_next_page: 3,
+        delta_started_at: new Date(startMs).toISOString().replace(/\.\d{3}Z$/, "Z"),
+        delta_max_updated_at: diff[0]?.updated_at,
+        refresh_owner: null,
+      });
+    });
+
+    it("次の delta は最後に取り終えたページから(1 ページ重ねて)取り直し、最後まで取ったらカーソルを進めて進捗を消す", async () => {
+      const { db, deps, clock } = setup();
+      await seedCompleted(deps);
+      clock.advance(60_000);
+      const diff = diffOf(450);
+      slowPages(clock, () => diff);
+      await refreshResource(deps, clients, "delta", { deadline: clock.now() + 10_000 });
+      vi.restoreAllMocks();
+
+      clock.advance(1_000);
+      const api = mockOutboundFetch({ [KEY]: pagedHandler(() => diff) });
+      const out = await refreshResource(deps, clients, "delta");
+      // next_page=3 の 1 つ前(2)から重ねて取り直す。
+      expect(pagesOf(api)).toEqual([2, 3, 4, 5]);
+      expect(new URL(api.calls[0]?.url ?? "").searchParams.get("updated_at_gteq")).toBe(
+        "2026-01-01 00:00:04",
+      );
+      expect(out).toMatchObject({ mode: "delta", state: "complete" });
+      expect(await countEntries(db, "clients")).toBe(5 + 450);
+      // 最大値は最初の回(ページ 1)で見たもの。保存した進捗が引き継がれる。
+      expect(await getSyncState(db, "clients")).toMatchObject({
+        cursor_updated_at: diff[0]?.updated_at,
+        delta_next_page: null,
+        delta_started_at: null,
+        delta_max_updated_at: null,
+        last_sync_status: "success",
+      });
+    });
+
+    it("カーソルは min(見た最大値, delta の開始の 5 分前)。最大値が開始より新しければ開始の 5 分前になる", async () => {
+      const { db, deps, clock } = setup();
+      await seedCompleted(deps);
+      clock.advance(60_000); // 2026-11-05T00:01:00Z = 09:01:00+09:00
+      // 開始の直前に更新された行(最大値が開始より新しい)。
+      mockOutboundFetch({
+        [KEY]: pagedHandler(() => [
+          { id: 900, name: "最近", updated_at: "2026-11-05T09:00:30.000+09:00" },
+        ]),
+      });
+      await refreshResource(deps, clients, "delta");
+      expect((await getSyncState(db, "clients"))?.cursor_updated_at).toBe(
+        "2026-11-05T08:56:00.000+09:00",
+      );
+    });
+
+    it("再開できる期間(1 時間)を過ぎた進捗は捨てて、最初のページからやり直す", async () => {
+      const { deps, clock } = setup();
+      await seedCompleted(deps);
+      clock.advance(60_000);
+      const diff = diffOf(450);
+      slowPages(clock, () => diff);
+      await refreshResource(deps, clients, "delta", { deadline: clock.now() + 10_000 });
+      vi.restoreAllMocks();
+
+      clock.advance(FULL_RESUME_WINDOW_MS + 1_000);
+      const api = mockOutboundFetch({ [KEY]: pagedHandler(() => diff) });
+      const out = await refreshResource(deps, clients, "delta");
+      expect(pagesOf(api)).toEqual([1, 2, 3, 4, 5]);
+      expect(out).toMatchObject({ state: "complete" });
+    });
+
+    it("API の失敗(failed)でも、それまでのページの進捗は残り、次の delta はそこから再開する", async () => {
+      const { db, deps, clock } = setup();
+      await seedCompleted(deps);
+      clock.advance(60_000);
+      const diff = diffOf(450);
+      mockOutboundFetch({
+        [KEY]: pagedHandler(
+          () => diff,
+          (page) => (page === 3 ? jsonResponse({ message: "boom" }, 401) : undefined),
+        ),
+      });
+      const out = await refreshResource(deps, clients, "delta");
+      expect(out).toMatchObject({ state: "failed" });
+      expect((await getSyncState(db, "clients"))?.delta_next_page).toBe(3);
+      vi.restoreAllMocks();
+
+      const api = mockOutboundFetch({ [KEY]: pagedHandler(() => diff) });
+      await refreshResource(deps, clients, "delta");
+      expect(pagesOf(api)).toEqual([2, 3, 4, 5]);
+    });
+  });
+
   it("ロックが保持されていれば RefreshInProgressError(delta も待たない)", async () => {
     const { db, deps, clock } = setup();
     await seedCompleted(deps);

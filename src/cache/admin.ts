@@ -103,7 +103,7 @@ export async function expireCache(
 /**
  * 行と同期状態を消す。先にロックを取る(refresh と同じ排他)ので、refresh 中のリソースがあれば何も消さずに RefreshInProgressError。
  * 確認から削除までの間に refresh が始まることはない(ロックを持っているので TryLock が弾かれる)。
- * 削除は所有者を条件に 1 つの batch で行い、ロックを奪われていた場合は何も消さず、奪った側のロック行も消さない。
+ * 削除は所有者を条件に 1 つの batch で行い、対象のどれか 1 つでもロックを奪われていれば全体として何も消さず(全か無か)、奪った側のロック行も消さない。
  */
 export async function clearCache(
   db: D1Database,
@@ -119,22 +119,44 @@ export async function clearCache(
   try {
     for (const r of targets) locks.push(await tryAcquireLock(db, r, { now: opts.now }));
     await opts.hooks?.afterLock?.();
-    const results = await db.batch(
-      locks.flatMap((l) => [
-        db
-          .prepare(
-            `DELETE FROM resource_cache WHERE resource_name = ?
-             AND EXISTS (SELECT 1 FROM sync_state WHERE resource_name = ? AND refresh_owner = ?)`,
-          )
-          .bind(l.resource, l.resource, l.owner),
-        db
-          .prepare("DELETE FROM sync_state WHERE resource_name = ? AND refresh_owner = ?")
-          .bind(l.resource, l.owner),
-      ]),
-    );
-    // sync_state の削除が空振り = ロックを奪われていた(その分の行も消えていない)。
-    const lost = locks.findIndex((_, i) => results[i * 2 + 1]?.meta.changes !== 1);
-    if (lost >= 0) throw new RefreshInProgressError(locks[lost]?.resource ?? "");
+    // 全か無か: どの文も「対象の全リソースのロックを自分がまだ持っている」ことを条件にする(1 つでも奪われていれば何も消さない)。
+    // sync_state の削除は 1 文にまとめる(文ごとに分けると、先に消した行の分だけ後続の条件の件数が減ってしまう)。
+    const heldAll = `(SELECT COUNT(*) FROM sync_state WHERE ${locks
+      .map(() => "(resource_name = ? AND refresh_owner = ?)")
+      .join(" OR ")}) = ?`;
+    const heldBinds = locks.flatMap((l) => [l.resource, l.owner]);
+    const results = await db.batch([
+      db
+        .prepare(
+          `DELETE FROM resource_cache WHERE resource_name IN (${locks.map(() => "?").join(", ")})
+           AND ${heldAll}`,
+        )
+        .bind(...locks.map((l) => l.resource), ...heldBinds, locks.length),
+      db
+        .prepare(
+          `DELETE FROM sync_state WHERE (${locks
+            .map(() => "(resource_name = ? AND refresh_owner = ?)")
+            .join(" OR ")}) AND ${heldAll}`,
+        )
+        .bind(...heldBinds, ...heldBinds, locks.length),
+    ]);
+    // sync_state の削除が全件に当たっていない = どれかのロックを奪われていた(行は 1 つも消えていない)。
+    if (results[1]?.meta.changes !== locks.length) {
+      const owned = new Set(
+        (
+          await db
+            .prepare(
+              `SELECT resource_name FROM sync_state WHERE ${locks
+                .map(() => "(resource_name = ? AND refresh_owner = ?)")
+                .join(" OR ")}`,
+            )
+            .bind(...heldBinds)
+            .all<{ resource_name: string }>()
+        ).results.map((r) => r.resource_name),
+      );
+      const lost = locks.find((l) => !owned.has(l.resource));
+      throw new RefreshInProgressError(lost?.resource ?? locks[0]?.resource ?? "");
+    }
   } finally {
     // 削除で消えた行には何も起きない。失敗・奪われた場合は、自分の分だけ解放する。
     await Promise.all(locks.map((l) => releaseLock(db, l.resource, l.owner)));
@@ -173,7 +195,8 @@ export interface DocumentScanReport {
 }
 
 function refreshStateOf(s: SyncState | undefined): ReportRefreshState {
-  if (s?.full_next_page != null) return "partial";
+  // full / delta のどちらかが途中なら partial(次の同じ refresh で続きから取る)。
+  if (s?.full_next_page != null || s?.delta_next_page != null) return "partial";
   if (s?.last_sync_status === "error") return "failed";
   return s?.last_synced_at ? "complete" : "not_synced";
 }
@@ -249,22 +272,36 @@ export async function clearDocumentMap(
       held.push(kind);
     }
     await opts.hooks?.afterLock?.();
-    const results = await db.batch(
-      held.flatMap((kind) => [
-        db
-          .prepare(
-            `DELETE FROM document_project_map WHERE document_kind = ?
-             AND EXISTS (SELECT 1 FROM document_scan_state WHERE document_kind = ? AND lock_owner = ?)`,
-          )
-          .bind(kind, kind, owner),
-        db
-          .prepare("DELETE FROM document_scan_state WHERE document_kind = ? AND lock_owner = ?")
-          .bind(kind, owner),
-      ]),
-    );
-    // scan_state の削除が空振り = ロックを奪われていた(その種別の対応表も消えていない)。
-    const lost = held.findIndex((_, i) => results[i * 2 + 1]?.meta.changes !== 1);
-    if (lost >= 0) throw new RefreshInProgressError(`document_map:${held[lost]}`);
+    // 全か無か: どの文も「全種別のロックを自分がまだ持っている」ことを条件にする。scan_state の削除は 1 文にまとめる。
+    const inKinds = held.map(() => "?").join(", ");
+    const heldAll = `(SELECT COUNT(*) FROM document_scan_state WHERE lock_owner = ? AND document_kind IN (${inKinds})) = ?`;
+    const results = await db.batch([
+      db
+        .prepare(
+          `DELETE FROM document_project_map WHERE document_kind IN (${inKinds}) AND ${heldAll}`,
+        )
+        .bind(...held, owner, ...held, held.length),
+      db
+        .prepare(
+          `DELETE FROM document_scan_state WHERE lock_owner = ? AND document_kind IN (${inKinds}) AND ${heldAll}`,
+        )
+        .bind(owner, ...held, owner, ...held, held.length),
+    ]);
+    // scan_state の削除が全種別に当たっていない = どれかのロックを奪われていた(対応表は 1 つも消えていない)。
+    if (results[1]?.meta.changes !== held.length) {
+      const owned = new Set(
+        (
+          await db
+            .prepare(
+              `SELECT document_kind FROM document_scan_state WHERE lock_owner = ? AND document_kind IN (${inKinds})`,
+            )
+            .bind(owner, ...held)
+            .all<{ document_kind: string }>()
+        ).results.map((r) => r.document_kind),
+      );
+      const lost = held.find((k) => !owned.has(k));
+      throw new RefreshInProgressError(`document_map:${lost ?? held[0]}`);
+    }
   } finally {
     // 消えた行には何も起きない。失敗・奪われた場合は、自分の分だけ解放する。
     await Promise.all(held.map((kind) => releaseScanLock(db, kind, owner)));

@@ -34,6 +34,12 @@ describe("annotationsFor", () => {
       openWorldHint: true,
     });
   });
+  it("openWorld=false を指定すると openWorldHint が false になる(BOARD を呼ばないツール用)", () => {
+    for (const c of ["ReadOnly", "Destructive"] as const) {
+      expect(annotationsFor(c, "t", { openWorld: false }).openWorldHint).toBe(false);
+      expect(annotationsFor(c, "t").openWorldHint).toBe(true);
+    }
+  });
   it("Destructive は destructiveHint=true", () => {
     expect(annotationsFor("Destructive", "t").destructiveHint).toBe(true);
   });

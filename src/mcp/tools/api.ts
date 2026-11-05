@@ -15,7 +15,7 @@ import {
   idArg,
   optBool,
   optEnum,
-  optInt,
+  optId,
   optIntArray,
   optNonNegativeInt,
   optStr,
@@ -39,7 +39,7 @@ function fieldSchema(f: FieldDef): z.ZodType {
     case "str":
       return optStr(f.description);
     case "int":
-      return optInt(f.description);
+      return optId(f.description);
     case "bool":
       return optBool(f.description);
     case "strs":

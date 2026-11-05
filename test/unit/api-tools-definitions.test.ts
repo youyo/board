@@ -302,6 +302,28 @@ describe("引数の検証(いずれも argument_error。BOARD には通信しな
     expect(r.calls).toHaveLength(0);
   });
 
+  // 負の ID は BOARD に送らず argument_error(0 は Go と同じ『指定なし』)。ID の引数は表の kind: "int" の項目すべて。
+  const idArgs = API_RESOURCES.flatMap((d) =>
+    d.fields
+      .filter((f) => f.kind.type === "int")
+      .map((f): [string, string] => [`list_${d.resource}`, f.arg]),
+  );
+  it("表に ID の引数がある", () => {
+    expect(idArgs.length).toBeGreaterThanOrEqual(12);
+  });
+  it.each(idArgs)("%s の %s が負なら argument_error", async (tool, arg) => {
+    const r = await callApiTool(tool, { [arg]: -1 });
+    expect(r.isError, r.text).toBe(true);
+    expect(r.json.error.code).toBe("argument_error");
+    expect(r.json.error.message).toContain(arg);
+    expect(r.calls).toHaveLength(0);
+  });
+  it("ID の引数が 0 なら『指定なし』で、エラーにならない", async () => {
+    const r = await callApiTool("list_contacts", { client_id: 0 });
+    expect(r.isError, r.text).toBe(false);
+    expect(r.calls).toHaveLength(0);
+  });
+
   it("tools/list の inputSchema に未知の引数を許す指定(additionalProperties: true)がない", async () => {
     const res = await rpcTo(() => createMcpServer(), "tools/list");
     for (const t of res.result?.tools ?? []) {

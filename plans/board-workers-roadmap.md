@@ -60,3 +60,4 @@ Go 製 CLI / ローカル MCP（v0.11.1）を書き直したもの。Go 版は `
 - 2026-11-05: M05 実装（find 層 11 ツール、逆引きの方式を決定済み事項に追加）。M04 の指摘 4 点に対応（cache-first の list は絞り込みがサーバー側なら refresh を走らせない、`limited` / `total_before_limit`、締め切りは `Date.now()` 基準、`response_too_large` の文面）。
 - 2026-11-05: M06 実装。cache 系ツール 2 個（`cache_expire` は作らない: Go では daily auto-refresh の廃止後、読み取りに影響しない印を付けるだけのため）、任意の `BOARD_UI_BASE_URL`（M05 で『上書きなし』としていたものを追加）、デプロイ設定の生成（logbutler の簡易版）、`test:live`（service token）、README・runbook・manual-verification・ADR 4 本・CLAUDE.md。ツールは 54 個。
 - 2026-11-05: M07 実装。ユーザー決定で『デプロイ設定』の決定済み事項を置き換え（upstream / 下流モデルを採用、rovo に倣う）。`board.config.json` + `deploy:config`（生成物は下流でコミット）、`setup`、下流 CI の雛形、スキル `board-setup`、ADR 0005。M06 の `deploy:render` と `BOARD_*` 環境変数方式を廃止。
+- 2026-11-05: v1.0.0。検証の指摘 4 点に対応（cache 系 2 ツールの `openWorldHint` を false に、`clearCache` / `clearDocumentMap` を全か無かに、api / find 層の ID 引数の負の値を `argument_error` に、delta refresh を full と同じ方式で再開できるように〔スキーマ v3〕）。

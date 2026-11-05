@@ -27,7 +27,7 @@
       "readOnlyHint": false,
       "destructiveHint": true,
       "idempotentHint": true,
-      "openWorldHint": true
+      "openWorldHint": false
     }
   },
   {
@@ -49,7 +49,7 @@
       "title": "キャッシュ状態",
       "readOnlyHint": true,
       "idempotentHint": true,
-      "openWorldHint": true
+      "openWorldHint": false
     }
   },
   {

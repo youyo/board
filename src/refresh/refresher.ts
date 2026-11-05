@@ -1,7 +1,10 @@
 /**
  * refresh(Go 版 `internal/refresh/resource_refresh.go` `force_refresh.go` `updater.go` の移植 + Workers 向けの再開)。
  *
- * - delta: `updated_at_gteq = カーソル` で差分を取って upsert し、カーソルを取得分の updated_at の最大値に進める(Go と同じ)。
+ * - delta: `updated_at_gteq = カーソル` で差分を取って upsert する。full と同じ方式で再開できる(Go との相違点): ページごとに進捗
+ *   (delta_next_page / delta_started_at / delta_max_updated_at)を保存し、締め切りで partial になったら次の delta は最後に取り終えた
+ *   ページから(1 ページ重ねて)取り直す。最後まで取ったらカーソルを min(見た updated_at の最大値, 開始の 5 分前)に進める(`cursorAfterFull` と同じ)。
+ *   再開できる窓は full と同じ 1 時間。
  *   カーソルがなければ全件が必要なので、再開できる full として動く。
  * - full: 世代を払い出してページ単位で upsert し、締め切りが近づいたら進捗を保存して partial で返す(Go との相違点)。
  *   次の full は最後に取り終えたページから(1 ページ重ねて)再開し、最後まで取り終えたら古い世代の行を消して complete にする。
@@ -164,15 +167,6 @@ function assertOwned(run: Run, result: D1Result | undefined): void {
   if (result?.meta.changes !== 1) throw lostLock(run);
 }
 
-/** 所有者の確認だけを行う文(sync_state を変更しない更新)。進捗の更新を伴わないページでも、ロックを失ったことに気づくため。 */
-function ownerTouchStatement(run: Run): D1PreparedStatement {
-  return run.deps.db
-    .prepare(
-      "UPDATE sync_state SET refresh_owner = refresh_owner WHERE resource_name = ? AND refresh_owner = ?",
-    )
-    .bind(run.target.resource, run.owner);
-}
-
 /** 次のページを取る余裕があるか。直前のページの所要時間の 1.5 倍(下限あり)を残り時間と比べる。 */
 function hasTimeForNextPage(run: Run, lastPageMs: number): boolean {
   return run.ctx.deadline - run.now() >= Math.max(run.floorMs, lastPageMs * 1.5);
@@ -286,6 +280,7 @@ async function runFull(run: Run, state: SyncState | null): Promise<RefreshOutcom
               `UPDATE sync_state SET last_synced_at = ?, last_full_synced_at = ?, last_sync_mode = 'full',
                last_sync_status = 'success', cursor_updated_at = ?, must_full_resync = 0,
                consecutive_failures = 0, full_next_page = NULL, full_max_updated_at = NULL,
+               delta_next_page = NULL, delta_started_at = NULL, delta_max_updated_at = NULL,
                full_prune_skipped = CASE WHEN ${PRUNE_OK_SQL} THEN 0 ELSE 1 END
                WHERE resource_name = ? AND refresh_owner = ?`,
             )
@@ -341,11 +336,23 @@ async function runDelta(run: Run, state: SyncState): Promise<RefreshOutcome> {
   // delta の書き込みは進行中(または最新)の世代を付ける。full の完了時に消されないように。
   const generation = state.full_generation;
 
+  // full と同じ方式で再開する。カーソルは完了するまで動かさないので、再開しても同じ gteq で取り直せる。
+  const nowMs = run.now();
+  const savedStartMs = state.delta_started_at ? Date.parse(state.delta_started_at) : Number.NaN;
+  const resumable =
+    state.delta_next_page != null &&
+    !Number.isNaN(savedStartMs) &&
+    nowMs - savedStartMs <= FULL_RESUME_WINDOW_MS;
+  // 最後に取り終えたページから取り直す(1 ページ重ねる)。理由は full と同じ。
+  let page = resumable ? Math.max(1, (state.delta_next_page ?? 1) - 1) : 1;
+  const startedAt =
+    resumable && state.delta_started_at ? state.delta_started_at : isoSeconds(nowMs);
+  let maxSeen: string | null = resumable ? state.delta_max_updated_at : null;
+
   let fetched = 0;
   let pages = 0;
   let lastPageMs = 0;
-  let maxSeen: string | null = null;
-  for (let page = 1; ; page++) {
+  for (; ; page++) {
     if (!hasTimeForNextPage(run, lastPageMs)) {
       return { resource, mode: "delta", state: "partial", fetched, pages };
     }
@@ -366,11 +373,17 @@ async function runDelta(run: Run, state: SyncState): Promise<RefreshOutcome> {
           ? db
               .prepare(
                 `UPDATE sync_state SET last_synced_at = ?, last_sync_mode = 'delta', last_sync_status = 'success',
-                 cursor_updated_at = COALESCE(?, cursor_updated_at), consecutive_failures = 0
+                 cursor_updated_at = COALESCE(?, cursor_updated_at), consecutive_failures = 0,
+                 delta_next_page = NULL, delta_started_at = NULL, delta_max_updated_at = NULL
                  WHERE resource_name = ? AND refresh_owner = ?`,
               )
-              .bind(isoSeconds(at), maxSeen, resource, guardOwner)
-          : ownerTouchStatement(run),
+              .bind(isoSeconds(at), cursorAfterFull(maxSeen, startedAt), resource, guardOwner)
+          : db
+              .prepare(
+                `UPDATE sync_state SET delta_next_page = ?, delta_started_at = ?, delta_max_updated_at = ?
+                 WHERE resource_name = ? AND refresh_owner = ?`,
+              )
+              .bind(page + 1, startedAt, maxSeen, resource, guardOwner),
       );
       const results = await db.batch(statements);
       assertOwned(run, results[results.length - 1]);
