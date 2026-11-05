@@ -195,7 +195,8 @@ export interface DocumentScanReport {
 }
 
 function refreshStateOf(s: SyncState | undefined): ReportRefreshState {
-  if (s?.full_next_page != null) return "partial";
+  // full / delta のどちらかが途中なら partial(次の同じ refresh で続きから取る)。
+  if (s?.full_next_page != null || s?.delta_next_page != null) return "partial";
   if (s?.last_sync_status === "error") return "failed";
   return s?.last_synced_at ? "complete" : "not_synced";
 }

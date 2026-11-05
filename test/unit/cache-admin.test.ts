@@ -285,6 +285,17 @@ describe("cache report (cache_status の元)", () => {
     });
   });
 
+  it("delta が途中(delta_next_page が残っている)なら partial(続きを取る必要があるとクライアントに伝える)", async () => {
+    const db = testDb();
+    await db.batch([
+      db.prepare(
+        "INSERT INTO sync_state (resource_name, last_synced_at, last_sync_status, delta_next_page, delta_started_at) VALUES ('projects', '2026-11-04T00:00:00Z', 'success', 2, '2026-11-05T00:00:00Z')",
+      ),
+    ]);
+    const { resources } = await cacheReport(db, { now: clock.now });
+    expect(resources.find((r) => r.resource === "projects")?.refresh_state).toBe("partial");
+  });
+
   it("ロック中は locked、stale なら locked ではない", async () => {
     const db = testDb();
     await tryAcquireLock(db, "users", { now: clock.now, owner: "A" });
