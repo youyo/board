@@ -1,4 +1,5 @@
 import type { BoardClient } from "../client";
+import type { CallContext } from "../context";
 import {
   baseQuery,
   type CommonListOptions,
@@ -52,6 +53,7 @@ export function listContacts(
   client: BoardClient,
   opts: ContactListOptions = {},
   paging?: ListPaging,
+  ctx?: CallContext,
 ): Promise<ListResult<ContactEntity>> {
   return listResource<ContactEntity, ContactListOptions>(
     client,
@@ -59,9 +61,14 @@ export function listContacts(
     buildContactsQuery,
     opts,
     paging,
+    ctx,
   );
 }
 
-export function getContact(client: BoardClient, id: number): Promise<ItemResult<ContactEntity>> {
-  return getResource<ContactEntity>(client, "/v1/contacts", id);
+export function getContact(
+  client: BoardClient,
+  id: number,
+  ctx?: CallContext,
+): Promise<ItemResult<ContactEntity>> {
+  return getResource<ContactEntity>(client, "/v1/contacts", id, undefined, "id", ctx);
 }

@@ -1,4 +1,5 @@
 import type { BoardClient } from "../client";
+import type { CallContext } from "../context";
 import {
   baseQuery,
   type CommonListOptions,
@@ -57,6 +58,7 @@ export function listInvoices(
   client: BoardClient,
   opts: InvoiceListOptions = {},
   paging?: ListPaging,
+  ctx?: CallContext,
 ): Promise<ListResult<InvoiceEntity>> {
   return listResource<InvoiceEntity, InvoiceListOptions>(
     client,
@@ -64,9 +66,14 @@ export function listInvoices(
     buildInvoicesQuery,
     opts,
     paging,
+    ctx,
   );
 }
 
-export function getInvoice(client: BoardClient, id: number): Promise<ItemResult<InvoiceEntity>> {
-  return getResource<InvoiceEntity>(client, "/v1/invoices", id);
+export function getInvoice(
+  client: BoardClient,
+  id: number,
+  ctx?: CallContext,
+): Promise<ItemResult<InvoiceEntity>> {
+  return getResource<InvoiceEntity>(client, "/v1/invoices", id, undefined, "id", ctx);
 }

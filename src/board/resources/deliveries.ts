@@ -1,4 +1,5 @@
 import type { BoardClient } from "../client";
+import type { CallContext } from "../context";
 import { getResource, type ItemResult } from "./common";
 import type { DocumentDetailEntity } from "./refs";
 
@@ -24,6 +25,7 @@ export interface DeliveryEntity {
 export function getDelivery(
   client: BoardClient,
   documentId: number,
+  ctx?: CallContext,
 ): Promise<ItemResult<DeliveryEntity>> {
   return getResource<DeliveryEntity>(
     client,
@@ -31,5 +33,6 @@ export function getDelivery(
     documentId,
     undefined,
     "documentId",
+    ctx,
   );
 }

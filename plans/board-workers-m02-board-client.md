@@ -20,7 +20,7 @@ MCP ツールにはまだつなげない(M04)。D1 キャッシュもまだ持�
 - 認証: `x-api-key: <BOARD_API_KEY>` と `Authorization: Bearer <BOARD_API_TOKEN>`(Go の `auth.go`)。GET のみ
 - URL: `BOARD_BASE_URL`(末尾のスラッシュは除く)+ パス + `?` + クエリ
 - 直列化: 1 クライアントの中では同時に 1 リクエスト(再試行の待機を含む)。前のリクエストが失敗しても後続は流す
-- 再試行(Go の `retry.go`): 429・5xx・通信失敗(タイムアウト含む)を最大 5 回再試行(最大 6 試行)。
+- 再試行(Go の `retry.go`): 429・5xx・通信失敗(タイムアウト含む)を再試行する(追補で最大 5 回から 3 回に変更。下の「追補」を参照)。
   待機は `Retry-After`(整数秒。1 以上)を優先し 60 秒で頭打ち。なければ 500ms × 2^試行番号(上限 30 秒)の full jitter。
   `sleep` と `random` は注入できる。4xx(429 以外)は再試行しない
 - タイムアウト: 1 試行ごとに 30 秒。応答ヘッダーだけでなく本文の読み取りまで同じ期限で守る
@@ -92,3 +92,42 @@ MCP ツール(M04)、D1 キャッシュ・refresh(M03)、find 層(M05)、1 回�
 - `board-paging.test.ts`: 短いページで終了、ちょうど割り切れる場合、空、maxPages と truncated、順番に取る、エラーの伝播、引数の検証
 - `board-resources.test.ts`: 22 リソースの一覧(list / get の有無・パス)、各 list のクエリ文字列(Go のテストの期待値)、get のパスと `response_group`、id の検証
 - `board-list-flow.test.ts`: モック fetch に対する「list → ページング → 全件」の通し(認証ヘッダー・クエリ・`_meta`・truncated)
+
+## 追補: 締め切りとキャンセル
+
+M02 の verifier が次を指摘した: 1 回の `client.get` が最悪 300〜480 秒待ちうる(6 試行 x 30 秒 + 待機最大 60 秒)。一覧は最大 10 ページなのでその 10 倍。
+呼び出し元の AbortSignal を受け取らないので、MCP クライアントが切れても Worker だけが待ち続ける。直列化がクライアントのインスタンス内に閉じているため、リクエストごとにクライアントを作ると効かない。
+
+### 仕様
+- **呼び出しコンテキスト**(`src/board/context.ts`): `CallContext = { signal?: AbortSignal; deadline?: number(epoch ms) }`。
+  `client.get(path, query?, ctx?)`、`fetchAllPages(fetchPage, { ctx })`、`listResource`、各リソースの list / get 関数の最後の任意引数として渡す。
+  一覧のページ巡回は、開始時に締め切りを 1 つに決めて全ページで共有する。
+- **既定の締め切り**: `deadline` がなければ呼び出し開始から `DEFAULT_CALL_BUDGET_MS = 30_000`。
+  ツール層(M04)はツール呼び出しごとに 1 つのコンテキストを作って渡す(同じ呼び出しの中の複数回の API 呼び出しも同じ締め切りを共有する)。
+- **待機の規則**: 次の試行までの待機(`Retry-After` またはバックオフ)が残り時間以上なら、待たずに即座に失敗させる(切り詰めて待たない)。
+  code は元が 429 なら `rate_limited`、5xx・通信失敗なら `api_error`、`retryable: true`。メッセージは "BOARD API did not respond before the deadline."(秘密情報なし)。
+- **1 試行の期限**: `min(timeoutMs(30 秒), 残り時間)`。
+- **再試行の上限**: `DEFAULT_MAX_RETRIES` を 5 から **3** に下げた(最大 4 試行)。理由: Go の 5 は常駐しない CLI が長く待てる前提の値。
+  Worker は MCP クライアントのタイムアウトより短い持ち時間で返す必要があり、呼び出しあたり 30 秒の締め切りの中では 4 試行目以降に届きにくい。
+- **キャンセル**: `signal` が abort されたら、fetch・待機(sleep)・直列化キューの待ちのすべてを即座に中断する。
+  エラーは code `api_error`・`retryable: true`・"BOARD API call was aborted."。注入する `sleep` は `(ms, signal?)` を受け取る
+  (signal を無視する sleep でもクライアント側で abort と競わせて中断する)。
+- **キュー待ちも締め切りに含める**: 順番待ちの間に締め切りを過ぎたら BOARD に送らずに失敗させる(code `api_error`・`retryable: true`)。
+  待ちをやめた呼び出しは自分の枠をすぐ手放すので、後続は塞がれない。
+- **クライアントの共有**: `createBoardClientFromEnv` は同じ設定(base URL・キー・トークン)なら isolate 内で同じインスタンスを返す(モジュールスコープ)。
+  キーやトークンは Map のキーにせず、設定の値をそのまま保持して `===` で比較する(ハッシュ化も文字列化もしないので、ログに出る経路がない)。
+  保持数は 8 件まで(超えたら古い順に捨てる)。`overrides` を渡したときは共有しない。テスト用に `clearBoardClientCache()` を export する。
+
+### 1 回のツール呼び出しで待ちうる最悪の時間
+- 変更前: 1 回の `get` で、6 試行 x 30 秒 + 待機(Retry-After 60 秒 x 5 回)= 最大 480 秒。一覧 10 ページで最大 4,800 秒。
+- 変更後: ツール呼び出しごとのコンテキスト 1 つにつき **30 秒**(キュー待ち・fetch・待機・全ページの合計)。
+  コンテキストを渡さなければ、`get` 1 回あたり 30 秒、一覧は 1 回の呼び出し全体で 30 秒。
+  締め切りの判定は fetch・本文の読み取り・待機の境界で行うため、実際の超過は数十 ms 程度に収まる。
+
+### 追加・変更したテスト(`test/unit/board-client.test.ts`)
+追加: Retry-After / バックオフが残り時間を超えると待たずに失敗(429 → `rate_limited`、5xx → `api_error`)、収まる Retry-After は待って成功、
+既定の締め切り 30 秒、1 試行の期限、一覧の 2 ページ目での期限切れ、ctx を省いた一覧が全ページで 1 つの締め切りを共有、get 系の ctx 伝播、
+abort(fetch 中・abort 済み・sleep 中・キュー待ち中)、キュー待ち中の期限切れ、`createBoardClientFromEnv` の共有(同一・別・clear・overrides・直列化)、
+締め切り・中断のエラーに秘密情報が出ないこと。
+仕様変更として意図的に変えた既存テスト: 既定値(再試行 5 → 3)、上限まで失敗したときの試行数(6 → 4)と待機数(5 → 3)、
+バックオフの待機列(5 個 → 3 個)、「Retry-After は 60 秒で頭打ち」(既定の締め切り 30 秒では 60 秒待てないので、締め切りを 120 秒に広げて渡す)。

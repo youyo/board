@@ -1,4 +1,5 @@
 import type { BoardClient } from "../client";
+import type { CallContext } from "../context";
 import {
   baseQuery,
   type CommonListOptions,
@@ -39,6 +40,7 @@ export function listPaymentTerms(
   client: BoardClient,
   opts: PaymentTermListOptions = {},
   paging?: ListPaging,
+  ctx?: CallContext,
 ): Promise<ListResult<PaymentTermEntity>> {
   return listResource<PaymentTermEntity, PaymentTermListOptions>(
     client,
@@ -46,12 +48,14 @@ export function listPaymentTerms(
     buildPaymentTermsQuery,
     opts,
     paging,
+    ctx,
   );
 }
 
 export function getPaymentTerm(
   client: BoardClient,
   id: number,
+  ctx?: CallContext,
 ): Promise<ItemResult<PaymentTermEntity>> {
-  return getResource<PaymentTermEntity>(client, "/v1/payment_terms", id);
+  return getResource<PaymentTermEntity>(client, "/v1/payment_terms", id, undefined, "id", ctx);
 }

@@ -6,6 +6,7 @@
  */
 
 import { ArgumentError } from "../errors";
+import { type CallContext, resolveContext } from "./context";
 
 /** 1 ページの件数の既定(Go の defaultPerPage)。 */
 export const DEFAULT_PER_PAGE = 100;
@@ -17,6 +18,8 @@ export interface PagingOptions {
   perPage?: number;
   /** 正の整数。既定 10。 */
   maxPages?: number;
+  /** 呼び出しコンテキスト。全ページで同じ締め切り・signal を共有する(deadline 省略時は開始時点で決める)。 */
+  ctx?: CallContext;
 }
 
 export interface Page<T> {
@@ -35,7 +38,7 @@ export interface AllPages<T> {
 }
 
 export async function fetchAllPages<T>(
-  fetchPage: (page: number, perPage: number) => Promise<Page<T>>,
+  fetchPage: (page: number, perPage: number, ctx: CallContext) => Promise<Page<T>>,
   options: PagingOptions = {},
 ): Promise<AllPages<T>> {
   const perPage = resolvePerPage(options.perPage);
@@ -44,10 +47,11 @@ export async function fetchAllPages<T>(
     throw new ArgumentError("maxPages must be a positive integer.");
   }
 
+  const ctx = resolveContext(options.ctx);
   const items: T[] = [];
   let headers: Headers | undefined;
   for (let page = 1; page <= maxPages; page++) {
-    const r = await fetchPage(page, perPage);
+    const r = await fetchPage(page, perPage, ctx);
     for (const item of r.items) items.push(item);
     headers = r.headers;
     if (r.items.length < perPage) return { items, headers, truncated: false, pages: page };

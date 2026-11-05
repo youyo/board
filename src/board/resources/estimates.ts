@@ -1,4 +1,5 @@
 import type { BoardClient } from "../client";
+import type { CallContext } from "../context";
 import { getResource, type ItemResult } from "./common";
 import type { DocumentDetailEntity } from "./refs";
 
@@ -22,6 +23,7 @@ export interface EstimateEntity {
 export function getEstimate(
   client: BoardClient,
   documentId: number,
+  ctx?: CallContext,
 ): Promise<ItemResult<EstimateEntity>> {
   return getResource<EstimateEntity>(
     client,
@@ -29,5 +31,6 @@ export function getEstimate(
     documentId,
     undefined,
     "documentId",
+    ctx,
   );
 }

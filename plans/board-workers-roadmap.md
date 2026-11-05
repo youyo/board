@@ -20,6 +20,7 @@ Go 製 CLI / ローカル MCP（v0.11.1）を書き直したもの。Go 版は `
 | キャッシュ | **D1**。Go 版の `resource_cache`（エンティティ単位の JSON）+ `sync_state` + `cache_meta` と、名前の正規化（NFKC + 小文字 + trim）、LLM が決める鮮度（`refresh` 引数の enum）を引き継ぐ | 2026-11-05 ユーザー決定。却下: KV、キャッシュなし |
 | D1 のスキーマ適用 | Worker が isolate ごとの初回に冪等なスキーマ適用を行う（Go の `internal/cache/migrate.go` と同じ考え方）。テストで `cloudflare:test` の `applyD1Migrations` を使わない | logbutler の規約（`cloudflare:test` を import すると並列実行でタイムアウトする） |
 | 流量制御 | **Durable Objects は使わない**。参照はキャッシュを優先し、1 回のツール呼び出し内では BOARD API を直列に呼ぶ。429 / 5xx は `Retry-After` を尊重して上限付きで再試行する。全件 refresh は D1 の条件付き UPDATE によるロック（Go の `refresh/lock.go` の TryLock + 429 相当、stale は 10 分） | 2026-11-05 ユーザー決定。少人数での利用を想定する。既知のリスク: 複数利用者が同時にキャッシュミスすると 3 回/秒を超えうる（429 の再試行で吸収する）。問題になったら DO による全体制御を再検討 |
+| 締め切りとキャンセル | 1 回のツール呼び出しにつき 1 つの呼び出しコンテキスト（`signal` + `deadline`、既定 30 秒）を作り、一覧のページ巡回全体で共有する。Retry-After やバックオフが残り時間を超えるなら待たずに `retryable: true` で失敗させる。`maxRetries` は 3（Go の 5 は CLI 前提）。クライアントは isolate 内で共有し、リクエストをまたいで直列化する | M02 の verifier 指摘（2026-11-05）。Go の設定のままだと 1 回の get が最悪 300〜480 秒待ち、MCP クライアントのタイムアウトを超える |
 | ランタイム・依存 | logbutler と同じ版に固定する（node 24.21.0 / pnpm 11.28.5 / agents 0.28.1 / @modelcontextprotocol/server 2.3.1 / hono 4.13.13 / zod 4.6.7 / vitest 4.1.11 / @cloudflare/vitest-plugin 1.4.1 / wrangler 4.151.0 / biome 2.5.15 / typescript 6.0.3、jose 6.2.12）。`^` `~` は使わない | 公開から 2 週間以上たった版に固定するという規約 |
 | MCP | `agents` の `createMcpHandler`（ステートレス）。`McpAgent` は使わない | logbutler と同じ |
 | 出力 | JSON を text content で返す。BOARD の生データは BOARD のキー（snake_case）のまま。エラーは `{"schema_version":"1","error":{"code","message","retryable"}}` を `isError: true` で返す。応答サイズの上限は `max_response_tokens`（logbutler の ADR 0007 と同じ） | logbutler と揃える |
@@ -39,8 +40,8 @@ Go 製 CLI / ローカル MCP（v0.11.1）を書き直したもの。Go 版は `
 | M | 内容 | 状態 |
 |---|---|---|
 | M00 | Go 版のアーカイブと削除 | 完了（74dfcde） |
-| M01 | 基盤: mise / pnpm / biome / tsconfig / vitest、`/healthz`、設定チェック、Access JWT 検証、`createMcpHandler` とダミーツール 1 個、エラーエンベロープ、応答サイズ上限、CI、CLAUDE.md | 未着手 |
-| M02 | BOARD API クライアント（x-api-key + Bearer、直列、再試行と Retry-After、ページング、`_meta` ヘッダ）と 22 リソースの型 | 未着手 |
+| M01 | 基盤: mise / pnpm / biome / tsconfig / vitest、`/healthz`、設定チェック、Access JWT 検証、`createMcpHandler` とダミーツール 1 個、エラーエンベロープ、応答サイズ上限、CI、CLAUDE.md | 完了（16df333） |
+| M02 | BOARD API クライアント（x-api-key + Bearer、直列、再試行と Retry-After、ページング、`_meta` ヘッダ）と 22 リソースの型。追補: 呼び出し単位の締め切り・キャンセル・isolate 内のクライアント共有 | 完了（2d14f28）、追補は作業中 |
 | M03 | D1 キャッシュ（スキーマ適用、resource_cache / sync_state / cache_meta、名前の正規化）、refresh（enum、差分 / 全件、D1 ロック）、repository 層 | 未着手 |
 | M04 | api 層のツール（22 リソースの list / get） | 未着手 |
 | M05 | find 層のツール 11 個（名前による ID 解決・曖昧な場合のエラー、fanout の上限、逆引きマップ、contract_status、URL、enrichment の失敗を致命的にしない、cache 配列の同梱） | 未着手 |
@@ -50,4 +51,4 @@ Go 製 CLI / ローカル MCP（v0.11.1）を書き直したもの。Go 版は `
 
 ## Changelog
 
-- 2026-11-05: 作成。M00 完了。
+- 2026-11-05: 作成。M00・M01・M02 完了。締め切りとキャンセルの決定を追加。

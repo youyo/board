@@ -1,4 +1,5 @@
 import type { BoardClient } from "../client";
+import type { CallContext } from "../context";
 import {
   baseQuery,
   type CommonListOptions,
@@ -33,6 +34,7 @@ export function listVendors(
   client: BoardClient,
   opts: VendorListOptions = {},
   paging?: ListPaging,
+  ctx?: CallContext,
 ): Promise<ListResult<VendorEntity>> {
   return listResource<VendorEntity, VendorListOptions>(
     client,
@@ -40,9 +42,14 @@ export function listVendors(
     buildVendorsQuery,
     opts,
     paging,
+    ctx,
   );
 }
 
-export function getVendor(client: BoardClient, id: number): Promise<ItemResult<VendorEntity>> {
-  return getResource<VendorEntity>(client, "/v1/payees", id);
+export function getVendor(
+  client: BoardClient,
+  id: number,
+  ctx?: CallContext,
+): Promise<ItemResult<VendorEntity>> {
+  return getResource<VendorEntity>(client, "/v1/payees", id, undefined, "id", ctx);
 }

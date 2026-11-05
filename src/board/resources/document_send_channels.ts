@@ -1,4 +1,5 @@
 import type { BoardClient } from "../client";
+import type { CallContext } from "../context";
 import {
   baseQuery,
   type CommonListOptions,
@@ -39,6 +40,7 @@ export function listDocumentSendChannels(
   client: BoardClient,
   opts: DocumentSendChannelListOptions = {},
   paging?: ListPaging,
+  ctx?: CallContext,
 ): Promise<ListResult<DocumentSendChannelEntity>> {
   return listResource<DocumentSendChannelEntity, DocumentSendChannelListOptions>(
     client,
@@ -46,12 +48,21 @@ export function listDocumentSendChannels(
     buildDocumentSendChannelsQuery,
     opts,
     paging,
+    ctx,
   );
 }
 
 export function getDocumentSendChannel(
   client: BoardClient,
   id: number,
+  ctx?: CallContext,
 ): Promise<ItemResult<DocumentSendChannelEntity>> {
-  return getResource<DocumentSendChannelEntity>(client, "/v1/document_send_channels", id);
+  return getResource<DocumentSendChannelEntity>(
+    client,
+    "/v1/document_send_channels",
+    id,
+    undefined,
+    "id",
+    ctx,
+  );
 }

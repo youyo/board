@@ -1,4 +1,5 @@
 import type { BoardClient } from "../client";
+import type { CallContext } from "../context";
 import {
   baseQuery,
   type CommonListOptions,
@@ -39,6 +40,7 @@ export function listAccountingTypes(
   client: BoardClient,
   opts: AccountingTypeListOptions = {},
   paging?: ListPaging,
+  ctx?: CallContext,
 ): Promise<ListResult<AccountingTypeEntity>> {
   return listResource<AccountingTypeEntity, AccountingTypeListOptions>(
     client,
@@ -46,12 +48,21 @@ export function listAccountingTypes(
     buildAccountingTypesQuery,
     opts,
     paging,
+    ctx,
   );
 }
 
 export function getAccountingType(
   client: BoardClient,
   id: number,
+  ctx?: CallContext,
 ): Promise<ItemResult<AccountingTypeEntity>> {
-  return getResource<AccountingTypeEntity>(client, "/v1/accounting_types", id);
+  return getResource<AccountingTypeEntity>(
+    client,
+    "/v1/accounting_types",
+    id,
+    undefined,
+    "id",
+    ctx,
+  );
 }

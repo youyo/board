@@ -1,4 +1,5 @@
 import type { BoardClient } from "../client";
+import type { CallContext } from "../context";
 import {
   baseQuery,
   type CommonListOptions,
@@ -39,6 +40,7 @@ export function listPurchaseTypes(
   client: BoardClient,
   opts: PurchaseTypeListOptions = {},
   paging?: ListPaging,
+  ctx?: CallContext,
 ): Promise<ListResult<PurchaseTypeEntity>> {
   return listResource<PurchaseTypeEntity, PurchaseTypeListOptions>(
     client,
@@ -46,12 +48,14 @@ export function listPurchaseTypes(
     buildPurchaseTypesQuery,
     opts,
     paging,
+    ctx,
   );
 }
 
 export function getPurchaseType(
   client: BoardClient,
   id: number,
+  ctx?: CallContext,
 ): Promise<ItemResult<PurchaseTypeEntity>> {
-  return getResource<PurchaseTypeEntity>(client, "/v1/expenditure_types", id);
+  return getResource<PurchaseTypeEntity>(client, "/v1/expenditure_types", id, undefined, "id", ctx);
 }

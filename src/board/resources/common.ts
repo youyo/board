@@ -1,5 +1,6 @@
 import { ArgumentError, BoardError } from "../../errors";
 import type { BoardClient } from "../client";
+import type { CallContext } from "../context";
 import { type ItemMeta, type ListMeta, parseItemMeta, parseListMeta } from "../meta";
 import { fetchAllPages } from "../paging";
 import { QueryBuilder } from "../query";
@@ -57,10 +58,11 @@ export async function listResource<T, O extends CommonListOptions>(
   build: (opts: O, page: number, perPage: number) => string,
   opts: O,
   paging: ListPaging = {},
+  ctx?: CallContext,
 ): Promise<ListResult<T>> {
   const all = await fetchAllPages<T>(
-    async (page, perPage) => {
-      const res = await client.get(path, build(opts, page, perPage));
+    async (page, perPage, shared) => {
+      const res = await client.get(path, build(opts, page, perPage), shared);
       if (!Array.isArray(res.body)) {
         throw new BoardError(
           "api_error",
@@ -70,7 +72,7 @@ export async function listResource<T, O extends CommonListOptions>(
       }
       return { items: res.body as T[], headers: res.headers };
     },
-    { perPage: opts.perPage, maxPages: paging.maxPages },
+    { perPage: opts.perPage, maxPages: paging.maxPages, ctx },
   );
   return { items: all.items, _meta: parseListMeta(all.headers), truncated: all.truncated };
 }
@@ -89,9 +91,10 @@ export async function getResource<T>(
   id: number,
   query?: string,
   label = "id",
+  ctx?: CallContext,
 ): Promise<ItemResult<T>> {
   assertId(id, label);
-  const res = await client.get(`${path}/${id}`, query);
+  const res = await client.get(`${path}/${id}`, query, ctx);
   if (typeof res.body !== "object" || res.body === null || Array.isArray(res.body)) {
     throw new BoardError(
       "api_error",

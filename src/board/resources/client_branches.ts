@@ -1,4 +1,5 @@
 import type { BoardClient } from "../client";
+import type { CallContext } from "../context";
 import {
   baseQuery,
   type CommonListOptions,
@@ -49,6 +50,7 @@ export function listClientBranches(
   client: BoardClient,
   opts: ClientBranchListOptions = {},
   paging?: ListPaging,
+  ctx?: CallContext,
 ): Promise<ListResult<ClientBranchEntity>> {
   return listResource<ClientBranchEntity, ClientBranchListOptions>(
     client,
@@ -56,12 +58,14 @@ export function listClientBranches(
     buildClientBranchesQuery,
     opts,
     paging,
+    ctx,
   );
 }
 
 export function getClientBranch(
   client: BoardClient,
   id: number,
+  ctx?: CallContext,
 ): Promise<ItemResult<ClientBranchEntity>> {
-  return getResource<ClientBranchEntity>(client, "/v1/client_branches", id);
+  return getResource<ClientBranchEntity>(client, "/v1/client_branches", id, undefined, "id", ctx);
 }

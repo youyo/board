@@ -1,4 +1,5 @@
 import type { BoardClient } from "../client";
+import type { CallContext } from "../context";
 import { getResource, type ItemResult } from "./common";
 import type { DocumentDetailEntity } from "./refs";
 
@@ -23,6 +24,7 @@ export interface ReceiptEntity {
 export function getReceipt(
   client: BoardClient,
   documentId: number,
+  ctx?: CallContext,
 ): Promise<ItemResult<ReceiptEntity>> {
   return getResource<ReceiptEntity>(
     client,
@@ -30,5 +32,6 @@ export function getReceipt(
     documentId,
     undefined,
     "documentId",
+    ctx,
   );
 }

@@ -1,4 +1,5 @@
 import type { BoardClient } from "../client";
+import type { CallContext } from "../context";
 import {
   baseQuery,
   type CommonListOptions,
@@ -56,6 +57,7 @@ export function listPurchaseOrders(
   client: BoardClient,
   opts: PurchaseOrderListOptions = {},
   paging?: ListPaging,
+  ctx?: CallContext,
 ): Promise<ListResult<PurchaseOrderEntity>> {
   return listResource<PurchaseOrderEntity, PurchaseOrderListOptions>(
     client,
@@ -63,12 +65,14 @@ export function listPurchaseOrders(
     buildPurchaseOrdersQuery,
     opts,
     paging,
+    ctx,
   );
 }
 
 export function getPurchaseOrder(
   client: BoardClient,
   id: number,
+  ctx?: CallContext,
 ): Promise<ItemResult<PurchaseOrderEntity>> {
-  return getResource<PurchaseOrderEntity>(client, "/v1/expenditures", id);
+  return getResource<PurchaseOrderEntity>(client, "/v1/expenditures", id, undefined, "id", ctx);
 }

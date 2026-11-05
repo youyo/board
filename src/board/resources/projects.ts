@@ -1,4 +1,5 @@
 import type { BoardClient } from "../client";
+import type { CallContext } from "../context";
 import { QueryBuilder } from "../query";
 import {
   baseQuery,
@@ -171,6 +172,7 @@ export function listProjects(
   client: BoardClient,
   opts: ProjectListOptions = {},
   paging?: ListPaging,
+  ctx?: CallContext,
 ): Promise<ListResult<ProjectEntity>> {
   return listResource<ProjectEntity, ProjectListOptions>(
     client,
@@ -178,6 +180,7 @@ export function listProjects(
     buildProjectsQuery,
     opts,
     paging,
+    ctx,
   );
 }
 
@@ -190,7 +193,8 @@ export function getProject(
   client: BoardClient,
   id: number,
   opts: GetProjectOptions = {},
+  ctx?: CallContext,
 ): Promise<ItemResult<ProjectEntity>> {
   const query = new QueryBuilder().responseGroup(opts.responseGroup).encode();
-  return getResource<ProjectEntity>(client, "/v1/projects", id, query || undefined);
+  return getResource<ProjectEntity>(client, "/v1/projects", id, query || undefined, "id", ctx);
 }

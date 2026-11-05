@@ -1,4 +1,5 @@
 import type { BoardClient } from "../client";
+import type { CallContext } from "../context";
 import {
   baseQuery,
   type CommonListOptions,
@@ -41,6 +42,7 @@ export function listProjectCosts(
   client: BoardClient,
   opts: ProjectCostListOptions = {},
   paging?: ListPaging,
+  ctx?: CallContext,
 ): Promise<ListResult<ProjectCostEntity>> {
   return listResource<ProjectCostEntity, ProjectCostListOptions>(
     client,
@@ -48,12 +50,14 @@ export function listProjectCosts(
     buildProjectCostsQuery,
     opts,
     paging,
+    ctx,
   );
 }
 
 export function getProjectCost(
   client: BoardClient,
   id: number,
+  ctx?: CallContext,
 ): Promise<ItemResult<ProjectCostEntity>> {
-  return getResource<ProjectCostEntity>(client, "/v1/project_costs", id);
+  return getResource<ProjectCostEntity>(client, "/v1/project_costs", id, undefined, "id", ctx);
 }

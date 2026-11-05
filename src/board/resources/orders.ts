@@ -1,4 +1,5 @@
 import type { BoardClient } from "../client";
+import type { CallContext } from "../context";
 import { getResource, type ItemResult } from "./common";
 import type { DocumentDetailEntity } from "./refs";
 
@@ -23,6 +24,7 @@ export interface OrderEntity {
 export function getOrder(
   client: BoardClient,
   documentId: number,
+  ctx?: CallContext,
 ): Promise<ItemResult<OrderEntity>> {
   return getResource<OrderEntity>(
     client,
@@ -30,5 +32,6 @@ export function getOrder(
     documentId,
     undefined,
     "documentId",
+    ctx,
   );
 }
