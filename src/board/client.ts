@@ -14,7 +14,7 @@
 import type { Env } from "../env";
 import { BoardError } from "../errors";
 import { type CallContext, DEFAULT_CALL_BUDGET_MS, resolveContext } from "./context";
-import { BoardApiError, type BoardApiErrorDetail } from "./errors";
+import { BoardApiError, type BoardApiErrorDetail, DeadlineExceededError } from "./errors";
 
 export type { CallContext };
 export { BoardApiError, DEFAULT_CALL_BUDGET_MS };
@@ -81,12 +81,7 @@ const defaultSleep = (ms: number, signal?: AbortSignal) =>
 const callAborted = () => new BoardError("api_error", "BOARD API call was aborted.", true);
 
 /** 締め切りまでに終わらなかった。元が 429 なら rate_limited、それ以外は api_error。 */
-const deadlineExceeded = (rateLimited: boolean) =>
-  new BoardError(
-    rateLimited ? "rate_limited" : "api_error",
-    "BOARD API did not respond before the deadline.",
-    true,
-  );
+const deadlineExceeded = (rateLimited: boolean) => new DeadlineExceededError(rateLimited);
 
 /** promise を signal の abort と競わせる。abort されたら即座に reject する(元の promise は放置)。 */
 function raceAbort<T>(promise: Promise<T>, signal: AbortSignal | undefined): Promise<T> {

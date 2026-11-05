@@ -9,6 +9,7 @@ export const ERROR_CODES = [
   "not_found",
   "api_error",
   "rate_limited",
+  "refresh_in_progress",
   "response_too_large",
   "generic_error",
 ] as const;
@@ -49,9 +50,33 @@ export class ResponseTooLargeError extends BoardError {
   }
 }
 
+/** 同じリソースの refresh が別の呼び出しで進行中(M03)。待たずに即返し、`retry_after_seconds` 後の再試行を促す。 */
+export const REFRESH_RETRY_AFTER_SECONDS = 30;
+
+export class RefreshInProgressError extends BoardError {
+  readonly retryAfterSeconds = REFRESH_RETRY_AFTER_SECONDS;
+  readonly resource: string;
+  readonly holder: string;
+  readonly elapsedSeconds: number;
+
+  constructor(resource: string, info: { holder?: string; elapsedSeconds?: number } = {}) {
+    const holder = info.holder ?? "";
+    const elapsedSeconds = info.elapsedSeconds ?? 0;
+    super(
+      "refresh_in_progress",
+      `Refresh in progress for ${resource} (holder=${holder}, elapsed=${elapsedSeconds}s). ` +
+        `Retry after ${REFRESH_RETRY_AFTER_SECONDS} seconds.`,
+      true,
+    );
+    this.resource = resource;
+    this.holder = holder;
+    this.elapsedSeconds = elapsedSeconds;
+  }
+}
+
 export interface ErrorEnvelope {
   schema_version: "1";
-  error: { code: ErrorCode; message: string; retryable: boolean };
+  error: { code: ErrorCode; message: string; retryable: boolean; retry_after_seconds?: number };
 }
 
 export function errorEnvelope(code: ErrorCode, message: string, retryable: boolean): ErrorEnvelope {
@@ -59,6 +84,11 @@ export function errorEnvelope(code: ErrorCode, message: string, retryable: boole
 }
 
 export function toErrorEnvelope(e: unknown): ErrorEnvelope {
+  if (e instanceof RefreshInProgressError) {
+    const env = errorEnvelope(e.code, e.message, e.retryable);
+    env.error.retry_after_seconds = e.retryAfterSeconds;
+    return env;
+  }
   if (e instanceof BoardError) return errorEnvelope(e.code, e.message, e.retryable);
   // 想定外の例外は内部情報を漏らさない。
   return errorEnvelope("generic_error", "Unexpected error.", false);

@@ -10,7 +10,7 @@ import {
   DEFAULT_TIMEOUT_MS,
   retryDelayMs,
 } from "../../src/board/client";
-import { BoardApiError } from "../../src/board/errors";
+import { BoardApiError, isDeadlineError } from "../../src/board/errors";
 import { getClient, listClients } from "../../src/board/resources/clients";
 import { BoardError, toErrorEnvelope } from "../../src/errors";
 import { jsonResponse, mockOutboundFetch } from "../helpers/mock-fetch";
@@ -459,8 +459,11 @@ describe("締め切りとキャンセル(呼び出しコンテキスト)", () =>
     expect((e as BoardError).code).toBe(code);
     expect((e as BoardError).retryable).toBe(true);
     expect((e as BoardError).message).toMatch(/deadline/);
+    // 呼び出し側(refresh)が文面に頼らず『締め切り』を見分けられる。
+    expect(isDeadlineError(e)).toBe(true);
   };
   const expectAbortError = (e: unknown) => {
+    expect(isDeadlineError(e)).toBe(false);
     expect(e).toBeInstanceOf(BoardError);
     expect((e as BoardError).code).toBe("api_error");
     expect((e as BoardError).retryable).toBe(true);

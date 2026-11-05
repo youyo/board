@@ -24,6 +24,7 @@ describe("エラーエンベロープ", () => {
       "not_found",
       "api_error",
       "rate_limited",
+      "refresh_in_progress",
       "response_too_large",
       "generic_error",
     ]);
@@ -58,5 +59,24 @@ describe("エラーエンベロープ", () => {
     expect(env.error.retryable).toBe(false);
     expect(JSON.stringify(env)).not.toContain("secret-api-key-123");
     expect(toErrorEnvelope("string thrown").error.code).toBe("generic_error");
+  });
+});
+
+describe("refresh_in_progress(M03 で追加した仕様)", () => {
+  it("エンベロープに retry_after_seconds を載せる(他のエラーには載せない)", async () => {
+    const { RefreshInProgressError } = await import("../../src/errors");
+    const e = new RefreshInProgressError("clients", { holder: "h", elapsedSeconds: 3 });
+    expect(toErrorEnvelope(e)).toEqual({
+      schema_version: "1",
+      error: {
+        code: "refresh_in_progress",
+        message: e.message,
+        retryable: true,
+        retry_after_seconds: 30,
+      },
+    });
+    expect(toErrorEnvelope(new BoardError("not_found", "x", false)).error).not.toHaveProperty(
+      "retry_after_seconds",
+    );
   });
 });

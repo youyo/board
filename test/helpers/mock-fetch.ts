@@ -45,7 +45,16 @@ export function mockOutboundFetch(handlers: Record<string, Handler>) {
       if (!handler) {
         throw new Error(`mockOutboundFetch: 想定外の outbound fetch ${req.method} ${req.url}`);
       }
-      return handler(call);
+      const result = handler(call);
+      const signal = init?.signal;
+      if (!signal) return result;
+      // 本物の fetch と同じく、signal が abort されたら待っている応答を中断する。
+      return new Promise<Response>((resolve, reject) => {
+        const aborted = () => reject(new DOMException("aborted", "AbortError"));
+        if (signal.aborted) return aborted();
+        signal.addEventListener("abort", aborted, { once: true });
+        Promise.resolve(result).then(resolve, reject);
+      });
     });
   return {
     calls,

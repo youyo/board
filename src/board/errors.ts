@@ -54,3 +54,21 @@ function describe(status: number, d: BoardApiErrorDetail): string {
   const head = `BOARD API error (HTTP ${status})`;
   return d.boardMessage ? `${head}: ${d.boardMessage}` : `${head}.`;
 }
+
+/**
+ * 呼び出しの締め切りまでに終わらなかった(M02 追補)。元が 429 なら rate_limited、それ以外は api_error。
+ * refresh が『ここまでの進捗を保存して partial で返す』判断のために、文面ではなくこの型で見分ける。
+ */
+export class DeadlineExceededError extends BoardError {
+  constructor(rateLimited: boolean) {
+    super(
+      rateLimited ? "rate_limited" : "api_error",
+      "BOARD API did not respond before the deadline.",
+      true,
+    );
+  }
+}
+
+export function isDeadlineError(e: unknown): e is DeadlineExceededError {
+  return e instanceof DeadlineExceededError;
+}

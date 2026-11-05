@@ -18,6 +18,7 @@ Go 製 CLI / ローカル MCP（v0.11.1）を書き直したもの。Go 版は `
 | 公開範囲 | `workers_dev: false`、カスタムドメインのみ。Access を迂回できる経路を作らない | JWT 検証は多層防御の 2 枚目 |
 | デプロイ単位 | 1 デプロイ = 1 BOARD アカウント。profile は持たない | 共有キー方式 |
 | キャッシュ | **D1**。Go 版の `resource_cache`（エンティティ単位の JSON）+ `sync_state` + `cache_meta` と、名前の正規化（NFKC + 小文字 + trim）、LLM が決める鮮度（`refresh` 引数の enum）を引き継ぐ | 2026-11-05 ユーザー決定。却下: KV、キャッシュなし |
+| full refresh の再開 | full は世代番号 + ページ単位で進め、30 秒の締め切りが近づいたら進捗を保存して `refresh_state: "partial"` で返し、次の `refresh=full` で続きから再開する。完了で古い世代の行を削除する。ロックは D1 の条件付き UPDATE(TryLock)で、取れなければ即 `refresh_in_progress`(`retry_after_seconds` 30) | 2026-11-05 M03 で決定。Go の full は 1 回の呼び出しで全件を取るが、Workers の締め切り内ではそのリソースの件数次第で終わらない(Go の実測で estimates は 25 ページ・約 19 秒)。詳細は `plans/board-workers-m03-d1-cache.md` |
 | D1 のスキーマ適用 | Worker が isolate ごとの初回に冪等なスキーマ適用を行う（Go の `internal/cache/migrate.go` と同じ考え方）。テストで `cloudflare:test` の `applyD1Migrations` を使わない | logbutler の規約（`cloudflare:test` を import すると並列実行でタイムアウトする） |
 | 流量制御 | **Durable Objects は使わない**。参照はキャッシュを優先し、1 回のツール呼び出し内では BOARD API を直列に呼ぶ。429 / 5xx は `Retry-After` を尊重して上限付きで再試行する。全件 refresh は D1 の条件付き UPDATE によるロック（Go の `refresh/lock.go` の TryLock + 429 相当、stale は 10 分） | 2026-11-05 ユーザー決定。少人数での利用を想定する。既知のリスク: 複数利用者が同時にキャッシュミスすると 3 回/秒を超えうる（429 の再試行で吸収する）。問題になったら DO による全体制御を再検討 |
 | 締め切りとキャンセル | 1 回のツール呼び出しにつき 1 つの呼び出しコンテキスト（`signal` + `deadline`、既定 30 秒）を作り、一覧のページ巡回全体で共有する。Retry-After やバックオフが残り時間を超えるなら待たずに `retryable: true` で失敗させる。`maxRetries` は 3（Go の 5 は CLI 前提）。クライアントは isolate 内で共有し、リクエストをまたいで直列化する | M02 の verifier 指摘（2026-11-05）。Go の設定のままだと 1 回の get が最悪 300〜480 秒待ち、MCP クライアントのタイムアウトを超える |
@@ -42,7 +43,7 @@ Go 製 CLI / ローカル MCP（v0.11.1）を書き直したもの。Go 版は `
 | M00 | Go 版のアーカイブと削除 | 完了（74dfcde） |
 | M01 | 基盤: mise / pnpm / biome / tsconfig / vitest、`/healthz`、設定チェック、Access JWT 検証、`createMcpHandler` とダミーツール 1 個、エラーエンベロープ、応答サイズ上限、CI、CLAUDE.md | 完了（16df333） |
 | M02 | BOARD API クライアント（x-api-key + Bearer、直列、再試行と Retry-After、ページング、`_meta` ヘッダ）と 22 リソースの型。追補: 呼び出し単位の締め切り・キャンセル・isolate 内のクライアント共有 | 完了（2d14f28）、追補は作業中 |
-| M03 | D1 キャッシュ（スキーマ適用、resource_cache / sync_state / cache_meta、名前の正規化）、refresh（enum、差分 / 全件、D1 ロック）、repository 層 | 未着手 |
+| M03 | D1 キャッシュ（スキーマ適用、resource_cache / sync_state / cache_meta、名前の正規化）、refresh（enum、差分 / 全件、D1 ロック）、repository 層。full は再開あり | 実装済み（`plans/board-workers-m03-d1-cache.md`）、レビュー待ち |
 | M04 | api 層のツール（22 リソースの list / get） | 未着手 |
 | M05 | find 層のツール 11 個（名前による ID 解決・曖昧な場合のエラー、fanout の上限、逆引きマップ、contract_status、URL、enrichment の失敗を致命的にしない、cache 配列の同梱） | 未着手 |
 | M06 | cache 系ツール、デプロイ設定の生成、runbook（Access アプリ・Managed OAuth・Portal の登録）、README、`test:live` | 未着手 |
@@ -52,3 +53,4 @@ Go 製 CLI / ローカル MCP（v0.11.1）を書き直したもの。Go 版は `
 ## Changelog
 
 - 2026-11-05: 作成。M00・M01・M02 完了。締め切りとキャンセルの決定を追加。
+- 2026-11-05: M03 実装。full refresh の再開方式を決定済み事項に追加。
