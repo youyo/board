@@ -51,7 +51,7 @@ const notYetSupportedDesc = (field: string, scope: string) =>
   `(NOT YET SUPPORTED) Will filter ${scope} by ${field} in a future release. Currently returns an error.`;
 
 const REFRESH_DESC =
-  'Trigger a refresh before reading cache. "none" (default) reads cache as-is. "delta" fetches incremental changes since last sync. "full" re-fetches all entries and removes stale ones (use periodically; a large resource may need several calls, see refresh_state=partial in cache). Concurrent refreshes return refresh_in_progress; clients should wait and retry.';
+  'Trigger a refresh before reading cache. "none" (default) reads cache as-is. "delta" fetches incremental changes since last sync. "full" re-fetches all entries and removes stale ones (use periodically; a large resource may need several calls, see refresh_state=partial in cache). Concurrent refreshes return refresh_in_progress; clients should wait and retry. Note: delta / full write to the shared D1 cache and consume the BOARD API daily quota (3,000 calls/day); BOARD data itself is never modified. Pass them only when needed.';
 
 // Go の説明は "default: 50, max: 100" だが、Go の実装は 0・未指定を無制限として扱い上限も強制していない。事実に合わせて書く。
 const LIMIT_DESC =

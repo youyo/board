@@ -4,6 +4,7 @@
  */
 
 import { BoardError } from "../errors";
+import { LOCK_STALE_MS } from "../refresh/lock";
 import { ensureSchema } from "./schema";
 import { type Clock, isoSeconds, systemClock } from "./time";
 
@@ -86,6 +87,66 @@ export async function upsertEntities(
   return entities.length;
 }
 
+/**
+ * 単体取得(キャッシュミスで API から 1 件取った結果)の保存。1 文の条件付き INSERT で、読んでから書くまでの隙間を作らない。
+ * - 世代: INSERT の中で `sync_state.full_generation` を読む(行がなければ 0)。`cache_clear` で世代が数え直しになっても、
+ *   古い大きい世代の行が戻って full の削除や件数の照合を狂わせることがない。
+ * - ロック: その resource のロックが取られている間は書かない。『取られている』は `tryAcquireLock` の定義と同じ
+ *   (`refresh_started_at` があり、`now - LOCK_STALE_MS` 以降。stale になったものは奪える = 保持していない扱い)。
+ * - ID: 応答の `id` が 1 以上の安全な整数で、要求した ID と同じときだけ書く(それ以外は何もしない)。
+ * - 新しさ: API を待っている間に別の refresh / get が同じ ID の行をもっと新しく書いていたら、その行を古い内容で上書きしない。
+ *   既存の行がない、または既存の `fetched_at < isoSeconds(fetchStartedAt)`(取得を始めた時刻より前に書かれた行)のときだけ書く。
+ *   `INSERT OR IGNORE` にしないのは、`refresh=full` の書類 1 件の取り直しで古い行を更新できる必要があるため。
+ *   `fetched_at` は秒精度なので、同じ秒は『新しい行を守る』側に倒す(上書きしない)。取り違えた場合の被害は、
+ *   同じ秒に書かれた古い行が次の取得まで残るだけで、古い内容が新しい内容を消すより軽い。
+ * 書いたかどうかを返す。
+ */
+export async function cacheFetchedEntity(
+  db: D1Database,
+  resource: string,
+  entity: unknown,
+  opts: {
+    requestedId: number /** API を呼ぶ直前の時刻(epoch ms)。 */;
+    fetchStartedAt: number;
+    now?: number;
+  },
+): Promise<boolean> {
+  const id = (entity as { id?: unknown } | null)?.id;
+  if (typeof id !== "number" || !Number.isSafeInteger(id) || id < 1 || id !== opts.requestedId) {
+    return false;
+  }
+  await ensureSchema(db);
+  const now = opts.now ?? systemClock();
+  const r = await db
+    .prepare(
+      `INSERT INTO resource_cache
+        (resource_name, entity_id, payload_json, updated_at, fetched_at, generation)
+       SELECT ?, ?, ?, ?, ?, COALESCE((SELECT full_generation FROM sync_state WHERE resource_name = ?), 0)
+       WHERE NOT EXISTS (
+         SELECT 1 FROM sync_state WHERE resource_name = ? AND refresh_started_at IS NOT NULL AND refresh_started_at >= ?
+       )
+       ON CONFLICT (resource_name, entity_id) DO UPDATE SET
+         payload_json = excluded.payload_json,
+         updated_at = excluded.updated_at,
+         fetched_at = excluded.fetched_at,
+         generation = excluded.generation
+       WHERE resource_cache.fetched_at < ?`,
+    )
+    .bind(
+      resource,
+      id,
+      JSON.stringify(entity),
+      updatedAtOf(entity),
+      isoSeconds(now),
+      resource,
+      resource,
+      isoSeconds(now - LOCK_STALE_MS),
+      isoSeconds(opts.fetchStartedAt),
+    )
+    .run();
+  return r.meta.changes === 1;
+}
+
 interface Row {
   entity_id: number;
   payload_json: string;
@@ -119,17 +180,22 @@ export async function getEntry<T = unknown>(
   return r ? toEntry<T>(r) : null;
 }
 
-/** updated_at の昇順(NULL が先頭。Go と同じ)。同じなら id 順にして順序を決定的にする。 */
+/**
+ * updated_at の昇順(NULL が先頭。Go と同じ)。同じなら id 順にして順序を決定的にする。
+ * `limit` が 1 以上なら SQL の LIMIT で先頭からその件数だけ読む(それ以外の行は読まず、JSON も解析しない)。0・未指定は全件。
+ */
 export async function listEntries<T = unknown>(
   db: D1Database,
   resource: string,
+  opts: { limit?: number } = {},
 ): Promise<Array<CacheEntry<T>>> {
   await ensureSchema(db);
+  const limit = opts.limit !== undefined && opts.limit > 0 ? Math.floor(opts.limit) : undefined;
   const r = await db
     .prepare(
-      "SELECT entity_id, payload_json, updated_at, fetched_at, generation FROM resource_cache WHERE resource_name = ? ORDER BY updated_at ASC, entity_id ASC",
+      `SELECT entity_id, payload_json, updated_at, fetched_at, generation FROM resource_cache WHERE resource_name = ? ORDER BY updated_at ASC, entity_id ASC${limit === undefined ? "" : " LIMIT ?"}`,
     )
-    .bind(resource)
+    .bind(...(limit === undefined ? [resource] : [resource, limit]))
     .all<Row>();
   return r.results.map((row) => toEntry<T>(row));
 }

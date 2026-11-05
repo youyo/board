@@ -6,7 +6,7 @@
 import { z } from "zod";
 import { cacheReport, clearCache, clearDocumentMap, RESOURCE_NAMES } from "../../cache/admin";
 import { RefreshInProgressError } from "../../errors";
-import { optBool } from "../args";
+import { boundedString, MAX_ARRAY_ITEMS, optBool } from "../args";
 import { defineTool } from "../registry";
 
 export const cacheStatus = defineTool({
@@ -46,7 +46,12 @@ export const cacheClear = defineTool({
   openWorld: false,
   inputSchema: z.strictObject({
     // 空配列を「全件」と取り違えないよう、指定するなら 1 件以上に限る(省略時だけが全件)。
-    resources: z.array(z.string()).min(1).describe(RESOURCES_DESC).optional(),
+    resources: z
+      .array(boundedString())
+      .min(1)
+      .max(MAX_ARRAY_ITEMS)
+      .describe(RESOURCES_DESC)
+      .optional(),
     include_document_map: optBool(DOCUMENT_MAP_DESC),
   }),
   handler: async ({ resources, include_document_map }, ctx) => {

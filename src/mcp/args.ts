@@ -8,8 +8,19 @@ import { z } from "zod";
 
 const isInt = (n: number) => Number.isInteger(n);
 
+/**
+ * 入力の上限。上限のない入力は、巨大な文字列・配列を BOARD のクエリや D1 の検索に流してしまうので、スキーマで先に断る(argument_error)。
+ * - 文字列 1,000 文字: BOARD の名前・タグ・ステータス・日付などの絞り込み値は数十文字に収まる。その 20 倍以上の余裕を見た値。
+ * - 配列 100 件: 絞り込みに使う ID・タグの現実的な数(22 リソースの cache_clear も収まる)の数倍。URL(クエリ)が過大にならない範囲。
+ */
+export const MAX_STRING_LENGTH = 1000;
+export const MAX_ARRAY_ITEMS = 100;
+
+/** 長さの上限つきの文字列(スキーマの部品)。 */
+export const boundedString = () => z.string().max(MAX_STRING_LENGTH);
+
 /** 任意の文字列。 */
-export const optStr = (description: string) => z.string().describe(description).optional();
+export const optStr = (description: string) => boundedString().describe(description).optional();
 /** 任意の整数(JSON Schema 上は number)。 */
 export const optInt = (description: string) =>
   z.number().refine(isInt, "must be an integer").describe(description).optional();
@@ -17,10 +28,14 @@ export const optInt = (description: string) =>
 export const optBool = (description: string) => z.boolean().describe(description).optional();
 /** 任意の文字列の配列。 */
 export const optStrArray = (description: string) =>
-  z.array(z.string()).describe(description).optional();
+  z.array(boundedString()).max(MAX_ARRAY_ITEMS).describe(description).optional();
 /** 任意の整数の配列。 */
 export const optIntArray = (description: string) =>
-  z.array(z.number().refine(isInt, "must be an integer")).describe(description).optional();
+  z
+    .array(z.number().refine(isInt, "must be an integer"))
+    .max(MAX_ARRAY_ITEMS)
+    .describe(description)
+    .optional();
 /** 任意の列挙値。 */
 export const optEnum = <const T extends readonly [string, ...string[]]>(
   values: T,

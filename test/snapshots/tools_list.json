@@ -9,9 +9,11 @@
       "properties": {
         "resources": {
           "minItems": 1,
+          "maxItems": 100,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 1000
           },
           "description": "Resources to clear (default: all 22). Valid: clients, client_branches, contacts, projects, project_costs, estimates, invoices, orders, deliveries, receipts, vendors, vendor_branches, vendor_contacts, purchase_orders, payments, users, groups, payment_terms, project_types, purchase_types, accounting_types, document_send_channels."
         },
@@ -66,6 +68,7 @@
         },
         "name": {
           "type": "string",
+          "maxLength": 1000,
           "description": "Substring match on client name."
         },
         "refresh": {
@@ -75,7 +78,7 @@
             "delta",
             "full"
           ],
-          "description": "Trigger a refresh before reading cache. \"none\" (default) reads cache as-is. \"delta\" fetches incremental changes since last sync. \"full\" re-fetches all entries and removes stale ones (use periodically; a large resource may need several calls, see refresh_state=partial in cache). Concurrent refreshes return refresh_in_progress; clients should wait and retry."
+          "description": "Trigger a refresh before reading cache. \"none\" (default) reads cache as-is. \"delta\" fetches incremental changes since last sync. \"full\" re-fetches all entries and removes stale ones (use periodically; a large resource may need several calls, see refresh_state=partial in cache). Concurrent refreshes return refresh_in_progress; clients should wait and retry. Note: delta / full write to the shared D1 cache and consume the BOARD API daily quota (3,000 calls/day); BOARD data itself is never modified. Pass them only when needed."
         },
         "limit": {
           "type": "number",
@@ -113,10 +116,12 @@
         },
         "client_name": {
           "type": "string",
+          "maxLength": 1000,
           "description": "Resolve client name (substring match) and fanout-search across all matching clients (no disambiguation). Use project_id to narrow to a single document. More than 5 matches is rejected (narrow the query)."
         },
         "project_name": {
           "type": "string",
+          "maxLength": 1000,
           "description": "Resolve project name (substring match) and fanout-search across all matching projects (no disambiguation). Use project_id to narrow to a single document. More than 5 matches is rejected (narrow the query)."
         },
         "refresh": {
@@ -126,7 +131,7 @@
             "delta",
             "full"
           ],
-          "description": "Trigger a refresh before reading cache. \"none\" (default) reads cache as-is. \"delta\" fetches incremental changes since last sync. \"full\" re-fetches all entries and removes stale ones (use periodically; a large resource may need several calls, see refresh_state=partial in cache). Concurrent refreshes return refresh_in_progress; clients should wait and retry."
+          "description": "Trigger a refresh before reading cache. \"none\" (default) reads cache as-is. \"delta\" fetches incremental changes since last sync. \"full\" re-fetches all entries and removes stale ones (use periodically; a large resource may need several calls, see refresh_state=partial in cache). Concurrent refreshes return refresh_in_progress; clients should wait and retry. Note: delta / full write to the shared D1 cache and consume the BOARD API daily quota (3,000 calls/day); BOARD data itself is never modified. Pass them only when needed."
         },
         "limit": {
           "type": "number",
@@ -164,10 +169,12 @@
         },
         "client_name": {
           "type": "string",
+          "maxLength": 1000,
           "description": "Resolve client name (substring match) and fanout-search across all matching clients (no disambiguation). Use project_id to narrow to a single document. More than 5 matches is rejected (narrow the query)."
         },
         "project_name": {
           "type": "string",
+          "maxLength": 1000,
           "description": "Resolve project name (substring match) and fanout-search across all matching projects (no disambiguation). Use project_id to narrow to a single document. More than 5 matches is rejected (narrow the query)."
         },
         "refresh": {
@@ -177,7 +184,7 @@
             "delta",
             "full"
           ],
-          "description": "Trigger a refresh before reading cache. \"none\" (default) reads cache as-is. \"delta\" fetches incremental changes since last sync. \"full\" re-fetches all entries and removes stale ones (use periodically; a large resource may need several calls, see refresh_state=partial in cache). Concurrent refreshes return refresh_in_progress; clients should wait and retry."
+          "description": "Trigger a refresh before reading cache. \"none\" (default) reads cache as-is. \"delta\" fetches incremental changes since last sync. \"full\" re-fetches all entries and removes stale ones (use periodically; a large resource may need several calls, see refresh_state=partial in cache). Concurrent refreshes return refresh_in_progress; clients should wait and retry. Note: delta / full write to the shared D1 cache and consume the BOARD API daily quota (3,000 calls/day); BOARD data itself is never modified. Pass them only when needed."
         },
         "limit": {
           "type": "number",
@@ -211,14 +218,17 @@
         },
         "client_name": {
           "type": "string",
+          "maxLength": 1000,
           "description": "Resolve client name (substring match) to filter invoice. Returns an ambiguity error with up to 5 candidates if multiple clients match; use id to disambiguate."
         },
         "project_name": {
           "type": "string",
+          "maxLength": 1000,
           "description": "(NOT YET SUPPORTED) Will filter invoices by project name in a future release. Currently returns an error."
         },
         "status": {
           "type": "string",
+          "maxLength": 1000,
           "description": "Filter by invoice status (single value; API delegated, no narrowing required)."
         },
         "refresh": {
@@ -228,7 +238,7 @@
             "delta",
             "full"
           ],
-          "description": "Trigger a refresh before reading cache. \"none\" (default) reads cache as-is. \"delta\" fetches incremental changes since last sync. \"full\" re-fetches all entries and removes stale ones (use periodically; a large resource may need several calls, see refresh_state=partial in cache). Concurrent refreshes return refresh_in_progress; clients should wait and retry."
+          "description": "Trigger a refresh before reading cache. \"none\" (default) reads cache as-is. \"delta\" fetches incremental changes since last sync. \"full\" re-fetches all entries and removes stale ones (use periodically; a large resource may need several calls, see refresh_state=partial in cache). Concurrent refreshes return refresh_in_progress; clients should wait and retry. Note: delta / full write to the shared D1 cache and consume the BOARD API daily quota (3,000 calls/day); BOARD data itself is never modified. Pass them only when needed."
         },
         "limit": {
           "type": "number",
@@ -266,10 +276,12 @@
         },
         "client_name": {
           "type": "string",
+          "maxLength": 1000,
           "description": "Resolve client name (substring match) and fanout-search across all matching clients (no disambiguation). Use project_id to narrow to a single document. More than 5 matches is rejected (narrow the query)."
         },
         "project_name": {
           "type": "string",
+          "maxLength": 1000,
           "description": "Resolve project name (substring match) and fanout-search across all matching projects (no disambiguation). Use project_id to narrow to a single document. More than 5 matches is rejected (narrow the query)."
         },
         "refresh": {
@@ -279,7 +291,7 @@
             "delta",
             "full"
           ],
-          "description": "Trigger a refresh before reading cache. \"none\" (default) reads cache as-is. \"delta\" fetches incremental changes since last sync. \"full\" re-fetches all entries and removes stale ones (use periodically; a large resource may need several calls, see refresh_state=partial in cache). Concurrent refreshes return refresh_in_progress; clients should wait and retry."
+          "description": "Trigger a refresh before reading cache. \"none\" (default) reads cache as-is. \"delta\" fetches incremental changes since last sync. \"full\" re-fetches all entries and removes stale ones (use periodically; a large resource may need several calls, see refresh_state=partial in cache). Concurrent refreshes return refresh_in_progress; clients should wait and retry. Note: delta / full write to the shared D1 cache and consume the BOARD API daily quota (3,000 calls/day); BOARD data itself is never modified. Pass them only when needed."
         },
         "limit": {
           "type": "number",
@@ -313,6 +325,7 @@
         },
         "vendor_name": {
           "type": "string",
+          "maxLength": 1000,
           "description": "Resolve vendor name (substring match) to filter payment. Returns an ambiguity error with up to 5 candidates if multiple vendors match; use id to disambiguate."
         },
         "purchase_order_id": {
@@ -321,6 +334,7 @@
         },
         "status": {
           "type": "string",
+          "maxLength": 1000,
           "description": "Filter by payment status (single value; API delegated, no narrowing required)."
         },
         "refresh": {
@@ -330,7 +344,7 @@
             "delta",
             "full"
           ],
-          "description": "Trigger a refresh before reading cache. \"none\" (default) reads cache as-is. \"delta\" fetches incremental changes since last sync. \"full\" re-fetches all entries and removes stale ones (use periodically; a large resource may need several calls, see refresh_state=partial in cache). Concurrent refreshes return refresh_in_progress; clients should wait and retry."
+          "description": "Trigger a refresh before reading cache. \"none\" (default) reads cache as-is. \"delta\" fetches incremental changes since last sync. \"full\" re-fetches all entries and removes stale ones (use periodically; a large resource may need several calls, see refresh_state=partial in cache). Concurrent refreshes return refresh_in_progress; clients should wait and retry. Note: delta / full write to the shared D1 cache and consume the BOARD API daily quota (3,000 calls/day); BOARD data itself is never modified. Pass them only when needed."
         },
         "limit": {
           "type": "number",
@@ -364,25 +378,31 @@
         },
         "client_name": {
           "type": "string",
+          "maxLength": 1000,
           "description": "Resolve client name (substring match) to filter project. Returns an ambiguity error with up to 5 candidates if multiple clients match; use id to disambiguate."
         },
         "name": {
           "type": "string",
+          "maxLength": 1000,
           "description": "Substring match on project name."
         },
         "status": {
           "type": "string",
+          "maxLength": 1000,
           "description": "Filter by project status (e.g. 受注, 完了). MUST be combined with id/client_name/name — status-only query is rejected (API delegation not possible, narrowing required). Mutually exclusive with statuses / contract_status."
         },
         "statuses": {
+          "maxItems": 100,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 1000
           },
           "description": "Filter by multiple project statuses (OR). Mutually exclusive with status / contract_status. Same narrowing rules apply. Max 10 items."
         },
         "contract_status": {
           "type": "string",
+          "maxLength": 1000,
           "description": "Contract status alias. Valid values: active (in-progress: 未着手/着手中/納品済), ended (検収済), prospect (見積中*), all. Mutually exclusive with status / statuses. Same narrowing rules apply."
         },
         "refresh": {
@@ -392,7 +412,7 @@
             "delta",
             "full"
           ],
-          "description": "Trigger a refresh before reading cache. \"none\" (default) reads cache as-is. \"delta\" fetches incremental changes since last sync. \"full\" re-fetches all entries and removes stale ones (use periodically; a large resource may need several calls, see refresh_state=partial in cache). Concurrent refreshes return refresh_in_progress; clients should wait and retry."
+          "description": "Trigger a refresh before reading cache. \"none\" (default) reads cache as-is. \"delta\" fetches incremental changes since last sync. \"full\" re-fetches all entries and removes stale ones (use periodically; a large resource may need several calls, see refresh_state=partial in cache). Concurrent refreshes return refresh_in_progress; clients should wait and retry. Note: delta / full write to the shared D1 cache and consume the BOARD API daily quota (3,000 calls/day); BOARD data itself is never modified. Pass them only when needed."
         },
         "limit": {
           "type": "number",
@@ -426,14 +446,17 @@
         },
         "vendor_name": {
           "type": "string",
+          "maxLength": 1000,
           "description": "Resolve vendor name (substring match) to filter purchase order. Returns an ambiguity error with up to 5 candidates if multiple vendors match; use id to disambiguate."
         },
         "project_name": {
           "type": "string",
+          "maxLength": 1000,
           "description": "(NOT YET SUPPORTED) Will filter purchase orders by project name in a future release. Currently returns an error."
         },
         "status": {
           "type": "string",
+          "maxLength": 1000,
           "description": "Filter by purchase order status (single value; API delegated, no narrowing required)."
         },
         "refresh": {
@@ -443,7 +466,7 @@
             "delta",
             "full"
           ],
-          "description": "Trigger a refresh before reading cache. \"none\" (default) reads cache as-is. \"delta\" fetches incremental changes since last sync. \"full\" re-fetches all entries and removes stale ones (use periodically; a large resource may need several calls, see refresh_state=partial in cache). Concurrent refreshes return refresh_in_progress; clients should wait and retry."
+          "description": "Trigger a refresh before reading cache. \"none\" (default) reads cache as-is. \"delta\" fetches incremental changes since last sync. \"full\" re-fetches all entries and removes stale ones (use periodically; a large resource may need several calls, see refresh_state=partial in cache). Concurrent refreshes return refresh_in_progress; clients should wait and retry. Note: delta / full write to the shared D1 cache and consume the BOARD API daily quota (3,000 calls/day); BOARD data itself is never modified. Pass them only when needed."
         },
         "limit": {
           "type": "number",
@@ -481,10 +504,12 @@
         },
         "client_name": {
           "type": "string",
+          "maxLength": 1000,
           "description": "Resolve client name (substring match) and fanout-search across all matching clients (no disambiguation). Use project_id to narrow to a single document. More than 5 matches is rejected (narrow the query)."
         },
         "project_name": {
           "type": "string",
+          "maxLength": 1000,
           "description": "Resolve project name (substring match) and fanout-search across all matching projects (no disambiguation). Use project_id to narrow to a single document. More than 5 matches is rejected (narrow the query)."
         },
         "refresh": {
@@ -494,7 +519,7 @@
             "delta",
             "full"
           ],
-          "description": "Trigger a refresh before reading cache. \"none\" (default) reads cache as-is. \"delta\" fetches incremental changes since last sync. \"full\" re-fetches all entries and removes stale ones (use periodically; a large resource may need several calls, see refresh_state=partial in cache). Concurrent refreshes return refresh_in_progress; clients should wait and retry."
+          "description": "Trigger a refresh before reading cache. \"none\" (default) reads cache as-is. \"delta\" fetches incremental changes since last sync. \"full\" re-fetches all entries and removes stale ones (use periodically; a large resource may need several calls, see refresh_state=partial in cache). Concurrent refreshes return refresh_in_progress; clients should wait and retry. Note: delta / full write to the shared D1 cache and consume the BOARD API daily quota (3,000 calls/day); BOARD data itself is never modified. Pass them only when needed."
         },
         "limit": {
           "type": "number",
@@ -528,6 +553,7 @@
         },
         "name": {
           "type": "string",
+          "maxLength": 1000,
           "description": "Substring match on user name."
         },
         "refresh": {
@@ -537,7 +563,7 @@
             "delta",
             "full"
           ],
-          "description": "Trigger a refresh before reading cache. \"none\" (default) reads cache as-is. \"delta\" fetches incremental changes since last sync. \"full\" re-fetches all entries and removes stale ones (use periodically; a large resource may need several calls, see refresh_state=partial in cache). Concurrent refreshes return refresh_in_progress; clients should wait and retry."
+          "description": "Trigger a refresh before reading cache. \"none\" (default) reads cache as-is. \"delta\" fetches incremental changes since last sync. \"full\" re-fetches all entries and removes stale ones (use periodically; a large resource may need several calls, see refresh_state=partial in cache). Concurrent refreshes return refresh_in_progress; clients should wait and retry. Note: delta / full write to the shared D1 cache and consume the BOARD API daily quota (3,000 calls/day); BOARD data itself is never modified. Pass them only when needed."
         },
         "limit": {
           "type": "number",
@@ -571,6 +597,7 @@
         },
         "name": {
           "type": "string",
+          "maxLength": 1000,
           "description": "Substring match on vendor name."
         },
         "refresh": {
@@ -580,7 +607,7 @@
             "delta",
             "full"
           ],
-          "description": "Trigger a refresh before reading cache. \"none\" (default) reads cache as-is. \"delta\" fetches incremental changes since last sync. \"full\" re-fetches all entries and removes stale ones (use periodically; a large resource may need several calls, see refresh_state=partial in cache). Concurrent refreshes return refresh_in_progress; clients should wait and retry."
+          "description": "Trigger a refresh before reading cache. \"none\" (default) reads cache as-is. \"delta\" fetches incremental changes since last sync. \"full\" re-fetches all entries and removes stale ones (use periodically; a large resource may need several calls, see refresh_state=partial in cache). Concurrent refreshes return refresh_in_progress; clients should wait and retry. Note: delta / full write to the shared D1 cache and consume the BOARD API daily quota (3,000 calls/day); BOARD data itself is never modified. Pass them only when needed."
         },
         "limit": {
           "type": "number",
@@ -619,7 +646,7 @@
             "delta",
             "full"
           ],
-          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)"
+          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)。注意: delta / full は共有の D1 キャッシュに書き込み、BOARD API の 1 日あたりの上限(3,000 回)を消費する(BOARD のデータは書き換えない)。必要なときだけ指定する"
         },
         "show_meta": {
           "type": "boolean",
@@ -661,7 +688,7 @@
             "delta",
             "full"
           ],
-          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)"
+          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)。注意: delta / full は共有の D1 キャッシュに書き込み、BOARD API の 1 日あたりの上限(3,000 回)を消費する(BOARD のデータは書き換えない)。必要なときだけ指定する"
         },
         "show_meta": {
           "type": "boolean",
@@ -703,7 +730,7 @@
             "delta",
             "full"
           ],
-          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)"
+          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)。注意: delta / full は共有の D1 キャッシュに書き込み、BOARD API の 1 日あたりの上限(3,000 回)を消費する(BOARD のデータは書き換えない)。必要なときだけ指定する"
         },
         "show_meta": {
           "type": "boolean",
@@ -745,7 +772,7 @@
             "delta",
             "full"
           ],
-          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)"
+          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)。注意: delta / full は共有の D1 キャッシュに書き込み、BOARD API の 1 日あたりの上限(3,000 回)を消費する(BOARD のデータは書き換えない)。必要なときだけ指定する"
         },
         "show_meta": {
           "type": "boolean",
@@ -787,7 +814,7 @@
             "delta",
             "full"
           ],
-          "description": "none=キャッシュがあればそれを返す(既定)/ full=キャッシュを使わず BOARD から取り直す / delta=何もしない"
+          "description": "none=キャッシュがあればそれを返す(既定)/ full=キャッシュを使わず BOARD から取り直す / delta=何もしない。注意: delta / full は共有の D1 キャッシュに書き込み、BOARD API の 1 日あたりの上限(3,000 回)を消費する(BOARD のデータは書き換えない)。必要なときだけ指定する"
         },
         "show_meta": {
           "type": "boolean",
@@ -829,7 +856,7 @@
             "delta",
             "full"
           ],
-          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)"
+          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)。注意: delta / full は共有の D1 キャッシュに書き込み、BOARD API の 1 日あたりの上限(3,000 回)を消費する(BOARD のデータは書き換えない)。必要なときだけ指定する"
         },
         "show_meta": {
           "type": "boolean",
@@ -871,7 +898,7 @@
             "delta",
             "full"
           ],
-          "description": "none=キャッシュがあればそれを返す(既定)/ full=キャッシュを使わず BOARD から取り直す / delta=何もしない"
+          "description": "none=キャッシュがあればそれを返す(既定)/ full=キャッシュを使わず BOARD から取り直す / delta=何もしない。注意: delta / full は共有の D1 キャッシュに書き込み、BOARD API の 1 日あたりの上限(3,000 回)を消費する(BOARD のデータは書き換えない)。必要なときだけ指定する"
         },
         "show_meta": {
           "type": "boolean",
@@ -913,7 +940,7 @@
             "delta",
             "full"
           ],
-          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)"
+          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)。注意: delta / full は共有の D1 キャッシュに書き込み、BOARD API の 1 日あたりの上限(3,000 回)を消費する(BOARD のデータは書き換えない)。必要なときだけ指定する"
         },
         "show_meta": {
           "type": "boolean",
@@ -955,7 +982,7 @@
             "delta",
             "full"
           ],
-          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)"
+          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)。注意: delta / full は共有の D1 キャッシュに書き込み、BOARD API の 1 日あたりの上限(3,000 回)を消費する(BOARD のデータは書き換えない)。必要なときだけ指定する"
         },
         "show_meta": {
           "type": "boolean",
@@ -997,7 +1024,7 @@
             "delta",
             "full"
           ],
-          "description": "none=キャッシュがあればそれを返す(既定)/ full=キャッシュを使わず BOARD から取り直す / delta=何もしない"
+          "description": "none=キャッシュがあればそれを返す(既定)/ full=キャッシュを使わず BOARD から取り直す / delta=何もしない。注意: delta / full は共有の D1 キャッシュに書き込み、BOARD API の 1 日あたりの上限(3,000 回)を消費する(BOARD のデータは書き換えない)。必要なときだけ指定する"
         },
         "show_meta": {
           "type": "boolean",
@@ -1039,7 +1066,7 @@
             "delta",
             "full"
           ],
-          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)"
+          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)。注意: delta / full は共有の D1 キャッシュに書き込み、BOARD API の 1 日あたりの上限(3,000 回)を消費する(BOARD のデータは書き換えない)。必要なときだけ指定する"
         },
         "show_meta": {
           "type": "boolean",
@@ -1081,7 +1108,7 @@
             "delta",
             "full"
           ],
-          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)"
+          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)。注意: delta / full は共有の D1 キャッシュに書き込み、BOARD API の 1 日あたりの上限(3,000 回)を消費する(BOARD のデータは書き換えない)。必要なときだけ指定する"
         },
         "show_meta": {
           "type": "boolean",
@@ -1123,7 +1150,7 @@
             "delta",
             "full"
           ],
-          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)"
+          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)。注意: delta / full は共有の D1 キャッシュに書き込み、BOARD API の 1 日あたりの上限(3,000 回)を消費する(BOARD のデータは書き換えない)。必要なときだけ指定する"
         },
         "show_meta": {
           "type": "boolean",
@@ -1177,7 +1204,7 @@
             "delta",
             "full"
           ],
-          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)"
+          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)。注意: delta / full は共有の D1 キャッシュに書き込み、BOARD API の 1 日あたりの上限(3,000 回)を消費する(BOARD のデータは書き換えない)。必要なときだけ指定する"
         },
         "show_meta": {
           "type": "boolean",
@@ -1219,7 +1246,7 @@
             "delta",
             "full"
           ],
-          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)"
+          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)。注意: delta / full は共有の D1 キャッシュに書き込み、BOARD API の 1 日あたりの上限(3,000 回)を消費する(BOARD のデータは書き換えない)。必要なときだけ指定する"
         },
         "show_meta": {
           "type": "boolean",
@@ -1261,7 +1288,7 @@
             "delta",
             "full"
           ],
-          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)"
+          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)。注意: delta / full は共有の D1 キャッシュに書き込み、BOARD API の 1 日あたりの上限(3,000 回)を消費する(BOARD のデータは書き換えない)。必要なときだけ指定する"
         },
         "show_meta": {
           "type": "boolean",
@@ -1303,7 +1330,7 @@
             "delta",
             "full"
           ],
-          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)"
+          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)。注意: delta / full は共有の D1 キャッシュに書き込み、BOARD API の 1 日あたりの上限(3,000 回)を消費する(BOARD のデータは書き換えない)。必要なときだけ指定する"
         },
         "show_meta": {
           "type": "boolean",
@@ -1345,7 +1372,7 @@
             "delta",
             "full"
           ],
-          "description": "none=キャッシュがあればそれを返す(既定)/ full=キャッシュを使わず BOARD から取り直す / delta=何もしない"
+          "description": "none=キャッシュがあればそれを返す(既定)/ full=キャッシュを使わず BOARD から取り直す / delta=何もしない。注意: delta / full は共有の D1 キャッシュに書き込み、BOARD API の 1 日あたりの上限(3,000 回)を消費する(BOARD のデータは書き換えない)。必要なときだけ指定する"
         },
         "show_meta": {
           "type": "boolean",
@@ -1387,7 +1414,7 @@
             "delta",
             "full"
           ],
-          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)"
+          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)。注意: delta / full は共有の D1 キャッシュに書き込み、BOARD API の 1 日あたりの上限(3,000 回)を消費する(BOARD のデータは書き換えない)。必要なときだけ指定する"
         },
         "show_meta": {
           "type": "boolean",
@@ -1429,7 +1456,7 @@
             "delta",
             "full"
           ],
-          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)"
+          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)。注意: delta / full は共有の D1 キャッシュに書き込み、BOARD API の 1 日あたりの上限(3,000 回)を消費する(BOARD のデータは書き換えない)。必要なときだけ指定する"
         },
         "show_meta": {
           "type": "boolean",
@@ -1471,7 +1498,7 @@
             "delta",
             "full"
           ],
-          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)"
+          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)。注意: delta / full は共有の D1 キャッシュに書き込み、BOARD API の 1 日あたりの上限(3,000 回)を消費する(BOARD のデータは書き換えない)。必要なときだけ指定する"
         },
         "show_meta": {
           "type": "boolean",
@@ -1513,7 +1540,7 @@
             "delta",
             "full"
           ],
-          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)"
+          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)。注意: delta / full は共有の D1 キャッシュに書き込み、BOARD API の 1 日あたりの上限(3,000 回)を消費する(BOARD のデータは書き換えない)。必要なときだけ指定する"
         },
         "show_meta": {
           "type": "boolean",
@@ -1546,14 +1573,17 @@
       "properties": {
         "name_cont": {
           "type": "string",
+          "maxLength": 1000,
           "description": "勘定科目種別の名前で絞り込む(部分一致)"
         },
         "updated_at_gteq": {
           "type": "string",
+          "maxLength": 1000,
           "description": "更新日時がこれ以降(`YYYY-MM-DD HH:MM:SS`)"
         },
         "updated_at_lteq": {
           "type": "string",
+          "maxLength": 1000,
           "description": "更新日時がこれ以前(`YYYY-MM-DD HH:MM:SS`)"
         },
         "include_archive_flg": {
@@ -1567,7 +1597,7 @@
             "delta",
             "full"
           ],
-          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)"
+          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)。注意: delta / full は共有の D1 キャッシュに書き込み、BOARD API の 1 日あたりの上限(3,000 回)を消費する(BOARD のデータは書き換えない)。必要なときだけ指定する"
         },
         "limit": {
           "type": "number",
@@ -1605,14 +1635,17 @@
         },
         "name_cont": {
           "type": "string",
+          "maxLength": 1000,
           "description": "顧客支店の名前で絞り込む(部分一致)"
         },
         "updated_at_gteq": {
           "type": "string",
+          "maxLength": 1000,
           "description": "更新日時がこれ以降(`YYYY-MM-DD HH:MM:SS`)"
         },
         "updated_at_lteq": {
           "type": "string",
+          "maxLength": 1000,
           "description": "更新日時がこれ以前(`YYYY-MM-DD HH:MM:SS`)"
         },
         "include_archive_flg": {
@@ -1626,7 +1659,7 @@
             "delta",
             "full"
           ],
-          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)"
+          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)。注意: delta / full は共有の D1 キャッシュに書き込み、BOARD API の 1 日あたりの上限(3,000 回)を消費する(BOARD のデータは書き換えない)。必要なときだけ指定する"
         },
         "limit": {
           "type": "number",
@@ -1660,24 +1693,30 @@
       "properties": {
         "name_cont": {
           "type": "string",
+          "maxLength": 1000,
           "description": "顧客の名前で絞り込む(部分一致)"
         },
         "name_disp_cont": {
           "type": "string",
+          "maxLength": 1000,
           "description": "顧客の表示名(略称)で絞り込む(部分一致)"
         },
         "invoice_system_number_eq": {
           "type": "string",
+          "maxLength": 1000,
           "description": "適格請求書発行事業者番号(インボイス登録番号)が一致する顧客"
         },
         "custom_no_eq": {
           "type": "string",
+          "maxLength": 1000,
           "description": "顧客管理番号(custom_no)が一致する顧客"
         },
         "tags": {
+          "maxItems": 100,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 1000
           },
           "description": "タグで絞り込む(複数指定可)"
         },
@@ -1691,10 +1730,12 @@
         },
         "updated_at_gteq": {
           "type": "string",
+          "maxLength": 1000,
           "description": "更新日時がこれ以降(`YYYY-MM-DD HH:MM:SS`)"
         },
         "updated_at_lteq": {
           "type": "string",
+          "maxLength": 1000,
           "description": "更新日時がこれ以前(`YYYY-MM-DD HH:MM:SS`)"
         },
         "include_archive_flg": {
@@ -1708,7 +1749,7 @@
             "delta",
             "full"
           ],
-          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)"
+          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)。注意: delta / full は共有の D1 キャッシュに書き込み、BOARD API の 1 日あたりの上限(3,000 回)を消費する(BOARD のデータは書き換えない)。必要なときだけ指定する"
         },
         "limit": {
           "type": "number",
@@ -1746,18 +1787,22 @@
         },
         "name_cont": {
           "type": "string",
+          "maxLength": 1000,
           "description": "顧客担当者の名前で絞り込む(部分一致)"
         },
         "email_cont": {
           "type": "string",
+          "maxLength": 1000,
           "description": "メールアドレスで絞り込む(部分一致)"
         },
         "updated_at_gteq": {
           "type": "string",
+          "maxLength": 1000,
           "description": "更新日時がこれ以降(`YYYY-MM-DD HH:MM:SS`)"
         },
         "updated_at_lteq": {
           "type": "string",
+          "maxLength": 1000,
           "description": "更新日時がこれ以前(`YYYY-MM-DD HH:MM:SS`)"
         },
         "include_archive_flg": {
@@ -1771,7 +1816,7 @@
             "delta",
             "full"
           ],
-          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)"
+          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)。注意: delta / full は共有の D1 キャッシュに書き込み、BOARD API の 1 日あたりの上限(3,000 回)を消費する(BOARD のデータは書き換えない)。必要なときだけ指定する"
         },
         "limit": {
           "type": "number",
@@ -1805,14 +1850,17 @@
       "properties": {
         "name_cont": {
           "type": "string",
+          "maxLength": 1000,
           "description": "書類送付方法の名前で絞り込む(部分一致)"
         },
         "updated_at_gteq": {
           "type": "string",
+          "maxLength": 1000,
           "description": "更新日時がこれ以降(`YYYY-MM-DD HH:MM:SS`)"
         },
         "updated_at_lteq": {
           "type": "string",
+          "maxLength": 1000,
           "description": "更新日時がこれ以前(`YYYY-MM-DD HH:MM:SS`)"
         },
         "include_archive_flg": {
@@ -1826,7 +1874,7 @@
             "delta",
             "full"
           ],
-          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)"
+          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)。注意: delta / full は共有の D1 キャッシュに書き込み、BOARD API の 1 日あたりの上限(3,000 回)を消費する(BOARD のデータは書き換えない)。必要なときだけ指定する"
         },
         "limit": {
           "type": "number",
@@ -1860,14 +1908,17 @@
       "properties": {
         "name_cont": {
           "type": "string",
+          "maxLength": 1000,
           "description": "グループの名前で絞り込む(部分一致)"
         },
         "updated_at_gteq": {
           "type": "string",
+          "maxLength": 1000,
           "description": "更新日時がこれ以降(`YYYY-MM-DD HH:MM:SS`)"
         },
         "updated_at_lteq": {
           "type": "string",
+          "maxLength": 1000,
           "description": "更新日時がこれ以前(`YYYY-MM-DD HH:MM:SS`)"
         },
         "include_archive_flg": {
@@ -1881,7 +1932,7 @@
             "delta",
             "full"
           ],
-          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)"
+          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)。注意: delta / full は共有の D1 キャッシュに書き込み、BOARD API の 1 日あたりの上限(3,000 回)を消費する(BOARD のデータは書き換えない)。必要なときだけ指定する"
         },
         "limit": {
           "type": "number",
@@ -1923,6 +1974,7 @@
         },
         "status_eq": {
           "type": "string",
+          "maxLength": 1000,
           "description": "ステータスが一致する請求書(例: sent)"
         },
         "response_group": {
@@ -1935,10 +1987,12 @@
         },
         "updated_at_gteq": {
           "type": "string",
+          "maxLength": 1000,
           "description": "更新日時がこれ以降(`YYYY-MM-DD HH:MM:SS`)"
         },
         "updated_at_lteq": {
           "type": "string",
+          "maxLength": 1000,
           "description": "更新日時がこれ以前(`YYYY-MM-DD HH:MM:SS`)"
         },
         "include_archive_flg": {
@@ -1952,7 +2006,7 @@
             "delta",
             "full"
           ],
-          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)"
+          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)。注意: delta / full は共有の D1 キャッシュに書き込み、BOARD API の 1 日あたりの上限(3,000 回)を消費する(BOARD のデータは書き換えない)。必要なときだけ指定する"
         },
         "limit": {
           "type": "number",
@@ -1986,14 +2040,17 @@
       "properties": {
         "name_cont": {
           "type": "string",
+          "maxLength": 1000,
           "description": "支払条件の名前で絞り込む(部分一致)"
         },
         "updated_at_gteq": {
           "type": "string",
+          "maxLength": 1000,
           "description": "更新日時がこれ以降(`YYYY-MM-DD HH:MM:SS`)"
         },
         "updated_at_lteq": {
           "type": "string",
+          "maxLength": 1000,
           "description": "更新日時がこれ以前(`YYYY-MM-DD HH:MM:SS`)"
         },
         "include_archive_flg": {
@@ -2007,7 +2064,7 @@
             "delta",
             "full"
           ],
-          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)"
+          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)。注意: delta / full は共有の D1 キャッシュに書き込み、BOARD API の 1 日あたりの上限(3,000 回)を消費する(BOARD のデータは書き換えない)。必要なときだけ指定する"
         },
         "limit": {
           "type": "number",
@@ -2049,6 +2106,7 @@
         },
         "status_eq": {
           "type": "string",
+          "maxLength": 1000,
           "description": "ステータスが一致する支払い"
         },
         "response_group": {
@@ -2061,10 +2119,12 @@
         },
         "updated_at_gteq": {
           "type": "string",
+          "maxLength": 1000,
           "description": "更新日時がこれ以降(`YYYY-MM-DD HH:MM:SS`)"
         },
         "updated_at_lteq": {
           "type": "string",
+          "maxLength": 1000,
           "description": "更新日時がこれ以前(`YYYY-MM-DD HH:MM:SS`)"
         },
         "include_archive_flg": {
@@ -2078,7 +2138,7 @@
             "delta",
             "full"
           ],
-          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)"
+          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)。注意: delta / full は共有の D1 キャッシュに書き込み、BOARD API の 1 日あたりの上限(3,000 回)を消費する(BOARD のデータは書き換えない)。必要なときだけ指定する"
         },
         "limit": {
           "type": "number",
@@ -2116,10 +2176,12 @@
         },
         "updated_at_gteq": {
           "type": "string",
+          "maxLength": 1000,
           "description": "更新日時がこれ以降(`YYYY-MM-DD HH:MM:SS`)"
         },
         "updated_at_lteq": {
           "type": "string",
+          "maxLength": 1000,
           "description": "更新日時がこれ以前(`YYYY-MM-DD HH:MM:SS`)"
         },
         "include_archive_flg": {
@@ -2133,7 +2195,7 @@
             "delta",
             "full"
           ],
-          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)"
+          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)。注意: delta / full は共有の D1 キャッシュに書き込み、BOARD API の 1 日あたりの上限(3,000 回)を消費する(BOARD のデータは書き換えない)。必要なときだけ指定する"
         },
         "limit": {
           "type": "number",
@@ -2167,14 +2229,17 @@
       "properties": {
         "name_cont": {
           "type": "string",
+          "maxLength": 1000,
           "description": "案件種別の名前で絞り込む(部分一致)"
         },
         "updated_at_gteq": {
           "type": "string",
+          "maxLength": 1000,
           "description": "更新日時がこれ以降(`YYYY-MM-DD HH:MM:SS`)"
         },
         "updated_at_lteq": {
           "type": "string",
+          "maxLength": 1000,
           "description": "更新日時がこれ以前(`YYYY-MM-DD HH:MM:SS`)"
         },
         "include_archive_flg": {
@@ -2188,7 +2253,7 @@
             "delta",
             "full"
           ],
-          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)"
+          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)。注意: delta / full は共有の D1 キャッシュに書き込み、BOARD API の 1 日あたりの上限(3,000 回)を消費する(BOARD のデータは書き換えない)。必要なときだけ指定する"
         },
         "limit": {
           "type": "number",
@@ -2222,6 +2287,7 @@
       "properties": {
         "name_cont": {
           "type": "string",
+          "maxLength": 1000,
           "description": "案件の名前で絞り込む(部分一致)"
         },
         "client_id": {
@@ -2230,9 +2296,11 @@
         },
         "client_name_cont": {
           "type": "string",
+          "maxLength": 1000,
           "description": "顧客名で絞り込む(部分一致)"
         },
         "order_status_in": {
+          "maxItems": 100,
           "type": "array",
           "items": {
             "type": "number"
@@ -2240,6 +2308,7 @@
           "description": "受注ステータスで絞り込む(いずれかに一致): 1=見積中(高) / 2=見積中(中) / 3=見積中(低) / 4=受注確定 / 5=受注済 / 8=見積中(除)"
         },
         "delivery_status_in": {
+          "maxItems": 100,
           "type": "array",
           "items": {
             "type": "number"
@@ -2248,29 +2317,36 @@
         },
         "project_no_eq": {
           "type": "string",
+          "maxLength": 1000,
           "description": "案件番号が一致する案件"
         },
         "management_no_eq": {
           "type": "string",
+          "maxLength": 1000,
           "description": "管理番号が一致する案件"
         },
         "delivery_date_gteq": {
           "type": "string",
+          "maxLength": 1000,
           "description": "納品日がこれ以降(`YYYY-MM-DD`)"
         },
         "delivery_date_lteq": {
           "type": "string",
+          "maxLength": 1000,
           "description": "納品日がこれ以前(`YYYY-MM-DD`)"
         },
         "invoice_date_gteq": {
           "type": "string",
+          "maxLength": 1000,
           "description": "請求日がこれ以降(`YYYY-MM-DD`)"
         },
         "invoice_date_lteq": {
           "type": "string",
+          "maxLength": 1000,
           "description": "請求日がこれ以前(`YYYY-MM-DD`)"
         },
         "invoice_timing_kbn_in": {
+          "maxItems": 100,
           "type": "array",
           "items": {
             "type": "number"
@@ -2278,9 +2354,11 @@
           "description": "請求タイミングで絞り込む(いずれかに一致): 1=一括請求 / 2=定期請求"
         },
         "tags": {
+          "maxItems": 100,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 1000
           },
           "description": "タグで絞り込む(複数指定可)"
         },
@@ -2300,10 +2378,12 @@
         },
         "created_at_gteq": {
           "type": "string",
+          "maxLength": 1000,
           "description": "作成日時がこれ以降(`YYYY-MM-DD HH:MM:SS`)"
         },
         "created_at_lteq": {
           "type": "string",
+          "maxLength": 1000,
           "description": "作成日時がこれ以前(`YYYY-MM-DD HH:MM:SS`)"
         },
         "include_lost_flg": {
@@ -2312,10 +2392,12 @@
         },
         "updated_at_gteq": {
           "type": "string",
+          "maxLength": 1000,
           "description": "更新日時がこれ以降(`YYYY-MM-DD HH:MM:SS`)"
         },
         "updated_at_lteq": {
           "type": "string",
+          "maxLength": 1000,
           "description": "更新日時がこれ以前(`YYYY-MM-DD HH:MM:SS`)"
         },
         "include_archive_flg": {
@@ -2329,7 +2411,7 @@
             "delta",
             "full"
           ],
-          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)"
+          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)。注意: delta / full は共有の D1 キャッシュに書き込み、BOARD API の 1 日あたりの上限(3,000 回)を消費する(BOARD のデータは書き換えない)。必要なときだけ指定する"
         },
         "limit": {
           "type": "number",
@@ -2371,6 +2453,7 @@
         },
         "status_eq": {
           "type": "string",
+          "maxLength": 1000,
           "description": "ステータスが一致する発注書"
         },
         "response_group": {
@@ -2383,10 +2466,12 @@
         },
         "updated_at_gteq": {
           "type": "string",
+          "maxLength": 1000,
           "description": "更新日時がこれ以降(`YYYY-MM-DD HH:MM:SS`)"
         },
         "updated_at_lteq": {
           "type": "string",
+          "maxLength": 1000,
           "description": "更新日時がこれ以前(`YYYY-MM-DD HH:MM:SS`)"
         },
         "include_archive_flg": {
@@ -2400,7 +2485,7 @@
             "delta",
             "full"
           ],
-          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)"
+          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)。注意: delta / full は共有の D1 キャッシュに書き込み、BOARD API の 1 日あたりの上限(3,000 回)を消費する(BOARD のデータは書き換えない)。必要なときだけ指定する"
         },
         "limit": {
           "type": "number",
@@ -2434,14 +2519,17 @@
       "properties": {
         "name_cont": {
           "type": "string",
+          "maxLength": 1000,
           "description": "購買種別の名前で絞り込む(部分一致)"
         },
         "updated_at_gteq": {
           "type": "string",
+          "maxLength": 1000,
           "description": "更新日時がこれ以降(`YYYY-MM-DD HH:MM:SS`)"
         },
         "updated_at_lteq": {
           "type": "string",
+          "maxLength": 1000,
           "description": "更新日時がこれ以前(`YYYY-MM-DD HH:MM:SS`)"
         },
         "include_archive_flg": {
@@ -2455,7 +2543,7 @@
             "delta",
             "full"
           ],
-          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)"
+          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)。注意: delta / full は共有の D1 キャッシュに書き込み、BOARD API の 1 日あたりの上限(3,000 回)を消費する(BOARD のデータは書き換えない)。必要なときだけ指定する"
         },
         "limit": {
           "type": "number",
@@ -2489,18 +2577,22 @@
       "properties": {
         "name_cont": {
           "type": "string",
+          "maxLength": 1000,
           "description": "ユーザーの名前で絞り込む(部分一致)"
         },
         "email_cont": {
           "type": "string",
+          "maxLength": 1000,
           "description": "メールアドレスで絞り込む(部分一致)"
         },
         "updated_at_gteq": {
           "type": "string",
+          "maxLength": 1000,
           "description": "更新日時がこれ以降(`YYYY-MM-DD HH:MM:SS`)"
         },
         "updated_at_lteq": {
           "type": "string",
+          "maxLength": 1000,
           "description": "更新日時がこれ以前(`YYYY-MM-DD HH:MM:SS`)"
         },
         "include_archive_flg": {
@@ -2514,7 +2606,7 @@
             "delta",
             "full"
           ],
-          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)"
+          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)。注意: delta / full は共有の D1 キャッシュに書き込み、BOARD API の 1 日あたりの上限(3,000 回)を消費する(BOARD のデータは書き換えない)。必要なときだけ指定する"
         },
         "limit": {
           "type": "number",
@@ -2552,14 +2644,17 @@
         },
         "name_cont": {
           "type": "string",
+          "maxLength": 1000,
           "description": "仕入先支店の名前で絞り込む(部分一致)"
         },
         "updated_at_gteq": {
           "type": "string",
+          "maxLength": 1000,
           "description": "更新日時がこれ以降(`YYYY-MM-DD HH:MM:SS`)"
         },
         "updated_at_lteq": {
           "type": "string",
+          "maxLength": 1000,
           "description": "更新日時がこれ以前(`YYYY-MM-DD HH:MM:SS`)"
         },
         "include_archive_flg": {
@@ -2573,7 +2668,7 @@
             "delta",
             "full"
           ],
-          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)"
+          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)。注意: delta / full は共有の D1 キャッシュに書き込み、BOARD API の 1 日あたりの上限(3,000 回)を消費する(BOARD のデータは書き換えない)。必要なときだけ指定する"
         },
         "limit": {
           "type": "number",
@@ -2611,18 +2706,22 @@
         },
         "name_cont": {
           "type": "string",
+          "maxLength": 1000,
           "description": "仕入先担当者の名前で絞り込む(部分一致)"
         },
         "email_cont": {
           "type": "string",
+          "maxLength": 1000,
           "description": "メールアドレスで絞り込む(部分一致)"
         },
         "updated_at_gteq": {
           "type": "string",
+          "maxLength": 1000,
           "description": "更新日時がこれ以降(`YYYY-MM-DD HH:MM:SS`)"
         },
         "updated_at_lteq": {
           "type": "string",
+          "maxLength": 1000,
           "description": "更新日時がこれ以前(`YYYY-MM-DD HH:MM:SS`)"
         },
         "include_archive_flg": {
@@ -2636,7 +2735,7 @@
             "delta",
             "full"
           ],
-          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)"
+          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)。注意: delta / full は共有の D1 キャッシュに書き込み、BOARD API の 1 日あたりの上限(3,000 回)を消費する(BOARD のデータは書き換えない)。必要なときだけ指定する"
         },
         "limit": {
           "type": "number",
@@ -2670,14 +2769,17 @@
       "properties": {
         "name_cont": {
           "type": "string",
+          "maxLength": 1000,
           "description": "仕入先の名前で絞り込む(部分一致)"
         },
         "updated_at_gteq": {
           "type": "string",
+          "maxLength": 1000,
           "description": "更新日時がこれ以降(`YYYY-MM-DD HH:MM:SS`)"
         },
         "updated_at_lteq": {
           "type": "string",
+          "maxLength": 1000,
           "description": "更新日時がこれ以前(`YYYY-MM-DD HH:MM:SS`)"
         },
         "include_archive_flg": {
@@ -2691,7 +2793,7 @@
             "delta",
             "full"
           ],
-          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)"
+          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)。注意: delta / full は共有の D1 キャッシュに書き込み、BOARD API の 1 日あたりの上限(3,000 回)を消費する(BOARD のデータは書き換えない)。必要なときだけ指定する"
         },
         "limit": {
           "type": "number",

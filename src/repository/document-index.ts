@@ -32,7 +32,7 @@ import {
 import { ensureSchema } from "../cache/schema";
 import { type Clock, isoSeconds, systemClock } from "../cache/time";
 import { BoardError } from "../errors";
-import { DOCUMENT_KIND_INFO, type DocumentKind } from "./document-kinds";
+import { DOCUMENT_KIND_INFO, type DocumentKind, isValidId } from "./document-kinds";
 
 /** 走査をやめて残しておく時間。このあと案件・顧客の取得(補助情報)が待っている。 */
 export const SCAN_RESERVE_MS = 8_000;
@@ -42,6 +42,12 @@ export const MIN_PAGE_BUDGET_MS = 1_500;
 export const COMPLETE_TTL_MS = 10 * 60_000;
 /** この時間を超えた走査ロックは stale とみなして奪える(走査は 1 回の呼び出し = 30 秒以内に終わる)。 */
 export const SCAN_LOCK_STALE_MS = 2 * 60_000;
+/**
+ * 1 回の呼び出しで取るページ数の上限。締め切り(30 秒)に頼らず明示する。
+ * 1 ページ = BOARD への通信 1 回 + D1 の batch 1 回。BOARD は 3 回/秒・3,000 回/日、Workers Free は 1 回の実行で通信 50 回までなので、
+ * その範囲に余裕を持って収まる値にしている。上限に達したら締め切りのときと同じく、進捗を保存した状態で未解決(deadline)として終える。
+ */
+export const MAX_SCAN_PAGES_PER_CALL = 20;
 
 export type IndexLookup =
   | { status: "hit"; projectId: number }
@@ -70,8 +76,9 @@ export interface DocumentIndexDeps {
 
 function pairsOf(kind: DocumentKind, projects: readonly ProjectEntity[]) {
   const info = DOCUMENT_KIND_INFO[kind];
+  // 案件 ID が不正な案件の書類は覚えない(上流の値を信用しない)。
   return projects.flatMap((p) =>
-    info.ids(p).map((documentId) => ({ documentId, projectId: p.id })),
+    isValidId(p.id) ? info.ids(p).map((documentId) => ({ documentId, projectId: p.id })) : [],
   );
 }
 
@@ -128,7 +135,9 @@ export function createDocumentIndex(deps: DocumentIndexDeps): DocumentIndex {
       const startedAt = resume === 1 ? isoSeconds(start) : (state?.started_at ?? isoSeconds(start));
       const group = DOCUMENT_KIND_INFO[kind].group;
       let lastPageMs = 0;
+      let scanned = 0;
       for (;;) {
+        if (scanned >= MAX_SCAN_PAGES_PER_CALL) return { status: "unresolved", reason: "deadline" };
         const remaining = budgetEnd - now();
         if (remaining < Math.max(MIN_PAGE_BUDGET_MS, lastPageMs * 1.5)) {
           return { status: "unresolved", reason: "deadline" };
@@ -155,6 +164,7 @@ export function createDocumentIndex(deps: DocumentIndexDeps): DocumentIndex {
           };
         }
         lastPageMs = now() - t0;
+        scanned++;
 
         const done = rows.length < perPage;
         const pairs = pairsOf(kind, rows);

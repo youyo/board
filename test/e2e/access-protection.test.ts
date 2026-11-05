@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { clearJwksCache } from "../../src/auth/access-jwt";
 import { createTestKey, jwksResponse, signAccessJwt } from "../helpers/access";
+import { MCP_HEADERS } from "../helpers/mcp";
 import { mockOutboundFetch } from "../helpers/mock-fetch";
 import { callWorker, mcpCall } from "../helpers/worker";
 
@@ -100,5 +101,48 @@ describe("E2E: /healthz 以外はすべて Cf-Access-Jwt-Assertion が必要", (
     mockOutboundFetch({ [CERTS]: () => jwksResponse(key) });
     const res = await callWorker("/nope", { jwt: await signAccessJwt(key) });
     expect(res.status).toBe(404);
+  });
+});
+
+describe("E2E: /mcp の Origin 検証と CORS(ブラウザからの呼び出しは想定しない)", () => {
+  async function callWithOrigin(origin: string | undefined, method = "POST"): Promise<Response> {
+    const key = await createTestKey("kid-1");
+    mockOutboundFetch({ [CERTS]: () => jwksResponse(key) });
+    const headers = new Headers(MCP_HEADERS);
+    if (origin !== undefined) headers.set("Origin", origin);
+    return callWorker("/mcp", {
+      jwt: await signAccessJwt(key),
+      init: {
+        method,
+        headers,
+        ...(method === "POST"
+          ? { body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} }) }
+          : {}),
+      },
+    });
+  }
+
+  const corsHeaderNames = (res: Response) =>
+    [...res.headers.keys()].filter((k) => k.toLowerCase().startsWith("access-control-"));
+
+  it("Origin ヘッダーのない正当なリクエスト(MCP クライアント)は通り、CORS ヘッダーは付かない", async () => {
+    const res = await callWithOrigin(undefined);
+    expect(res.status).toBe(200);
+    expect(corsHeaderNames(res)).toEqual([]);
+  });
+
+  it.each(["https://evil.example", "http://localhost:3000", "https://board.test"])(
+    "Origin が %s のリクエストは 403 で、CORS ヘッダーは付かない",
+    async (origin) => {
+      const res = await callWithOrigin(origin);
+      expect(res.status).toBe(403);
+      expect(corsHeaderNames(res)).toEqual([]);
+    },
+  );
+
+  it("プリフライト(OPTIONS)に CORS の許可を返さない", async () => {
+    const res = await callWithOrigin("https://evil.example", "OPTIONS");
+    expect(res.headers.get("access-control-allow-origin")).toBeNull();
+    expect(corsHeaderNames(res)).toEqual([]);
   });
 });

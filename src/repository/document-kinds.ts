@@ -14,8 +14,13 @@ export interface DocumentKindInfo {
   ids: (p: ProjectEntity) => number[];
 }
 
-const positive = (ids: Array<number | undefined>) =>
-  ids.filter((x): x is number => typeof x === "number" && x !== 0);
+/**
+ * 上流(BOARD)の値は信用しない。ID は 1 以上の安全な整数だけを使う(0・負数・小数・NaN・巨大な値・数値以外は除く)。
+ * 逆引きの表・URL に入る前の共通の門。
+ */
+export const isValidId = (x: unknown): x is number => Number.isSafeInteger(x) && (x as number) >= 1;
+
+const positive = (ids: unknown[]) => ids.filter(isValidId);
 
 export const DOCUMENT_KIND_INFO: Record<DocumentKind, DocumentKindInfo> = {
   estimate: {

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
+  cacheFetchedEntity,
   countEntries,
   deleteAllEntries,
   deleteEntry,
@@ -8,6 +9,7 @@ import {
   listEntries,
   upsertEntities,
 } from "../../src/cache/resource-cache";
+import { LOCK_STALE_MS } from "../../src/refresh/lock";
 import { resetCache, testDb } from "../helpers/d1";
 
 const NOW = Date.parse("2026-11-05T01:02:03Z");
@@ -122,5 +124,92 @@ describe("resource_cache: upsert / 取得 / 削除", () => {
     await deleteOlderGenerations(db, "clients", 2);
     expect((await listEntries<{ id: number }>(db, "clients")).map((e) => e.entity.id)).toEqual([3]);
     expect(await countEntries(db, "vendors")).toBe(1);
+  });
+});
+
+describe("cacheFetchedEntity: 新しい行を古い取得結果で上書きしない", () => {
+  const T = Date.parse("2026-11-05T01:02:03Z"); // 取得を始めた時刻
+  const fetchOpts = (over: { now?: number; fetchStartedAt?: number } = {}) => ({
+    requestedId: 5,
+    fetchStartedAt: over.fetchStartedAt ?? T,
+    now: over.now ?? T + 5_000,
+  });
+  const nameOf = async (db: D1Database) =>
+    ((await getEntry<{ name: string }>(db, "clients", 5))?.entity as { name: string } | undefined)
+      ?.name;
+
+  it("行がなければ書く", async () => {
+    const db = testDb();
+    expect(await cacheFetchedEntity(db, "clients", { id: 5, name: "new" }, fetchOpts())).toBe(true);
+    expect(await nameOf(db)).toBe("new");
+  });
+
+  it("既存の行の fetched_at が fetchStartedAt より古ければ上書きする", async () => {
+    const db = testDb();
+    await upsertEntities(db, "clients", [{ id: 5, name: "old" }], { now: T - 1_000 });
+    expect(await cacheFetchedEntity(db, "clients", { id: 5, name: "new" }, fetchOpts())).toBe(true);
+    expect(await nameOf(db)).toBe("new");
+  });
+
+  it("既存の行の fetched_at が fetchStartedAt 以降なら上書きしない(取得中に別の書き込みが先に新しい行を書いた)", async () => {
+    const db = testDb();
+    await upsertEntities(db, "clients", [{ id: 5, name: "fresh" }], { now: T + 2_000 });
+    expect(await cacheFetchedEntity(db, "clients", { id: 5, name: "stale" }, fetchOpts())).toBe(
+      false,
+    );
+    expect(await nameOf(db)).toBe("fresh");
+  });
+
+  it("同じ秒は新しい行を守る側に倒す(上書きしない)", async () => {
+    const db = testDb();
+    await upsertEntities(db, "clients", [{ id: 5, name: "same-second" }], { now: T + 400 });
+    expect(
+      await cacheFetchedEntity(
+        db,
+        "clients",
+        { id: 5, name: "stale" },
+        fetchOpts({ fetchStartedAt: T + 900 }),
+      ),
+    ).toBe(false);
+    expect(await nameOf(db)).toBe("same-second");
+  });
+
+  it("ロック中は書かない(既存の行があっても、なくても)", async () => {
+    const db = testDb();
+    await db
+      .prepare(
+        "INSERT INTO sync_state (resource_name, refresh_started_at, refresh_owner) VALUES ('clients', ?, 'other')",
+      )
+      .bind(new Date(T + 5_000 - LOCK_STALE_MS + 1_000).toISOString().replace(/\.\d{3}Z$/, "Z"))
+      .run();
+    expect(await cacheFetchedEntity(db, "clients", { id: 5, name: "x" }, fetchOpts())).toBe(false);
+    expect(await getEntry(db, "clients", 5)).toBeNull();
+    await upsertEntities(db, "clients", [{ id: 5, name: "old" }], { now: T - 1_000 });
+    expect(await cacheFetchedEntity(db, "clients", { id: 5, name: "x" }, fetchOpts())).toBe(false);
+    expect(await nameOf(db)).toBe("old");
+  });
+
+  it("世代は COALESCE(sync_state.full_generation, 0)。上書きでも書く時点の世代になる", async () => {
+    const db = testDb();
+    await cacheFetchedEntity(db, "clients", { id: 5, name: "a" }, fetchOpts());
+    expect((await getEntry(db, "clients", 5))?.generation).toBe(0);
+    await db
+      .prepare("INSERT INTO sync_state (resource_name, full_generation) VALUES ('clients', 3)")
+      .run();
+    expect(
+      await cacheFetchedEntity(
+        db,
+        "clients",
+        { id: 5, name: "b" },
+        fetchOpts({ fetchStartedAt: T + 10_000, now: T + 11_000 }),
+      ),
+    ).toBe(true);
+    expect((await getEntry(db, "clients", 5))?.generation).toBe(3);
+  });
+
+  it("ID が要求と違えば書かない", async () => {
+    const db = testDb();
+    expect(await cacheFetchedEntity(db, "clients", { id: 6, name: "x" }, fetchOpts())).toBe(false);
+    expect(await countEntries(db, "clients")).toBe(0);
   });
 });
