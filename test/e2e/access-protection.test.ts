@@ -85,6 +85,16 @@ describe("E2E: /healthz 以外はすべて Cf-Access-Jwt-Assertion が必要", (
     expect(res.status).toBe(200);
   });
 
+  it("service token の JWT(test:live・Portal の service token 接続の形)でも /mcp に到達する(200)", async () => {
+    const key = await createTestKey("kid-1");
+    mockOutboundFetch({ [CERTS]: () => jwksResponse(key) });
+    const res = await mcpCall(
+      await signAccessJwt(key, { serviceClientId: "abc123.access" }),
+      "tools/list",
+    );
+    expect(res.status).toBe(200);
+  });
+
   it("正しい JWT でも、存在しないパスは 404(認証は通る)", async () => {
     const key = await createTestKey("kid-1");
     mockOutboundFetch({ [CERTS]: () => jwksResponse(key) });

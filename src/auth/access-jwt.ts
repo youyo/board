@@ -13,10 +13,15 @@ export interface AccessJwtConfig {
   aud: string;
 }
 
-export interface AccessIdentity {
-  email: string;
-  subject: string;
-}
+/**
+ * Access が認証した主体。
+ * - user: IdP でログインした人(email と sub を持つ)
+ * - service: service token(CF-Access-Client-Id / Secret)。Cloudflare の Application token の仕様で、
+ *   email を持たず sub は空文字、common_name に Client ID が入る(test:live や Portal の service token 接続)。
+ */
+export type AccessIdentity =
+  | { kind: "user"; email: string; subject: string }
+  | { kind: "service"; clientId: string };
 
 export type AccessJwtErrorReason = "missing" | "invalid" | "jwks_unavailable";
 
@@ -111,9 +116,13 @@ export async function verifyAccessJwt(
     throw new AccessJwtError("invalid", "Access JWT verification failed");
   }
 
-  const email = result.payload.email;
-  if (typeof email !== "string" || email === "" || !result.payload.sub) {
-    throw new AccessJwtError("invalid", "Access JWT has no identity");
+  // 署名・iss・aud・exp は上で検証済み。ここでは主体の形だけを見る。
+  const { email, sub, common_name: commonName } = result.payload;
+  if (typeof email === "string" && email !== "" && typeof sub === "string" && sub !== "") {
+    return { kind: "user", email, subject: sub };
   }
-  return { email, subject: result.payload.sub };
+  if (typeof commonName === "string" && commonName !== "" && email === undefined && !sub) {
+    return { kind: "service", clientId: commonName };
+  }
+  throw new AccessJwtError("invalid", "Access JWT has no identity");
 }

@@ -32,7 +32,37 @@ describe("verifyAccessJwt", () => {
     mockOutboundFetch({ [CERTS]: () => jwksResponse(key) });
     const token = await signAccessJwt(key, { email: "bob@example.com" });
     const identity = await verifyAccessJwt(token, cfg);
-    expect(identity.email).toBe("bob@example.com");
+    expect(identity).toEqual({ kind: "user", email: "bob@example.com", subject: "access-user-1" });
+  });
+
+  it("service token の JWT(email なし・sub 空・common_name = Client ID)を受け入れる", async () => {
+    mockOutboundFetch({ [CERTS]: () => jwksResponse(key) });
+    const token = await signAccessJwt(key, { serviceClientId: "abc123.access" });
+    const identity = await verifyAccessJwt(token, cfg);
+    expect(identity).toEqual({ kind: "service", clientId: "abc123.access" });
+  });
+
+  it("service token の JWT でも aud 違い・期限切れは拒否する", async () => {
+    mockOutboundFetch({ [CERTS]: () => jwksResponse(key) });
+    await expectRejected(
+      await signAccessJwt(key, { serviceClientId: "abc123.access", aud: "other" }),
+      "invalid",
+    );
+    const past = Math.floor(Date.now() / 1000) - 3600;
+    await expectRejected(
+      await signAccessJwt(key, { serviceClientId: "abc123.access", iat: past, exp: past + 300 }),
+      "invalid",
+    );
+  });
+
+  it("email も common_name もない JWT は拒否する(identity なし)", async () => {
+    mockOutboundFetch({ [CERTS]: () => jwksResponse(key) });
+    await expectRejected(await signAccessJwt(key, { omitEmail: true }), "invalid");
+  });
+
+  it("common_name が空文字の service token 形の JWT は拒否する", async () => {
+    mockOutboundFetch({ [CERTS]: () => jwksResponse(key) });
+    await expectRejected(await signAccessJwt(key, { serviceClientId: "" }), "invalid");
   });
 
   it("JWT がない(ヘッダー欠落)なら拒否する", async () => {
@@ -131,7 +161,7 @@ describe("verifyAccessJwt", () => {
       vi.setSystemTime(Date.now() + 61_000);
       current = [key, unknown];
       const identity = await verifyAccessJwt(token, cfg);
-      expect(identity.email).toBe("alice@example.com");
+      expect(identity).toMatchObject({ kind: "user", email: "alice@example.com" });
       expect(m.callsTo(CERTS)).toHaveLength(2);
     } finally {
       vi.useRealTimers();

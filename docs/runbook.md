@@ -195,8 +195,11 @@ Portal を使うと、複数の MCP サーバーを 1 つの URL にまとめ、
 4. **Add server portal** で Portal を作り(または既存の Portal に)このサーバーを追加する。Portal の URL は `https://<portal-subdomain>.<domain>/mcp`。
 5. Portal 経由だとツール名の前に `board_` が付く(例 `board_list_clients`)。
 
-注意: Portal 経由では **Require user auth**(利用者ごとの OAuth)の扱いに注意する。board は共有キーなので利用者ごとのトークンは持たないが、
-Access の Managed OAuth でログインした利用者の JWT が Worker に届く。Portal が `Cf-Access-Jwt-Assertion` を付けて届くかは実機で確認する(docs/manual-verification.md の V1)。
+**Require user auth の設定**: 既定では **ON**(利用者ごと)を勧める。各利用者が Portal の Connect から Access(Managed OAuth)にログインし、
+その人の JWT(`email` と `sub` を持つ)が Worker に届く。board は共有キーなので BOARD 側の権限は全員同じだが、Access のポリシーで利用者を絞れ、Access の監査ログに利用者が残る。
+**OFF**(`on_behalf: false`、Portal の管理者資格情報で接続)にするのは、Portal に service token で自動化エージェントをつなぐ場合だけ。この場合 Worker に届くのは
+service token の JWT(`email` なし・`sub` は空・`common_name` に Client ID)で、Worker はこれも受け入れる(`src/auth/access-jwt.ts` の `kind: "service"`)。
+Portal が `Cf-Access-Jwt-Assertion` を付けて届くかは実機で確認する(docs/manual-verification.md の V1)。
 
 ## 7. live 用の service token と Service Auth ポリシー
 

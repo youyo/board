@@ -115,10 +115,10 @@ logbutler の upstream / 下流モデルは持ち込まない(ロードマップ
 - 実機でしか確かめられない前提は `docs/manual-verification.md`(V1〜V9)。特に Portal 経由の `Cf-Access-Jwt-Assertion`、MCP の abort、D1 の `meta.changes`、1 ページあたりの時間。
 - `test:live` の『1 ページあたり』は、cache_status の `row_count` の増分から見積もったページ数で割った値(Worker は何ページ取ったかを返さない)。粗い見積もり。
 - Access の画面の名前は 2026-11 時点の公式ドキュメントに基づく。変わっていたら公式を優先する。
-- `(eval):1: == not found` の警告は、このリポジトリの `mise.toml` に原因がなく再現しなかった(環境側。下記)。
+- `(eval):1: == not found` の警告は、リポジトリ側に原因はない(下記。2026-11-05 に原因を訂正)。
 
 ## 調査: `(eval):1: == not found`
 
-`mise run lint` / `test:unit` / `build` / `fmt`(board)と `lint`(logbutler)、`zsh -ic` / `zsh -lc` での `mise run lint` のいずれでも再現しなかった。`mise.toml` に `==` を含む記述はない(タスクは `pnpm exec ...` だけ)。
-`(eval):1:` は zsh が `eval` した 1 行目という意味で、エージェント実行環境のシェルラッパーが各コマンドを `eval` する際に出るもの(同じ環境で、別のコマンドが `(eval):1: no matches found: --include=*.d.ts` のような zsh 由来のエラーを出した)。
-zsh は、コマンド位置の `==` を `=cmd` 展開(EQUALS オプション)と解釈して『not found』にするので、ラッパーが `[ a == b ]` 形のテストを `[` なしで評価した場合などに出る。**利用者の環境(シェルのラッパー)由来で、リポジトリ側の修正は不要**と判断した。
+**訂正(2026-11-05)**: 当初は「エージェント実行環境のシェルラッパー由来」と書いたが誤り。原因は、司令塔のセッションが実行していた確認用コマンドに含まれる、引用符なしの `echo ===`(`echo ======`)だった。
+zsh の EQUALS オプションは `=` で始まる単語を `=cmd`(コマンドのパスへの展開)と解釈し、`==` という名前のコマンドが見つからずに `(eval):1: == not found` でその行全体を中断する。そのため、その後に続く `mise run lint` などの出力が消えていた。
+`mise.toml` やリポジトリのコードには関係しない。zsh で区切り線を出すときは `echo "==="` のように引用符で囲む。

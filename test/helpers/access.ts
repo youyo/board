@@ -20,15 +20,26 @@ export interface SignOptions {
   iat?: number;
   /** 期限(エポック秒)。null なら exp クレームを付けない(必須クレーム欠落の検証用)。 */
   exp?: number | null;
+  /**
+   * service token(CF-Access-Client-Id / Secret)で認証したときの形にする。値は common_name(Client ID)。
+   * Cloudflare の Application token の仕様どおり、email を持たず sub は空文字になる。
+   */
+  serviceClientId?: string;
+  /** 人の JWT から email を外す(identity のない JWT の拒否を確かめる用)。 */
+  omitEmail?: boolean;
 }
 
 export async function signAccessJwt(key: TestKey, opts: SignOptions = {}): Promise<string> {
   const iat = opts.iat ?? Math.floor(Date.now() / 1000);
-  const jwt = new SignJWT({ email: opts.email ?? "alice@example.com", type: "app" })
+  const service = opts.serviceClientId !== undefined;
+  const claims: Record<string, unknown> = { type: "app" };
+  if (service) claims.common_name = opts.serviceClientId;
+  else if (!opts.omitEmail) claims.email = opts.email ?? "alice@example.com";
+  const jwt = new SignJWT(claims)
     .setProtectedHeader({ alg: "RS256", kid: key.kid })
     .setIssuer(`https://${opts.teamDomain ?? "board-test.cloudflareaccess.com"}`)
     .setAudience(opts.aud ?? "test-access-aud")
-    .setSubject("access-user-1")
+    .setSubject(service ? "" : "access-user-1")
     .setIssuedAt(iat);
   if (opts.exp !== null) jwt.setExpirationTime(opts.exp ?? iat + 300);
   return jwt.sign(key.privateKey);

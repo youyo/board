@@ -22,6 +22,8 @@
 - 確認日 / 確認者:
 - Portal 経由: [ ] 届いた  [ ] 届かない  / メモ:
 - Managed OAuth の直接接続: [ ] 届いた  [ ] 届かない  / メモ:
+- service token(`test:live`)の JWT が `email` なし・`sub` 空・`common_name` = Client ID の形で届き、Worker が受け入れた(`kind: "service"`): [ ] はい  [ ] いいえ  / メモ:
+  (形は Cloudflare の Application token の仕様に基づく。違っていたら `src/auth/access-jwt.ts` を直す)
 
 ### V2 abort が切断で発火するか
 - 確認日 / 確認者:
