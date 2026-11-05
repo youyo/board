@@ -11,6 +11,7 @@ export function pagedHandler(
     q: URLSearchParams,
     call: RecordedCall,
   ) => Response | Promise<Response | undefined> | undefined,
+  opts: { totalHeader?: boolean | number } = {},
 ) {
   return async (call: RecordedCall): Promise<Response> => {
     const q = new URL(call.url).searchParams;
@@ -19,7 +20,15 @@ export function pagedHandler(
     const over = onPage ? await onPage(page, q, call) : undefined;
     if (over) return over;
     const all = rows();
-    return jsonResponse(all.slice((page - 1) * perPage, page * perPage));
+    const res = jsonResponse(all.slice((page - 1) * perPage, page * perPage));
+    // 実際の BOARD は一覧の応答に X-Total-Count(全件数)を付ける。
+    if (opts.totalHeader !== undefined && opts.totalHeader !== false) {
+      res.headers.set(
+        "X-Total-Count",
+        String(typeof opts.totalHeader === "number" ? opts.totalHeader : all.length),
+      );
+    }
+    return res;
   };
 }
 

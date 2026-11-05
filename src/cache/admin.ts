@@ -5,10 +5,9 @@
 
 import { RESOURCES } from "../board/resources";
 import { ArgumentError, RefreshInProgressError } from "../errors";
-import { LOCK_STALE_MS } from "../refresh/lock";
-import { deleteAllEntries } from "./resource-cache";
+import { LOCK_STALE_MS, type Lock, releaseLock, tryAcquireLock } from "../refresh/lock";
 import { ensureSchema } from "./schema";
-import { deleteSyncStates, expireStates, listSyncStates } from "./sync-state";
+import { expireStates, listSyncStates } from "./sync-state";
 import { type Clock, isoSeconds, systemClock } from "./time";
 
 export const RESOURCE_NAMES: readonly string[] = RESOURCES.map((r) => r.name);
@@ -95,17 +94,44 @@ export async function expireCache(
   return { expired: targets };
 }
 
-/** 行と同期状態を消す。refresh 中(ロック保持)のリソースがあれば、何も消さずに RefreshInProgressError。 */
+/**
+ * 行と同期状態を消す。先にロックを取る(refresh と同じ排他)ので、refresh 中のリソースがあれば何も消さずに RefreshInProgressError。
+ * 確認から削除までの間に refresh が始まることはない(ロックを持っているので TryLock が弾かれる)。
+ * 削除は所有者を条件に 1 つの batch で行い、ロックを奪われていた場合は何も消さず、奪った側のロック行も消さない。
+ */
 export async function clearCache(
   db: D1Database,
-  opts: AdminOptions & { resources?: readonly string[] } = {},
+  opts: AdminOptions & {
+    resources?: readonly string[];
+    /** テスト用: ロックを取り終えたあと・削除の前に呼ばれる。 */
+    hooks?: { afterLock?: () => Promise<void> };
+  } = {},
 ): Promise<{ cleared: readonly string[] }> {
   const targets = validate(opts.resources);
-  const busy = (await cacheStatus(db, opts)).find(
-    (r) => r.refreshing && targets.includes(r.resource),
-  );
-  if (busy) throw new RefreshInProgressError(busy.resource);
-  for (const r of targets) await deleteAllEntries(db, r);
-  await deleteSyncStates(db, targets);
+  await ensureSchema(db);
+  const locks: Lock[] = [];
+  try {
+    for (const r of targets) locks.push(await tryAcquireLock(db, r, { now: opts.now }));
+    await opts.hooks?.afterLock?.();
+    const results = await db.batch(
+      locks.flatMap((l) => [
+        db
+          .prepare(
+            `DELETE FROM resource_cache WHERE resource_name = ?
+             AND EXISTS (SELECT 1 FROM sync_state WHERE resource_name = ? AND refresh_owner = ?)`,
+          )
+          .bind(l.resource, l.resource, l.owner),
+        db
+          .prepare("DELETE FROM sync_state WHERE resource_name = ? AND refresh_owner = ?")
+          .bind(l.resource, l.owner),
+      ]),
+    );
+    // sync_state の削除が空振り = ロックを奪われていた(その分の行も消えていない)。
+    const lost = locks.findIndex((_, i) => results[i * 2 + 1]?.meta.changes !== 1);
+    if (lost >= 0) throw new RefreshInProgressError(locks[lost]?.resource ?? "");
+  } finally {
+    // 削除で消えた行には何も起きない。失敗・奪われた場合は、自分の分だけ解放する。
+    await Promise.all(locks.map((l) => releaseLock(db, l.resource, l.owner)));
+  }
   return { cleared: targets };
 }

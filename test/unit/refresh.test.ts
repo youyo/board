@@ -4,7 +4,7 @@ import { buildClientsQuery } from "../../src/board/resources/clients";
 import { countEntries, getEntry, listEntries } from "../../src/cache/resource-cache";
 import { getSyncState } from "../../src/cache/sync-state";
 import { RefreshInProgressError } from "../../src/errors";
-import { tryAcquireLock } from "../../src/refresh/lock";
+import { LOCK_STALE_MS, tryAcquireLock } from "../../src/refresh/lock";
 import {
   cursorAfterFull,
   FULL_RESUME_WINDOW_MS,
@@ -186,7 +186,7 @@ describe("full refresh", () => {
     expect(await countEntries(db, "clients")).toBe(100);
   });
 
-  it("次の full は続きのページから再開し、最後まで取ったら古い世代を消して complete にする", async () => {
+  it("次の full は最後に取り終えたページから(1 ページ重ねて)再開し、最後まで取ったら古い世代を消して complete にする", async () => {
     const { db, deps, clock } = setup();
     // 既存のキャッシュ(世代 1)に、あとで API から消えるエンティティ 999 がある。
     let data = makeEntities(250);
@@ -221,13 +221,13 @@ describe("full refresh", () => {
     expect((await getEntry<{ name: string }>(db, "clients", 150))?.entity.name).toBe("顧客150");
     vi.restoreAllMocks();
 
-    // 再開: 2 ページ目から。
+    // 再開: 最後に取り終えたページ(1)から取り直す(1 ページ重ねる)。
     allowSlow = false;
     const api = mockOutboundFetch({ [KEY]: pagedHandler(() => data) });
     clock.advance(30_000);
     const p2 = await refreshResource(deps, clients, "full");
-    expect(api.calls.map((c) => new URL(c.url).searchParams.get("page"))).toEqual(["2", "3"]);
-    expect(p2).toMatchObject({ state: "complete", fetched: 150, pages: 2 });
+    expect(api.calls.map((c) => new URL(c.url).searchParams.get("page"))).toEqual(["1", "2", "3"]);
+    expect(p2).toMatchObject({ state: "complete", fetched: 250, pages: 3 });
     expect(await getEntry(db, "clients", 999)).toBeNull(); // 古い世代は消える
     expect((await getEntry<{ name: string }>(db, "clients", 150))?.entity.name).toBe("v2-150");
     expect(await countEntries(db, "clients")).toBe(250);
@@ -517,5 +517,163 @@ describe("呼び出し元の中断", () => {
     const st = await getSyncState(db, "clients");
     expect(st?.consecutive_failures).toBe(0);
     expect(st?.refresh_owner).toBeNull();
+  });
+});
+
+describe("full の再開でページがずれても、実在する行を消さない", () => {
+  it("再開は最後に取り終えたページから取り直す: 合間に前のページの行が消えても、繰り上がった行(Z)が残る", async () => {
+    const { db, deps, clock } = setup();
+    let data = makeEntities(250);
+    mockOutboundFetch({ [KEY]: pagedHandler(() => data, undefined, { totalHeader: true }) });
+    await refreshResource(deps, clients, "full"); // 旧世代: 1..250
+    vi.restoreAllMocks();
+
+    // 世代 2 の full を 1 ページ(1..100)で止める。Z = id 101 は 2 ページ目の先頭。
+    clock.advance(60_000);
+    mockOutboundFetch({
+      [KEY]: pagedHandler(
+        () => data,
+        () => {
+          clock.advance(9_000);
+          return undefined;
+        },
+        { totalHeader: true },
+      ),
+    });
+    const p1 = await refreshResource(deps, clients, "full", { deadline: clock.now() + 10_000 });
+    expect(p1).toMatchObject({ state: "partial", nextPage: 2 });
+    vi.restoreAllMocks();
+
+    // 合間に BOARD で id 5 が削除され、Z(101)が 1 ページ目の末尾に繰り上がる。
+    // あわせて、まだ取っていない末尾の id 250 も削除される(これは旧世代として消えるのが正しい)。
+    data = data.filter((e) => e.id !== 5 && e.id !== 250);
+    const api = mockOutboundFetch({
+      [KEY]: pagedHandler(() => data, undefined, { totalHeader: true }),
+    });
+    const p2 = await refreshResource(deps, clients, "full");
+    expect(api.calls.map((c) => new URL(c.url).searchParams.get("page"))).toEqual(["1", "2", "3"]);
+    expect(p2).toMatchObject({ state: "complete" });
+    expect(await getEntry(db, "clients", 101)).not.toBeNull(); // Z は残る
+    expect(await getEntry(db, "clients", 250)).toBeNull(); // 実際に消えた旧世代の行は消える
+    // id 5 は削除前のページ取得で新世代に入っているため、次の full まで残る(既知の限界。計画書に記載)。
+    expect(await countEntries(db, "clients")).toBe(249);
+    expect((await getSyncState(db, "clients"))?.full_prune_skipped).toBe(0);
+  });
+
+  it("新世代で取れた件数が総件数(X-Total-Count)に満たなければ、旧世代を消さず complete にして full_prune_skipped を記録する。次の full で消える", async () => {
+    const { db, deps, clock } = setup();
+    const data = makeEntities(300);
+    mockOutboundFetch({ [KEY]: pagedHandler(() => data) });
+    await refreshResource(deps, clients, "full"); // 旧世代: 1..300
+    vi.restoreAllMocks();
+
+    // 世代 2: 150 件しか返らないが、総件数のヘッダは 160 件と言っている(取りこぼしが疑われる)。
+    clock.advance(60_000);
+    const short = data.slice(0, 150);
+    mockOutboundFetch({ [KEY]: pagedHandler(() => short, undefined, { totalHeader: 160 }) });
+    const out = await refreshResource(deps, clients, "full");
+    expect(out).toMatchObject({ state: "complete", pruneSkipped: true });
+    expect(await countEntries(db, "clients")).toBe(300); // 旧世代の 151..300 を残した
+    expect(await getSyncState(db, "clients")).toMatchObject({
+      full_next_page: null,
+      full_prune_skipped: 1,
+      last_sync_status: "success",
+    });
+    vi.restoreAllMocks();
+
+    // 次の full: 件数が総件数に届けば、旧世代(世代 2 に更新されなかった行)を消し、フラグを戻す。
+    clock.advance(60_000);
+    mockOutboundFetch({ [KEY]: pagedHandler(() => short, undefined, { totalHeader: true }) });
+    const again = await refreshResource(deps, clients, "full");
+    expect(again.pruneSkipped).toBeFalsy();
+    expect(await countEntries(db, "clients")).toBe(150);
+    expect((await getSyncState(db, "clients"))?.full_prune_skipped).toBe(0);
+  });
+
+  it("総件数のヘッダがなければ、従来どおり旧世代を消す", async () => {
+    const { db, deps, clock } = setup();
+    mockOutboundFetch({ [KEY]: pagedHandler(() => makeEntities(300)) });
+    await refreshResource(deps, clients, "full");
+    vi.restoreAllMocks();
+    clock.advance(60_000);
+    mockOutboundFetch({ [KEY]: pagedHandler(() => makeEntities(150)) });
+    await refreshResource(deps, clients, "full");
+    expect(await countEntries(db, "clients")).toBe(150);
+  });
+});
+
+describe("stale ロックを奪われた元の保持者は、その後 sync_state にも行にも書き込めない", () => {
+  /** A の 1 ページ目の取得中に 11 分が経ち、B が stale ロックを奪う。 */
+  function stolenDuringFetch(db: D1Database, clock: ReturnType<typeof fakeClock>) {
+    return async () => {
+      clock.advance(LOCK_STALE_MS + 1_000);
+      await tryAcquireLock(db, "clients", { now: clock.now, owner: "B" });
+      return undefined;
+    };
+  }
+
+  it("full: 書き込みは反映されず、refresh_in_progress で失敗する。B のロックと進捗は壊れない", async () => {
+    const { db, deps, clock } = setup();
+    mockOutboundFetch({
+      [KEY]: pagedHandler(() => makeEntities(250), stolenDuringFetch(db, clock)),
+    });
+    const e = await refreshResource({ ...deps, owner: "A" }, clients, "full", {
+      deadline: clock.now() + 3_600_000,
+    }).catch((x) => x);
+    expect(e).toBeInstanceOf(RefreshInProgressError);
+    expect(await countEntries(db, "clients")).toBe(0);
+    expect(await getSyncState(db, "clients")).toMatchObject({
+      refresh_owner: "B",
+      full_next_page: 1, // A は進めていない
+      full_max_updated_at: null,
+      last_sync_status: "partial",
+      consecutive_failures: 0, // A の失敗を B の状態に書かない
+    });
+  });
+
+  it("full の最終ページ: 旧世代の削除もカーソルの更新も反映されない", async () => {
+    const { db, deps, clock } = setup();
+    mockOutboundFetch({ [KEY]: pagedHandler(() => makeEntities(5)) });
+    await refreshResource(deps, clients, "full"); // 旧世代 1..5
+    vi.restoreAllMocks();
+    const before = await getSyncState(db, "clients");
+
+    clock.advance(60_000);
+    mockOutboundFetch({
+      [KEY]: pagedHandler(() => makeEntities(3), stolenDuringFetch(db, clock)),
+    });
+    const e = await refreshResource({ ...deps, owner: "A" }, clients, "full", {
+      deadline: clock.now() + 3_600_000,
+    }).catch((x) => x);
+    expect(e).toBeInstanceOf(RefreshInProgressError);
+    expect(await countEntries(db, "clients")).toBe(5); // 旧世代は消えていない
+    const st = await getSyncState(db, "clients");
+    expect(st?.cursor_updated_at).toBe(before?.cursor_updated_at);
+    expect(st?.last_full_synced_at).toBe(before?.last_full_synced_at);
+    expect(st?.refresh_owner).toBe("B");
+  });
+
+  it("delta: 書き込みは反映されず、failed ではなく refresh_in_progress で失敗する", async () => {
+    const { db, deps, clock } = setup();
+    mockOutboundFetch({ [KEY]: pagedHandler(() => makeEntities(5)) });
+    await refreshResource(deps, clients, "full");
+    vi.restoreAllMocks();
+    const before = await getSyncState(db, "clients");
+
+    mockOutboundFetch({
+      [KEY]: pagedHandler(
+        () => [{ id: 99, name: "新規", updated_at: "2026-06-01T00:00:00.000+09:00" }],
+        stolenDuringFetch(db, clock),
+      ),
+    });
+    const e = await refreshResource({ ...deps, owner: "A" }, clients, "delta", {
+      deadline: clock.now() + 3_600_000,
+    }).catch((x) => x);
+    expect(e).toBeInstanceOf(RefreshInProgressError);
+    expect(await getEntry(db, "clients", 99)).toBeNull();
+    const st = await getSyncState(db, "clients");
+    expect(st?.cursor_updated_at).toBe(before?.cursor_updated_at);
+    expect(st?.consecutive_failures).toBe(0);
+    expect(st?.refresh_owner).toBe("B");
   });
 });

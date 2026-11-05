@@ -43,7 +43,8 @@ const DDL_V1: string[] = [
     full_generation INTEGER NOT NULL DEFAULT 0,
     full_next_page INTEGER,
     full_started_at TEXT,
-    full_max_updated_at TEXT
+    full_max_updated_at TEXT,
+    full_prune_skipped INTEGER NOT NULL DEFAULT 0
   )`,
   `CREATE TABLE IF NOT EXISTS cache_meta (
     key TEXT PRIMARY KEY,

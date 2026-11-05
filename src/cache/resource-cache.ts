@@ -21,11 +21,20 @@ export interface UpsertOptions {
   now?: number;
   /** 1 件だけ upsert するときの保存キー(エンティティの id ではなく、取得に使った id で引けるようにする。document 用)。 */
   entityId?: number;
+  /** 指定すると、sync_state の `refresh_owner` がこの値のときだけ書く(同じ batch の中で判定する)。ロックを失った保持者の書き込みを無効にする。 */
+  guardOwner?: string;
 }
 
 const SQL_UPSERT = `INSERT OR REPLACE INTO resource_cache
   (resource_name, entity_id, payload_json, updated_at, fetched_at, generation)
   VALUES (?, ?, ?, ?, ?, ?)`;
+
+const OWNER_EXISTS = `EXISTS (SELECT 1 FROM sync_state WHERE resource_name = ? AND refresh_owner = ?)`;
+
+/** 所有者の条件つき upsert。ロックを失っていれば 0 行の SELECT になり、何も書かれない。 */
+const SQL_UPSERT_GUARDED = `INSERT OR REPLACE INTO resource_cache
+  (resource_name, entity_id, payload_json, updated_at, fetched_at, generation)
+  SELECT ?, ?, ?, ?, ?, ? WHERE ${OWNER_EXISTS}`;
 
 function entityId(entity: unknown): number {
   const id = (entity as { id?: unknown } | null)?.id;
@@ -49,18 +58,19 @@ export function upsertStatements(
 ): D1PreparedStatement[] {
   const fetchedAt = isoSeconds(opts.now ?? systemClock());
   const generation = opts.generation ?? 0;
-  return entities.map((e) =>
-    db
-      .prepare(SQL_UPSERT)
-      .bind(
-        resource,
-        entities.length === 1 && opts.entityId !== undefined ? opts.entityId : entityId(e),
-        JSON.stringify(e),
-        updatedAtOf(e),
-        fetchedAt,
-        generation,
-      ),
-  );
+  const guard = opts.guardOwner;
+  return entities.map((e) => {
+    const params: unknown[] = [
+      resource,
+      entities.length === 1 && opts.entityId !== undefined ? opts.entityId : entityId(e),
+      JSON.stringify(e),
+      updatedAtOf(e),
+      fetchedAt,
+      generation,
+    ];
+    if (guard === undefined) return db.prepare(SQL_UPSERT).bind(...params);
+    return db.prepare(SQL_UPSERT_GUARDED).bind(...params, resource, guard);
+  });
 }
 
 /** 複数件を 1 つのバッチ(原子的)で upsert する。入れた件数を返す。 */
@@ -146,15 +156,34 @@ export async function deleteAllEntries(db: D1Database, resource: string): Promis
   await db.prepare("DELETE FROM resource_cache WHERE resource_name = ?").bind(resource).run();
 }
 
+export interface PruneOptions {
+  /** 指定すると、所有者がこの値のときだけ消す。 */
+  guardOwner?: string;
+  /** BOARD の総件数。新しい世代以降の行数がこれに満たなければ消さない(同じ batch の中、upsert のあとで判定)。 */
+  expectedTotal?: number | null;
+}
+
+/**
+ * 件数の照合を通ったか(新しい世代以降の行数 >= 総件数)を表す SQL の条件。`?` は (total, resource, generation, total) の順。
+ * total が NULL(ヘッダなし)なら常に真。
+ */
+export const PRUNE_OK_SQL = `(? IS NULL OR (SELECT count(*) FROM resource_cache WHERE resource_name = ? AND generation >= ?) >= ?)`;
+
 /** 指定の世代より古い行の削除文(full の完了時に、最後のページの upsert と同じバッチに入れる)。 */
 export function deleteOlderGenerationsStatement(
   db: D1Database,
   resource: string,
   generation: number,
+  opts: PruneOptions = {},
 ): D1PreparedStatement {
-  return db
-    .prepare("DELETE FROM resource_cache WHERE resource_name = ? AND generation < ?")
-    .bind(resource, generation);
+  const total = opts.expectedTotal ?? null;
+  let sql = `DELETE FROM resource_cache WHERE resource_name = ? AND generation < ? AND ${PRUNE_OK_SQL}`;
+  const params: unknown[] = [resource, generation, total, resource, generation, total];
+  if (opts.guardOwner !== undefined) {
+    sql += ` AND ${OWNER_EXISTS}`;
+    params.push(resource, opts.guardOwner);
+  }
+  return db.prepare(sql).bind(...params);
 }
 
 export async function deleteOlderGenerations(

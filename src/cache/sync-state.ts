@@ -30,6 +30,8 @@ export interface SyncState {
   full_started_at: string | null;
   /** 進行中の full で見た updated_at の最大値(完了時の delta カーソルの元)。 */
   full_max_updated_at: string | null;
+  /** 直近の full の完了時に、件数の照合に通らず旧世代を消さなかった(1)。次の full で取り直す。 */
+  full_prune_skipped: number;
 }
 
 export async function getSyncState(db: D1Database, resource: string): Promise<SyncState | null> {
@@ -66,6 +68,8 @@ export async function markError(
   resource: string,
   code: string,
   atIso: string,
+  /** 指定すると、ロックの所有者がこの値のときだけ記録する(ロックを失った保持者が他人の状態を汚さない)。 */
+  owner?: string,
 ): Promise<void> {
   await ensureSchema(db);
   await db.batch([
@@ -74,9 +78,9 @@ export async function markError(
       .prepare(
         `UPDATE sync_state SET last_sync_status = 'error', last_error_at = ?, last_error_code = ?,
          last_error_message = ?, consecutive_failures = consecutive_failures + 1
-         WHERE resource_name = ?`,
+         WHERE resource_name = ? AND (? IS NULL OR refresh_owner = ?)`,
       )
-      .bind(atIso, code, code, resource),
+      .bind(atIso, code, code, resource, owner ?? null, owner ?? null),
   ]);
 }
 

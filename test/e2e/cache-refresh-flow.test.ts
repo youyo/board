@@ -74,19 +74,24 @@ describe("E2E: full refresh を複数回の呼び出しに分けて完了させ�
     const r2 = await call();
     expect(r2.cache[0]?.refresh_state).toBe("partial");
     expect(r2.items.some((e) => e.id === 9999)).toBe(true);
-    expect(r2.items).toHaveLength(400 + 1);
+    expect(r2.items).toHaveLength(300 + 1);
 
+    // 再開は最後に取り終えたページから(1 ページ重ねる)なので、2 ページ取れる呼び出しでも進みは 1 ページ分少ない。
     const r3 = await call();
-    expect(r3.cache[0]).toMatchObject({
+    expect(r3.cache[0]?.refresh_state).toBe("partial");
+    expect(r3.items).toHaveLength(400 + 1);
+
+    const r4 = await call();
+    expect(r4.cache[0]).toMatchObject({
       refresh_state: "complete",
     });
-    expect(r3.cache[0]?.full_refreshed_at).not.toBe("2026-11-05T00:00:00Z");
-    expect(r3.items).toHaveLength(450);
-    expect(r3.items.some((e) => e.id === 9999)).toBe(false);
-    expect(new Date(r3.cache[0]?.full_refreshed_at ?? "").getTime()).toBeGreaterThan(day2);
+    expect(r4.cache[0]?.full_refreshed_at).not.toBe("2026-11-05T00:00:00Z");
+    expect(r4.items).toHaveLength(450);
+    expect(r4.items.some((e) => e.id === 9999)).toBe(false);
+    expect(new Date(r4.cache[0]?.full_refreshed_at ?? "").getTime()).toBeGreaterThan(day2);
 
-    // 取りに行ったページは 1,2 / 3,4 / 5 の順(再開しても重複して取らない)。
-    expect(api.calls.map((_, i) => pageOf(i))).toEqual(["1", "2", "3", "4", "5"]);
+    // 取りに行ったページは 1,2 / 2,3 / 3,4 / 4,5 の順(再開のたびに最後のページを 1 枚重ねる)。
+    expect(api.calls.map((_, i) => pageOf(i))).toEqual(["1", "2", "2", "3", "3", "4", "4", "5"]);
 
     // 状態の確認(運用向け)。
     const row = (await cacheStatus(env.DB, { now: clock.now })).find(
@@ -94,6 +99,48 @@ describe("E2E: full refresh を複数回の呼び出しに分けて完了させ�
     );
     expect(row).toMatchObject({ cached_rows: 450, refreshing: false });
     expect(row?.full_in_progress).toBeUndefined();
+  });
+});
+
+describe("E2E: full の合間に BOARD で行が消えても、繰り上がった行を誤って消さない", () => {
+  it("partial → BOARD 側で 1 件削除 → 再開 → complete。Z が残り、実際に消えた行だけが消える", async () => {
+    const { clock, repos } = setup();
+    let data = makeEntities(250);
+    mockOutboundFetch({ [KEY]: pagedHandler(() => data, undefined, { totalHeader: true }) });
+    await repos.clients.list({}, { refresh: "full" }); // 旧世代 1..250
+    vi.restoreAllMocks();
+    clock.advance(86_400_000);
+
+    // 1 ページ 9 秒かかる BOARD で、1 回目は 1 ページ(1..100)で partial。Z = 101 は 2 ページ目の先頭。
+    mockOutboundFetch({
+      [KEY]: pagedHandler(
+        () => data,
+        () => {
+          clock.advance(9_000);
+          return undefined;
+        },
+        { totalHeader: true },
+      ),
+    });
+    const r1 = await repos.clients.list(
+      {},
+      { refresh: "full" },
+      { deadline: clock.now() + 10_000 },
+    );
+    expect(r1.cache[0]?.refresh_state).toBe("partial");
+    vi.restoreAllMocks();
+
+    // 呼び出しの合間に、BOARD 側で 1 ページ目の id 5 が削除される。Z(101)は 1 ページ目に繰り上がる。
+    // あわせて、まだ取っていない末尾の id 250 も削除される。
+    data = data.filter((e) => e.id !== 5 && e.id !== 250);
+    mockOutboundFetch({ [KEY]: pagedHandler(() => data, undefined, { totalHeader: true }) });
+    const r2 = await repos.clients.list({}, { refresh: "full" });
+    expect(r2.cache[0]?.refresh_state).toBe("complete");
+    const ids = r2.items.map((e) => e.id);
+    expect(ids).toContain(101); // Z は残る
+    expect(ids).not.toContain(250); // 実際に消えた旧世代の行は消える
+    // id 5 は削除前のページ取得で新世代に入っているので、次の full まで残る(既知の限界)。
+    expect(r2.items).toHaveLength(249);
   });
 });
 

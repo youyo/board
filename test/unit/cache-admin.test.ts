@@ -3,7 +3,7 @@ import { cacheStatus, clearCache, expireCache } from "../../src/cache/admin";
 import { countEntries, upsertEntities } from "../../src/cache/resource-cache";
 import { getSyncState } from "../../src/cache/sync-state";
 import { RefreshInProgressError } from "../../src/errors";
-import { tryAcquireLock } from "../../src/refresh/lock";
+import { LOCK_STALE_MS, tryAcquireLock } from "../../src/refresh/lock";
 import { fakeClock, resetCache, testDb } from "../helpers/d1";
 
 const clock = fakeClock();
@@ -125,6 +125,59 @@ describe("cache clear", () => {
     await expect(clearCache(db, { now: clock.now })).rejects.toBeInstanceOf(RefreshInProgressError);
     expect(await countEntries(db, "clients")).toBe(2);
     expect(await countEntries(db, "vendors")).toBe(1);
+  });
+
+  it("ロックを取ってから消す: 削除の直前に別の取得を試みても弾かれ、ロックは clear の完了後に残らない", async () => {
+    const db = testDb();
+    await seed(db);
+    let inner: unknown;
+    await clearCache(db, {
+      resources: ["clients"],
+      now: clock.now,
+      hooks: {
+        afterLock: async () => {
+          inner = await tryAcquireLock(db, "clients", { now: clock.now, owner: "B" }).catch(
+            (e) => e,
+          );
+        },
+      },
+    });
+    expect(inner).toBeInstanceOf(RefreshInProgressError);
+    expect(await countEntries(db, "clients")).toBe(0);
+    expect(await getSyncState(db, "clients")).toBeNull();
+  });
+
+  it("確認から削除までの間に stale ロックを別の取得者に奪われたら、何も消さず、その人のロック行を残す", async () => {
+    const db = testDb();
+    await seed(db);
+    // 時計を進めて、clear が取ったロックを stale にして B に奪わせる。
+    const local = fakeClock();
+    await expect(
+      clearCache(db, {
+        resources: ["clients"],
+        now: local.now,
+        hooks: {
+          afterLock: async () => {
+            local.advance(LOCK_STALE_MS + 1_000);
+            await tryAcquireLock(db, "clients", { now: local.now, owner: "B" });
+          },
+        },
+      }),
+    ).rejects.toBeInstanceOf(RefreshInProgressError);
+    expect(await countEntries(db, "clients")).toBe(2);
+    expect(await getSyncState(db, "clients")).toMatchObject({ refresh_owner: "B" });
+  });
+
+  it("複数リソースの途中で busy が見つかったら、それまでに取ったロックを返して何も消さない", async () => {
+    const db = testDb();
+    await seed(db);
+    await tryAcquireLock(db, "vendors", { now: clock.now, owner: "A" });
+    await expect(
+      clearCache(db, { resources: ["clients", "vendors"], now: clock.now }),
+    ).rejects.toBeInstanceOf(RefreshInProgressError);
+    expect(await countEntries(db, "clients")).toBe(2);
+    expect((await getSyncState(db, "clients"))?.refresh_owner).toBeNull();
+    expect((await getSyncState(db, "vendors"))?.refresh_owner).toBe("A");
   });
 
   it("未知のリソース名は argument_error", async () => {
