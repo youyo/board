@@ -31,7 +31,6 @@ import {
   idOrUndefined,
   optEnum,
   optId,
-  optInt,
   optNonNegativeInt,
   optStr,
   optStrArray,
@@ -346,7 +345,7 @@ const findPaymentsTool = defineTool({
   inputSchema: z.strictObject({
     id: optId(idDesc("Payment")),
     vendor_name: optStr(disambiguateNameDesc("vendor", "payment")),
-    purchase_order_id: optInt(notYetSupportedDesc("purchase order ID", "payments")),
+    purchase_order_id: optId(notYetSupportedDesc("purchase order ID", "payments")),
     status: optStr(
       "Filter by payment status (single value; API delegated, no narrowing required).",
     ),

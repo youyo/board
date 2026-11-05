@@ -24,6 +24,7 @@ export const cacheStatus = defineTool({
     "document_scans[]: progress of the document-to-project reverse lookup per document kind (estimate/order/delivery/receipt): " +
     "scan_state (not_started/in_progress/complete), mapped_rows, next_page.",
   category: "ReadOnly",
+  openWorld: false,
   inputSchema: z.strictObject({}),
   handler: async (_args, ctx) => cacheReport(ctx.db(), { now: () => ctx.now().getTime() }),
 });
@@ -42,6 +43,7 @@ export const cacheClear = defineTool({
     "If a refresh is running for any target, nothing is deleted and refresh_in_progress is returned (retry after retry_after_seconds). " +
     "The document-to-project reverse lookup is kept unless include_document_map=true. Does not call the BOARD API.",
   category: "Destructive",
+  openWorld: false,
   inputSchema: z.strictObject({
     // 空配列を「全件」と取り違えないよう、指定するなら 1 件以上に限る(省略時だけが全件)。
     resources: z.array(z.string()).min(1).describe(RESOURCES_DESC).optional(),

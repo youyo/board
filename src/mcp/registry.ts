@@ -24,7 +24,15 @@ export interface ToolAnnotations {
   openWorldHint: boolean;
 }
 
-export function annotationsFor(category: ToolCategory, title: string): ToolAnnotations {
+export function annotationsFor(
+  category: ToolCategory,
+  title: string,
+  opts: { openWorld?: boolean } = {},
+): ToolAnnotations {
+  return { ...baseAnnotations(category, title), openWorldHint: opts.openWorld ?? true };
+}
+
+function baseAnnotations(category: ToolCategory, title: string): ToolAnnotations {
   switch (category) {
     case "ReadOnly":
       return { title, readOnlyHint: true, idempotentHint: true, openWorldHint: true };
@@ -84,6 +92,8 @@ export interface ToolDefinitionInput<S extends z.ZodObject> {
    * 書き込み系には付けない(成功を失敗に見せないため)。
    */
   responseLimit?: boolean;
+  /** 外部(BOARD API)と通信するか。D1 だけを扱うツールは false にする(annotation の openWorldHint)。既定は true。 */
+  openWorld?: boolean;
   /** 戻り値は JSON にして text content に入れる。構造化出力(structuredContent)は使わない。 */
   handler: (args: z.infer<S>, ctx: ToolContext) => Promise<unknown>;
 }
@@ -115,7 +125,7 @@ export function defineTool<S extends z.ZodObject>(input: ToolDefinitionInput<S>)
       ? input.inputSchema.extend(maxResponseTokensShape)
       : input.inputSchema,
     responseLimit,
-    annotations: annotationsFor(input.category, input.title),
+    annotations: annotationsFor(input.category, input.title, { openWorld: input.openWorld }),
     handler: (args, ctx) => input.handler(args as z.infer<S>, ctx),
   };
 }

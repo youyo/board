@@ -29,7 +29,7 @@ describe("スキーマの適用", () => {
         "document_scan_state",
       ]),
     );
-    expect(SCHEMA_VERSION).toBe(2);
+    expect(SCHEMA_VERSION).toBe(3);
     expect(await names(db, "index")).toEqual(
       expect.arrayContaining(["idx_resource_cache_generation", "idx_resource_cache_updated"]),
     );
@@ -80,7 +80,46 @@ describe("スキーマの適用", () => {
     const v = await db
       .prepare("SELECT value FROM cache_meta WHERE key = 'db_schema_version'")
       .first<{ value: string }>();
-    expect(v?.value).toBe("2");
+    expect(v?.value).toBe(String(SCHEMA_VERSION));
+  });
+
+  it("v2 のデータベースに v3(delta の再開用の列)だけを足す。既存の行と同期状態は壊さず、何度流しても同じ", async () => {
+    const db = testDb();
+    await applySchema(db);
+    await db.batch([
+      db.prepare("ALTER TABLE sync_state DROP COLUMN delta_next_page"),
+      db.prepare("ALTER TABLE sync_state DROP COLUMN delta_started_at"),
+      db.prepare("ALTER TABLE sync_state DROP COLUMN delta_max_updated_at"),
+      db.prepare(
+        "INSERT OR REPLACE INTO sync_state (resource_name, cursor_updated_at, full_generation) VALUES ('clients', '2026-01-01T00:00:00Z', 4)",
+      ),
+      db.prepare("UPDATE cache_meta SET value = '2' WHERE key = 'db_schema_version'"),
+    ]);
+    const cols = async () =>
+      (await db.prepare("PRAGMA table_info(sync_state)").all<{ name: string }>()).results.map(
+        (c) => c.name,
+      );
+    expect(await cols()).not.toContain("delta_next_page");
+
+    await applySchema(db);
+    expect(await cols()).toEqual(
+      expect.arrayContaining(["delta_next_page", "delta_started_at", "delta_max_updated_at"]),
+    );
+    const row = await db
+      .prepare("SELECT * FROM sync_state WHERE resource_name = 'clients'")
+      .first<Record<string, unknown>>();
+    expect(row).toMatchObject({
+      cursor_updated_at: "2026-01-01T00:00:00Z",
+      full_generation: 4,
+      delta_next_page: null,
+      delta_started_at: null,
+      delta_max_updated_at: null,
+    });
+
+    // 版の記録を戻して DDL をもう一度流しても(列が既にあっても)失敗しない。
+    await db.prepare("UPDATE cache_meta SET value = '2' WHERE key = 'db_schema_version'").run();
+    await applySchema(db);
+    expect((await cols()).filter((c) => c === "delta_next_page")).toHaveLength(1);
   });
 
   it("profile の列を持たない(1 デプロイ = 1 アカウント)", async () => {

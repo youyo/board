@@ -61,9 +61,9 @@ Go の 3 テーブルを移す。profile の列は持たない(1 デプロイ = 
 
 **delta**(Go と同じ):
 1. カーソル(`cursor_updated_at`)を `YYYY-MM-DD HH:MM:SS` にして `updated_at_gteq` に渡す(`isoToBoardDateTime`。UTC に直さず、元のオフセットの時刻部分を使う)。
-2. 取得分を upsert(世代は `sync_state.full_generation`)。最後のページまで取れたら、カーソルを取得分の `updated_at` の最大値に進め(取得 0 件なら据え置き)、`last_synced_at` を更新する。
+2. 取得分を upsert(世代は `sync_state.full_generation`)。1 ページ取るごとに進捗(`delta_next_page` / `delta_started_at` / `delta_max_updated_at`)を同じ `batch` で保存する。最後のページまで取れたら、カーソルを `min(見た updated_at の最大値, delta_started_at の 5 分前)`(`cursorAfterFull` と同じ)に進め(取得 0 件なら据え置き)、進捗を消し、`last_synced_at` を更新する。
 3. カーソルがなければ全件が必要なので、再開できる full として動く(結果の `mode` は `full`)。
-4. 締め切りで止まったら `partial`(取れた分は upsert 済み、カーソルは動かさない)。API の失敗は例外にせず `failed`(古いキャッシュを返す。Go と同じ)。失敗は `sync_state` に記録する。
+4. 締め切りで止まったら `partial`(取れた分は upsert 済み、進捗は保存済みでカーソルは動かさない)。次の delta は `delta_started_at` から 1 時間以内なら、最後に取り終えたページから(1 ページ重ねて)再開する。過ぎていたら最初のページからやり直す。API の失敗は例外にせず `failed`(古いキャッシュを返す。Go と同じ)。失敗は `sync_state` に記録する。
 
 **full**(再開あり。Go との相違点):
 1. 開始時に新しい世代 `full_generation + 1` を払い出し、`full_next_page = 1` `full_started_at` を記録する。
@@ -108,6 +108,7 @@ vendors = name(fold)/ users = name / email(fold)。複数の条件は AND。`lim
 | full refresh | `DeleteAll` + 全件取得を 1 回の呼び出しで | 世代 + ページ単位の再開。途中は新旧の和集合を返す | 30 秒の締め切りの中では件数の多いリソースの全件取得が終わらない(Go の実測で estimates は 25 ページ・約 19 秒)。**決定済み事項の表に追記** |
 | full 完了後のカーソル | `NULL` に戻す(次の delta が全件取得になる) | 見た updated_at の最大値(ただし full の開始の 5 分前を上限) | 次の delta が全件取得になると、締め切りの中で終わらず、delta は再開できない。判断として入れた。**覆すなら `cursorAfterFull` を `null` を返すだけにする(1 行)** |
 | delta のカーソルなし | 全件取得 | 再開できる full として動く | 同上 |
+| delta の再開 | (なし。1 回で取り切る) | full と同じ方式で再開(`delta_next_page` / `delta_started_at` / `delta_max_updated_at`。スキーマ v3)。完了時のカーソルは min(見た最大値, 開始の 5 分前) | 差分が 30 秒で取り切れないと、毎回先頭からやり直して `complete` にならないため |
 | partial な full の再開 | (なし) | 1 時間以内なら、最後に取り終えたページから(1 ページ重ねて)再開。過ぎたら最初から。完了時の旧世代の削除は総件数(X-Total-Count)と照合 | ページ番号での再開は、間に削除・挿入があるとページがずれて行を取りこぼす。重ね取りと件数照合で緩和(下の既知のリスク)。長く経った partial は信用しない |
 | ロック | プロセス内 mutex + `refresh_started_at` の確認(読んでから書く) | D1 の 1 つの条件付き UPDATE(`meta.changes` で判定)。解放は自分の取得者のときだけ | isolate が複数あり、読んでから書く方式は競合する |
 | 『同期済み』の判定 | `sync_state` の行があるか(ロックを取っただけでも作られる) | `last_synced_at` があるか。partial は進めない | 行の有無では、ロックだけ取った・最初の refresh が失敗した状態を『同期済み』と誤認する |
@@ -141,8 +142,8 @@ MCP ツール(M04・M05)、cache 系ツール(M06)、find 層(逆引きマップ
   残るリスク: (a) 呼び出しの合間に重ね取りの 1 ページを超える件数(100 件超)が前のページから消えた場合は、繰り上がった行を拾えない。ただし件数照合が働けば削除は止まる
   (新世代の件数が総件数より少ないため)。(b) 取得済みのページにあった行が合間に BOARD で削除された場合、その行は新世代に入ったまま次の full まで残る。
   (c) 件数照合は『新世代以降の行数 >= 総件数』なので、残った (b) の行が不足分を埋めてしまうと検出できない。
-- **delta が締め切りで partial になるとカーソルが進まない**: 差分が 1 回の呼び出し(30 秒)で取り切れない量だと、delta は何度やっても `complete` にならない
-  (取れた分の upsert は残るが、カーソルは complete のときだけ進める)。回避策は full を使うこと(full は再開できる)。
+- **delta の再開も、ページ番号のずれの影響を受ける**(2026-11-05 に再開できるようにした。以前は partial になるとカーソルが進まず、差分が 30 秒で取り切れないと delta は何度やっても `complete` にならなかった)。
+  full と同じく 1 ページ重ねて取り直すが、合間に差分の並びが変わると取りこぼしうる。カーソルは完了まで動かさず、完了時に開始の 5 分前を上限にするので、取りこぼしの多くは次の delta が拾う。
 - **空のリソースではカーソルが null のまま**: full を完了しても取得件数が 0 なら `updated_at` の最大値がなくカーソルが作られず、以後の delta は毎回 full として動く(再開できる full なので安全だが、delta の軽さは得られない)。
 - **stale ロックの奪取**: 10 分を超えたロックは奪える。元の保持者が遅れて書こうとしても、すべての書き込み(行の upsert・旧世代の削除・sync_state の更新・失敗の記録)は
   同じ D1 batch の中で `refresh_owner` が自分であることを条件にしているため反映されず、`sync_state` の更新の `meta.changes` が 0 になって `refresh_in_progress` で止まる。

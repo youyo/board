@@ -190,6 +190,66 @@ describe("E2E: delta refresh のあとに参照する", () => {
   });
 });
 
+describe("E2E: delta refresh を複数回の呼び出しに分けて完了させる", () => {
+  it("差分が締め切りに収まらなくても、partial → 再開(1 ページ重ねる)→ complete でカーソルが進む", async () => {
+    const { clock, repos } = setup();
+    const seed = mockOutboundFetch({ [KEY]: pagedHandler(() => makeEntities(5)) });
+    await repos.clients.list({}, { refresh: "full" });
+    expect(seed.calls).toHaveLength(1);
+    vi.restoreAllMocks();
+    clock.advance(3_600_000);
+
+    // 差分 450 件(5 ページ)。1 ページ 4 秒、1 回の持ち時間は 10 秒 = 2 ページ。
+    const diff = Array.from({ length: 450 }, (_, i) => ({
+      id: 1000 + i,
+      name: `差分${i}`,
+      updated_at: `2026-05-01T12:00:00.${String(999 - i).padStart(3, "0")}+09:00`,
+    }));
+    const api = mockOutboundFetch({
+      [KEY]: pagedHandler(
+        () => diff,
+        () => {
+          clock.advance(4_000);
+          return undefined;
+        },
+      ),
+    });
+    const call = () =>
+      repos.clients.list({}, { refresh: "delta" }, { deadline: clock.now() + 10_000 });
+    const pages = () => api.calls.map((c) => Number(new URL(c.url).searchParams.get("page")));
+
+    const r1 = await call();
+    expect(pages()).toEqual([1, 2]);
+    expect(r1.cache[0]).toMatchObject({
+      refresh_state: "partial",
+      cached_at: "2026-11-05T00:00:00Z", // 同期の記録は、delta が完了するまで動かない
+    });
+
+    // 2 回目: 最後に取り終えたページ(2)から重ねて 2, 3 を取り、まだ partial。3 回目で 3, 4, 5 を取って complete。
+    const r2 = await call();
+    expect(r2.cache[0]?.refresh_state).toBe("partial");
+    expect(pages()).toEqual([1, 2, 2, 3]);
+    const r3 = await call();
+    expect(pages()).toEqual([1, 2, 2, 3, 3, 4]);
+    expect(r3.cache[0]?.refresh_state).toBe("partial");
+    const r4 = await call();
+    expect(pages()).toEqual([1, 2, 2, 3, 3, 4, 4, 5]);
+    expect(r4.items).toHaveLength(455);
+    expect(r4.cache[0]).toMatchObject({
+      refresh_state: "complete",
+      cached_at: "2026-11-05T01:00:32Z",
+    });
+
+    // カーソルは見た最大値(最初のページの先頭)に進んだ。次の delta はそこから差分を取る。
+    vi.restoreAllMocks();
+    const next = mockOutboundFetch({ [KEY]: pagedHandler(() => []) });
+    await repos.clients.list({}, { refresh: "delta" });
+    expect(new URL(next.calls[0]?.url ?? "").searchParams.get("updated_at_gteq")).toBe(
+      "2026-05-01 12:00:00",
+    );
+  });
+});
+
 describe("E2E: 2 つの refresh を同時に走らせると、一方は refresh_in_progress", () => {
   it("後から来たほうは待たずに失敗し(retry_after_seconds 30)、先のほうは最後まで完了する。終われば再試行が通る", async () => {
     const { repos } = setup();

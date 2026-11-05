@@ -8,6 +8,7 @@
 
 export type FieldKind =
   | { type: "str" }
+  /** ID(0 以上の整数。0 は『指定なし』、負の数は argument_error)。 */
   | { type: "int" }
   | { type: "bool" }
   | { type: "strs" }

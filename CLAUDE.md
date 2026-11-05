@@ -45,8 +45,8 @@ src/config-check.ts       起動時の設定チェック(BOARD_UI_BASE_URL は�
 src/env.ts  src/info.ts   Env の型 / サーバー名とバージョン
 src/errors.ts             エラーエンベロープ(BoardError / ArgumentError / ResponseTooLargeError / RefreshInProgressError)
 src/board/                BOARD API クライアント(直列・再試行・Retry-After・ページング・締め切り)と 22 リソースの型(resources/)
-src/cache/                D1 キャッシュ: schema(v2。ensureSchema)・resource-cache・sync-state・document-map(逆引き)・admin(cacheReport / clearCache / clearDocumentMap)・info(応答に同梱する鮮度)
-src/refresh/              lock(D1 の条件付き UPDATE)と refresher(delta / full。full は再開できる)
+src/cache/                D1 キャッシュ: schema(v3。ensureSchema)・resource-cache・sync-state・document-map(逆引き)・admin(cacheReport / clearCache / clearDocumentMap)・info(応答に同梱する鮮度)
+src/refresh/              lock(D1 の条件付き UPDATE)と refresher(delta / full。どちらも再開できる)
 src/repository/           cache → refresh → API の統一窓口(22 リソースの表 resources.ts)と書類 → 案件の逆引き(document-index.ts)
 src/find/                 find 層(名前の解決・fanout・contract_status・url。resolveUiBaseUrl)
 src/mcp/                  registry(defineTool / registerTools)・server・args・response-limit・call-context

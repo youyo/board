@@ -111,6 +111,7 @@ describe("引数の検証(BOARD に通信する前に拒否する)", () => {
       "project_name is not yet supported for purchase orders",
     ],
     ["find_payments", { purchase_order_id: 5 }, "purchase_order_id is not yet supported"],
+    ["find_payments", { purchase_order_id: -1 }, "must be a positive integer"],
   ];
   it.each(cases)("%s %j → argument_error", async (tool, args, message) => {
     const r = await callApiTool(tool, args, {});

@@ -175,6 +175,29 @@ describe("cache clear", () => {
     expect(await getSyncState(db, "clients")).toMatchObject({ refresh_owner: "B" });
   });
 
+  it("複数リソースのうち 1 つのロックを奪われたら、どのリソースも消さない(全か無か)", async () => {
+    const db = testDb();
+    await seed(db);
+    const local = fakeClock();
+    await expect(
+      clearCache(db, {
+        resources: ["clients", "vendors"],
+        now: local.now,
+        hooks: {
+          afterLock: async () => {
+            // 時計を進めて vendors のロックだけを stale にして B に奪わせる。
+            local.advance(LOCK_STALE_MS + 1_000);
+            await tryAcquireLock(db, "vendors", { now: local.now, owner: "B" });
+          },
+        },
+      }),
+    ).rejects.toBeInstanceOf(RefreshInProgressError);
+    expect(await countEntries(db, "clients")).toBe(2);
+    expect(await countEntries(db, "vendors")).toBe(1);
+    expect(await getSyncState(db, "clients")).not.toBeNull();
+    expect(await getSyncState(db, "vendors")).toMatchObject({ refresh_owner: "B" });
+  });
+
   it("複数リソースの途中で busy が見つかったら、それまでに取ったロックを返して何も消さない", async () => {
     const db = testDb();
     await seed(db);
@@ -370,9 +393,62 @@ describe("clearDocumentMap", () => {
       .prepare("SELECT count(*) AS c FROM document_project_map WHERE document_kind = 'estimate'")
       .first<{ c: number }>();
     expect(maps?.c).toBe(2);
+    // 全か無か: 奪われていない種別(order)の対応表と走査状態も消えない。
+    const all = await db
+      .prepare("SELECT count(*) AS c FROM document_project_map")
+      .first<{ c: number }>();
+    expect(all?.c).toBe(3);
+    const orderScan = await db
+      .prepare("SELECT count(*) AS c FROM document_scan_state WHERE document_kind = 'order'")
+      .first<{ c: number }>();
+    expect(orderScan?.c).toBe(1);
     const row = await db
       .prepare("SELECT lock_owner FROM document_scan_state WHERE document_kind = 'estimate'")
       .first<{ lock_owner: string }>();
     expect(row?.lock_owner).toBe("thief");
+  });
+});
+
+/**
+ * D1 は 1 文あたりのバインド変数を 100 までに制限する(Cloudflare D1 Limits)。ローカルの SQLite(miniflare)は
+ * 上限が大きく、超えても他のテストでは検知できないので、全リソースを対象にした削除のバインド数をここで固定する。
+ */
+const D1_MAX_BOUND_PARAMS = 100;
+
+function recordingDb(db: D1Database): { db: D1Database; bindCounts: number[] } {
+  const bindCounts: number[] = [];
+  const wrapped = new Proxy(db, {
+    get(target, prop, receiver) {
+      if (prop === "prepare") {
+        return (sql: string) => {
+          const stmt = target.prepare(sql);
+          const bind = stmt.bind.bind(stmt);
+          stmt.bind = (...values: unknown[]) => {
+            bindCounts.push(values.length);
+            return bind(...values);
+          };
+          return stmt;
+        };
+      }
+      const value = Reflect.get(target, prop, receiver);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+  return { db: wrapped, bindCounts };
+}
+
+describe("D1 のバインド変数の上限", () => {
+  it("全リソースを対象にした clearCache の各文はバインド変数が 100 以下", async () => {
+    const { db, bindCounts } = recordingDb(testDb());
+    await clearCache(db, { now: clock.now });
+    expect(bindCounts.length).toBeGreaterThan(0);
+    expect(Math.max(...bindCounts)).toBeLessThanOrEqual(D1_MAX_BOUND_PARAMS);
+  });
+
+  it("clearDocumentMap の各文はバインド変数が 100 以下", async () => {
+    const { db, bindCounts } = recordingDb(testDb());
+    await clearDocumentMap(db, { now: clock.now });
+    expect(bindCounts.length).toBeGreaterThan(0);
+    expect(Math.max(...bindCounts)).toBeLessThanOrEqual(D1_MAX_BOUND_PARAMS);
   });
 });

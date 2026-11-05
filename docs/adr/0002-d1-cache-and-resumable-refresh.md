@@ -37,4 +37,5 @@ Go の full refresh は 1 回の呼び出しで全件を取っていたが、Wor
 - 初回は、リソースごとに `refresh=full` を `complete` になるまで繰り返す必要がある(runbook の『キャッシュの初回構築』)。
 - full の途中でも参照できる(未取得分は返らない)。`cache.refresh_state` が `partial` なら不完全。
 - ページ番号での再開は、合間に前のほうのエンティティが削除・挿入されるとずれて取りこぼしうる。取りこぼしは次の full か delta で拾う。
+- delta も full と同じ方式で再開できる(`delta_next_page` / `delta_started_at` / `delta_max_updated_at`。1 時間以内なら最後のページから重ねて再開し、完了時にカーソルを min(見た最大値, 開始の 5 分前) に進める)。差分が 1 回の呼び出しで取り切れなくても、呼び出しを重ねれば `complete` になる。
 - D1 の Workers Free プランは 1 回の Worker 実行あたり 50 クエリまで(Paid は 1,000)。full refresh は Paid を前提にする。
