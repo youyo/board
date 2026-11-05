@@ -64,3 +64,11 @@
 ### V9 Portal のツール名
 - 確認日 / 確認者:
 - 結果: [ ] `board_` 付きで 54 個  / メモ:
+
+### V10 workers.dev での Access と Managed OAuth(`customDomain` が空のとき。2026-11-06 追加)
+- 確認日 / 確認者:
+- Worker の Settings > Domains & Routes の workers.dev で Enable Cloudflare Access できた: [ ] はい  [ ] いいえ(メモ:      )
+- MCP server application 型を workers.dev ホストで作れた: [ ] 作れた  [ ] self-hosted のみ  [ ] どちらも不可
+- workers.dev で Managed OAuth が動き、`Cf-Access-Jwt-Assertion` が Worker に届く(JWT なしは 401、ログイン後は 200): [ ] はい  [ ] いいえ
+- Version URL(`<version>-<worker>.<subdomain>.workers.dev`)が無効になっている(`preview_urls: false`。アクセスすると 404 などで Worker に届かない): [ ] 無効  [ ] 有効のまま(メモ:      )
+- Portal に `https://<worker>.<subdomain>.workers.dev/mcp` を登録して Ready になる: [ ] はい  [ ] いいえ

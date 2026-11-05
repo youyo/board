@@ -97,7 +97,57 @@ describe("deploy-config generate (実プロセス)", () => {
     expect(config.vars.BOARD_UI_BASE_URL).toBe("https://ui.e2e.example.org");
     expect(config.routes).toEqual([{ pattern: "board.e2e.example.org", custom_domain: true }]);
     expect(config.workers_dev).toBe(false);
+    expect(config.preview_urls).toBe(false);
     expect(config.env).toBeUndefined();
+  });
+
+  it.each([
+    ["キーなし", (c: Record<string, unknown>) => delete c.customDomain],
+    ["空文字", (c: Record<string, unknown>) => Object.assign(c, { customDomain: "" })],
+  ])(
+    "customDomain が%s: workers.dev で公開(routes なし)。dry-run まで通る",
+    async (_n, edit) => {
+      const dir = join(REPO, ".wrangler", `e2e-workersdev-${process.pid}`);
+      const value: Record<string, unknown> = { ...VALID };
+      edit(value);
+      const cfg = await writeConfig(value);
+      try {
+        const r = await main(MAIN, ["generate", "--config", cfg, "--dir", dir]);
+        expect(r.code).toBe(0);
+        const text = await readFile(join(dir, "wrangler.jsonc"), "utf8");
+        const config = JSON.parse(text.replace(/^\/\/.*\n/, ""));
+        expect(config.workers_dev).toBe(true);
+        expect(config.preview_urls).toBe(false);
+        expect("routes" in config).toBe(false);
+        const out = await dryRun(join(dir, "wrangler.jsonc"));
+        expect(out).toContain("e2e-board");
+        expect(out).toContain("--dry-run");
+      } finally {
+        await rm(dir, { recursive: true, force: true });
+      }
+    },
+    120_000,
+  );
+
+  it("customDomain がカスタムドメインの形のとき dry-run まで通る(routes あり・workers_dev false)", async () => {
+    const dir = join(REPO, ".wrangler", `e2e-customdomain-${process.pid}`);
+    const cfg = await writeConfig(VALID);
+    try {
+      expect((await main(MAIN, ["generate", "--config", cfg, "--dir", dir])).code).toBe(0);
+      const out = await dryRun(join(dir, "wrangler.jsonc"));
+      expect(out).toContain("e2e-board");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  }, 120_000);
+
+  it("customDomain が不正(ホスト名でない)・プレースホルダなら終了コード 1(項目名だけ)", async () => {
+    for (const bad of ["https://board.e2e.example.org", "<YOUR_CUSTOM_DOMAIN>"]) {
+      const cfg = await writeConfig({ ...VALID, customDomain: bad });
+      const r = await main(MAIN, ["generate", "--config", cfg, "--dir", join(work, "out")]);
+      expect(r.code).toBe(1);
+      expect(r.stderr).toContain("customDomain");
+    }
   });
 
   it("必須値が欠ければ終了コード 1、stderr に項目名、ファイルは作らない", async () => {
@@ -165,6 +215,7 @@ describe("deploy-config generate --example", () => {
     );
     expect(r.code).toBe(0);
     const text = await readFile(join(root, ".wrangler/deploy-example/wrangler.jsonc"), "utf8");
+    expect(text).toContain('"workers_dev": true');
     expect(text).toContain('"main": "../../src/index.ts"');
     expect(text).toContain("00000000-0000-0000-0000-000000000000");
     await expect(stat(join(root, "deploy"))).rejects.toThrow();
@@ -177,6 +228,23 @@ describe("deploy-config generate --example", () => {
     expect(out).toContain("board-example");
     expect(out).toContain("--dry-run");
   }, 120_000);
+});
+
+describe("deploy-config generate --example --with-domain", () => {
+  it("カスタムドメインの形のダミー設定を .wrangler/deploy-example-domain に作り、dry-run を通る", async () => {
+    const r = await main(MAIN, ["generate", "--example", "--with-domain"]);
+    expect(r.code).toBe(0);
+    const file = join(REPO, ".wrangler/deploy-example-domain/wrangler.jsonc");
+    const config = JSON.parse((await readFile(file, "utf8")).replace(/^\/\/.*\n/, ""));
+    expect(config.routes).toEqual([{ pattern: "board.example.com", custom_domain: true }]);
+    expect(config.workers_dev).toBe(false);
+    expect(config.preview_urls).toBe(false);
+    expect(await dryRun(file)).toContain("--dry-run");
+  }, 120_000);
+
+  it("--example なしの --with-domain は使えない(終了コード 2)", async () => {
+    expect((await main(MAIN, ["generate", "--with-domain"])).code).toBe(2);
+  });
 });
 
 describe("deploy-config の通し(生成 → dry-run → check)", () => {
@@ -266,6 +334,20 @@ describe("deploy-config の補助サブコマンド(setup が使う)", () => {
     expect(r.code).toBe(0);
     expect(r.stdout.trim()).toBe("");
     expect((await main(MAIN, ["get", "nope", "--config", cfg])).code).toBe(2);
+    // customDomain が無い・空なら、空行を出して終了コード 0(setup.sh が workers.dev の分岐に使う)
+    const none = await writeConfig({ ...VALID, customDomain: "" }, "none.json");
+    const g = await main(MAIN, ["get", "customDomain", "--config", none]);
+    expect(g.code).toBe(0);
+    expect(g.stdout.trim()).toBe("");
+    const { customDomain: _c, ...noKey } = VALID;
+    const g2 = await main(MAIN, [
+      "get",
+      "customDomain",
+      "--config",
+      await writeConfig(noKey, "nokey.json"),
+    ]);
+    expect(g2.code).toBe(0);
+    expect(g2.stdout.trim()).toBe("");
   });
 
   it("set-d1: databaseId だけを書き戻す。uuid でなければ書かない", async () => {

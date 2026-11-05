@@ -38,3 +38,11 @@ board は条件が逆である。
 - 共有キーが漏れると全員分の権限が漏れる。secret は `wrangler secret put` だけで登録し、リポジトリ・`board.config.json`・`deploy/wrangler.jsonc` には載せない。
 - Access の AUD と team domain を間違えると全リクエストが 403 になる。設定チェック(`src/config-check.ts`)が欠けと形式違いを `/healthz` で伝える。
 - logbutler との違い: logbutler は『利用者ごとのトークン + Access なし』、board は『共有キー + Access』。この表は board の方が運用が軽い代わりに、利用者の区別がない。
+
+## 追記(2026-11-06): カスタムドメインは任意
+
+上の『`workers_dev: false`。カスタムドメインだけで公開し…』を改める。`customDomain` を `board.config.json` の任意項目にした。空(キーなし、または `""`)なら workers.dev で公開する(`workers_dev: true`、`routes` なし)。
+理由: MCP Server Portal に登録するサーバーを workers.dev で公開している組織があるため。
+Access を迂回できない根拠は、公開経路ではなく、Worker が `/healthz` 以外の全パスで JWT を検証すること(`src/` は変えない)。workers.dev に直接来ても 401 / 403 になる。
+`preview_urls: false` を両方の場合で明示し、Version URL という Access を付け忘れやすい経路を作らない。
+workers.dev で Access と Managed OAuth が実際に動くかは未確認(`docs/manual-verification.md` の V10)。

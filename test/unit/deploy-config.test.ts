@@ -19,6 +19,8 @@ type Rendered = Record<string, unknown> & {
   vars: Record<string, string>;
   d1_databases: Array<Record<string, string>>;
   routes?: unknown[];
+  workers_dev?: boolean;
+  preview_urls?: boolean;
 };
 
 // リポジトリの wrangler.jsonc に近い入力(コメント・末尾カンマを含む)。
@@ -120,10 +122,41 @@ describe("renderWranglerConfig", () => {
     expect(r.ok && (parseJsonc(r.text) as Rendered).main).toBe("/abs/index.ts");
   });
 
-  it("workers_dev は常に false(Access を迂回できる経路を作らない)", () => {
+  it("customDomain がある: routes あり・workers_dev false・preview_urls false", () => {
     const base = BASE.replace('"workers_dev": false', '"workers_dev": true');
     const r = renderWranglerConfig(base, valid(), { relBase: ".." });
-    expect(r.ok && (parseJsonc(r.text) as Rendered).workers_dev).toBe(false);
+    const c = r.ok ? (parseJsonc(r.text) as Rendered) : undefined;
+    expect(c?.routes).toEqual([{ pattern: "board.example.org", custom_domain: true }]);
+    expect(c?.workers_dev).toBe(false);
+    expect(c?.preview_urls).toBe(false);
+  });
+
+  it.each([
+    ["キーなし", undefined],
+    ["空文字", ""],
+    ["空白だけ", "  "],
+  ])(
+    "customDomain が%s: workers.dev で公開(routes なし・workers_dev true・preview_urls false)",
+    (_n, value) => {
+      // upstream 側に routes や workers_dev: false があっても、設定に従って作り直す
+      const base = BASE.replace(
+        '"workers_dev": false',
+        '"workers_dev": false, "routes": [{ "pattern": "x.example.org", "custom_domain": true }]',
+      );
+      const r = renderWranglerConfig(base, patched("customDomain", value), { relBase: ".." });
+      expect(r.ok).toBe(true);
+      const c = r.ok ? (parseJsonc(r.text) as Rendered) : undefined;
+      expect(c?.workers_dev).toBe(true);
+      expect("routes" in (c as object)).toBe(false);
+      expect(c?.preview_urls).toBe(false);
+    },
+  );
+
+  it("customDomain の有無にかかわらず、同じ入力なら出力は同じ(deploy:config:check が安定する)", () => {
+    for (const v of [undefined, "", "board.example.org"]) {
+      const raw = patched("customDomain", v);
+      expect(ok(raw).text).toBe(ok(raw).text);
+    }
   });
 
   it("boardBaseUrl は省略すると wrangler.jsonc の値を残し、指定すれば差し替える", () => {
@@ -170,7 +203,6 @@ describe("renderWranglerConfig", () => {
 describe("検証エラー(項目名と理由だけ。値は載せない)", () => {
   const REQUIRED = [
     "workerName",
-    "customDomain",
     "d1.databaseId",
     "d1.databaseName",
     "access.teamDomain",
@@ -179,6 +211,19 @@ describe("検証エラー(項目名と理由だけ。値は載せない)", () =>
 
   it.each(REQUIRED)("%s が無ければ missing", (name) => {
     expect(errorsOf(patched(name, undefined))).toEqual([{ name, reason: "missing" }]);
+  });
+
+  it("customDomain は任意: 無い・空は検証を通り、空文字として返る", () => {
+    for (const v of [undefined, "", "  "]) {
+      const r = validateConfig(patched("customDomain", v));
+      expect(r.ok && r.config.customDomain).toBeFalsy();
+    }
+  });
+
+  it("customDomain がプレースホルダなら placeholder(任意でも握りつぶさない)", () => {
+    expect(errorsOf(patched("customDomain", "<YOUR_CUSTOM_DOMAIN>"))).toEqual([
+      { name: "customDomain", reason: "placeholder" },
+    ]);
   });
 
   it("空文字・空白だけは未設定", () => {
@@ -318,11 +363,32 @@ describe("example(deploy:check 用)", () => {
     expect(JSON.stringify(example)).not.toMatch(/[0-9a-f]{32}/);
   });
 
-  it("exampleConfig はプレースホルダをダミー値に置き換え、生成できる", () => {
+  it("board.config.example.json の customDomain は空文字(workers.dev で公開。プレースホルダにしない)", () => {
+    expect(example.customDomain).toBe("");
+  });
+
+  it("exampleConfig はプレースホルダをダミー値に置き換え、生成できる(workers.dev の形)", () => {
     const r = renderWranglerConfig(upstreamWrangler, exampleConfig(example), {
       relBase: "../..",
     });
     expect(r.ok).toBe(true);
+    const c = r.ok ? (parseJsonc(r.text) as Rendered) : undefined;
+    expect(c?.workers_dev).toBe(true);
+    expect(c?.routes).toBeUndefined();
+    expect(c?.preview_urls).toBe(false);
+  });
+
+  it("exampleConfig(withCustomDomain)はダミーのドメインを入れ、カスタムドメインの形で生成できる", () => {
+    const r = renderWranglerConfig(
+      upstreamWrangler,
+      exampleConfig(example, { withCustomDomain: true }),
+      { relBase: "../.." },
+    );
+    expect(r.ok).toBe(true);
+    const c = r.ok ? (parseJsonc(r.text) as Rendered) : undefined;
+    expect(c?.workers_dev).toBe(false);
+    expect(c?.routes).toEqual([{ pattern: EXAMPLE_DUMMIES.customDomain, custom_domain: true }]);
+    expect(c?.preview_urls).toBe(false);
   });
 
   it("ダミー値は実在しない値(ゼロ埋めと example ドメイン)", () => {

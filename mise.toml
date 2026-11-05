@@ -58,10 +58,12 @@ description = "deploy/wrangler.jsonc が、board.config.json と upstream の wr
 run = "node scripts/deploy-config/main.ts check"
 
 [tasks."deploy:check"]
-description = "example の設定(ダミー値)から deploy 用の設定を生成し、wrangler deploy --dry-run が通ることを確かめる(Cloudflare へは何も変更しない。CI でも走る)"
+description = "example の設定(ダミー値。workers.dev の形とカスタムドメインの形の両方)から deploy 用の設定を生成し、wrangler deploy --dry-run が通ることを確かめる(Cloudflare へは何も変更しない。CI でも走る)"
 run = [
   "node scripts/deploy-config/main.ts generate --example",
   "pnpm exec wrangler deploy --dry-run -c .wrangler/deploy-example/wrangler.jsonc --outdir dist",
+  "node scripts/deploy-config/main.ts generate --example --with-domain",
+  "pnpm exec wrangler deploy --dry-run -c .wrangler/deploy-example-domain/wrangler.jsonc --outdir dist",
 ]
 
 [tasks.deploy]
