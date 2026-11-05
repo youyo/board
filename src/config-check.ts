@@ -26,6 +26,11 @@ function isD1Database(value: unknown): boolean {
   );
 }
 
+/** https のオリジンだけ(UI の URL 用。http は loopback でも不可)。 */
+function isHttpsOrigin(value: string): boolean {
+  return isValidBaseUrl(value) && new URL(value).protocol === "https:";
+}
+
 /** https のオリジンだけ(ローカル開発の loopback は http も可)。パス(末尾 / を除く)・クエリ・フラグメントは不可。 */
 function isValidBaseUrl(value: string): boolean {
   let url: URL;
@@ -57,6 +62,8 @@ export function checkConfig(env: Record<string, unknown>): ConfigCheckResult {
   text("ACCESS_TEAM_DOMAIN", (v) => HOST.test(v));
   text("ACCESS_AUD");
   text("BOARD_BASE_URL", isValidBaseUrl);
+  // 任意。未設定・空は問題にしない。設定されているなら https のオリジンであること。
+  if (!isBlank(env.BOARD_UI_BASE_URL)) text("BOARD_UI_BASE_URL", isHttpsOrigin);
   text("BOARD_API_KEY");
   text("BOARD_API_TOKEN");
 

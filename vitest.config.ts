@@ -32,8 +32,31 @@ function project(name: string, include: string) {
   };
 }
 
+// 生成スクリプトなどを実プロセスとして起動する E2E。workerd ではなく Node 環境で動かす。
+const nodeE2eProject = {
+  test: { name: "node-e2e", environment: "node", include: ["test/node-e2e/**/*.test.ts"] },
+};
+
+// 実環境(デプロイ済み Worker + 実 BOARD)の確認。`mise run test` には含めない(`mise run test:live` だけが実行する)。
+const liveProject = {
+  test: {
+    name: "live",
+    environment: "node",
+    include: ["test/live/**/*.test.ts"],
+    testTimeout: 180_000,
+    hookTimeout: 180_000,
+    fileParallelism: false,
+    sequence: { concurrent: false },
+  },
+};
+
 export default defineConfig({
   test: {
-    projects: [project("unit", "test/unit/**/*.test.ts"), project("e2e", "test/e2e/**/*.test.ts")],
+    projects: [
+      project("unit", "test/unit/**/*.test.ts"),
+      project("e2e", "test/e2e/**/*.test.ts"),
+      nodeE2eProject,
+      liveProject,
+    ],
   },
 });

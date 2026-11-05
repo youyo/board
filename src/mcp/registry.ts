@@ -61,6 +61,8 @@ export interface ToolContext {
   now: () => Date;
   /** MCP クライアントが呼び出しを取り消したら abort される(SDK の `ctx.mcpReq.signal`)。BOARD への通信まで渡す。 */
   signal?: AbortSignal;
+  /** キャッシュ用の D1(cache 系ツールが使う)。設定されていないサーバーでは呼ぶと例外。 */
+  db: () => D1Database;
   /** 22 リソースの repository(D1 + BOARD クライアント)。設定されていないサーバーでは呼ぶと例外。 */
   repositories: () => Repositories;
   /** 書類 ID → 案件 ID の逆引き(find 層)。設定されていないサーバーでは呼ぶと例外。 */
@@ -121,12 +123,17 @@ export function defineTool<S extends z.ZodObject>(input: ToolDefinitionInput<S>)
 export interface RegisterDeps {
   /** 現在時刻。省略時は `new Date()`。 */
   now?: () => Date;
+  /** D1 の取得口。省略時、ツールが `ctx.db()` を呼ぶと例外(generic_error)。 */
+  db?: () => D1Database;
   /** repository の取得口。省略時、ツールが `ctx.repositories()` を呼ぶと例外(generic_error)。 */
   repositories?: () => Repositories;
   documentIndex?: () => DocumentIndex;
   uiBaseUrl?: string;
 }
 
+const noDb = (): D1Database => {
+  throw new Error("db is not configured for this server");
+};
 const noRepositories = (): Repositories => {
   throw new Error("repositories are not configured for this server");
 };
@@ -202,6 +209,7 @@ export function registerTools(
           const result = await tool.handler(parsed.data, {
             now: deps.now ?? (() => new Date()),
             signal: extra?.mcpReq?.signal,
+            db: deps.db ?? noDb,
             repositories: deps.repositories ?? noRepositories,
             documentIndex: deps.documentIndex ?? noDocumentIndex,
             uiBaseUrl: deps.uiBaseUrl ?? "",

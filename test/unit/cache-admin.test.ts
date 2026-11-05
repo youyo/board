@@ -1,5 +1,12 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { cacheStatus, clearCache, expireCache } from "../../src/cache/admin";
+import {
+  cacheReport,
+  cacheStatus,
+  clearCache,
+  clearDocumentMap,
+  expireCache,
+} from "../../src/cache/admin";
+import { recordStatements, tryAcquireScanLock } from "../../src/cache/document-map";
 import { countEntries, upsertEntities } from "../../src/cache/resource-cache";
 import { getSyncState } from "../../src/cache/sync-state";
 import { RefreshInProgressError } from "../../src/errors";
@@ -186,5 +193,186 @@ describe("cache clear", () => {
     ).rejects.toMatchObject({
       code: "argument_error",
     });
+  });
+});
+
+async function seedDocumentMap(db: D1Database) {
+  await db.batch([
+    ...recordStatements(
+      db,
+      "estimate",
+      [
+        { documentId: 10, projectId: 1 },
+        { documentId: 11, projectId: 2 },
+      ],
+      NOW,
+    ),
+    ...recordStatements(db, "order", [{ documentId: 20, projectId: 1 }], NOW),
+    db.prepare(
+      "INSERT INTO document_scan_state (document_kind, next_page, started_at) VALUES ('estimate', 4, '2026-11-04T00:00:00Z')",
+    ),
+    db.prepare(
+      "INSERT INTO document_scan_state (document_kind, next_page, started_at, completed_at) VALUES ('order', NULL, '2026-11-03T00:00:00Z', '2026-11-03T00:01:00Z')",
+    ),
+  ]);
+}
+
+describe("cache report (cache_status の元)", () => {
+  it("22 リソースを cached_at / full_refreshed_at / refresh_state / row_count / full_prune_skipped / locked で返す", async () => {
+    const db = testDb();
+    await seed(db);
+    const { resources } = await cacheReport(db, { now: clock.now });
+    expect(resources).toHaveLength(22);
+    const clients = resources.find((r) => r.resource === "clients");
+    expect(clients).toEqual({
+      resource: "clients",
+      cached_at: "2026-11-04T00:00:00Z",
+      full_refreshed_at: "2026-11-01T00:00:00Z",
+      refresh_state: "complete",
+      row_count: 2,
+      full_prune_skipped: false,
+      locked: false,
+    });
+    // 未取得のリソースは cached_at / full_refreshed_at を出さず、refresh_state は not_synced。
+    expect(resources.find((r) => r.resource === "users")).toEqual({
+      resource: "users",
+      refresh_state: "not_synced",
+      row_count: 0,
+      full_prune_skipped: false,
+      locked: false,
+    });
+  });
+
+  it("full が途中なら partial、直近が失敗なら failed(エラーコード付き)、照合に通らず削除を見送ったら full_prune_skipped", async () => {
+    const db = testDb();
+    await db.batch([
+      db.prepare(
+        "INSERT INTO sync_state (resource_name, last_synced_at, full_next_page) VALUES ('clients', '2026-11-04T00:00:00Z', 3)",
+      ),
+      db.prepare(
+        "INSERT INTO sync_state (resource_name, last_synced_at, last_sync_status, last_error_code, consecutive_failures, full_prune_skipped) VALUES ('vendors', '2026-11-04T00:00:00Z', 'error', 'rate_limited', 2, 1)",
+      ),
+    ]);
+    const { resources } = await cacheReport(db, { now: clock.now });
+    expect(resources.find((r) => r.resource === "clients")?.refresh_state).toBe("partial");
+    expect(resources.find((r) => r.resource === "vendors")).toMatchObject({
+      refresh_state: "failed",
+      last_error_code: "rate_limited",
+      full_prune_skipped: true,
+    });
+  });
+
+  it("ロック中は locked、stale なら locked ではない", async () => {
+    const db = testDb();
+    await tryAcquireLock(db, "users", { now: clock.now, owner: "A" });
+    expect(
+      (await cacheReport(db, { now: clock.now })).resources.find((r) => r.resource === "users")
+        ?.locked,
+    ).toBe(true);
+    const later = fakeClock(NOW + LOCK_STALE_MS + 1_000);
+    expect(
+      (await cacheReport(db, { now: later.now })).resources.find((r) => r.resource === "users")
+        ?.locked,
+    ).toBe(false);
+  });
+
+  it("逆引きの走査状態を書類種別(4 種)ごとに返す", async () => {
+    const db = testDb();
+    await seedDocumentMap(db);
+    const { document_scans } = await cacheReport(db, { now: clock.now });
+    expect(document_scans.map((d) => d.document_kind)).toEqual([
+      "estimate",
+      "order",
+      "delivery",
+      "receipt",
+    ]);
+    expect(document_scans[0]).toEqual({
+      document_kind: "estimate",
+      scan_state: "in_progress",
+      mapped_rows: 2,
+      next_page: 4,
+      started_at: "2026-11-04T00:00:00Z",
+      locked: false,
+    });
+    expect(document_scans[1]).toMatchObject({
+      document_kind: "order",
+      scan_state: "complete",
+      mapped_rows: 1,
+      completed_at: "2026-11-03T00:01:00Z",
+    });
+    expect(document_scans[2]).toEqual({
+      document_kind: "delivery",
+      scan_state: "not_started",
+      mapped_rows: 0,
+      locked: false,
+    });
+  });
+
+  it("読み取り専用: 状態を変えない", async () => {
+    const db = testDb();
+    await seed(db);
+    await cacheReport(db, { now: clock.now });
+    expect(await countEntries(db, "clients")).toBe(2);
+    expect(await getSyncState(db, "users")).toBeNull();
+  });
+});
+
+describe("clearDocumentMap", () => {
+  it("逆引きの対応表と走査状態を全種別について消す", async () => {
+    const db = testDb();
+    await seedDocumentMap(db);
+    await clearDocumentMap(db, { now: clock.now });
+    const maps = await db
+      .prepare("SELECT count(*) AS c FROM document_project_map")
+      .first<{ c: number }>();
+    const scans = await db
+      .prepare("SELECT count(*) AS c FROM document_scan_state")
+      .first<{ c: number }>();
+    expect(maps?.c).toBe(0);
+    expect(scans?.c).toBe(0);
+  });
+
+  it("走査中(ロック保持)の種別があれば何も消さず RefreshInProgressError。取ったロックは返す", async () => {
+    const db = testDb();
+    await seedDocumentMap(db);
+    await tryAcquireScanLock(db, "receipt", "other", NOW, 120_000);
+    await expect(clearDocumentMap(db, { now: clock.now })).rejects.toBeInstanceOf(
+      RefreshInProgressError,
+    );
+    const maps = await db
+      .prepare("SELECT count(*) AS c FROM document_project_map")
+      .first<{ c: number }>();
+    expect(maps?.c).toBe(3);
+    const owners = await db
+      .prepare(
+        "SELECT document_kind, lock_owner FROM document_scan_state WHERE lock_owner IS NOT NULL",
+      )
+      .all<{ document_kind: string; lock_owner: string }>();
+    expect(owners.results).toEqual([{ document_kind: "receipt", lock_owner: "other" }]);
+  });
+
+  it("確認から削除までの間にロックを奪われたら、何も消さない(所有者条件つきの batch)", async () => {
+    const db = testDb();
+    await seedDocumentMap(db);
+    const local = fakeClock();
+    await expect(
+      clearDocumentMap(db, {
+        now: local.now,
+        hooks: {
+          afterLock: async () => {
+            local.advance(10 * 60_000);
+            await tryAcquireScanLock(db, "estimate", "thief", local.now(), 120_000);
+          },
+        },
+      }),
+    ).rejects.toBeInstanceOf(RefreshInProgressError);
+    const maps = await db
+      .prepare("SELECT count(*) AS c FROM document_project_map WHERE document_kind = 'estimate'")
+      .first<{ c: number }>();
+    expect(maps?.c).toBe(2);
+    const row = await db
+      .prepare("SELECT lock_owner FROM document_scan_state WHERE document_kind = 'estimate'")
+      .first<{ lock_owner: string }>();
+    expect(row?.lock_owner).toBe("thief");
   });
 });

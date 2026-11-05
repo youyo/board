@@ -349,6 +349,7 @@ describe("呼び出しコンテキスト", () => {
   const toolCtx = (signal?: AbortSignal) => ({
     now: () => new Date(),
     signal,
+    db: testDb,
     documentIndex: () => {
       throw new Error("api 層では使わない");
     },

@@ -72,6 +72,25 @@ describe("E2E: 起動時の設定チェック", () => {
     expect(text).not.toContain("access-application-aud");
   });
 
+  it("BOARD_UI_BASE_URL は任意: 未設定・https なら 200、http なら invalid として /healthz に出る", async () => {
+    expect(
+      (await callWorker("/healthz", { overrides: { BOARD_UI_BASE_URL: undefined } })).status,
+    ).toBe(200);
+    expect(
+      (await callWorker("/healthz", { overrides: { BOARD_UI_BASE_URL: "https://ui.example.com" } }))
+        .status,
+    ).toBe(200);
+    const res = await callWorker("/healthz", {
+      overrides: { BOARD_UI_BASE_URL: "http://ui.example.com" },
+    });
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({
+      status: "misconfigured",
+      missing: [],
+      invalid: ["BOARD_UI_BASE_URL"],
+    });
+  });
+
   it("設定がそろっていれば /healthz は 200、/mcp は JWT がなく 401", async () => {
     const health = await callWorker("/healthz");
     expect(health.status).toBe(200);

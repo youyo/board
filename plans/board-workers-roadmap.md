@@ -12,7 +12,7 @@ Go 製 CLI / ローカル MCP（v0.11.1）を書き直したもの。Go 版は `
 |---|---|---|
 | Go 版の扱い | `archive/go-cli` ブランチ + 注釈付きタグ `go-cli-final`（= v0.11.1）に残し、main からは削除する。Homebrew tap・goreleaser・`/board:docs` スキル・Lambda 配備例も廃止 | 2026-11-05 ユーザー決定。却下: `archive/` ディレクトリへの移動 |
 | スコープ | Remote MCP のみ。CLI 専用の機能（configure / completion / docs / cache path）は移植しない | Workers で意味を持たない |
-| ツール | **全ツールを移植**: api 層（22 リソースの list / get。Go 版 CLI に存在する組み合わせだけ。`show_meta` 引数あり）+ find 層 11 個（`find_*`、Go 版 MCP と同じ名前・引数）+ cache 系（`cache_status` / `cache_expire` / `cache_clear`）。合計 58 個以下 | 2026-11-05 ユーザー決定（「全ツールの完全移植」）。ツール名の接頭辞はなし（Portal が `board_` を前置する） |
+| ツール | **全ツールを移植**: api 層（22 リソースの list / get。Go 版 CLI に存在する組み合わせだけ。`show_meta` 引数あり）+ find 層 11 個（`find_*`、Go 版 MCP と同じ名前・引数）+ cache 系（`cache_status` / `cache_clear`。`cache_expire` は M06 で作らないと決めた）+ `server_info`。合計 54 個 | 2026-11-05 ユーザー決定（「全ツールの完全移植」）。ツール名の接頭辞はなし（Portal が `board_` を前置する） |
 | 認証 | **BOARD の API キー / トークンは Worker の secret（`BOARD_API_KEY` / `BOARD_API_TOKEN`）を全員で共有**する。Worker 自体は OAuth サーバーを持たない。Access アプリで保護し Managed OAuth を有効にする。Worker は `/healthz` 以外の全リクエストで `Cf-Access-Jwt-Assertion`（署名・iss・aud・exp）を検証する | 2026-11-05 ユーザー決定。BOARD API に OAuth がない。Cloudflare 公式: Managed OAuth を使う MCP server application は「`Cf-Access-Jwt-Assertion` の Access JWT を検証しなければならない」。logbutler の ADR 0009（自前 OAuth があるので Managed OAuth を使わない）とは逆の条件。却下: 利用者ごとのトークン入力（OAuth サーバーを Worker 内に持つ） |
 | JWT 検証の実装 | logbutler で M06 に削除した `src/auth/access-jwt.ts`（jose・JWKS キャッシュ）と、そのテストを出発点にする（`git -C ../logbutler show 8dac72c^:<path>`） | 実績のあるコードの再利用 |
 | 公開範囲 | `workers_dev: false`、カスタムドメインのみ。Access を迂回できる経路を作らない | JWT 検証は多層防御の 2 枚目 |
@@ -43,11 +43,11 @@ Go 製 CLI / ローカル MCP（v0.11.1）を書き直したもの。Go 版は `
 |---|---|---|
 | M00 | Go 版のアーカイブと削除 | 完了（74dfcde） |
 | M01 | 基盤: mise / pnpm / biome / tsconfig / vitest、`/healthz`、設定チェック、Access JWT 検証、`createMcpHandler` とダミーツール 1 個、エラーエンベロープ、応答サイズ上限、CI、CLAUDE.md | 完了（16df333） |
-| M02 | BOARD API クライアント（x-api-key + Bearer、直列、再試行と Retry-After、ページング、`_meta` ヘッダ）と 22 リソースの型。追補: 呼び出し単位の締め切り・キャンセル・isolate 内のクライアント共有 | 完了（2d14f28）、追補は作業中 |
-| M03 | D1 キャッシュ（スキーマ適用、resource_cache / sync_state / cache_meta、名前の正規化）、refresh（enum、差分 / 全件、D1 ロック）、repository 層。full は再開あり | 実装済み（`plans/board-workers-m03-d1-cache.md`）、レビュー待ち |
-| M04 | api 層のツール（22 リソースの list / get） | 実装済み（`plans/board-workers-m04-api-tools.md`）、レビュー待ち |
-| M05 | find 層のツール 11 個（名前による ID 解決・曖昧な場合のエラー、fanout の上限、逆引きマップ、contract_status、URL、enrichment の失敗を致命的にしない、cache 配列の同梱） | 実装済み（`plans/board-workers-m05-find-tools.md`）、レビュー待ち |
-| M06 | cache 系ツール、デプロイ設定の生成、runbook（Access アプリ・Managed OAuth・Portal の登録）、README、`test:live` | 未着手 |
+| M02 | BOARD API クライアント（x-api-key + Bearer、直列、再試行と Retry-After、ページング、`_meta` ヘッダ）と 22 リソースの型。追補: 呼び出し単位の締め切り・キャンセル・isolate 内のクライアント共有 | 完了（2d14f28、追補を含む） |
+| M03 | D1 キャッシュ（スキーマ適用、resource_cache / sync_state / cache_meta、名前の正規化）、refresh（enum、差分 / 全件、D1 ロック）、repository 層。full は再開あり | 完了（`plans/board-workers-m03-d1-cache.md`。コミット済み） |
+| M04 | api 層のツール（22 リソースの list / get） | 完了（`plans/board-workers-m04-api-tools.md`。コミット済み） |
+| M05 | find 層のツール 11 個（名前による ID 解決・曖昧な場合のエラー、fanout の上限、逆引きマップ、contract_status、URL、enrichment の失敗を致命的にしない、cache 配列の同梱） | 完了（`plans/board-workers-m05-find-tools.md`。コミット済み） |
+| M06 | cache 系ツール 2 個（`cache_status` / `cache_clear`。`cache_expire` は作らない）、`BOARD_UI_BASE_URL`、デプロイ設定の生成（`deploy:render` / `deploy:check` / `deploy`）、`test:live`、README・runbook・manual-verification・ADR 4 本・CLAUDE.md | 実装済み（`plans/board-workers-m06-finish.md`）、verifier の確認とコミット待ち。**実機での確認（デプロイ・`test:live`・`docs/manual-verification.md`）はユーザーが行う** |
 
 各マイルストーンの完了条件: `mise run test`（unit + e2e）と `mise run lint` が通り、verifier が差分とテスト結果を確認していること。完了したらローカルでコミットする（push はしない）。
 
@@ -57,3 +57,4 @@ Go 製 CLI / ローカル MCP（v0.11.1）を書き直したもの。Go 版は `
 - 2026-11-05: M03 実装。full refresh の再開方式を決定済み事項に追加。
 - 2026-11-05: M04 実装（api 層 40 ツール）。
 - 2026-11-05: M05 実装（find 層 11 ツール、逆引きの方式を決定済み事項に追加）。M04 の指摘 4 点に対応（cache-first の list は絞り込みがサーバー側なら refresh を走らせない、`limited` / `total_before_limit`、締め切りは `Date.now()` 基準、`response_too_large` の文面）。
+- 2026-11-05: M06 実装。cache 系ツール 2 個（`cache_expire` は作らない: Go では daily auto-refresh の廃止後、読み取りに影響しない印を付けるだけのため）、任意の `BOARD_UI_BASE_URL`（M05 で『上書きなし』としていたものを追加）、デプロイ設定の生成（logbutler の簡易版）、`test:live`（service token）、README・runbook・manual-verification・ADR 4 本・CLAUDE.md。ツールは 54 個。

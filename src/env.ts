@@ -8,6 +8,8 @@ export interface Env {
   ACCESS_AUD: string;
   /** BOARD API のベース URL (オリジンのみ。例 https://api.the-board.jp)。 */
   BOARD_BASE_URL: string;
+  /** BOARD の UI のベース URL (任意。https のオリジン)。省略時は BOARD_BASE_URL の `://api.` を `://` にして導く。 */
+  BOARD_UI_BASE_URL?: string;
   /** BOARD の API キー (secret)。全利用者で共有する。 */
   BOARD_API_KEY: string;
   /** BOARD の API トークン (secret)。全利用者で共有する。 */

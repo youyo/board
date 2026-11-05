@@ -13,3 +13,15 @@ export const vendorUrl = (base: string, id: number) => url(base, "payees", id);
 export function uiBaseUrlFromApiBase(apiBase: string): string {
   return apiBase.replace(/\/+$/, "").replace("://api.", "://");
 }
+
+/**
+ * UI のベース URL。`BOARD_UI_BASE_URL` があればそれ(末尾の / は除く)、なければ API のオリジンから導く。
+ * 空文字・空白だけは未設定として扱う。
+ */
+export function resolveUiBaseUrl(env: {
+  BOARD_BASE_URL: string;
+  BOARD_UI_BASE_URL?: string;
+}): string {
+  const override = env.BOARD_UI_BASE_URL?.trim();
+  return override ? override.replace(/\/+$/, "") : uiBaseUrlFromApiBase(env.BOARD_BASE_URL);
+}

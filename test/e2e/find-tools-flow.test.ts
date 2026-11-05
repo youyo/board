@@ -53,11 +53,11 @@ const one = (body: unknown) => () => jsonResponse(body);
 const list = (rows: unknown[]) => pagedHandler(() => rows);
 
 describe("E2E: tools/list", () => {
-  it("find 層 11 個が読み取り専用で出る(合計 52 個)", async () => {
+  it("find 層 11 個が読み取り専用で出る(合計 54 個)", async () => {
     boardMocks({});
     const res = await readRpc(await mcpCall(jwt, "tools/list"));
     const tools = res.result?.tools ?? [];
-    expect(tools).toHaveLength(52);
+    expect(tools).toHaveLength(54);
     const find = tools.filter((t) => t.name.startsWith("find_")).map((t) => t.name);
     expect(find.sort()).toEqual(
       [
@@ -74,7 +74,8 @@ describe("E2E: tools/list", () => {
         "find_payments",
       ].sort(),
     );
-    for (const t of tools) expect(t.annotations?.readOnlyHint).toBe(true);
+    for (const t of tools)
+      expect(t.annotations?.readOnlyHint, t.name).toBe(t.name !== "cache_clear");
   });
 });
 

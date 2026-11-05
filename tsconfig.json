@@ -14,5 +14,6 @@
     "resolveJsonModule": true,
     "allowImportingTsExtensions": true
   },
-  "include": ["src", "test", "vitest.config.ts"]
+  "include": ["src", "test", "vitest.config.ts", "scripts/render-wrangler-config/core.ts"],
+  "exclude": ["test/node-e2e", "test/live"]
 }

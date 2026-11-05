@@ -112,7 +112,7 @@ Workers は 1 回の呼び出しの締め切りが 30 秒で、書類の取得�
 | `contract_status` の検証 | `id` を指定したときは検証しない(ID が優先で、ほかの条件は無視) | `id` を指定したときも検証する(未知の値は `argument_error`) | 通信前に誤りを知らせる。Go との挙動差 |
 | 逆引きの表の有効期限 | (走査の結果を 10 秒だけ持つ in-memory) | 対応(書類 ID → 案件 ID)に有効期限はない。書類は作られた案件にずっと属する前提で、一度覚えたら引き直さない(走査の『完了』だけが 10 分の TTL) | D1 に永続化するため。案件の付け替えがあっても反映されない |
 | 曖昧・fanout 超過・未対応の引数 | 汎用のエラー | `argument_error`(retryable: false)。0 件は `not_found` | エンベロープの code |
-| UI のベース URL | `BOARD_UI_BASE_URL` で上書き可 | `BOARD_BASE_URL` の `://api.` を `://` にして導く(上書きなし) | 設定項目を増やさない(M06 で必要なら追加) |
+| UI のベース URL | `BOARD_UI_BASE_URL` で上書き可 | `BOARD_BASE_URL` の `://api.` を `://` にして導く(M05 時点では上書きなし。**M06 で任意の `BOARD_UI_BASE_URL` を追加した**) | 設定項目を増やさない |
 | `find_projects` の description | `docs/usage/maintenance-contract-search.md` への参照 | 参照を削除(リポジトリにない) | |
 | 全 description | Go の文面 | Go の文面 + 応答の形(`cache` / `warnings` / `limited`)の説明、fanout 超過の 5 件の上限 | Workers 版で足した応答 |
 | 結果のキー | Go のフィールド名(PascalCase)+ `url` | 同じ | 決定どおり |
@@ -143,7 +143,7 @@ cache 系ツール・README・デプロイ設定(M06)、依存の追加、Durabl
 ## 既知のリスク・未解決
 
 - **逆引きの最初の 1〜2 回**: 表が空のうちは、id 指定の書類が `ProjectID=0` + `deadline` の警告で返りうる(再実行で続きから進む)。`response_group=all` で一度に覚える案は M06 の `test:live` で計測してから判断する。
-- **`cache_clear` と逆引きの表**: M06 の cache 系ツールで `projects` を消しても逆引きの表は残る(対応は不変なので害はない)。消す必要があるか M06 で決める。
+- **`cache_clear` と逆引きの表**: `projects` を消しても逆引きの表は残る(対応は不変なので害はない)。M06 で『既定では残し、`include_document_map: true` で消せる』と決めた。
 - **応答サイズ**: find_clients / find_vendors / find_users は `limit` なしで多数にマッチすると、補助情報の取得が増え、応答も大きくなる(`response_too_large` は `limit` を案内する)。
 - **補助情報の通信量**: 顧客 N 件にマッチすると支店・担当者で 2N 回の BOARD 呼び出し(Go と同じ)。締め切りで失敗した分は `enrichment_failed` の警告になる(警告は 20 件で打ち切り)。
 - **書類 fanout の途中の失敗**: 書類の取得が 404 以外で失敗すると、それまでの結果は返さずエラーにする(Go と同じ)。取れた書類は D1 に残るので、再試行は続きから進む。

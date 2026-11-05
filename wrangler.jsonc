@@ -2,7 +2,7 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   // このファイルはローカル開発 (wrangler dev) とテスト (vitest) が読むダミー値の設定で、デプロイには使わない。
   // アカウント固有の値 (D1 の id・Access のチーム / AUD) はここに書かない。
-  // デプロイ用の設定は M06 で、mise.local.toml の [env] から wrangler.deploy.jsonc (gitignore 済み) に生成する。
+  // デプロイ用の設定は、mise.local.toml の [env] から `mise run deploy:render` で wrangler.deploy.jsonc (gitignore 済み) に生成する (docs/runbook.md)。
   "name": "board",
   "main": "src/index.ts",
   "compatibility_date": "2026-10-13",
@@ -26,6 +26,7 @@
     "ACCESS_AUD": "<access-application-aud>",
     // BOARD API のベース URL。
     "BOARD_BASE_URL": "https://api.the-board.jp"
+    // 任意: "BOARD_UI_BASE_URL" (BOARD の UI の URL。find_* の url の組み立てに使う)。省略すると BOARD_BASE_URL の `://api.` を `://` にして導く。https のオリジンのみ。
   }
   // secrets (デプロイ先で wrangler secret put / --secrets-file。ローカルは .dev.vars):
   //   BOARD_API_KEY   BOARD の API キー (x-api-key ヘッダー)。全利用者で共有する

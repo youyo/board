@@ -46,15 +46,18 @@ async function tool(name: string, args: Record<string, unknown>, id = 1) {
 }
 
 describe("E2E: tools/list", () => {
-  it("server_info + api 層 40 個 + find 層 11 個 = 52 個が出る", async () => {
+  it("server_info + api 層 40 個 + find 層 11 個 + cache 系 2 個 = 54 個が出る", async () => {
     boardMocks({});
     const res = await readRpc(await mcpCall(jwt, "tools/list"));
     const names = (res.result?.tools ?? []).map((t) => t.name);
-    expect(names).toHaveLength(52);
+    expect(names).toHaveLength(54);
     expect(names.filter((n) => n.startsWith("list_"))).toHaveLength(18);
     expect(names.filter((n) => n.startsWith("get_"))).toHaveLength(22);
     expect(names).toContain("server_info");
-    for (const t of res.result?.tools ?? []) expect(t.annotations?.readOnlyHint).toBe(true);
+    for (const t of res.result?.tools ?? []) {
+      // cache_clear だけが破壊的(cache 系は cache-tools-flow.test.ts)。
+      expect(t.annotations?.readOnlyHint, t.name).toBe(t.name !== "cache_clear");
+    }
   });
 });
 

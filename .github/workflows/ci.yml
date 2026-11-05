@@ -25,4 +25,6 @@ jobs:
       - run: mise run install
       - run: mise run lint
       - run: mise run test
+      # ダミー値でデプロイ設定を生成し、wrangler deploy --dry-run が通ることを確かめる(Cloudflare へは何も送らない)。
+      - run: mise run deploy:check
 

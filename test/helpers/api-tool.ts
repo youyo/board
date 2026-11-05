@@ -40,6 +40,7 @@ export async function callApiTool(
   const res = await rpcTo(
     () =>
       createMcpServer({
+        db: testDb,
         repositories: () => createRepositories({ db: testDb(), client: testClient() }),
         documentIndex: () => createDocumentIndex({ db: testDb(), client: testClient() }),
         uiBaseUrl: "https://board.test",

@@ -81,6 +81,29 @@ describe("checkConfig", () => {
     expect(result.invalid.includes("ACCESS_TEAM_DOMAIN")).toBe(!isValid);
   });
 
+  describe("BOARD_UI_BASE_URL(任意)", () => {
+    it("未設定・空・空白だけなら問題にしない", () => {
+      expect(checkConfig(valid)).toEqual({ ok: true, missing: [], invalid: [] });
+      expect(checkConfig({ ...valid, BOARD_UI_BASE_URL: "" }).ok).toBe(true);
+      expect(checkConfig({ ...valid, BOARD_UI_BASE_URL: "  " }).ok).toBe(true);
+    });
+
+    it.each([
+      ["https://app.board.example.com", true],
+      ["https://app.board.example.com/", true],
+      ["http://app.board.example.com", false],
+      ["http://localhost:8788", false],
+      ["app.board.example.com", false],
+      ["https://app.board.example.com/ui", false],
+      ["https://<ui-host>", false],
+    ])("BOARD_UI_BASE_URL %s の妥当性は %s", (url, isValid) => {
+      const result = checkConfig({ ...valid, BOARD_UI_BASE_URL: url });
+      expect(result.missing).toEqual([]);
+      expect(result.invalid.includes("BOARD_UI_BASE_URL")).toBe(!isValid);
+      expect(result.ok).toBe(isValid);
+    });
+  });
+
   it("結果に値(秘密を含む)を載せない", () => {
     const result = checkConfig({
       ...valid,

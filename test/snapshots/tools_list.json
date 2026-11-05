@@ -1,5 +1,58 @@
 [
   {
+    "name": "cache_clear",
+    "title": "キャッシュ削除",
+    "description": "Destructive: delete the cached rows and sync state of the given resources (all 22 if resources is omitted) from the D1 cache. Use it only when the cache looks corrupt or you must drop everything and start over; to just get fresher data, pass refresh=delta or refresh=full to a read tool instead. After clearing, the next read of that resource returns nothing until a refresh (refresh=full) rebuilds it, which may take several calls for large resources. If a refresh is running for any target, nothing is deleted and refresh_in_progress is returned (retry after retry_after_seconds). The document-to-project reverse lookup is kept unless include_document_map=true. Does not call the BOARD API.",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "resources": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Resources to clear (default: all 22). Valid: clients, client_branches, contacts, projects, project_costs, estimates, invoices, orders, deliveries, receipts, vendors, vendor_branches, vendor_contacts, purchase_orders, payments, users, groups, payment_terms, project_types, purchase_types, accounting_types, document_send_channels."
+        },
+        "include_document_map": {
+          "type": "boolean",
+          "description": "Also delete the document-to-project reverse lookup (default false). The mapping never changes, so keep it unless it looks wrong; it is rebuilt by find_* tools and scans."
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "キャッシュ削除",
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "cache_status",
+    "title": "キャッシュ状態",
+    "description": "Show the state of the local D1 cache for all 22 BOARD resources, without calling the BOARD API. Use it to decide whether to pass refresh=delta or refresh=full to other tools, or to see how far a long refresh has progressed. resources[]: {resource, cached_at, full_refreshed_at, refresh_state, row_count, full_prune_skipped, locked}. cached_at / full_refreshed_at are absent when never fetched. refresh_state: complete = up to date as of cached_at; partial = a full refresh is unfinished (call a tool with refresh=full again until it is complete); failed = the last refresh failed (last_error_code); not_synced = never fetched (cache is empty, so tools return nothing until refreshed). full_prune_skipped=true means the last full refresh could not confirm the total count and kept old rows (run refresh=full again). locked=true means a refresh is running now (concurrent refreshes return refresh_in_progress). document_scans[]: progress of the document-to-project reverse lookup per document kind (estimate/order/delivery/receipt): scan_state (not_started/in_progress/complete), mapped_rows, next_page.",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "キャッシュ状態",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
     "name": "find_clients",
     "title": "顧客検索",
     "description": "Search BOARD clients by ID or name. Returns client entities with branches and contacts. Priority: id > name. Response: {items, cache, warnings?, limited?, total_before_limit?}. cache = freshness of the cached resources that were read (cached_at, full_refreshed_at, refresh_state); warnings = non-fatal problems (enrichment that failed and is null, a project_id that could not be resolved, a truncated list).",

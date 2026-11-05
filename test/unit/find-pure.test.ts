@@ -24,6 +24,7 @@ import {
   clientUrl,
   documentUrl,
   projectUrl,
+  resolveUiBaseUrl,
   uiBaseUrlFromApiBase,
   vendorUrl,
 } from "../../src/find/url";
@@ -255,5 +256,23 @@ describe("クエリの検証(Go: types_test.go)", () => {
     expect(() => validateInvoiceQuery({ status: "sent" })).not.toThrow();
     expect(() => validateInvoiceQuery({ statuses: ["a"] })).toThrow("requires one of ID or");
     expect(() => validateInvoiceQuery({ statuses: ["a"], partnerId: 1 })).not.toThrow();
+  });
+});
+
+describe("resolveUiBaseUrl", () => {
+  it("BOARD_UI_BASE_URL があればそれを使う(末尾の / は除く)", () => {
+    expect(
+      resolveUiBaseUrl({
+        BOARD_BASE_URL: "https://api.the-board.jp",
+        BOARD_UI_BASE_URL: "https://ui.example.com/",
+      }),
+    ).toBe("https://ui.example.com");
+  });
+
+  it("未設定・空・空白だけなら BOARD_BASE_URL から導く", () => {
+    const base = { BOARD_BASE_URL: "https://api.the-board.jp" };
+    expect(resolveUiBaseUrl(base)).toBe("https://the-board.jp");
+    expect(resolveUiBaseUrl({ ...base, BOARD_UI_BASE_URL: "" })).toBe("https://the-board.jp");
+    expect(resolveUiBaseUrl({ ...base, BOARD_UI_BASE_URL: "  " })).toBe("https://the-board.jp");
   });
 });

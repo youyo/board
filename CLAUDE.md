@@ -1,7 +1,7 @@
 # CLAUDE.md
 
-board(BOARD API 向け Remote MCP サーバー。Cloudflare Workers + Hono。キャッシュは D1 を予定)の作業規約。
-計画は `plans/`(ロードマップ `plans/board-workers-roadmap.md` と各マイルストーン `plans/board-workers-m*.md`)。
+board(BOARD API 向け Remote MCP サーバー。Cloudflare Workers + Hono + D1。ツール 54 個)の作業規約。
+計画は `plans/`(ロードマップ `plans/board-workers-roadmap.md` と各マイルストーン `plans/board-workers-m*.md`)。使い方は `README.md`、デプロイと運用は `docs/runbook.md`、設計の理由は `docs/adr/`、実機でしか確かめられない前提は `docs/manual-verification.md`。
 構成と規約は姉妹リポジトリ `../logbutler` に揃えている。決定済み事項はロードマップが正で、勝手に覆さない。
 Go 版は `archive/go-cli` ブランチと `go-cli-final` タグにある(このブランチには無い)。
 
@@ -12,9 +12,11 @@ Go 版は `archive/go-cli` ブランチと `go-cli-final` タグにある(この
 - 完了条件は `mise run test`(unit + e2e)と `mise run lint` が通ること。
 - **Durable Objects / McpAgent は使わない**。MCP はステートレス(`createMcpHandler`)。
 - **BOARD の API キー・トークン(`BOARD_API_KEY` / `BOARD_API_TOKEN`)と Access の JWT を、ログ・エラー・MCP の応答に出さない**。
-- **BOARD API はモックのみ**。unit / e2e テストで実 API に通信しない(`test/helpers/mock-fetch.ts` は未登録の宛先への通信を例外にする)。実 API への確認は `mise run test:live`(M06 で追加。デプロイ済み Worker 経由でユーザーが実行)だけで、`mise run test` と CI には含めない。
+- **BOARD API はモックのみ**。unit / e2e テストで実 API に通信しない(`test/helpers/mock-fetch.ts` は未登録の宛先への通信を例外にする)。実 API への確認は `mise run test:live`(デプロイ済み Worker に Access の service token で接続。ユーザーが実行)だけで、`mise run test` と CI には含めない。
 - 依存は公開から 2 週間以上たった正確なバージョンに固定する(`^` `~` を使わない)。`wrangler.jsonc` の `compatibility_date` も、固定した workerd が対応する日付まで。
-- コミット・push・PR・リモート作成・デプロイ・`wrangler secret put`・D1 の作成は、ユーザーの指示があるときだけ。
+- コミット・push・PR・リモート作成・デプロイ(`mise run deploy`、dry-run 以外の `wrangler deploy`)・`wrangler secret put`・D1 の作成・`mise run test:live` の実行は、ユーザーの指示があるときだけ。
+- **ロックで守る書き込みは、必ず所有者条件つきの 1 つの batch で行う**(`WHERE ... lock_owner = ?` / `EXISTS (SELECT 1 ... WHERE lock_owner = ?)` を同じ batch に入れ、`meta.changes` でロックを失っていないか確かめる)。読んで確かめてから別の文で書く方式は、stale ロックを奪われたときに他人の状態を壊す。M03(full の再開)と M05(逆引きの走査)で同じ不具合が 2 回出た。新しいロックを足したら、ロックを奪われた場合のテストを書く。
+- **`git diff` は `--no-ext-diff` を付ける**(外部の diff ツールの設定で出力が変わるのを避ける)。
 
 ## 認証
 
@@ -31,27 +33,37 @@ Go 版は `archive/go-cli` ブランチと `go-cli-final` タグにある(この
 - **起動時の設定チェック**(`src/config-check.ts`。logbutler の ADR 0010 と同じ): 必須の vars / secrets / D1(`DB` / `ACCESS_TEAM_DOMAIN` / `ACCESS_AUD` / `BOARD_BASE_URL` / `BOARD_API_KEY` / `BOARD_API_TOKEN`)が欠けている・プレースホルダ(`<...>`)のままなら、`/healthz` は 503、それ以外は 500 で項目名だけを返す。ログにも応答にも**値は出さない**。必須の設定を足したら `checkConfig` と unit / E2E を更新する。
 - GitHub Actions は**コミット SHA で固定**する(`.github/workflows/ci.yml`)。更新時は `gh api repos/<owner>/<repo>/git/ref/tags/<tag>` で実在を確かめる。
 
-## 構成(M01 時点)
+## 構成(M06 時点)
 
 ```
 src/index.ts              default export { fetch }。checkConfig の後に Hono の app を呼ぶ
 src/app.ts                Hono: GET /healthz(認証なし)、全パスの Access JWT 検証、/mcp(createMcpHandler。リクエストごとに McpServer を生成)
 src/auth/access-jwt.ts    Cf-Access-Jwt-Assertion の検証(jose。JWKS は https://{team}/cdn-cgi/access/certs から取得し isolate 内で 5 分キャッシュ)
-src/config-check.ts       起動時の設定チェック
+src/config-check.ts       起動時の設定チェック(BOARD_UI_BASE_URL は任意項目。あれば https のオリジン)
 src/env.ts  src/info.ts   Env の型 / サーバー名とバージョン
-src/errors.ts             エラーエンベロープ(BoardError / ArgumentError / ResponseTooLargeError)
-src/mcp/registry.ts       defineTool / registerTools(入力は自前で検証してエンベロープにする)
-src/mcp/response-limit.ts 応答サイズの上限
-src/mcp/server.ts         McpServer のファクトリ
-src/mcp/tools/            ツール(index.ts の ALL_TOOLS に足す)。今は疎通確認用の server_info だけ
-test/unit/  test/e2e/  test/helpers/  test/snapshots/(tools/list のスナップショット)
+src/errors.ts             エラーエンベロープ(BoardError / ArgumentError / ResponseTooLargeError / RefreshInProgressError)
+src/board/                BOARD API クライアント(直列・再試行・Retry-After・ページング・締め切り)と 22 リソースの型(resources/)
+src/cache/                D1 キャッシュ: schema(v2。ensureSchema)・resource-cache・sync-state・document-map(逆引き)・admin(cacheReport / clearCache / clearDocumentMap)・info(応答に同梱する鮮度)
+src/refresh/              lock(D1 の条件付き UPDATE)と refresher(delta / full。full は再開できる)
+src/repository/           cache → refresh → API の統一窓口(22 リソースの表 resources.ts)と書類 → 案件の逆引き(document-index.ts)
+src/find/                 find 層(名前の解決・fanout・contract_status・url。resolveUiBaseUrl)
+src/mcp/                  registry(defineTool / registerTools)・server・args・response-limit・call-context
+src/mcp/tools/            index.ts の ALL_TOOLS に足す: server-info(1)・api(40)・find(11)・cache(2)= 54 個
+scripts/render-wrangler-config/  core.ts(純粋なコア)+ main.ts(入口)。wrangler.jsonc と BOARD_* 環境変数から wrangler.deploy.jsonc を生成
+test/unit/  test/e2e/  test/node-e2e/  test/live/  test/helpers/  test/snapshots/(tools/list のスナップショット)
+docs/  plans/
 ```
 
-未実装(BOARD API クライアント、D1 キャッシュ、api 層 / find 層 / cache 系のツール、デプロイ設定の生成、runbook、`test:live`)はロードマップ参照。
+- ツールは `defineTool` で定義し `src/mcp/tools/index.ts` の `ALL_TOOLS` に足す。D1 は `ctx.db()`、repository は `ctx.repositories()`、UI の URL は `ctx.uiBaseUrl`。
+- `cache_expire` は作らない(Go では daily auto-refresh の廃止後、読み取りに影響しない印を付けるだけだったため)。`expireCache` は `src/cache/admin.ts` に残るがツールにはつないでいない。
+- BOARD の UI の URL は `BOARD_UI_BASE_URL`(任意)があればそれ、なければ `BOARD_BASE_URL` の `://api.` を `://` にして導く。
+- デプロイ設定は `wrangler.jsonc`(ダミー値。dev / test 用)から `mise run deploy:render` が `wrangler.deploy.jsonc`(gitignore 済み)を生成する。実値は `mise.local.toml` の `[env]`(`BOARD_WORKER_NAME` ほか。docs/runbook.md)。`workers_dev: false` は維持する。
 
 ## テストの書き方
 
-- 実行環境は workerd(`@cloudflare/vitest-plugin`)。`vitest.config.ts` の `unit` / `e2e` の 2 プロジェクト。
+- 実行環境は workerd(`@cloudflare/vitest-plugin`)。`vitest.config.ts` のプロジェクトは `unit` / `e2e`(workerd)、`node-e2e`(Node。生成スクリプトを実プロセスで起動して `wrangler deploy --dry-run` まで通す。`mise run test:e2e` に含まれる)、`live`(`mise run test:live` だけ。`test` と CI には含めない)。
+- `test/live/` と `test/node-e2e/` は `tsconfig.json` の対象外(Node 環境)。`test/unit/readme-tools.test.ts` は README のツール表と `ALL_TOOLS` を突き合わせる(ツールを足したら README の表と総数も直す)。
+- D1 を使うテストは `test/helpers/d1.ts` の `testDb()` / `resetCache()`。ツールを呼ぶ unit は `test/helpers/api-tool.ts` の `callApiTool`(実物の D1 + モックした BOARD)。
 - workerd のテストで `cloudflare:test` を import しない(import すると並列実行時に他ファイルの初回リクエストがタイムアウトする)。Worker 全体を任意の env で呼ぶときは `test/helpers/worker.ts` の `callWorker`(`import worker from "../../src/index"` に `cloudflare:workers` の `env` を上書きして渡す)。D1 のスキーマ適用でも `applyD1Migrations` は使わず、Worker が isolate ごとの初回に冪等に適用する(M03)。
 - Access の JWKS は `vi.spyOn(globalThis, "fetch")` で差し替える(`mockOutboundFetch`。同じ isolate で動くので Worker にも効く)。テスト用の鍵と JWT は `test/helpers/access.ts`。JWKS のキャッシュは `clearJwksCache()` で各テストの前にリセットする。
 - 時刻に依存する挙動は `vi.useFakeTimers({ toFake: ["Date"] })` で進める。コード側は `Date.now` の参照を保持せず、呼び出し時に読むこと。

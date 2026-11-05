@@ -135,10 +135,10 @@ describe("api 層のツール一覧", () => {
   it("api 層は list 18 + get 22(server_info と find 層は別)", () => {
     expect(Object.keys(LIST_TOOLS)).toHaveLength(18);
     expect(Object.keys(GET_TOOLS)).toHaveLength(22);
-    // 全体は server_info + api 層 40 個 + find 層 11 個(find 層は find-tools-definitions.test.ts)。
+    // 全体は server_info + api 層 40 個 + find 層 11 個(find-tools-definitions.test.ts)+ cache 系 2 個(cache-tools.test.ts)。
     expect(
       ALL_TOOLS.map((t) => t.name)
-        .filter((n) => !n.startsWith("find_"))
+        .filter((n) => !n.startsWith("find_") && !n.startsWith("cache_"))
         .sort(),
     ).toEqual(["server_info", ...Object.values(LIST_TOOLS), ...Object.values(GET_TOOLS)].sort());
   });
