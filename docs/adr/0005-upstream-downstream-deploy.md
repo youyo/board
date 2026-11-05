@@ -38,3 +38,10 @@ rovo の方式に倣う。
 - `wrangler.jsonc` に相対パスを持つキー(`main` と `$schema` 以外)を足したら、`scripts/deploy-config/core.ts` の書き換えと、`test/unit/deploy-config.test.ts` の許可キーを更新する。
 - 下流のスキルとドキュメントは、`mise.toml`・runbook・コードと一致させる。`test/unit/board-setup-skill.test.ts` が、スキルと文書が参照するタスク名とパスの実在を確かめる。
 - ロードマップの決定済み事項『デプロイ設定』は、このADR で置き換える。
+
+## 追記(2026-11-06): カスタムドメインは任意
+
+上の『`workers_dev: false` とカスタムドメインを強制し』を改める。`customDomain` は任意で、あれば `routes` + `workers_dev: false`、空なら `workers_dev: true`(`routes` なし)。どちらも `preview_urls: false` を明示する(出力は決定的で、`deploy:config:check` は安定する)。
+`board.config.example.json` の `customDomain` は `""`(workers.dev で公開する、の意味。プレースホルダにしない)。ホスト名でない値と `<...>` のままの値は、これまでどおりエラー。
+`deploy:check` は例の設定(workers.dev の形)に加えて、ダミーのドメインを入れた設定(カスタムドメインの形)も dry-run する(`generate --example --with-domain`)。
+`mise run setup` は、`customDomain` が空なら `wrangler deploy` の出力から workers.dev の URL を取って `/healthz` を確認する。取れなければ失敗にせず、手で確認する案内を出す。

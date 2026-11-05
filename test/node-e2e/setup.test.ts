@@ -57,7 +57,7 @@ case "$*" in
   "exec wrangler d1 create"*)
     echo '[{"uuid":"${D1_ID}","name":"e2e-board-cache"}]' > "${state}/d1.json"
     echo "Successfully created DB" ;;
-  "exec wrangler deploy"*) echo "Deployed" ;;
+  "exec wrangler deploy"*) cat "${state}/deploy.out" 2>/dev/null || echo "Deployed" ;;
   "exec wrangler secret list"*)
     if [ -f "${state}/secret-list-fails" ]; then echo "boom" >&2; exit 1; fi
     cat "${state}/secrets.json" 2>/dev/null || echo '[]' ;;
@@ -375,6 +375,84 @@ describe("/healthz の確認", () => {
     const r = await setup();
     expect(r.code).not.toBe(0);
     expect((await calls()).filter((x) => x.startsWith("curl")).length).toBe(2);
+  });
+});
+
+// wrangler deploy の出力(workers.dev のとき): `Deployed <worker> triggers (x sec)` の次の行に `  https://<worker>.<subdomain>.workers.dev`
+// (node_modules/wrangler/wrangler-dist/cli.js の triggersDeploy が logger.log する)。
+const DEPLOY_OUT_WORKERS_DEV = `Total Upload: 1.00 KiB / gzip: 0.50 KiB
+Uploaded e2e-board (1.00 sec)
+Deployed e2e-board triggers (0.50 sec)
+  https://e2e-board.e2e-sub.workers.dev
+Current Version ID: 00000000-0000-0000-0000-000000000000
+`;
+
+describe("customDomain が無いとき(workers.dev で公開)", () => {
+  const { customDomain: _c, ...NO_DOMAIN } = VALID;
+
+  it.each([
+    ["キーなし", NO_DOMAIN],
+    ["空文字", { ...VALID, customDomain: "" }],
+  ])(
+    "%s: deploy の出力の workers.dev の URL で /healthz を確認し、Access の案内を出す",
+    async (_n, cfg) => {
+      await writeConfig(cfg);
+      await put("deploy.out", DEPLOY_OUT_WORKERS_DEV);
+      const r = await setup();
+      expect(r.code).toBe(0);
+      const curl = (await calls()).filter((x) => x.startsWith("curl"));
+      expect(curl.length).toBe(1);
+      expect(curl[0]).toContain("https://e2e-board.e2e-sub.workers.dev/healthz");
+      expect(r.out).toContain("Enable Cloudflare Access");
+      expect(r.out).toContain("https://e2e-board.e2e-sub.workers.dev/mcp");
+      expect(r.out).toContain("docs/runbook.md");
+      const deployed = await readFile(join(root, "deploy/wrangler.jsonc"), "utf8");
+      expect(deployed).toContain('"workers_dev": true');
+      expect(deployed).not.toContain('"routes"');
+    },
+  );
+
+  it("Preview URL(<version>-<worker>...)は /healthz の確認に使わない", async () => {
+    await writeConfig(NO_DOMAIN);
+    await put(
+      "deploy.out",
+      "Deployed e2e-board triggers (0.50 sec)\n  https://abcd1234-e2e-board.e2e-sub.workers.dev\n",
+    );
+    const r = await setup();
+    expect(r.code).toBe(0);
+    expect((await calls()).filter((x) => x.startsWith("curl"))).toEqual([]);
+  });
+
+  it("URL が取れなければ die せず、手で確認する案内を出して続行する(curl は呼ばない)", async () => {
+    await writeConfig(NO_DOMAIN);
+    await put("deploy.out", "Deployed e2e-board triggers (0.50 sec)\n");
+    const r = await setup();
+    expect(r.code).toBe(0);
+    expect((await calls()).filter((x) => x.startsWith("curl"))).toEqual([]);
+    expect(r.out).toContain("https://e2e-board.<アカウントのサブドメイン>.workers.dev/healthz");
+    expect(r.out).toContain("Enable Cloudflare Access");
+    expect(r.out).toContain("docs/runbook.md");
+  });
+
+  it("URL が取れた上で /healthz が 503 なら、これまでどおり失敗で終わる", async () => {
+    await writeConfig(NO_DOMAIN);
+    await put("deploy.out", DEPLOY_OUT_WORKERS_DEV);
+    await put("healthz.code", "503");
+    await put(
+      "healthz.body",
+      JSON.stringify({ status: "misconfigured", missing: ["BOARD_API_TOKEN"] }),
+    );
+    const r = await setup();
+    expect(r.code).not.toBe(0);
+    expect(r.out).toContain("BOARD_API_TOKEN");
+  });
+
+  it("customDomain があれば、deploy の出力に workers.dev の URL があってもカスタムドメインを使う", async () => {
+    await put("deploy.out", DEPLOY_OUT_WORKERS_DEV);
+    const r = await setup();
+    expect(r.code).toBe(0);
+    const curl = (await calls()).filter((x) => x.startsWith("curl"));
+    expect(curl[0]).toContain("https://board.e2e.example.org/healthz");
   });
 });
 

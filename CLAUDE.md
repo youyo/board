@@ -24,7 +24,7 @@ Go 版は `archive/go-cli` ブランチと `go-cli-final` タグにある(この
 
 - OAuth サーバーは持たない。Worker は Cloudflare Access(self-hosted / MCP server application + Managed OAuth)の背後に置き、**`/healthz` 以外の全パス**で `Cf-Access-Jwt-Assertion`(署名・iss・aud・exp)を検証する(`src/auth/access-jwt.ts`、`src/app.ts` のミドルウェア)。JWT なしは 401、それ以外の失敗(JWKS が取れない場合を含む)は 403。理由は応答に出さずログに種別だけ残す。
 - BOARD の認証情報は Worker の secret を全員で共有する(1 デプロイ = 1 BOARD アカウント)。
-- `workers_dev: false`。カスタムドメインだけで公開し、Access を迂回できる経路を作らない。
+- `board.config.json` の `customDomain` は任意。あればカスタムドメインだけで公開(`workers_dev: false`)、空なら workers.dev で公開する(`workers_dev: true`、`routes` なし)。どちらも `preview_urls: false`(Version URL を作らない)を明示する。`src/` は変えず、Worker が `/healthz` 以外で JWT を検証することで、workers.dev に直接来ても 401 / 403 になる(ADR 0001、2026-11-06 の追記)。
 
 ## 出力規約
 
@@ -63,7 +63,7 @@ docs/  plans/
 - ツールは `defineTool` で定義し `src/mcp/tools/index.ts` の `ALL_TOOLS` に足す。D1 は `ctx.db()`、repository は `ctx.repositories()`、UI の URL は `ctx.uiBaseUrl`。
 - `cache_expire` は作らない(Go では daily auto-refresh の廃止後、読み取りに影響しない印を付けるだけだったため)。`expireCache` は `src/cache/admin.ts` に残るがツールにはつないでいない。
 - BOARD の UI の URL は `BOARD_UI_BASE_URL`(任意)があればそれ、なければ `BOARD_BASE_URL` の `://api.` を `://` にして導く。
-- **upstream / 下流モデル**(ADR 0005): このリポジトリは公開の upstream で、`wrangler.jsonc` はローカル開発・テスト用のダミー値。**追跡ファイルに実値(Worker 名・D1 の id・ドメイン・Access のチーム / AUD)を書かない**。下流は `board.config.json`(秘密でない値だけ)を書き、`mise run deploy:config` が `deploy/wrangler.jsonc` を生成する(下流でコミット)。`wrangler.jsonc` のトップレベルを変えれば下流に pull で届き、`deploy:config:check` が下流で差分を検出する。`workers_dev: false` は維持する。`wrangler.jsonc` に相対パスを持つキー(`main` / `$schema` 以外)を足したら、`scripts/deploy-config/core.ts`・unit・E2E・runbook を更新する。生成項目を足したときも同じ。
+- **upstream / 下流モデル**(ADR 0005): このリポジトリは公開の upstream で、`wrangler.jsonc` はローカル開発・テスト用のダミー値。**追跡ファイルに実値(Worker 名・D1 の id・ドメイン・Access のチーム / AUD)を書かない**。下流は `board.config.json`(秘密でない値だけ)を書き、`mise run deploy:config` が `deploy/wrangler.jsonc` を生成する(下流でコミット)。`wrangler.jsonc` のトップレベルを変えれば下流に pull で届き、`deploy:config:check` が下流で差分を検出する。`preview_urls: false` は維持する(`workers_dev` は `customDomain` の有無で `scripts/deploy-config/core.ts` が決める。upstream の値は使わない)。`wrangler.jsonc` に相対パスを持つキー(`main` / `$schema` 以外)を足したら、`scripts/deploy-config/core.ts`・unit・E2E・runbook を更新する。生成項目を足したときも同じ。
 - `board.config.json` と `deploy/` は upstream の `.gitignore` に入っている。upstream で `git add -f` しない(CI の `no-downstream-files` が止める)。`BOARD_LIVE_*`(`test:live`)は `mise.local.toml` の `[env]` に置く別物。
 
 ## テストの書き方

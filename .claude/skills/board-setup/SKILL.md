@@ -78,7 +78,7 @@ description: board(BOARD API 向け Remote MCP サーバー)の下流リポジ�
 1. `board.config.example.json` を `board.config.json` にコピーする(エージェントが行ってよい)。
 2. 運用者から次の値を聞いて書く(すべて秘密ではない):
    - [ ] `workerName`(Worker 名。小文字・数字・ハイフン)
-   - [ ] `customDomain`(公開するホスト名。`https://` は付けない。**既存の DNS レコードがない**ことを運用者に確認してもらう)
+   - [ ] `customDomain`(任意。公開するホスト名。`https://` は付けない。**既存の DNS レコードがない**ことを運用者に確認してもらう)。**カスタムドメインを使わず workers.dev で公開するかを運用者に聞く**。workers.dev なら空文字のままにする(キーを消してもよい)。MCP Server Portal に登録するサーバーを workers.dev で公開している組織ではこちら
    - [ ] `d1.databaseName`(D1 の名前)。`d1.databaseId` は `<YOUR_D1_DATABASE_ID>` のままにする(`setup` が作成後に書き戻す。既に D1 があるなら、その id を運用者に聞いて書く)
    - [ ] `access.teamDomain`(Zero Trust のチームドメイン `<team>.cloudflareaccess.com`)
    - [ ] `access.aud`: この時点では Access アプリがまだない。**64 桁の 0 などのダミー**を入れる。Step 4 で実値に差し替える
@@ -102,7 +102,7 @@ description: board(BOARD API 向け Remote MCP サーバー)の下流リポジ�
 
 ## Step 3: `/healthz` の確認
 
-`curl -s https://<customDomain>/healthz`。`{"status":"ok"}` なら設定がそろっている。503 は「障害の切り分け」へ。Access の保護前でも `/healthz` だけは認証なしで返り、それ以外のパスは JWT がなければ 401 になる。
+`curl -s https://<customDomain>/healthz`(`customDomain` が空なら `https://<worker>.<subdomain>.workers.dev/healthz`。`setup` が `wrangler deploy` の出力から URL を取れなかったときは、運用者に Worker の URL を聞く)。`{"status":"ok"}` なら設定がそろっている。503 は「障害の切り分け」へ。Access の保護前でも `/healthz` だけは認証なしで返り、それ以外のパスは JWT がなければ 401 になる。
 
 ## Step 4: Access(MCP server application と Managed OAuth)
 
@@ -111,11 +111,12 @@ description: board(BOARD API 向け Remote MCP サーバー)の下流リポジ�
 運用者にダッシュボードで行ってもらう:
 
 1. Access のアプリケーションを作る(MCP server application、なければ self-hosted)。公開ホスト名は `customDomain`。
+   **`customDomain` が空(workers.dev)のとき**: Worker の Settings > Domains & Routes の workers.dev で **Enable Cloudflare Access** してもらう(作られる self-hosted アプリで 2 以降を行う)。MCP server application 型を workers.dev ホストで作れるかは未確認(`docs/runbook.md` の 5、`docs/manual-verification.md` の V10)。作れなければ運用者に結果を聞く。
 2. **Managed OAuth を ON** にする(既定は OFF)。
 3. **AUD タグ**(Application Audience (AUD) Tag。64 桁の 16 進)を取得し、`board.config.json` の `access.aud` に入れる(エージェントが編集してよい。AUD は秘密ではないが、完了報告には全桁を書かない)。
 4. `mise run deploy:config` → 差分を運用者に示す(`git diff --no-ext-diff deploy/`)→ 承認後に `mise run deploy`。
 5. ポリシーを付ける: 人が使う **Allow** ポリシー(自分のメールや IdP のグループ。広げすぎない)。
-6. 確認: `curl -i https://<customDomain>/mcp` は JWT なしでログインへのリダイレクトか 401。
+6. 確認: `curl -i https://<customDomain>/mcp`(workers.dev なら `https://<worker>.<subdomain>.workers.dev/mcp`)は JWT なしでログインへのリダイレクトか 401。
 
 完了条件: AUD が実値で、再デプロイ後も `/healthz` が 200。
 
@@ -123,7 +124,7 @@ description: board(BOARD API 向け Remote MCP サーバー)の下流リポジ�
 
 参照: `docs/runbook.md` の 6。
 
-運用者がダッシュボードで、HTTP URL `https://<customDomain>/mcp` のサーバーを追加し、状態が **Ready** になることを確かめ、Portal に加える。Portal 経由だとツール名の前に `board_` が付く。Portal が `Cf-Access-Jwt-Assertion` を付けて Worker に届くかは実機で確認する項目(`docs/manual-verification.md` の V1)。
+運用者がダッシュボードで、HTTP URL `https://<customDomain>/mcp`(workers.dev なら `https://<worker>.<subdomain>.workers.dev/mcp`)のサーバーを追加し、状態が **Ready** になることを確かめ、Portal に加える。Portal 経由だとツール名の前に `board_` が付く。Portal が `Cf-Access-Jwt-Assertion` を付けて Worker に届くかは実機で確認する項目(`docs/manual-verification.md` の V1)。
 
 ## Step 6: 動作確認(`test:live` の service token)
 

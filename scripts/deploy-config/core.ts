@@ -13,6 +13,7 @@ export type RenderResult =
 
 export interface DeployConfig {
   workerName: string;
+  /** 任意。空なら workers.dev で公開する。 */
   customDomain: string;
   d1: { databaseId: string; databaseName: string };
   access: { teamDomain: string; aud: string };
@@ -182,7 +183,8 @@ export function validateConfig(raw: unknown, opts: ValidateOptions = {}): Valida
     if (!TOP_KEYS.includes(k)) errors.push({ name: k, reason: "unknown" });
   }
   const workerName = read(raw, "", "workerName", (v) => WORKER_NAME.test(v), true);
-  const customDomain = read(raw, "", "customDomain", (v) => HOSTNAME.test(v), true);
+  // 任意。無い・空なら workers.dev で公開する(ある場合は検証し、不正・プレースホルダはエラー)。
+  const customDomain = read(raw, "", "customDomain", (v) => HOSTNAME.test(v), false);
   const d1 = section("d1", ["databaseId", "databaseName"]);
   const databaseId = d1 && read(d1, "d1", "databaseId", (v) => UUID.test(v), true, opts.pendingD1);
   const databaseName = d1 && read(d1, "d1", "databaseName", (v) => DATABASE_NAME.test(v), true);
@@ -193,7 +195,7 @@ export function validateConfig(raw: unknown, opts: ValidateOptions = {}): Valida
   const boardUiBaseUrl = read(raw, "", "boardUiBaseUrl", isHttpsOrigin, false);
   const accountId = read(raw, "", "accountId", (v) => ACCOUNT_ID.test(v), false);
 
-  if (errors.length > 0 || !workerName || !customDomain || !databaseName || !teamDomain || !aud) {
+  if (errors.length > 0 || !workerName || !databaseName || !teamDomain || !aud) {
     return { ok: false, errors };
   }
   if (!databaseId && !opts.pendingD1) return { ok: false, errors };
@@ -201,7 +203,7 @@ export function validateConfig(raw: unknown, opts: ValidateOptions = {}): Valida
     ok: true,
     config: {
       workerName,
-      customDomain,
+      customDomain: customDomain ?? "",
       d1: { databaseId: databaseId ?? "", databaseName },
       access: { teamDomain, aud },
       ...(boardBaseUrl ? { boardBaseUrl } : {}),
@@ -211,8 +213,13 @@ export function validateConfig(raw: unknown, opts: ValidateOptions = {}): Valida
   };
 }
 
-/** board.config.example.json のプレースホルダをダミー値に置き換える(deploy:check 用)。 */
-export function exampleConfig(example: unknown): unknown {
+export interface ExampleOptions {
+  /** true なら customDomain が空でもダミーのドメインを入れる(カスタムドメインの形の検査用)。 */
+  withCustomDomain?: boolean;
+}
+
+/** board.config.example.json のプレースホルダをダミー値に置き換える(deploy:check 用)。customDomain は空のまま(workers.dev の形)。 */
+export function exampleConfig(example: unknown, opts: ExampleOptions = {}): unknown {
   if (!isObj(example)) return example;
   const d = EXAMPLE_DUMMIES;
   const sub = (v: unknown, dummy: string): unknown =>
@@ -222,7 +229,9 @@ export function exampleConfig(example: unknown): unknown {
   return {
     ...example,
     workerName: sub(example.workerName, d.workerName),
-    customDomain: sub(example.customDomain, d.customDomain),
+    customDomain: opts.withCustomDomain
+      ? d.customDomain
+      : sub(example.customDomain, d.customDomain),
     d1: {
       ...d1,
       databaseId: sub(d1.databaseId, d.databaseId),
@@ -293,9 +302,16 @@ export function renderWranglerConfig(
     ...(c.boardUiBaseUrl ? { BOARD_UI_BASE_URL: c.boardUiBaseUrl } : {}),
   };
 
-  // カスタムドメインだけで公開する。workers.dev は常に無効(Access を迂回できる経路を作らない)。
-  config.routes = [{ pattern: c.customDomain, custom_domain: true }];
-  config.workers_dev = false;
+  // customDomain があればカスタムドメインだけで公開し、workers.dev は無効にする。
+  // なければ workers.dev で公開する(routes は出さない)。どちらも Worker が Access の JWT を検証する。
+  // preview_urls(Version URL)は両方で明示的に無効にする(Access を付け忘れやすい公開経路を増やさない。出力も決定的になる)。
+  if (c.customDomain) {
+    config.routes = [{ pattern: c.customDomain, custom_domain: true }];
+    config.workers_dev = false;
+  } else {
+    config.workers_dev = true;
+  }
+  config.preview_urls = false;
 
   return { ok: true, config, text: `${GENERATED_HEADER}${JSON.stringify(config, null, 2)}\n` };
 }

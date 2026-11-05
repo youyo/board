@@ -6,6 +6,8 @@
 #     BOARD_SETUP_ASSUME_TTY / BOARD_SETUP_HEALTHZ_TRIES / BOARD_SETUP_HEALTHZ_SLEEP はテスト用(対話端末とみなす / /healthz の再試行回数と待ち秒)
 #
 # 流れ: 前提の確認 → D1 がなければ作成して id を board.config.json に書き戻す → deploy:config → deploy → 未登録の secret だけ登録 → /healthz → 画面の作業の案内
+#   customDomain が無い(空)なら workers.dev で公開する: /healthz の URL は wrangler deploy の出力(`  https://<worker>.<subdomain>.workers.dev`)から取る。
+#   取れなければ失敗にせず、手で確認する案内を出して続行する(Access の有効化の案内も出す)。
 #   前提に 1 つでも欠けていたら、何も実行しない(wrangler の変更系を呼ばない)。
 #   secret の値はこのスクリプトを通らない: wrangler secret put の隠した入力を端末から直接受ける。引数・env・ファイル・ログに載せない。
 #   Access アプリ・Managed OAuth・Portal は画面の作業。docs/runbook.md の該当節を案内して終わる。
@@ -54,7 +56,7 @@ if [ "$tools_ok" -eq 1 ]; then
 fi
 [ "$missing" -eq 0 ] || exit 1
 workername="$(cli get workerName --config "$cfg")"
-domain="$(cli get customDomain --config "$cfg")"
+domain="$(cli get customDomain --config "$cfg")" # 空なら workers.dev で公開する
 echo "  OK"
 
 # ---- 2. D1 ---------------------------------------------------------------------
@@ -82,7 +84,11 @@ echo "==> deploy:config($dir/wrangler.jsonc を生成する)"
 cli generate --config "$cfg" --dir "$dir"
 
 echo "==> deploy"
-BOARD_DEPLOY_DIR="$dir" bash "$root/scripts/deploy.sh"
+body="$(mktemp)"
+deploylog="$(mktemp)"
+trap 'rm -f "$body" "$deploylog"' EXIT
+# 出力はそのまま見せつつ、workers.dev の URL を取るために控える(pipefail で deploy.sh の失敗は伝わる)
+BOARD_DEPLOY_DIR="$dir" bash "$root/scripts/deploy.sh" 2>&1 | tee "$deploylog"
 
 # ---- 4. secrets(未登録のものだけ) -------------------------------------------------
 echo "==> secrets(未登録のものだけ登録する。値は隠した入力で、このスクリプトは受け取らない)"
@@ -106,31 +112,43 @@ for name in $todo; do
 done
 
 # ---- 5. /healthz ---------------------------------------------------------------
-echo "==> https://$domain/healthz を確認する"
-tries="${BOARD_SETUP_HEALTHZ_TRIES:-6}"
-nap="${BOARD_SETUP_HEALTHZ_SLEEP:-5}"
-body="$(mktemp)"
-trap 'rm -f "$body"' EXIT
-health="unreachable"
-i=0
-while [ "$i" -lt "$tries" ]; do
-  i=$((i + 1))
-  code="$(curl -sS -m 10 -o "$body" -w '%{http_code}' "https://$domain/healthz" 2> /dev/null)" || code="000"
-  if [ "$code" = "200" ]; then health="ok"; break; fi
-  if [ "$code" = "503" ]; then health="misconfigured"; break; fi
-  [ "$i" -lt "$tries" ] && sleep "$nap"
-done
-case "$health" in
-  ok) echo "  OK(設定はそろっている)" ;;
-  misconfigured)
-    echo "  NG 503: 設定が足りない(項目名のみ)" >&2
-    cli healthz-report < "$body" >&2 || true
-    ;;
-  *) echo "  NG 到達できなかった(DNS・証明書の反映待ちかもしれない。しばらくしてもう一度 mise run setup)" >&2 ;;
-esac
+# 公開 URL: customDomain があればそれ。なければ wrangler deploy の出力の workers.dev の URL(この Worker のもの。Preview URL は除く)
+base=""
+if [ -n "$domain" ]; then
+  base="https://$domain"
+else
+  base="$(grep -Eo "https://${workername}\.[a-z0-9-]+\.workers\.dev" "$deploylog" 2> /dev/null | head -n 1 || true)"
+fi
+health="unknown"
+if [ -z "$base" ]; then
+  echo "==> /healthz の確認を飛ばした(wrangler deploy の出力から workers.dev の URL を取れなかった)"
+  echo "  https://${workername}.<アカウントのサブドメイン>.workers.dev/healthz を手で確認する(200 なら設定はそろっている。<アカウントのサブドメイン> は Cloudflare のダッシュボードの Workers & Pages に出る)"
+else
+  echo "==> $base/healthz を確認する"
+  tries="${BOARD_SETUP_HEALTHZ_TRIES:-6}"
+  nap="${BOARD_SETUP_HEALTHZ_SLEEP:-5}"
+  health="unreachable"
+  i=0
+  while [ "$i" -lt "$tries" ]; do
+    i=$((i + 1))
+    code="$(curl -sS -m 10 -o "$body" -w '%{http_code}' "$base/healthz" 2> /dev/null)" || code="000"
+    if [ "$code" = "200" ]; then health="ok"; break; fi
+    if [ "$code" = "503" ]; then health="misconfigured"; break; fi
+    [ "$i" -lt "$tries" ] && sleep "$nap"
+  done
+  case "$health" in
+    ok) echo "  OK(設定はそろっている)" ;;
+    misconfigured)
+      echo "  NG 503: 設定が足りない(項目名のみ)" >&2
+      cli healthz-report < "$body" >&2 || true
+      ;;
+    *) echo "  NG 到達できなかった(DNS・証明書の反映待ちかもしれない。しばらくしてもう一度 mise run setup)" >&2 ;;
+  esac
+fi
 
 # ---- 6. 画面の作業の案内 ---------------------------------------------------------
-cat <<MSG
+if [ -n "$domain" ]; then
+  cat <<MSG
 
 ==> 残りは画面の作業(docs/runbook.md)
 [1] Access のアプリケーション(MCP server application)を作り、Managed OAuth を有効にする(runbook の 5)
@@ -139,12 +157,26 @@ cat <<MSG
 [2] MCP Server Portal に https://$domain/mcp を登録する(runbook の 6)
 [3] 動作確認と、キャッシュの初回構築(runbook の 7、8)
 MSG
+else
+  mcp_url="${base:-https://${workername}.<アカウントのサブドメイン>.workers.dev}/mcp"
+  cat <<MSG
+
+==> 残りは画面の作業(docs/runbook.md。workers.dev で公開している)
+[1] Worker の Settings > Domains & Routes の workers.dev で Enable Cloudflare Access する(runbook の 5)
+    作られる self-hosted アプリで Managed OAuth を有効にし、その AUD タグを $cfg の access.aud に入れ、
+    mise run deploy:config && mise run deploy(runbook の 5 の 3)
+    Access を付けるまで、Worker は /healthz 以外で JWT を検証して 401 / 403 を返す(Access を迂回して使えることはない)
+[2] MCP Server Portal に $mcp_url を登録する(runbook の 6)
+[3] 動作確認と、キャッシュの初回構築(runbook の 7、8)
+MSG
+fi
 if [ -n "$secrets_pending" ]; then
   echo
   echo "未登録の secret:$secrets_pending(対話端末でないため登録を飛ばした)。端末で次を実行する:" >&2
   for name in $secrets_pending; do echo "  pnpm exec wrangler secret put $name -c $dir/wrangler.jsonc" >&2; done
   exit 1
 fi
-[ "$health" = "ok" ] || exit 1
+# 確認できなかった(workers.dev の URL が取れない)ときは失敗にしない。手で確認する案内を出してある
+[ "$health" = "ok" ] || [ "$health" = "unknown" ] || exit 1
 echo
 echo "完了($workername)。"

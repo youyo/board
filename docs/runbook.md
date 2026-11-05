@@ -72,7 +72,7 @@ upstream 専用の CI(`.github/workflows/ci.yml` の `github.repository == 'youy
 | 項目 | 必須 | 内容・形式 | 例 |
 |---|---|---|---|
 | `workerName` | 必須 | Worker 名(小文字・数字・ハイフン) | `board` |
-| `customDomain` | 必須 | 公開するホスト名(`https://` は付けない)。既存の DNS レコードがないこと | `board.example.com` |
+| `customDomain` | 任意 | 公開するホスト名(`https://` は付けない)。既存の DNS レコードがないこと。**空(キーなし、または `""`)なら workers.dev で公開する**(下の 5 の『workers.dev で公開する場合』) | `board.example.com` |
 | `d1.databaseName` | 必須 | D1 の名前 | `board-cache` |
 | `d1.databaseId` | 必須 | D1 の uuid。`<YOUR_D1_DATABASE_ID>` のままにしておくと `setup` が作成して書き戻す | |
 | `access.teamDomain` | 必須 | Zero Trust のチームドメイン | `<team>.cloudflareaccess.com` |
@@ -84,7 +84,7 @@ upstream 専用の CI(`.github/workflows/ci.yml` の `github.repository == 'youy
 使わない任意の項目は空文字のままにする。未知の項目名はエラー(綴りの間違いに気づくため)。
 
 `mise run deploy:config` が `board.config.json` と upstream の `wrangler.jsonc` から `deploy/wrangler.jsonc` を生成する。
-- `workers_dev` は常に `false`、`routes` は `customDomain`(`custom_domain: true`)だけ。
+- `customDomain` があれば `routes` は `customDomain`(`custom_domain: true`)だけで `workers_dev` は `false`。なければ `workers_dev` は `true` で `routes` は出さない。どちらも `preview_urls` は `false`(Version URL は作らない)。`customDomain` がホスト名でない・`<...>` のままならエラー。
 - `main` などの相対パスは `deploy/` から見たパス(`../src/index.ts`)に直る。
 - 生成物は**下流でコミットする**(デプロイ時に再生成しないので、CI に特別な権限が要らない)。
 - 設定の検証だけなら `mise run deploy:config:validate`(`d1.databaseId` が未作成でもよい)。
@@ -109,7 +109,7 @@ mise run setup                     # 何度でも再実行できる。--yes で 
 2. `mise run deploy:config`
 3. `mise run deploy`
 4. 未登録の secret(`BOARD_API_KEY` / `BOARD_API_TOKEN`)だけを `wrangler secret put`(隠した入力)。値はスクリプトを通らず、引数・env・ファイル・ログに残らない。登録済みのものは上書きしない。対話端末でなければ飛ばして手順を案内する。
-5. `https://<customDomain>/healthz` で確認する。503 なら、欠けている項目名を表示する。DNS・証明書の反映待ちで届かないことがあるので数回再試行する。
+5. `https://<customDomain>/healthz` で確認する。503 なら、欠けている項目名を表示する。DNS・証明書の反映待ちで届かないことがあるので数回再試行する。`customDomain` が空なら、`wrangler deploy` の出力の `https://<worker>.<subdomain>.workers.dev` で確認する。URL を取れなければ失敗にせず、`https://<worker>.<アカウントのサブドメイン>.workers.dev/healthz` を手で確認する案内を出して続ける。
 6. 画面の作業(Access・Portal)は 5〜7 を案内して終わる。
 
 途中で失敗・中断しても、原因を直して `mise run setup` を再実行すればよい(D1・登録済みの secret・生成物は冪等)。
@@ -173,7 +173,7 @@ Worker を Access の **MCP server application**(または self-hosted applicati
 Worker は OAuth サーバーを持たず、Access が発行した JWT(`Cf-Access-Jwt-Assertion`)を検証する(ADR 0001)。
 
 1. Zero Trust ダッシュボード → **Access controls** → **Applications** → アプリケーションを作る。
-   種類は MCP server application(ない場合は self-hosted application)。公開ホスト名は `board.config.json` の `customDomain`、パスは Worker 全体(または `/mcp`)。
+   種類は MCP server application(ない場合は self-hosted application)。公開ホスト名は `board.config.json` の `customDomain`、パスは Worker 全体(または `/mcp`)。`customDomain` が空(workers.dev)なら下の『workers.dev で公開する場合』。
 2. アプリケーションを編集 → **Advanced settings** → **Managed OAuth** を ON にして保存する。
    (Managed OAuth は MCP server application / self-hosted application では既定 OFF。Portal では新規作成時に既定 ON。)
 3. **AUD タグ**を取得する: アプリケーションの設定画面の **Basic information**(Application Audience (AUD) Tag)。64 桁の 16 進。
@@ -183,14 +183,22 @@ Worker は OAuth サーバーを持たず、Access が発行した JWT(`Cf-Acces
    live 用の service token は 7 で別に追加する。
 5. 動作確認: `curl -i https://<domain>/mcp` は Access のログインへのリダイレクトか 401 になる(JWT なし)。ブラウザの MCP クライアントでつなぎ、ログインできること。
 
-> Access を迂回する経路がないことを確かめる: `workers_dev` は無効で、カスタムドメイン以外に Worker の URL は存在しない。
+> Access を迂回する経路がないことを確かめる: `customDomain` がある場合、`workers_dev` は無効で、カスタムドメイン以外に Worker の URL は存在しない。`preview_urls`(Version URL)はどちらの場合も無効。
+
+**workers.dev で公開する場合**(`customDomain` が空。Portal に登録するサーバーを workers.dev で公開している環境向け)
+
+1. `mise run setup`(または `deploy`)で Worker を作る。公開 URL は `https://<worker>.<subdomain>.workers.dev`。
+2. Worker の Settings > Domains & Routes の workers.dev で **Enable Cloudflare Access** する。作られる self-hosted アプリケーションを開き、**Managed OAuth** を有効にする。その AUD タグを `board.config.json` の `access.aud` に入れ、`deploy:config` → `deploy` で反映する(上の 3、4 と同じ)。
+3. Portal の HTTP URL は `https://<worker>.<subdomain>.workers.dev/mcp`(6)。
+4. **【未検証】** MCP server application 型を workers.dev ホストで作れるか、workers.dev で Access と Managed OAuth が動き JWT が Worker に届くかは実機で確かめていない(`docs/manual-verification.md` の V10)。作れなければ self-hosted application で足りるかを確かめる。
+5. Access を付けるまでの間も、Worker は `/healthz` 以外で JWT を検証するので、workers.dev に直接来ても 401 / 403 になる(Access の代わりにはならない。多層防御の 2 枚目)。
 
 ## 6. MCP Server Portal への登録
 
 Portal を使うと、複数の MCP サーバーを 1 つの URL にまとめ、クライアントには Portal の URL だけを渡せる。
 
 1. Zero Trust → **Access controls** → **MCP Portals** → **MCP servers** タブ → **Add MCP server**。
-2. 名前を入れ、**HTTP URL** に `https://<domain>/mcp`(`customDomain` + `/mcp`)を入れる。
+2. 名前を入れ、**HTTP URL** に `https://<domain>/mcp`(`customDomain` + `/mcp`。workers.dev なら `https://<worker>.<subdomain>.workers.dev/mcp`)を入れる。
 3. Access ポリシーでサーバーを見せる利用者を絞る。OAuth credentials は **Automatic**(DCR)。保存して接続し、状態が **Ready** になることを確認する。
 4. **Add server portal** で Portal を作り(または既存の Portal に)このサーバーを追加する。Portal の URL は `https://<portal-subdomain>.<domain>/mcp`。
 5. Portal 経由だとツール名の前に `board_` が付く(例 `board_list_clients`)。

@@ -91,7 +91,7 @@ Worker を直接 MCP クライアントにつなぐ場合も、Access の MCP se
 
 ## 前提
 
-- Cloudflare アカウント(Workers **Paid** プラン推奨。下記)、Cloudflare Access(Zero Trust)、カスタムドメイン。
+- Cloudflare アカウント(Workers **Paid** プラン推奨。下記)、Cloudflare Access(Zero Trust)、カスタムドメイン(任意。なければ workers.dev で公開する。[docs/runbook.md](docs/runbook.md) の 5)。
 - BOARD の API キーとトークン(BOARD の設定画面で発行する)。
 - ローカルの作業: [mise](https://mise.jdx.dev/)(node 24 / pnpm 11 は `mise.toml` が入れる)。
 

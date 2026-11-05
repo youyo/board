@@ -2,7 +2,7 @@
 // board.config.json(秘密でない値)と upstream の wrangler.jsonc から、deploy/wrangler.jsonc を生成・検査する(docs/runbook.md)。
 // ロジックは core.ts。ここは引数・ファイル入出力・終了コードだけ。
 //
-//   node scripts/deploy-config/main.ts generate [--example] [--config <path>] [--dir <dir>]
+//   node scripts/deploy-config/main.ts generate [--example [--with-domain]] [--config <path>] [--dir <dir>]
 //   node scripts/deploy-config/main.ts check    [--config <path>] [--dir <dir>]
 //   node scripts/deploy-config/main.ts validate [--pending-d1] [--config <path>]   設定の検証だけ(setup の前提確認)
 //   node scripts/deploy-config/main.ts get <workerName|customDomain|d1.databaseId|d1.databaseName> [--config <path>]
@@ -11,7 +11,9 @@
 //   node scripts/deploy-config/main.ts healthz-report                                 標準入力の /healthz の本文から欠けた項目名を出す
 //
 // 既定: 設定は <repo>/board.config.json、出力先は <repo>/deploy。--example は board.config.example.json のプレースホルダを
-// ダミー値にして <repo>/.wrangler/deploy-example に作る(dry-run 専用。deploy:check)。
+// ダミー値にして <repo>/.wrangler/deploy-example に作る(dry-run 専用。deploy:check)。example の customDomain は空なので workers.dev の形。
+// --example --with-domain はダミーのドメインを入れ、カスタムドメインの形を <repo>/.wrangler/deploy-example-domain に作る(deploy:check が両方を検査する)。
+// get customDomain は、未設定なら空行を出して終了コード 0(setup.sh が workers.dev の分岐に使う)。
 // エラーには項目名だけを出し、設定の値は出さない。
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
@@ -27,12 +29,13 @@ import {
 
 const ROOT = resolve(import.meta.dirname, "../..");
 const USAGE =
-  "使い方: deploy-config <generate|check|validate|get|set-d1|find-d1|healthz-report> [--example] [--pending-d1] [--config <path>] [--dir <dir>]";
+  "使い方: deploy-config <generate|check|validate|get|set-d1|find-d1|healthz-report> [--example] [--with-domain] [--pending-d1] [--config <path>] [--dir <dir>]";
 
 interface Args {
   cmd: string;
   positional: string[];
   example: boolean;
+  withDomain: boolean;
   pendingD1: boolean;
   config?: string;
   dir?: string;
@@ -41,10 +44,11 @@ interface Args {
 function parseArgs(argv: string[]): Args {
   const [cmd, ...rest] = argv;
   if (!cmd) throw new Error("サブコマンドが要ります");
-  const args: Args = { cmd, positional: [], example: false, pendingD1: false };
+  const args: Args = { cmd, positional: [], example: false, withDomain: false, pendingD1: false };
   for (let i = 0; i < rest.length; i++) {
     const a = rest[i] as string;
     if (a === "--example") args.example = true;
+    else if (a === "--with-domain") args.withDomain = true;
     else if (a === "--pending-d1") args.pendingD1 = true;
     else if (a === "--config" || a === "--dir") {
       const v = rest[++i];
@@ -82,10 +86,19 @@ function stdin(): string {
 }
 
 function generate(args: Args, check: boolean): number {
+  if (args.withDomain && !args.example) {
+    console.error("--with-domain は --example と一緒にだけ使える");
+    return 2;
+  }
   const configPath = resolve(args.config ?? join(ROOT, "board.config.json"));
-  const dir = resolve(args.dir ?? join(ROOT, args.example ? ".wrangler/deploy-example" : "deploy"));
+  const exampleDir = args.withDomain
+    ? ".wrangler/deploy-example-domain"
+    : ".wrangler/deploy-example";
+  const dir = resolve(args.dir ?? join(ROOT, args.example ? exampleDir : "deploy"));
   const raw = args.example
-    ? exampleConfig(readJson(join(ROOT, "board.config.example.json")))
+    ? exampleConfig(readJson(join(ROOT, "board.config.example.json")), {
+        withCustomDomain: args.withDomain,
+      })
     : readJson(configPath);
   const relBase = relative(dir, ROOT).split(sep).join("/") || ".";
   const base = readFileSync(join(ROOT, "wrangler.jsonc"), "utf8");

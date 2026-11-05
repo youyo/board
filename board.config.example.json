@@ -1,6 +1,6 @@
 {
   "workerName": "<YOUR_WORKER_NAME>",
-  "customDomain": "<YOUR_CUSTOM_DOMAIN>",
+  "customDomain": "",
   "d1": {
     "databaseId": "<YOUR_D1_DATABASE_ID>",
     "databaseName": "<YOUR_D1_DATABASE_NAME>"
