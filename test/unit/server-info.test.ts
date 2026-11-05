@@ -4,9 +4,9 @@ import { ALL_TOOLS } from "../../src/mcp/tools";
 import { firstText, rpcTo } from "../helpers/mcp";
 
 describe("server_info", () => {
-  it("ALL_TOOLS の先頭は server_info(api 層の 40 個が続く。M04)", () => {
+  it("ALL_TOOLS の先頭は server_info(api 層の 40 個 + find 層の 11 個が続く。M04・M05)", () => {
     expect(ALL_TOOLS[0]?.name).toBe("server_info");
-    expect(ALL_TOOLS).toHaveLength(41);
+    expect(ALL_TOOLS).toHaveLength(52);
   });
 
   it("名前とバージョンだけを返す", async () => {

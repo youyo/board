@@ -10,6 +10,8 @@ export async function resetCache(db: D1Database = testDb()): Promise<D1Database>
   await db.batch([
     db.prepare("DELETE FROM resource_cache"),
     db.prepare("DELETE FROM sync_state"),
+    db.prepare("DELETE FROM document_project_map"),
+    db.prepare("DELETE FROM document_scan_state"),
     db.prepare("DELETE FROM cache_meta WHERE key <> 'db_schema_version'"),
   ]);
   return db;

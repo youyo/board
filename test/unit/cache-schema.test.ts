@@ -17,12 +17,19 @@ describe("スキーマの適用", () => {
     await resetCache();
   });
 
-  it("3 つのテーブルと索引を作り、スキーマ版を cache_meta に書く", async () => {
+  it("テーブルと索引を作り、スキーマ版を cache_meta に書く(v2 で書類 → 案件の逆引きの 2 表を追加)", async () => {
     const db = testDb();
     await applySchema(db);
     expect(await names(db, "table")).toEqual(
-      expect.arrayContaining(["cache_meta", "resource_cache", "sync_state"]),
+      expect.arrayContaining([
+        "cache_meta",
+        "resource_cache",
+        "sync_state",
+        "document_project_map",
+        "document_scan_state",
+      ]),
     );
+    expect(SCHEMA_VERSION).toBe(2);
     expect(await names(db, "index")).toEqual(
       expect.arrayContaining(["idx_resource_cache_generation", "idx_resource_cache_updated"]),
     );
@@ -49,6 +56,31 @@ describe("スキーマの適用", () => {
     expect(await names(db, "table")).toEqual(before);
     const n = await db.prepare("SELECT count(*) AS c FROM resource_cache").first<{ c: number }>();
     expect(n?.c).toBe(1);
+  });
+
+  it("v1 のデータベースに v2 だけを足す(既存のデータを壊さない)", async () => {
+    const db = testDb();
+    await applySchema(db);
+    await db.prepare("DROP TABLE document_project_map").run();
+    await db.prepare("DROP TABLE document_scan_state").run();
+    await db
+      .prepare(
+        "INSERT OR REPLACE INTO resource_cache (resource_name, entity_id, payload_json, fetched_at) VALUES ('clients', 9, '{}', 'x')",
+      )
+      .run();
+    await db.prepare("UPDATE cache_meta SET value = '1' WHERE key = 'db_schema_version'").run();
+    await applySchema(db);
+    expect(await names(db, "table")).toEqual(
+      expect.arrayContaining(["document_project_map", "document_scan_state"]),
+    );
+    const n = await db
+      .prepare("SELECT count(*) AS c FROM resource_cache WHERE entity_id = 9")
+      .first<{ c: number }>();
+    expect(n?.c).toBe(1);
+    const v = await db
+      .prepare("SELECT value FROM cache_meta WHERE key = 'db_schema_version'")
+      .first<{ value: string }>();
+    expect(v?.value).toBe("2");
   });
 
   it("profile の列を持たない(1 デプロイ = 1 アカウント)", async () => {

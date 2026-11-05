@@ -6,7 +6,7 @@
  * - 版の管理は `cache_meta.db_schema_version`。将来の変更は MIGRATIONS に版を足す(各版は冪等に書く)。
  */
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 const DDL_V1: string[] = [
   // エンティティ単位の JSON。generation は full refresh の世代(古い世代の行は full の完了時に消す)。
@@ -52,7 +52,30 @@ const DDL_V1: string[] = [
   )`,
 ];
 
-const MIGRATIONS: Array<{ version: number; ddl: string[] }> = [{ version: 1, ddl: DDL_V1 }];
+// v2(M05): 書類 ID → 案件 ID の逆引き(find 層)。書類の API は案件 ID を返さないので、
+// projects を response_group 付きで走査して得た対応を残す。走査はページ単位で再開できる(締め切りで止まっても進捗が残る)。
+const DDL_V2: string[] = [
+  `CREATE TABLE IF NOT EXISTS document_project_map (
+    document_kind TEXT NOT NULL,
+    document_id INTEGER NOT NULL,
+    project_id INTEGER NOT NULL,
+    recorded_at TEXT NOT NULL,
+    PRIMARY KEY (document_kind, document_id)
+  )`,
+  `CREATE TABLE IF NOT EXISTS document_scan_state (
+    document_kind TEXT PRIMARY KEY,
+    next_page INTEGER,
+    started_at TEXT,
+    completed_at TEXT,
+    lock_started_at TEXT,
+    lock_owner TEXT
+  )`,
+];
+
+const MIGRATIONS: Array<{ version: number; ddl: string[] }> = [
+  { version: 1, ddl: DDL_V1 },
+  { version: 2, ddl: DDL_V2 },
+];
 
 const VERSION_KEY = "db_schema_version";
 

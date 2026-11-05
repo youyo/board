@@ -6,6 +6,7 @@ import type { McpServer, StandardSchemaWithJSON } from "@modelcontextprotocol/se
 import type { z } from "zod";
 import { ArgumentError, BoardError, toErrorEnvelope } from "../errors";
 import type { Repositories } from "../repository";
+import type { DocumentIndex } from "../repository/document-index";
 import {
   assertWithinResponseLimit,
   maxResponseTokensShape,
@@ -62,6 +63,10 @@ export interface ToolContext {
   signal?: AbortSignal;
   /** 22 リソースの repository(D1 + BOARD クライアント)。設定されていないサーバーでは呼ぶと例外。 */
   repositories: () => Repositories;
+  /** 書類 ID → 案件 ID の逆引き(find 層)。設定されていないサーバーでは呼ぶと例外。 */
+  documentIndex: () => DocumentIndex;
+  /** BOARD の UI のベース URL(find 層の url の組み立てに使う)。空なら url は付けない。 */
+  uiBaseUrl: string;
 }
 
 export interface ToolDefinitionInput<S extends z.ZodObject> {
@@ -118,10 +123,15 @@ export interface RegisterDeps {
   now?: () => Date;
   /** repository の取得口。省略時、ツールが `ctx.repositories()` を呼ぶと例外(generic_error)。 */
   repositories?: () => Repositories;
+  documentIndex?: () => DocumentIndex;
+  uiBaseUrl?: string;
 }
 
 const noRepositories = (): Repositories => {
   throw new Error("repositories are not configured for this server");
+};
+const noDocumentIndex = (): DocumentIndex => {
+  throw new Error("documentIndex is not configured for this server");
 };
 
 function textResult(text: string, isError = false) {
@@ -193,6 +203,8 @@ export function registerTools(
             now: deps.now ?? (() => new Date()),
             signal: extra?.mcpReq?.signal,
             repositories: deps.repositories ?? noRepositories,
+            documentIndex: deps.documentIndex ?? noDocumentIndex,
+            uiBaseUrl: deps.uiBaseUrl ?? "",
           });
           const text = JSON.stringify(result ?? null);
           if (responseLimit !== undefined) assertWithinResponseLimit(text, responseLimit);

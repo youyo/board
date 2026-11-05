@@ -20,7 +20,7 @@ import {
   type RefreshTarget,
   refreshResource,
 } from "../refresh/refresher";
-import { applyLimit, isCacheableFilter, isZeroFilter } from "./filter";
+import { isCacheableFilter, isZeroFilter, limitResult } from "./filter";
 import { SPECS } from "./resources";
 import type { CacheFirstSpec, DocumentSpec, ListSpec } from "./spec";
 import type { GetReadResult, ListReadResult, ReadOptions } from "./types";
@@ -83,7 +83,7 @@ function createListRepository<E, F extends CommonListOptions>(
   ): Promise<ListReadResult<E>> {
     const r = await spec.list(deps.client, filter, undefined, ctx);
     return {
-      items: applyLimit(r.items, readOpts.limit),
+      ...limitResult(r.items, readOpts.limit),
       source: "api",
       cache: [],
       truncated: r.truncated,
@@ -99,17 +99,23 @@ function createListRepository<E, F extends CommonListOptions>(
     // nonzero-api: 非ゼロのフィルタは refresh もキャッシュも経由しない(Go と同じ)。
     if (spec.kind === "nonzero-api" && !zero) return viaApi(filter, readOpts, ctx);
 
+    // cache-first: キャッシュでは扱えない絞り込み(サーバー専用の項目)が 1 つでもあれば、結果は必ず API から取る。
+    // その場合 refresh は結果に効かない(通信が無駄になり、refresh_in_progress にもなりうる)ので、走らせない(M04 の指摘)。
+    const cf = spec.kind === "cache-first" ? spec.cacheFirst : undefined;
+    if (!zero && cf && !isCacheableFilter(filter, cf.keys)) return viaApi(filter, readOpts, ctx);
+
     const outcome = await maybeRefresh(readOpts, ctx);
 
     if (!zero) {
-      // cache-first: キャッシュ側で絞れる項目だけで、同期済みなら fold で絞る。そうでなければ API。
-      const cf = (spec as CacheFirstSpec<E, F>).cacheFirst;
-      if (isCacheableFilter(filter, cf.keys) && hasSynced(await getSyncState(deps.db, resource))) {
+      // キャッシュで絞れる項目だけ: 同期済みなら fold で絞る。未同期(refresh が失敗・partial など)なら API。
+      if (hasSynced(await getSyncState(deps.db, resource))) {
         try {
           const entries = await listEntries<E>(deps.db, resource);
-          const items = entries.map((e) => e.entity).filter((e) => cf.match(e, filter));
+          const items = entries
+            .map((e) => e.entity)
+            .filter((e) => (cf as CacheFirstSpec<E, F>["cacheFirst"]).match(e, filter));
           return {
-            items: applyLimit(items, readOpts.limit),
+            ...limitResult(items, readOpts.limit),
             source: "cache",
             cache: [await info(outcome)],
           } satisfies ListReadResult<E>;
@@ -123,7 +129,7 @@ function createListRepository<E, F extends CommonListOptions>(
     // ゼロフィルタ: キャッシュ全件。空なら空(未取得は cache の cached_at が無いことで分かる。API は呼ばない)。
     const entries = await listEntries<E>(deps.db, resource);
     return {
-      items: applyLimit(
+      ...limitResult(
         entries.map((e) => e.entity),
         readOpts.limit,
       ),

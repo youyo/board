@@ -208,6 +208,21 @@ describe("list の出力", () => {
     expect(l0.json.items).toHaveLength(5);
   });
 
+  it("limit で切ったときだけ limited:true と total_before_limit を付ける(truncated とは別)", async () => {
+    const key = { [`GET ${BASE}/v1/contacts`]: ok(makeEntities(5)) };
+    const cut = await callApiTool("list_contacts", { name_cont: "a", limit: 2 }, key);
+    expect(cut.json.limited).toBe(true);
+    expect(cut.json.total_before_limit).toBe(5);
+    expect("truncated" in cut.json).toBe(false);
+    for (const limit of [5, 9, 0]) {
+      const r = await callApiTool("list_contacts", { name_cont: "a", limit }, key);
+      expect("limited" in r.json, `limit=${limit}`).toBe(false);
+      expect("total_before_limit" in r.json, `limit=${limit}`).toBe(false);
+    }
+    const unlimited = await callApiTool("list_contacts", { name_cont: "a" }, key);
+    expect("limited" in unlimited.json).toBe(false);
+  });
+
   it("refresh=full でキャッシュを作り、refresh=none ではキャッシュから返す(cache に鮮度が載る)", async () => {
     const key = { [`GET ${BASE}/v1/clients`]: ok(makeEntities(3)) };
     const full = await callApiTool("list_clients", { refresh: "full" }, key);
@@ -334,6 +349,10 @@ describe("呼び出しコンテキスト", () => {
   const toolCtx = (signal?: AbortSignal) => ({
     now: () => new Date(),
     signal,
+    documentIndex: () => {
+      throw new Error("api 層では使わない");
+    },
+    uiBaseUrl: "",
     repositories: () =>
       createRepositories({
         db: testDb(),
@@ -372,6 +391,26 @@ describe("呼び出しコンテキスト", () => {
     });
     await tool("list_contacts").handler({}, { ...base, repositories: () => repos });
     expect(spy).toHaveBeenCalledTimes(1);
+    expect(deadlines[0]).toBeGreaterThanOrEqual(t0 + 30_000);
+    expect(deadlines[0]).toBeLessThan(t0 + 31_000);
+  });
+
+  it("締め切りは ctx.now() ではなく Date.now()(BOARD クライアントと同じ時計)から作る", async () => {
+    const t0 = Date.now();
+    const deadlines: number[] = [];
+    const base = toolCtx();
+    const repos = base.repositories();
+    vi.spyOn(repos.contacts, "list").mockImplementation(async (_f, _o, ctx) => {
+      deadlines.push(ctx?.deadline ?? 0);
+      return { items: [], source: "api", cache: [] };
+    });
+    // ツールの時計が大きくずれていても、締め切りは本物の時計から 30 秒後。
+    const skewed = {
+      ...base,
+      now: () => new Date("2000-01-01T00:00:00Z"),
+      repositories: () => repos,
+    };
+    await tool("list_contacts").handler({}, skewed);
     expect(deadlines[0]).toBeGreaterThanOrEqual(t0 + 30_000);
     expect(deadlines[0]).toBeLessThan(t0 + 31_000);
   });

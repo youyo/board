@@ -16,7 +16,7 @@ import type { GetReadResult } from "./types";
 
 export type { CacheInfo } from "../cache/info";
 export type { RefreshOutcome } from "../refresh/refresher";
-export { applyLimit, isCacheableFilter, isZeroFilter } from "./filter";
+export { applyLimit, isCacheableFilter, isZeroFilter, limitResult } from "./filter";
 export type { DocumentRepository, ListRepository, RepositoryDeps } from "./repository";
 export { SPECS } from "./resources";
 export type { GetReadResult, ListReadResult, ReadOptions, RefreshChoice } from "./types";

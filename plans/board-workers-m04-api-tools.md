@@ -170,3 +170,12 @@ find 層(M05)、cache 系ツール・README・ツール一覧と README の突�
 
 - **応答サイズ**: cache-first の `refresh=full` 後のゼロフィルタ list は全件を返す(clients / projects は数千件)。`max_response_tokens`(既定 50,000)を超えると `response_too_large` になるので、LLM は `limit` や絞り込みを使う。description に書いてはいるが、実運用で既定の上限に当たりやすいかは M06 の `test:live` で確かめる。
 - **`include_archive_flg: false` の明示**: cache-first / nonzero-api のどちらでも『指定あり』になり API を直接呼ぶ(Go の `*bool` と同じ)。LLM が不必要に `false` を付けるとキャッシュを使わなくなる。description に『false を明示すると 0 を送る』と書いた。
+
+## M05 での追補(M04 の検証の指摘 4 点への対応)
+
+- **cache-first の list × サーバー専用の項目 × `refresh=delta/full`**: refresh を走らせず BOARD を直接呼ぶ(nonzero-api の『非ゼロのフィルタなら refresh を無視』と同じ扱い)。以前は refresh のあとに API を呼んでいて、通信が無駄になり `refresh_in_progress` にもなりえた。
+  repository の `list` を変更(`src/repository/repository.ts`)。description に『このとき refresh は無視される』を追記。キャッシュで絞れる項目だけの指定、および未同期のフォールバックは従来どおり(refresh は効く)。
+- **`limit` で切ったことの通知**: list の出力に、切ったときだけ `limited: true` と `total_before_limit`(切る前の件数)。`truncated`(API のページ打ち切り)とは別の意味。`limit` の description に明記。repository の結果に `totalBeforeLimit`。
+- **締め切りの時計**: `callContextOf` は `Date.now() + 30 秒`(BOARD クライアントの判定と同じ時計)。`ctx.now()`(テストで差し替える時計)は使わない。`src/mcp/call-context.ts` に移した(find 層と共有)。
+- **`response_too_large`**: 『絞り込む』に加えて『`limit` を指定する』を案内する。cache-first の list の description に『まず limit か絞り込みを指定する』。
+- 変えた既存テストの期待値: `test/snapshots/tools_list.json`(description の変更のみ)。それ以外の既存テストの期待値は変えていない(新しいテストを足した)。

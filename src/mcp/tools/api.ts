@@ -9,7 +9,7 @@
  *   1 クライアントでの直列実行が上限の役割を果たす。
  */
 import { z } from "zod";
-import { type CallContext, DEFAULT_CALL_BUDGET_MS } from "../../board/context";
+import type { CallContext } from "../../board/context";
 import type { GetReadResult, ListReadResult, ReadOptions, RefreshChoice } from "../../repository";
 import {
   idArg,
@@ -22,7 +22,8 @@ import {
   optStrArray,
   REFRESH_CHOICES,
 } from "../args";
-import { defineTool, type ToolContext, type ToolDefinition } from "../registry";
+import { callContextOf } from "../call-context";
+import { defineTool, type ToolDefinition } from "../registry";
 import {
   API_RESOURCES,
   COMMON_FILTERS,
@@ -52,7 +53,8 @@ function fieldSchema(f: FieldDef): z.ZodType {
 
 const REFRESH_LIST_DESC =
   "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)";
-const LIMIT_DESC = "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)";
+const LIMIT_DESC =
+  "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)。件数を切ったときだけ、応答に limited: true と total_before_limit(切る前の件数)が付く。truncated(BOARD のページ巡回の打ち切り)とは別の意味";
 const SHOW_META_DESC =
   "true で応答に _meta(BOARD の応答ヘッダー由来: total_count / rate_limit_remaining / etag など)を付ける。BOARD から直接取ったときだけ値が入る";
 
@@ -83,11 +85,6 @@ export function toListFilter(
 
 // --- 呼び出し ------------------------------------------------------------------------------
 
-/** ツール呼び出しごとに 1 つ作る。signal は MCP のリクエストのもの、締め切りは既定の持ち時間。 */
-export function callContextOf(ctx: ToolContext): CallContext {
-  return { signal: ctx.signal, deadline: ctx.now().getTime() + DEFAULT_CALL_BUDGET_MS };
-}
-
 interface CommonArgs {
   refresh?: RefreshChoice;
   limit?: number;
@@ -104,6 +101,9 @@ function listOutput(r: ListReadResult<unknown>, showMeta: boolean | undefined) {
     items: r.items,
     cache: r.cache,
     ...(r.truncated ? { truncated: true } : {}),
+    ...(r.totalBeforeLimit !== undefined
+      ? { limited: true, total_before_limit: r.totalBeforeLimit }
+      : {}),
     ...(showMeta && r._meta ? { _meta: r._meta } : {}),
   };
 }
@@ -121,14 +121,15 @@ function getOutput(r: GetReadResult<unknown>, showMeta: boolean | undefined) {
 function listDescription(def: ResourceDef): string {
   const head = `${def.label}の一覧を返す。${def.summary}。`;
   const common =
-    "結果は {items, cache, truncated?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。";
+    "結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。";
   if (def.mode === "cache-first") {
     const keys = def.fields.filter((f) => f.cacheable).map((f) => f.arg);
     return (
       `${head}絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。` +
       `最新が要るときは refresh=delta(差分)か refresh=full(全件)を指定する。` +
+      `件数が多いリソースでは全件を返すと応答が大きくなるので、まず limit か絞り込みを指定する。` +
       `絞り込み: ${keys.join(" / ")} だけを指定した場合は、同期済みならキャッシュを絞って返す。それ以外の引数(updated_at_* / include_archive_flg` +
-      `${def.fields.some((f) => f.arg === "tags") ? " / tags" : ""} / response_group などサーバー側の指定を含む)を指定したとき、またはキャッシュが未同期のときは BOARD の API を直接呼び、cache は空になる。${common}`
+      `${def.fields.some((f) => f.arg === "tags") ? " / tags" : ""} / response_group などサーバー側の指定を含む)を指定したときは BOARD の API を直接呼び(このとき refresh は無視される)、キャッシュが未同期のときも API を直接呼ぶ。API から取った結果の cache は空になる。${common}`
     );
   }
   return (

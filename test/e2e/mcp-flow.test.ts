@@ -37,7 +37,7 @@ describe("E2E: /mcp (Access の JWT つき)", () => {
     const list = await readRpc(await mcpCall(jwt, "tools/list", {}, 2));
     const names = list.result?.tools?.map((t) => t.name) ?? [];
     expect(names).toContain("server_info");
-    expect(names).toHaveLength(41); // server_info + api 層 40 個(M04)
+    expect(names).toHaveLength(52); // server_info + api 層 40 個(M04)+ find 層 11 個(M05)
 
     const call = await readRpc(
       await mcpCall(jwt, "tools/call", { name: "server_info", arguments: {} }, 3),

@@ -43,7 +43,7 @@ export class ResponseTooLargeError extends BoardError {
     super(
       "response_too_large",
       `Response is too large: estimated size ${estimatedTokens} tokens exceeds the limit of ${limit} tokens. ` +
-        "Narrow the request and retry (e.g. use filters or a smaller page size), " +
+        "Narrow the request and retry (e.g. use filters, or set the limit argument to cap the number of items), " +
         "or raise max_response_tokens (0 disables the limit).",
       false,
     );

@@ -34,6 +34,14 @@ export const idArg = (description: string) =>
     .refine((n) => isInt(n) && n >= 1, "must be a positive integer")
     .describe(description);
 
+/** 任意の ID(1 以上の整数。JSON Schema 上は number)。 */
+export const optId = (description: string) =>
+  z
+    .number()
+    .refine((n) => isInt(n) && n >= 1, "must be a positive integer")
+    .describe(description)
+    .optional();
+
 /** 0 以上の整数(JSON Schema 上は number)。 */
 export const optNonNegativeInt = (description: string) =>
   z

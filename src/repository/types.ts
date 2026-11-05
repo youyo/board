@@ -16,6 +16,8 @@ export interface ListReadResult<E> {
   source: "cache" | "api";
   /** 読んだリソースの鮮度情報。M05 の find 層がまとめて応答の `cache` 配列にする。 */
   cache: CacheInfo[];
+  /** limit で件数を切ったときだけ: 切る前の件数。API のページ打ち切り(truncated)とは別の意味。 */
+  totalBeforeLimit?: number;
   /** api のときだけ: ページ数の上限で止めた。 */
   truncated?: boolean;
   /** api のときだけ: 最終ページの応答ヘッダーから作った `_meta`。 */

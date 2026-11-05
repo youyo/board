@@ -51,6 +51,9 @@ describe("エラーエンベロープ", () => {
     expect(env.error.message).toContain("1234");
     expect(env.error.message).toContain("100");
     expect(env.error.message).toContain("max_response_tokens");
+    // 絞り込みに加えて limit を案内する(M04 指摘)。
+    expect(env.error.message).toContain("limit argument");
+    expect(env.error.message).toContain("filters");
   });
 
   it("想定外の例外は内部情報(message)を漏らさず generic_error にする", () => {

@@ -1,5 +1,6 @@
 import { createMcpServer } from "../../src/mcp/server";
 import { createRepositories } from "../../src/repository";
+import { createDocumentIndex } from "../../src/repository/document-index";
 import { BASE, testClient } from "./board-list";
 import { testDb } from "./d1";
 import { firstText, rpcTo } from "./mcp";
@@ -40,6 +41,8 @@ export async function callApiTool(
     () =>
       createMcpServer({
         repositories: () => createRepositories({ db: testDb(), client: testClient() }),
+        documentIndex: () => createDocumentIndex({ db: testDb(), client: testClient() }),
+        uiBaseUrl: "https://board.test",
       }),
     "tools/call",
     { name, arguments: args },

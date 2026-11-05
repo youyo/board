@@ -132,12 +132,15 @@ const props = (name: string) =>
   ).sort();
 
 describe("api 層のツール一覧", () => {
-  it("server_info + list 18 + get 22 = 41 個", () => {
+  it("api 層は list 18 + get 22(server_info と find 層は別)", () => {
     expect(Object.keys(LIST_TOOLS)).toHaveLength(18);
     expect(Object.keys(GET_TOOLS)).toHaveLength(22);
-    expect(ALL_TOOLS.map((t) => t.name).sort()).toEqual(
-      ["server_info", ...Object.values(LIST_TOOLS), ...Object.values(GET_TOOLS)].sort(),
-    );
+    // 全体は server_info + api 層 40 個 + find 層 11 個(find 層は find-tools-definitions.test.ts)。
+    expect(
+      ALL_TOOLS.map((t) => t.name)
+        .filter((n) => !n.startsWith("find_"))
+        .sort(),
+    ).toEqual(["server_info", ...Object.values(LIST_TOOLS), ...Object.values(GET_TOOLS)].sort());
   });
 
   it("すべて ReadOnly で、接頭辞はなく、title と description がある", () => {
@@ -177,6 +180,35 @@ describe("list の引数は Go 版 CLI のフィルタフラグと一致する",
     ]) {
       const d = byName.get(LIST_TOOLS[resource] as string)?.description ?? "";
       expect(d, resource).toContain("API を直接");
+    }
+  });
+
+  it("cache-first の list は『サーバー側の項目では refresh が無視される』と『まず limit か絞り込み』を書く", () => {
+    for (const resource of [
+      "clients",
+      "projects",
+      "invoices",
+      "purchase_orders",
+      "payments",
+      "users",
+      "vendors",
+    ]) {
+      const d = byName.get(LIST_TOOLS[resource] as string)?.description ?? "";
+      expect(d, resource).toContain("refresh は無視");
+      expect(d, resource).toContain("まず limit か絞り込み");
+    }
+  });
+
+  it("list の limit の description に、切ったときの limited / total_before_limit を書く", () => {
+    for (const tool of Object.values(LIST_TOOLS)) {
+      const p = (
+        z.toJSONSchema(byName.get(tool)?.inputSchema as z.ZodObject) as {
+          properties: Record<string, { description?: string }>;
+        }
+      ).properties;
+      expect(p.limit?.description, tool).toContain("limited");
+      expect(p.limit?.description, tool).toContain("total_before_limit");
+      expect(p.limit?.description, tool).toContain("truncated");
     }
   });
 

@@ -103,6 +103,48 @@ describe("cache-first リソース(clients)", () => {
     expect(new URL(api.calls.at(-1)?.url ?? "").searchParams.getAll("tags[]")).toEqual(["vip"]);
   });
 
+  it("サーバー専用の項目と refresh=full を同時に指定したら、refresh を走らせず API だけを呼ぶ(M04 指摘)", async () => {
+    const { repos, db } = setup();
+    const api = mockOutboundFetch({
+      [clientsKey]: pagedHandler(() => [{ id: 1, name: "live" }]),
+    });
+    // 別の呼び出しが refresh 中でも refresh_in_progress にならない(refresh を試みない)。
+    await tryAcquireLock(db, "clients");
+    for (const refresh of ["full", "delta"] as const) {
+      const r = await repos.clients.list({ tags: ["vip"] }, { refresh });
+      expect(r.source).toBe("api");
+      expect(r.cache).toEqual([]);
+    }
+    // 通信は API の絞り込み 2 回だけ(refresh の分の通信がない)。
+    expect(api.calls).toHaveLength(2);
+    for (const c of api.calls) {
+      expect(new URL(c.url).searchParams.getAll("tags[]")).toEqual(["vip"]);
+    }
+    expect((await getSyncState(db, "clients"))?.last_synced_at).toBeNull();
+  });
+
+  it("キャッシュで絞れる項目だけなら、refresh 指定はこれまでどおり効く", async () => {
+    const { repos } = setup();
+    const api = mockOutboundFetch({ [clientsKey]: pagedHandler(clientRows) });
+    const r = await repos.clients.list({ nameCont: "client" }, { refresh: "full" });
+    expect(r.source).toBe("cache");
+    expect(r.cache[0]).toMatchObject({ refresh_state: "complete" });
+    expect(api.calls).toHaveLength(1);
+  });
+
+  it("limit で切ったときだけ totalBeforeLimit を返す", async () => {
+    const { repos } = setup();
+    mockOutboundFetch({ [clientsKey]: pagedHandler(clientRows) });
+    await repos.clients.list({}, { refresh: "full" });
+    const cut = await repos.clients.list({}, { limit: 2 });
+    expect(cut.items).toHaveLength(2);
+    expect(cut.totalBeforeLimit).toBe(5);
+    const exact = await repos.clients.list({}, { limit: 5 });
+    expect(exact.totalBeforeLimit).toBeUndefined();
+    const none = await repos.clients.list({}, {});
+    expect(none.totalBeforeLimit).toBeUndefined();
+  });
+
   it("limit はフィルタのあとに適用する", async () => {
     const { repos } = setup();
     mockOutboundFetch({ [clientsKey]: pagedHandler(clientRows) });

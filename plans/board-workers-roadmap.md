@@ -29,6 +29,7 @@ Go 製 CLI / ローカル MCP（v0.11.1）を書き直したもの。Go 版は `
 | 設定チェック | 必須の vars / secrets / D1 が欠けていたり `<...>` のプレースホルダのままだったりする場合、`/healthz` は 503、それ以外は 500 を返し、項目名だけを返す（logbutler の ADR 0010） | 同上 |
 | デプロイ設定 | logbutler の upstream / 下流モデル（`render-wrangler-config`）は**持ち込まない**。`wrangler.jsonc` はダミー値にし、実値は `mise.local.toml` の `[env]` から `wrangler.deploy.jsonc`（gitignore 対象）を生成する簡易版にする。デプロイはユーザーが行う | board は fork して自組織にデプロイする製品ではない |
 | テスト | vitest + workerd。BOARD API はモックのみ（未登録の宛先への通信は例外にする）。実 API への確認は `mise run test:live`（デプロイ済み Worker 経由、ユーザーが実行）で、`mise run test` と CI には含めない | logbutler と同じ |
+| 書類 ID → 案件 ID の逆引き | **D1 の表（スキーマ v2）+ 再開できるページ単位の走査 + find が案件を取るたびの記録**。走査は締め切りの手前（8 秒を残して）で止め、縮退（`ProjectID=0`）は応答の `warnings` で伝える。対応は不変なので一度覚えれば引き直さない | 2026-11-05 M05 で決定。Go の全件走査は実測 16〜32 秒で 30 秒の締め切りに収まらない。却下: projects のキャッシュから引く（M03 の refresh は response_group を付けず書類 ID が入っていない）。詳細は `plans/board-workers-m05-find-tools.md` |
 | エンティティの型 | Go の `internal/boardapi/*.go` の構造体を正とする（実 API と全フィールドを突合済み）。docs/specs や記憶から型を作らない | 準拠検証 38 マイルストーンの成果 |
 
 ## 移植元の参照
@@ -45,7 +46,7 @@ Go 製 CLI / ローカル MCP（v0.11.1）を書き直したもの。Go 版は `
 | M02 | BOARD API クライアント（x-api-key + Bearer、直列、再試行と Retry-After、ページング、`_meta` ヘッダ）と 22 リソースの型。追補: 呼び出し単位の締め切り・キャンセル・isolate 内のクライアント共有 | 完了（2d14f28）、追補は作業中 |
 | M03 | D1 キャッシュ（スキーマ適用、resource_cache / sync_state / cache_meta、名前の正規化）、refresh（enum、差分 / 全件、D1 ロック）、repository 層。full は再開あり | 実装済み（`plans/board-workers-m03-d1-cache.md`）、レビュー待ち |
 | M04 | api 層のツール（22 リソースの list / get） | 実装済み（`plans/board-workers-m04-api-tools.md`）、レビュー待ち |
-| M05 | find 層のツール 11 個（名前による ID 解決・曖昧な場合のエラー、fanout の上限、逆引きマップ、contract_status、URL、enrichment の失敗を致命的にしない、cache 配列の同梱） | 未着手 |
+| M05 | find 層のツール 11 個（名前による ID 解決・曖昧な場合のエラー、fanout の上限、逆引きマップ、contract_status、URL、enrichment の失敗を致命的にしない、cache 配列の同梱） | 実装済み（`plans/board-workers-m05-find-tools.md`）、レビュー待ち |
 | M06 | cache 系ツール、デプロイ設定の生成、runbook（Access アプリ・Managed OAuth・Portal の登録）、README、`test:live` | 未着手 |
 
 各マイルストーンの完了条件: `mise run test`（unit + e2e）と `mise run lint` が通り、verifier が差分とテスト結果を確認していること。完了したらローカルでコミットする（push はしない）。
@@ -55,3 +56,4 @@ Go 製 CLI / ローカル MCP（v0.11.1）を書き直したもの。Go 版は `
 - 2026-11-05: 作成。M00・M01・M02 完了。締め切りとキャンセルの決定を追加。
 - 2026-11-05: M03 実装。full refresh の再開方式を決定済み事項に追加。
 - 2026-11-05: M04 実装（api 層 40 ツール）。
+- 2026-11-05: M05 実装（find 層 11 ツール、逆引きの方式を決定済み事項に追加）。M04 の指摘 4 点に対応（cache-first の list は絞り込みがサーバー側なら refresh を走らせない、`limited` / `total_before_limit`、締め切りは `Date.now()` 基準、`response_too_large` の文面）。

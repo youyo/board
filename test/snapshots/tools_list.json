@@ -1,5 +1,553 @@
 [
   {
+    "name": "find_clients",
+    "title": "顧客検索",
+    "description": "Search BOARD clients by ID or name. Returns client entities with branches and contacts. Priority: id > name. Response: {items, cache, warnings?, limited?, total_before_limit?}. cache = freshness of the cached resources that were read (cached_at, full_refreshed_at, refresh_state); warnings = non-fatal problems (enrichment that failed and is null, a project_id that could not be resolved, a truncated list).",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "id": {
+          "type": "number",
+          "description": "Client ID for direct lookup (highest priority; ignores name)."
+        },
+        "name": {
+          "type": "string",
+          "description": "Substring match on client name."
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "Trigger a refresh before reading cache. \"none\" (default) reads cache as-is. \"delta\" fetches incremental changes since last sync. \"full\" re-fetches all entries and removes stale ones (use periodically; a large resource may need several calls, see refresh_state=partial in cache). Concurrent refreshes return refresh_in_progress; clients should wait and retry."
+        },
+        "limit": {
+          "type": "number",
+          "description": "Max results to return (0 or omitted = unlimited). When the limit cuts the results, the response has limited: true and total_before_limit (the count before cutting). Set a limit when a name may match many entities."
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "顧客検索",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "find_deliveries",
+    "title": "納品書検索",
+    "description": "Search BOARD delivery documents by ID, project ID, client name, or project name. Returns delivery entities (no Status field on entity, hence no status filter). client_name/project_name perform fanout search across all matching entities (no disambiguation). Response: {items, cache, warnings?, limited?, total_before_limit?}. cache = freshness of the cached resources that were read (cached_at, full_refreshed_at, refresh_state); warnings = non-fatal problems (enrichment that failed and is null, a project_id that could not be resolved, a truncated list). Each item has ProjectID/ClientID resolved from the document ID (0 with a project_unresolved warning if it could not be resolved in time; retry to continue).",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "id": {
+          "type": "number",
+          "description": "Delivery document ID for direct lookup (highest priority)."
+        },
+        "project_id": {
+          "type": "number",
+          "description": "Project ID to find its deliveries (use to narrow to a single project)."
+        },
+        "client_name": {
+          "type": "string",
+          "description": "Resolve client name (substring match) and fanout-search across all matching clients (no disambiguation). Use project_id to narrow to a single document. More than 5 matches is rejected (narrow the query)."
+        },
+        "project_name": {
+          "type": "string",
+          "description": "Resolve project name (substring match) and fanout-search across all matching projects (no disambiguation). Use project_id to narrow to a single document. More than 5 matches is rejected (narrow the query)."
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "Trigger a refresh before reading cache. \"none\" (default) reads cache as-is. \"delta\" fetches incremental changes since last sync. \"full\" re-fetches all entries and removes stale ones (use periodically; a large resource may need several calls, see refresh_state=partial in cache). Concurrent refreshes return refresh_in_progress; clients should wait and retry."
+        },
+        "limit": {
+          "type": "number",
+          "description": "Max results to return (0 or omitted = unlimited). When the limit cuts the results, the response has limited: true and total_before_limit (the count before cutting). Set a limit when a name may match many entities."
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "納品書検索",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "find_estimates",
+    "title": "見積書検索",
+    "description": "Search BOARD estimate documents by ID, project ID, client name, or project name. Returns estimate entities (no Status field on entity, hence no status filter). client_name/project_name perform fanout search across all matching entities (no disambiguation). Response: {items, cache, warnings?, limited?, total_before_limit?}. cache = freshness of the cached resources that were read (cached_at, full_refreshed_at, refresh_state); warnings = non-fatal problems (enrichment that failed and is null, a project_id that could not be resolved, a truncated list). Each item has ProjectID/ClientID resolved from the document ID (0 with a project_unresolved warning if it could not be resolved in time; retry to continue).",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "id": {
+          "type": "number",
+          "description": "Estimate document ID for direct lookup (highest priority)."
+        },
+        "project_id": {
+          "type": "number",
+          "description": "Project ID to find its estimate (use to narrow to a single document)."
+        },
+        "client_name": {
+          "type": "string",
+          "description": "Resolve client name (substring match) and fanout-search across all matching clients (no disambiguation). Use project_id to narrow to a single document. More than 5 matches is rejected (narrow the query)."
+        },
+        "project_name": {
+          "type": "string",
+          "description": "Resolve project name (substring match) and fanout-search across all matching projects (no disambiguation). Use project_id to narrow to a single document. More than 5 matches is rejected (narrow the query)."
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "Trigger a refresh before reading cache. \"none\" (default) reads cache as-is. \"delta\" fetches incremental changes since last sync. \"full\" re-fetches all entries and removes stale ones (use periodically; a large resource may need several calls, see refresh_state=partial in cache). Concurrent refreshes return refresh_in_progress; clients should wait and retry."
+        },
+        "limit": {
+          "type": "number",
+          "description": "Max results to return (0 or omitted = unlimited). When the limit cuts the results, the response has limited: true and total_before_limit (the count before cutting). Set a limit when a name may match many entities."
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "見積書検索",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "find_invoices",
+    "title": "請求書検索",
+    "description": "Search BOARD invoices by ID, client name, or status. Fields combine with AND (ID overrides others). Returns invoice entities. client_name resolves with ambiguity error on multiple matches. status accepts a single status (API delegated; no narrowing required). project_name is not yet supported. Response: {items, cache, warnings?, limited?, total_before_limit?}. cache = freshness of the cached resources that were read (cached_at, full_refreshed_at, refresh_state); warnings = non-fatal problems (enrichment that failed and is null, a project_id that could not be resolved, a truncated list).",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "id": {
+          "type": "number",
+          "description": "Invoice ID for direct lookup (highest priority)."
+        },
+        "client_name": {
+          "type": "string",
+          "description": "Resolve client name (substring match) to filter invoice. Returns an ambiguity error with up to 5 candidates if multiple clients match; use id to disambiguate."
+        },
+        "project_name": {
+          "type": "string",
+          "description": "(NOT YET SUPPORTED) Will filter invoices by project name in a future release. Currently returns an error."
+        },
+        "status": {
+          "type": "string",
+          "description": "Filter by invoice status (single value; API delegated, no narrowing required)."
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "Trigger a refresh before reading cache. \"none\" (default) reads cache as-is. \"delta\" fetches incremental changes since last sync. \"full\" re-fetches all entries and removes stale ones (use periodically; a large resource may need several calls, see refresh_state=partial in cache). Concurrent refreshes return refresh_in_progress; clients should wait and retry."
+        },
+        "limit": {
+          "type": "number",
+          "description": "Max results to return (0 or omitted = unlimited). When the limit cuts the results, the response has limited: true and total_before_limit (the count before cutting). Set a limit when a name may match many entities."
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "請求書検索",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "find_orders",
+    "title": "注文書検索",
+    "description": "Search BOARD order documents by ID, project ID, client name, or project name. Returns order entities (no Status field on entity, hence no status filter). client_name/project_name perform fanout search across all matching entities (no disambiguation). Response: {items, cache, warnings?, limited?, total_before_limit?}. cache = freshness of the cached resources that were read (cached_at, full_refreshed_at, refresh_state); warnings = non-fatal problems (enrichment that failed and is null, a project_id that could not be resolved, a truncated list). Each item has ProjectID/ClientID resolved from the document ID (0 with a project_unresolved warning if it could not be resolved in time; retry to continue).",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "id": {
+          "type": "number",
+          "description": "Order document ID for direct lookup (highest priority)."
+        },
+        "project_id": {
+          "type": "number",
+          "description": "Project ID to find its order (use to narrow to a single document)."
+        },
+        "client_name": {
+          "type": "string",
+          "description": "Resolve client name (substring match) and fanout-search across all matching clients (no disambiguation). Use project_id to narrow to a single document. More than 5 matches is rejected (narrow the query)."
+        },
+        "project_name": {
+          "type": "string",
+          "description": "Resolve project name (substring match) and fanout-search across all matching projects (no disambiguation). Use project_id to narrow to a single document. More than 5 matches is rejected (narrow the query)."
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "Trigger a refresh before reading cache. \"none\" (default) reads cache as-is. \"delta\" fetches incremental changes since last sync. \"full\" re-fetches all entries and removes stale ones (use periodically; a large resource may need several calls, see refresh_state=partial in cache). Concurrent refreshes return refresh_in_progress; clients should wait and retry."
+        },
+        "limit": {
+          "type": "number",
+          "description": "Max results to return (0 or omitted = unlimited). When the limit cuts the results, the response has limited: true and total_before_limit (the count before cutting). Set a limit when a name may match many entities."
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "注文書検索",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "find_payments",
+    "title": "支払検索",
+    "description": "Search BOARD payments by ID, vendor name, or status. Fields combine with AND (ID overrides others). Returns payment entities. vendor_name resolves with ambiguity error on multiple matches. status accepts a single status (API delegated; no narrowing required). purchase_order_id is not yet supported. Response: {items, cache, warnings?, limited?, total_before_limit?}. cache = freshness of the cached resources that were read (cached_at, full_refreshed_at, refresh_state); warnings = non-fatal problems (enrichment that failed and is null, a project_id that could not be resolved, a truncated list).",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "id": {
+          "type": "number",
+          "description": "Payment ID for direct lookup (highest priority)."
+        },
+        "vendor_name": {
+          "type": "string",
+          "description": "Resolve vendor name (substring match) to filter payment. Returns an ambiguity error with up to 5 candidates if multiple vendors match; use id to disambiguate."
+        },
+        "purchase_order_id": {
+          "type": "number",
+          "description": "(NOT YET SUPPORTED) Will filter payments by purchase order ID in a future release. Currently returns an error."
+        },
+        "status": {
+          "type": "string",
+          "description": "Filter by payment status (single value; API delegated, no narrowing required)."
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "Trigger a refresh before reading cache. \"none\" (default) reads cache as-is. \"delta\" fetches incremental changes since last sync. \"full\" re-fetches all entries and removes stale ones (use periodically; a large resource may need several calls, see refresh_state=partial in cache). Concurrent refreshes return refresh_in_progress; clients should wait and retry."
+        },
+        "limit": {
+          "type": "number",
+          "description": "Max results to return (0 or omitted = unlimited). When the limit cuts the results, the response has limited: true and total_before_limit (the count before cutting). Set a limit when a name may match many entities."
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "支払検索",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "find_projects",
+    "title": "案件検索",
+    "description": "Search BOARD projects by ID, client name, or project name. Fields combine with AND (ID overrides others). Returns project entities with enriched client info. client_name resolves with ambiguity error on multiple matches. status/statuses/contract_status filtering requires narrowing (must combine with id/client_name/name). status, statuses, contract_status are mutually exclusive. Response: {items, cache, warnings?, limited?, total_before_limit?}. cache = freshness of the cached resources that were read (cached_at, full_refreshed_at, refresh_state); warnings = non-fatal problems (enrichment that failed and is null, a project_id that could not be resolved, a truncated list).",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "id": {
+          "type": "number",
+          "description": "Project ID for direct lookup (highest priority; ignores other filters)."
+        },
+        "client_name": {
+          "type": "string",
+          "description": "Resolve client name (substring match) to filter project. Returns an ambiguity error with up to 5 candidates if multiple clients match; use id to disambiguate."
+        },
+        "name": {
+          "type": "string",
+          "description": "Substring match on project name."
+        },
+        "status": {
+          "type": "string",
+          "description": "Filter by project status (e.g. 受注, 完了). MUST be combined with id/client_name/name — status-only query is rejected (API delegation not possible, narrowing required). Mutually exclusive with statuses / contract_status."
+        },
+        "statuses": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Filter by multiple project statuses (OR). Mutually exclusive with status / contract_status. Same narrowing rules apply. Max 10 items."
+        },
+        "contract_status": {
+          "type": "string",
+          "description": "Contract status alias. Valid values: active (in-progress: 未着手/着手中/納品済), ended (検収済), prospect (見積中*), all. Mutually exclusive with status / statuses. Same narrowing rules apply."
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "Trigger a refresh before reading cache. \"none\" (default) reads cache as-is. \"delta\" fetches incremental changes since last sync. \"full\" re-fetches all entries and removes stale ones (use periodically; a large resource may need several calls, see refresh_state=partial in cache). Concurrent refreshes return refresh_in_progress; clients should wait and retry."
+        },
+        "limit": {
+          "type": "number",
+          "description": "Max results to return (0 or omitted = unlimited). When the limit cuts the results, the response has limited: true and total_before_limit (the count before cutting). Set a limit when a name may match many entities."
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "案件検索",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "find_purchase_orders",
+    "title": "発注書検索",
+    "description": "Search BOARD purchase orders by ID, vendor name, or status. Fields combine with AND (ID overrides others). Returns purchase order entities. vendor_name resolves with ambiguity error on multiple matches. status accepts a single status (API delegated; no narrowing required). project_name is not yet supported. Response: {items, cache, warnings?, limited?, total_before_limit?}. cache = freshness of the cached resources that were read (cached_at, full_refreshed_at, refresh_state); warnings = non-fatal problems (enrichment that failed and is null, a project_id that could not be resolved, a truncated list).",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "id": {
+          "type": "number",
+          "description": "Purchase order ID for direct lookup (highest priority)."
+        },
+        "vendor_name": {
+          "type": "string",
+          "description": "Resolve vendor name (substring match) to filter purchase order. Returns an ambiguity error with up to 5 candidates if multiple vendors match; use id to disambiguate."
+        },
+        "project_name": {
+          "type": "string",
+          "description": "(NOT YET SUPPORTED) Will filter purchase orders by project name in a future release. Currently returns an error."
+        },
+        "status": {
+          "type": "string",
+          "description": "Filter by purchase order status (single value; API delegated, no narrowing required)."
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "Trigger a refresh before reading cache. \"none\" (default) reads cache as-is. \"delta\" fetches incremental changes since last sync. \"full\" re-fetches all entries and removes stale ones (use periodically; a large resource may need several calls, see refresh_state=partial in cache). Concurrent refreshes return refresh_in_progress; clients should wait and retry."
+        },
+        "limit": {
+          "type": "number",
+          "description": "Max results to return (0 or omitted = unlimited). When the limit cuts the results, the response has limited: true and total_before_limit (the count before cutting). Set a limit when a name may match many entities."
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "発注書検索",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "find_receipts",
+    "title": "領収書検索",
+    "description": "Search BOARD receipt documents by ID, project ID, client name, or project name. Returns receipt entities (no Status field on entity, hence no status filter). client_name/project_name perform fanout search across all matching entities (no disambiguation). Response: {items, cache, warnings?, limited?, total_before_limit?}. cache = freshness of the cached resources that were read (cached_at, full_refreshed_at, refresh_state); warnings = non-fatal problems (enrichment that failed and is null, a project_id that could not be resolved, a truncated list). Each item has ProjectID/ClientID resolved from the document ID (0 with a project_unresolved warning if it could not be resolved in time; retry to continue).",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "id": {
+          "type": "number",
+          "description": "Receipt document ID for direct lookup (highest priority)."
+        },
+        "project_id": {
+          "type": "number",
+          "description": "Project ID to find its receipts (use to narrow to a single project)."
+        },
+        "client_name": {
+          "type": "string",
+          "description": "Resolve client name (substring match) and fanout-search across all matching clients (no disambiguation). Use project_id to narrow to a single document. More than 5 matches is rejected (narrow the query)."
+        },
+        "project_name": {
+          "type": "string",
+          "description": "Resolve project name (substring match) and fanout-search across all matching projects (no disambiguation). Use project_id to narrow to a single document. More than 5 matches is rejected (narrow the query)."
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "Trigger a refresh before reading cache. \"none\" (default) reads cache as-is. \"delta\" fetches incremental changes since last sync. \"full\" re-fetches all entries and removes stale ones (use periodically; a large resource may need several calls, see refresh_state=partial in cache). Concurrent refreshes return refresh_in_progress; clients should wait and retry."
+        },
+        "limit": {
+          "type": "number",
+          "description": "Max results to return (0 or omitted = unlimited). When the limit cuts the results, the response has limited: true and total_before_limit (the count before cutting). Set a limit when a name may match many entities."
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "領収書検索",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "find_users",
+    "title": "ユーザー検索",
+    "description": "Search BOARD users by ID or name. Returns user entities. Priority: id > name. Response: {items, cache, warnings?, limited?, total_before_limit?}. cache = freshness of the cached resources that were read (cached_at, full_refreshed_at, refresh_state); warnings = non-fatal problems (enrichment that failed and is null, a project_id that could not be resolved, a truncated list).",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "id": {
+          "type": "number",
+          "description": "User ID for direct lookup (highest priority; ignores name)."
+        },
+        "name": {
+          "type": "string",
+          "description": "Substring match on user name."
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "Trigger a refresh before reading cache. \"none\" (default) reads cache as-is. \"delta\" fetches incremental changes since last sync. \"full\" re-fetches all entries and removes stale ones (use periodically; a large resource may need several calls, see refresh_state=partial in cache). Concurrent refreshes return refresh_in_progress; clients should wait and retry."
+        },
+        "limit": {
+          "type": "number",
+          "description": "Max results to return (0 or omitted = unlimited). When the limit cuts the results, the response has limited: true and total_before_limit (the count before cutting). Set a limit when a name may match many entities."
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "ユーザー検索",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "find_vendors",
+    "title": "仕入先検索",
+    "description": "Search BOARD vendors by ID or name. Returns vendor entities with branches and contacts. Priority: id > name. Response: {items, cache, warnings?, limited?, total_before_limit?}. cache = freshness of the cached resources that were read (cached_at, full_refreshed_at, refresh_state); warnings = non-fatal problems (enrichment that failed and is null, a project_id that could not be resolved, a truncated list).",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "id": {
+          "type": "number",
+          "description": "Vendor ID for direct lookup (highest priority; ignores name)."
+        },
+        "name": {
+          "type": "string",
+          "description": "Substring match on vendor name."
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "Trigger a refresh before reading cache. \"none\" (default) reads cache as-is. \"delta\" fetches incremental changes since last sync. \"full\" re-fetches all entries and removes stale ones (use periodically; a large resource may need several calls, see refresh_state=partial in cache). Concurrent refreshes return refresh_in_progress; clients should wait and retry."
+        },
+        "limit": {
+          "type": "number",
+          "description": "Max results to return (0 or omitted = unlimited). When the limit cuts the results, the response has limited: true and total_before_limit (the count before cutting). Set a limit when a name may match many entities."
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "仕入先検索",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
     "name": "get_accounting_type",
     "title": "勘定科目種別取得",
     "description": "勘定科目種別を ID で 1 件取得する。勘定科目の種別マスタ。キャッシュにあればそれを返し、なければ BOARD から 1 件取って保存する。refresh=delta / full を指定すると、先に勘定科目種別の一覧キャッシュを更新してから読む。結果は {item, cache, _meta?}。item は BOARD の生データ。",
@@ -938,7 +1486,7 @@
   {
     "name": "list_accounting_types",
     "title": "勘定科目種別一覧取得",
-    "description": "勘定科目種別の一覧を返す。勘定科目の種別マスタ。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。結果は {items, cache, truncated?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "description": "勘定科目種別の一覧を返す。勘定科目の種別マスタ。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -970,7 +1518,7 @@
         },
         "limit": {
           "type": "number",
-          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)"
+          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)。件数を切ったときだけ、応答に limited: true と total_before_limit(切る前の件数)が付く。truncated(BOARD のページ巡回の打ち切り)とは別の意味"
         },
         "show_meta": {
           "type": "boolean",
@@ -993,7 +1541,7 @@
   {
     "name": "list_client_branches",
     "title": "顧客支店一覧取得",
-    "description": "顧客支店の一覧を返す。顧客の支店・拠点。顧客 ID(client_id)で顧客に紐づく。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。結果は {items, cache, truncated?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "description": "顧客支店の一覧を返す。顧客の支店・拠点。顧客 ID(client_id)で顧客に紐づく。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1029,7 +1577,7 @@
         },
         "limit": {
           "type": "number",
-          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)"
+          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)。件数を切ったときだけ、応答に limited: true と total_before_limit(切る前の件数)が付く。truncated(BOARD のページ巡回の打ち切り)とは別の意味"
         },
         "show_meta": {
           "type": "boolean",
@@ -1052,7 +1600,7 @@
   {
     "name": "list_clients",
     "title": "顧客一覧取得",
-    "description": "顧客の一覧を返す。顧客(取引先)マスタ。案件・請求書・顧客支店・顧客担当者はこの顧客 ID に紐づく。名前から顧客 ID を探すのに使う。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta(差分)か refresh=full(全件)を指定する。絞り込み: name_cont / name_disp_cont / invoice_system_number_eq / custom_no_eq だけを指定した場合は、同期済みならキャッシュを絞って返す。それ以外の引数(updated_at_* / include_archive_flg / tags / response_group などサーバー側の指定を含む)を指定したとき、またはキャッシュが未同期のときは BOARD の API を直接呼び、cache は空になる。結果は {items, cache, truncated?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "description": "顧客の一覧を返す。顧客(取引先)マスタ。案件・請求書・顧客支店・顧客担当者はこの顧客 ID に紐づく。名前から顧客 ID を探すのに使う。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta(差分)か refresh=full(全件)を指定する。件数が多いリソースでは全件を返すと応答が大きくなるので、まず limit か絞り込みを指定する。絞り込み: name_cont / name_disp_cont / invoice_system_number_eq / custom_no_eq だけを指定した場合は、同期済みならキャッシュを絞って返す。それ以外の引数(updated_at_* / include_archive_flg / tags / response_group などサーバー側の指定を含む)を指定したときは BOARD の API を直接呼び(このとき refresh は無視される)、キャッシュが未同期のときも API を直接呼ぶ。API から取った結果の cache は空になる。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1111,7 +1659,7 @@
         },
         "limit": {
           "type": "number",
-          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)"
+          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)。件数を切ったときだけ、応答に limited: true と total_before_limit(切る前の件数)が付く。truncated(BOARD のページ巡回の打ち切り)とは別の意味"
         },
         "show_meta": {
           "type": "boolean",
@@ -1134,7 +1682,7 @@
   {
     "name": "list_contacts",
     "title": "顧客担当者一覧取得",
-    "description": "顧客担当者の一覧を返す。顧客の担当者。顧客 ID(client_id)で顧客に紐づく。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。結果は {items, cache, truncated?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "description": "顧客担当者の一覧を返す。顧客の担当者。顧客 ID(client_id)で顧客に紐づく。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1174,7 +1722,7 @@
         },
         "limit": {
           "type": "number",
-          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)"
+          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)。件数を切ったときだけ、応答に limited: true と total_before_limit(切る前の件数)が付く。truncated(BOARD のページ巡回の打ち切り)とは別の意味"
         },
         "show_meta": {
           "type": "boolean",
@@ -1197,7 +1745,7 @@
   {
     "name": "list_document_send_channels",
     "title": "書類送付方法一覧取得",
-    "description": "書類送付方法の一覧を返す。書類の送付方法(メール・郵送など)マスタ。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。結果は {items, cache, truncated?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "description": "書類送付方法の一覧を返す。書類の送付方法(メール・郵送など)マスタ。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1229,7 +1777,7 @@
         },
         "limit": {
           "type": "number",
-          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)"
+          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)。件数を切ったときだけ、応答に limited: true と total_before_limit(切る前の件数)が付く。truncated(BOARD のページ巡回の打ち切り)とは別の意味"
         },
         "show_meta": {
           "type": "boolean",
@@ -1252,7 +1800,7 @@
   {
     "name": "list_groups",
     "title": "グループ一覧取得",
-    "description": "グループの一覧を返す。ユーザーのグループ(部署など)マスタ。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。結果は {items, cache, truncated?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "description": "グループの一覧を返す。ユーザーのグループ(部署など)マスタ。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1284,7 +1832,7 @@
         },
         "limit": {
           "type": "number",
-          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)"
+          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)。件数を切ったときだけ、応答に limited: true と total_before_limit(切る前の件数)が付く。truncated(BOARD のページ巡回の打ち切り)とは別の意味"
         },
         "show_meta": {
           "type": "boolean",
@@ -1307,7 +1855,7 @@
   {
     "name": "list_invoices",
     "title": "請求書一覧取得",
-    "description": "請求書の一覧を返す。請求書。顧客 ID・案件 ID に紐づく。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta(差分)か refresh=full(全件)を指定する。絞り込み: client_id_eq / project_id_eq / status_eq だけを指定した場合は、同期済みならキャッシュを絞って返す。それ以外の引数(updated_at_* / include_archive_flg / response_group などサーバー側の指定を含む)を指定したとき、またはキャッシュが未同期のときは BOARD の API を直接呼び、cache は空になる。結果は {items, cache, truncated?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "description": "請求書の一覧を返す。請求書。顧客 ID・案件 ID に紐づく。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta(差分)か refresh=full(全件)を指定する。件数が多いリソースでは全件を返すと応答が大きくなるので、まず limit か絞り込みを指定する。絞り込み: client_id_eq / project_id_eq / status_eq だけを指定した場合は、同期済みならキャッシュを絞って返す。それ以外の引数(updated_at_* / include_archive_flg / response_group などサーバー側の指定を含む)を指定したときは BOARD の API を直接呼び(このとき refresh は無視される)、キャッシュが未同期のときも API を直接呼ぶ。API から取った結果の cache は空になる。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1355,7 +1903,7 @@
         },
         "limit": {
           "type": "number",
-          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)"
+          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)。件数を切ったときだけ、応答に limited: true と total_before_limit(切る前の件数)が付く。truncated(BOARD のページ巡回の打ち切り)とは別の意味"
         },
         "show_meta": {
           "type": "boolean",
@@ -1378,7 +1926,7 @@
   {
     "name": "list_payment_terms",
     "title": "支払条件一覧取得",
-    "description": "支払条件の一覧を返す。支払条件(締め日・支払日の定義)マスタ。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。結果は {items, cache, truncated?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "description": "支払条件の一覧を返す。支払条件(締め日・支払日の定義)マスタ。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1410,7 +1958,7 @@
         },
         "limit": {
           "type": "number",
-          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)"
+          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)。件数を切ったときだけ、応答に limited: true と total_before_limit(切る前の件数)が付く。truncated(BOARD のページ巡回の打ち切り)とは別の意味"
         },
         "show_meta": {
           "type": "boolean",
@@ -1433,7 +1981,7 @@
   {
     "name": "list_payments",
     "title": "支払い一覧取得",
-    "description": "支払いの一覧を返す。仕入先への支払い。仕入先 ID・発注書 ID に紐づく。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta(差分)か refresh=full(全件)を指定する。絞り込み: vendor_id_eq / purchase_order_id_eq / status_eq だけを指定した場合は、同期済みならキャッシュを絞って返す。それ以外の引数(updated_at_* / include_archive_flg / response_group などサーバー側の指定を含む)を指定したとき、またはキャッシュが未同期のときは BOARD の API を直接呼び、cache は空になる。結果は {items, cache, truncated?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "description": "支払いの一覧を返す。仕入先への支払い。仕入先 ID・発注書 ID に紐づく。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta(差分)か refresh=full(全件)を指定する。件数が多いリソースでは全件を返すと応答が大きくなるので、まず limit か絞り込みを指定する。絞り込み: vendor_id_eq / purchase_order_id_eq / status_eq だけを指定した場合は、同期済みならキャッシュを絞って返す。それ以外の引数(updated_at_* / include_archive_flg / response_group などサーバー側の指定を含む)を指定したときは BOARD の API を直接呼び(このとき refresh は無視される)、キャッシュが未同期のときも API を直接呼ぶ。API から取った結果の cache は空になる。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1481,7 +2029,7 @@
         },
         "limit": {
           "type": "number",
-          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)"
+          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)。件数を切ったときだけ、応答に limited: true と total_before_limit(切る前の件数)が付く。truncated(BOARD のページ巡回の打ち切り)とは別の意味"
         },
         "show_meta": {
           "type": "boolean",
@@ -1504,7 +2052,7 @@
   {
     "name": "list_project_costs",
     "title": "案件原価一覧取得",
-    "description": "案件原価の一覧を返す。案件の原価(外注費・仕入など)。案件 ID(project_id)で案件に紐づく。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。結果は {items, cache, truncated?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "description": "案件原価の一覧を返す。案件の原価(外注費・仕入など)。案件 ID(project_id)で案件に紐づく。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1536,7 +2084,7 @@
         },
         "limit": {
           "type": "number",
-          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)"
+          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)。件数を切ったときだけ、応答に limited: true と total_before_limit(切る前の件数)が付く。truncated(BOARD のページ巡回の打ち切り)とは別の意味"
         },
         "show_meta": {
           "type": "boolean",
@@ -1559,7 +2107,7 @@
   {
     "name": "list_project_types",
     "title": "案件種別一覧取得",
-    "description": "案件種別の一覧を返す。案件種別マスタ。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。結果は {items, cache, truncated?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "description": "案件種別の一覧を返す。案件種別マスタ。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1591,7 +2139,7 @@
         },
         "limit": {
           "type": "number",
-          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)"
+          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)。件数を切ったときだけ、応答に limited: true と total_before_limit(切る前の件数)が付く。truncated(BOARD のページ巡回の打ち切り)とは別の意味"
         },
         "show_meta": {
           "type": "boolean",
@@ -1614,7 +2162,7 @@
   {
     "name": "list_projects",
     "title": "案件一覧取得",
-    "description": "案件の一覧を返す。案件。見積書・受注書・納品書・請求書・領収書(書類)と案件原価はこの案件に紐づく。顧客 ID(client_id)で顧客に紐づく。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta(差分)か refresh=full(全件)を指定する。絞り込み: name_cont / client_id / client_name_cont / project_no_eq / management_no_eq だけを指定した場合は、同期済みならキャッシュを絞って返す。それ以外の引数(updated_at_* / include_archive_flg / tags / response_group などサーバー側の指定を含む)を指定したとき、またはキャッシュが未同期のときは BOARD の API を直接呼び、cache は空になる。結果は {items, cache, truncated?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "description": "案件の一覧を返す。案件。見積書・受注書・納品書・請求書・領収書(書類)と案件原価はこの案件に紐づく。顧客 ID(client_id)で顧客に紐づく。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta(差分)か refresh=full(全件)を指定する。件数が多いリソースでは全件を返すと応答が大きくなるので、まず limit か絞り込みを指定する。絞り込み: name_cont / client_id / client_name_cont / project_no_eq / management_no_eq だけを指定した場合は、同期済みならキャッシュを絞って返す。それ以外の引数(updated_at_* / include_archive_flg / tags / response_group などサーバー側の指定を含む)を指定したときは BOARD の API を直接呼び(このとき refresh は無視される)、キャッシュが未同期のときも API を直接呼ぶ。API から取った結果の cache は空になる。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1732,7 +2280,7 @@
         },
         "limit": {
           "type": "number",
-          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)"
+          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)。件数を切ったときだけ、応答に limited: true と total_before_limit(切る前の件数)が付く。truncated(BOARD のページ巡回の打ち切り)とは別の意味"
         },
         "show_meta": {
           "type": "boolean",
@@ -1755,7 +2303,7 @@
   {
     "name": "list_purchase_orders",
     "title": "発注書一覧取得",
-    "description": "発注書の一覧を返す。発注書(仕入側)。仕入先 ID・案件 ID に紐づく。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta(差分)か refresh=full(全件)を指定する。絞り込み: vendor_id_eq / project_id_eq / status_eq だけを指定した場合は、同期済みならキャッシュを絞って返す。それ以外の引数(updated_at_* / include_archive_flg / response_group などサーバー側の指定を含む)を指定したとき、またはキャッシュが未同期のときは BOARD の API を直接呼び、cache は空になる。結果は {items, cache, truncated?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "description": "発注書の一覧を返す。発注書(仕入側)。仕入先 ID・案件 ID に紐づく。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta(差分)か refresh=full(全件)を指定する。件数が多いリソースでは全件を返すと応答が大きくなるので、まず limit か絞り込みを指定する。絞り込み: vendor_id_eq / project_id_eq / status_eq だけを指定した場合は、同期済みならキャッシュを絞って返す。それ以外の引数(updated_at_* / include_archive_flg / response_group などサーバー側の指定を含む)を指定したときは BOARD の API を直接呼び(このとき refresh は無視される)、キャッシュが未同期のときも API を直接呼ぶ。API から取った結果の cache は空になる。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1803,7 +2351,7 @@
         },
         "limit": {
           "type": "number",
-          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)"
+          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)。件数を切ったときだけ、応答に limited: true と total_before_limit(切る前の件数)が付く。truncated(BOARD のページ巡回の打ち切り)とは別の意味"
         },
         "show_meta": {
           "type": "boolean",
@@ -1826,7 +2374,7 @@
   {
     "name": "list_purchase_types",
     "title": "購買種別一覧取得",
-    "description": "購買種別の一覧を返す。購買(仕入)種別マスタ。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。結果は {items, cache, truncated?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "description": "購買種別の一覧を返す。購買(仕入)種別マスタ。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1858,7 +2406,7 @@
         },
         "limit": {
           "type": "number",
-          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)"
+          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)。件数を切ったときだけ、応答に limited: true と total_before_limit(切る前の件数)が付く。truncated(BOARD のページ巡回の打ち切り)とは別の意味"
         },
         "show_meta": {
           "type": "boolean",
@@ -1881,7 +2429,7 @@
   {
     "name": "list_users",
     "title": "ユーザー一覧取得",
-    "description": "ユーザーの一覧を返す。BOARD のユーザー(社内の担当者)マスタ。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta(差分)か refresh=full(全件)を指定する。絞り込み: name_cont / email_cont だけを指定した場合は、同期済みならキャッシュを絞って返す。それ以外の引数(updated_at_* / include_archive_flg / response_group などサーバー側の指定を含む)を指定したとき、またはキャッシュが未同期のときは BOARD の API を直接呼び、cache は空になる。結果は {items, cache, truncated?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "description": "ユーザーの一覧を返す。BOARD のユーザー(社内の担当者)マスタ。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta(差分)か refresh=full(全件)を指定する。件数が多いリソースでは全件を返すと応答が大きくなるので、まず limit か絞り込みを指定する。絞り込み: name_cont / email_cont だけを指定した場合は、同期済みならキャッシュを絞って返す。それ以外の引数(updated_at_* / include_archive_flg / response_group などサーバー側の指定を含む)を指定したときは BOARD の API を直接呼び(このとき refresh は無視される)、キャッシュが未同期のときも API を直接呼ぶ。API から取った結果の cache は空になる。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1917,7 +2465,7 @@
         },
         "limit": {
           "type": "number",
-          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)"
+          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)。件数を切ったときだけ、応答に limited: true と total_before_limit(切る前の件数)が付く。truncated(BOARD のページ巡回の打ち切り)とは別の意味"
         },
         "show_meta": {
           "type": "boolean",
@@ -1940,7 +2488,7 @@
   {
     "name": "list_vendor_branches",
     "title": "仕入先支店一覧取得",
-    "description": "仕入先支店の一覧を返す。仕入先の支店・拠点。仕入先 ID(payee_id_eq)で仕入先に紐づく。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。結果は {items, cache, truncated?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "description": "仕入先支店の一覧を返す。仕入先の支店・拠点。仕入先 ID(payee_id_eq)で仕入先に紐づく。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1976,7 +2524,7 @@
         },
         "limit": {
           "type": "number",
-          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)"
+          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)。件数を切ったときだけ、応答に limited: true と total_before_limit(切る前の件数)が付く。truncated(BOARD のページ巡回の打ち切り)とは別の意味"
         },
         "show_meta": {
           "type": "boolean",
@@ -1999,7 +2547,7 @@
   {
     "name": "list_vendor_contacts",
     "title": "仕入先担当者一覧取得",
-    "description": "仕入先担当者の一覧を返す。仕入先の担当者。仕入先 ID(payee_id_eq)で仕入先に紐づく。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。結果は {items, cache, truncated?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "description": "仕入先担当者の一覧を返す。仕入先の担当者。仕入先 ID(payee_id_eq)で仕入先に紐づく。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -2039,7 +2587,7 @@
         },
         "limit": {
           "type": "number",
-          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)"
+          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)。件数を切ったときだけ、応答に limited: true と total_before_limit(切る前の件数)が付く。truncated(BOARD のページ巡回の打ち切り)とは別の意味"
         },
         "show_meta": {
           "type": "boolean",
@@ -2062,7 +2610,7 @@
   {
     "name": "list_vendors",
     "title": "仕入先一覧取得",
-    "description": "仕入先の一覧を返す。仕入先(支払先)マスタ。仕入先支店・仕入先担当者・発注書・支払いはこの仕入先 ID に紐づく。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta(差分)か refresh=full(全件)を指定する。絞り込み: name_cont だけを指定した場合は、同期済みならキャッシュを絞って返す。それ以外の引数(updated_at_* / include_archive_flg / response_group などサーバー側の指定を含む)を指定したとき、またはキャッシュが未同期のときは BOARD の API を直接呼び、cache は空になる。結果は {items, cache, truncated?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "description": "仕入先の一覧を返す。仕入先(支払先)マスタ。仕入先支店・仕入先担当者・発注書・支払いはこの仕入先 ID に紐づく。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta(差分)か refresh=full(全件)を指定する。件数が多いリソースでは全件を返すと応答が大きくなるので、まず limit か絞り込みを指定する。絞り込み: name_cont だけを指定した場合は、同期済みならキャッシュを絞って返す。それ以外の引数(updated_at_* / include_archive_flg / response_group などサーバー側の指定を含む)を指定したときは BOARD の API を直接呼び(このとき refresh は無視される)、キャッシュが未同期のときも API を直接呼ぶ。API から取った結果の cache は空になる。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -2094,7 +2642,7 @@
         },
         "limit": {
           "type": "number",
-          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)"
+          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)。件数を切ったときだけ、応答に limited: true と total_before_limit(切る前の件数)が付く。truncated(BOARD のページ巡回の打ち切り)とは別の意味"
         },
         "show_meta": {
           "type": "boolean",

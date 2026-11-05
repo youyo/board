@@ -1,8 +1,10 @@
 import { McpServer } from "@modelcontextprotocol/server";
 import { createBoardClientFromEnv } from "../board/client";
 import type { Env } from "../env";
+import { uiBaseUrlFromApiBase } from "../find/url";
 import { SERVER_NAME, SERVER_VERSION } from "../info";
 import { createRepositories, type Repositories } from "../repository";
+import { createDocumentIndex, type DocumentIndex } from "../repository/document-index";
 import { registerTools, type ToolDefinition } from "./registry";
 import { ALL_TOOLS } from "./tools";
 
@@ -13,6 +15,10 @@ export interface McpServerDeps {
   env?: Pick<Env, "DB" | "BOARD_BASE_URL" | "BOARD_API_KEY" | "BOARD_API_TOKEN">;
   /** テスト用: repository の取得口を差し替える(`env` より優先)。 */
   repositories?: () => Repositories;
+  /** テスト用: 書類 → 案件の逆引きの取得口を差し替える(`env` より優先)。 */
+  documentIndex?: () => DocumentIndex;
+  /** テスト用: BOARD の UI のベース URL(省略時は `env.BOARD_BASE_URL` から導く)。 */
+  uiBaseUrl?: string;
   /** テスト用: 現在時刻。 */
   now?: () => Date;
 }
@@ -23,6 +29,8 @@ export function createMcpServer(deps: McpServerDeps = {}): McpServer {
   registerTools(server, deps.tools ?? ALL_TOOLS, {
     now: deps.now,
     repositories: deps.repositories ?? repositoriesFromEnv(deps.env),
+    documentIndex: deps.documentIndex ?? documentIndexFromEnv(deps.env),
+    uiBaseUrl: deps.uiBaseUrl ?? (deps.env ? uiBaseUrlFromApiBase(deps.env.BOARD_BASE_URL) : ""),
   });
   return server;
 }
@@ -34,5 +42,14 @@ function repositoriesFromEnv(env: McpServerDeps["env"]): (() => Repositories) | 
   return () => {
     repos ??= createRepositories({ db: env.DB, client: createBoardClientFromEnv(env) });
     return repos;
+  };
+}
+
+function documentIndexFromEnv(env: McpServerDeps["env"]): (() => DocumentIndex) | undefined {
+  if (!env) return undefined;
+  let index: DocumentIndex | undefined;
+  return () => {
+    index ??= createDocumentIndex({ db: env.DB, client: createBoardClientFromEnv(env) });
+    return index;
   };
 }
