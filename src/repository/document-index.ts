@@ -25,6 +25,7 @@ import {
   getScanState,
   recordStatements,
   releaseScanLock,
+  type ScanState,
   saveProgressStatement,
   tryAcquireScanLock,
 } from "../cache/document-map";
@@ -74,6 +75,11 @@ function pairsOf(kind: DocumentKind, projects: readonly ProjectEntity[]) {
   );
 }
 
+function isCompletedFresh(state: ScanState | null, nowMs: number): boolean {
+  const completedMs = state?.completed_at ? Date.parse(state.completed_at) : Number.NaN;
+  return !Number.isNaN(completedMs) && nowMs - completedMs < COMPLETE_TTL_MS;
+}
+
 export function createDocumentIndex(deps: DocumentIndexDeps): DocumentIndex {
   const { db, client } = deps;
   const now = deps.now ?? systemClock;
@@ -96,10 +102,9 @@ export function createDocumentIndex(deps: DocumentIndexDeps): DocumentIndex {
     if (known !== null) return { status: "hit", projectId: known };
 
     const start = now();
-    const state = await getScanState(db, kind);
-    const completedMs = state?.completed_at ? Date.parse(state.completed_at) : Number.NaN;
-    const completedFresh = !Number.isNaN(completedMs) && start - completedMs < COMPLETE_TTL_MS;
-    if (completedFresh) return { status: "miss", reason: "not_found" };
+    const state0 = await getScanState(db, kind);
+    // 先にロックなしで見る近道(完了して間もなければ、ロックも取らずに終わる)。ロックを取ったあとで読み直す。
+    if (isCompletedFresh(state0, start)) return { status: "miss", reason: "not_found" };
 
     const ctx = resolveContext(callCtx, now);
     // 走査はここまでに使える時間(予約を残す)。1 ページ目に入る前の下限もここで見る。
@@ -111,6 +116,12 @@ export function createDocumentIndex(deps: DocumentIndexDeps): DocumentIndex {
       return { status: "unresolved", reason: "scan_in_progress" };
     }
     try {
+      // ロックを取ったので、状態を読み直す。読んでからロックを取るまでの間に、別の呼び出しが
+      // 対応を覚えた・走査を完了した・進捗を進めたかもしれない(古い状態で再開すると、完了印を巻き戻す)。
+      const known2 = await getProjectId(db, kind, documentId);
+      if (known2 !== null) return { status: "hit", projectId: known2 };
+      const state = await getScanState(db, kind);
+      if (isCompletedFresh(state, now())) return { status: "miss", reason: "not_found" };
       // 完了済み(TTL 切れ)または未開始なら先頭から。途中なら保存した次のページから。
       const resume = state && !state.completed_at && state.next_page ? state.next_page : 1;
       let page = resume;
@@ -148,14 +159,24 @@ export function createDocumentIndex(deps: DocumentIndexDeps): DocumentIndex {
         const done = rows.length < perPage;
         const pairs = pairsOf(kind, rows);
         // 1 ページ分の対応と進捗を同じ batch で書く(途中で止まっても整合する)。
-        await db.batch([
-          ...recordStatements(db, kind, pairs, now()),
-          saveProgressStatement(db, kind, {
-            nextPage: done ? null : page + 1,
-            startedAt,
-            completedAt: done ? isoSeconds(now()) : null,
-          }),
+        // すべて走査ロックの所有者を条件にする。奪われていれば何も書かれず、最後の文の changes が 1 にならない。
+        const results = await db.batch([
+          ...recordStatements(db, kind, pairs, now(), owner),
+          saveProgressStatement(
+            db,
+            kind,
+            {
+              nextPage: done ? null : page + 1,
+              startedAt,
+              completedAt: done ? isoSeconds(now()) : null,
+            },
+            owner,
+          ),
         ]);
+        if (results[results.length - 1]?.meta.changes !== 1) {
+          // ロックを失った(stale として奪われた)。以後の書き込みも走査も中止する。
+          return { status: "unresolved", reason: "scan_in_progress" };
+        }
         const found = pairs.find((p) => p.documentId === documentId);
         if (found) return { status: "hit", projectId: found.projectId };
         if (done) return { status: "miss", reason: "not_found" };

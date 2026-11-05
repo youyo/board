@@ -34,13 +34,20 @@ export const idArg = (description: string) =>
     .refine((n) => isInt(n) && n >= 1, "must be a positive integer")
     .describe(description);
 
-/** 任意の ID(1 以上の整数。JSON Schema 上は number)。 */
+/**
+ * 任意の ID。0 は『指定なし』(Go の getIntArg と同じ)で、負の数・小数は argument_error。
+ * 0 を取り除くのはハンドラの責務(`idOrUndefined`)。JSON Schema 上は number。
+ */
 export const optId = (description: string) =>
   z
     .number()
-    .refine((n) => isInt(n) && n >= 1, "must be a positive integer")
+    .refine((n) => isInt(n) && n >= 0, "must be a positive integer (0 or omitted = not specified)")
     .describe(description)
     .optional();
+
+/** `optId` の値を検索の条件に直す。0 は『指定なし』なので undefined。 */
+export const idOrUndefined = (n: number | undefined): number | undefined =>
+  n === undefined || n === 0 ? undefined : n;
 
 /** 0 以上の整数(JSON Schema 上は number)。 */
 export const optNonNegativeInt = (description: string) =>

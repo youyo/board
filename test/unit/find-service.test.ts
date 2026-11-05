@@ -740,7 +740,9 @@ describe("書類 4 種(Go: find_estimate_test.go ほか)", () => {
       const r = await findEstimates(s, { clientName: "A", limit: 1 });
       expect(r).toHaveLength(1);
       expect(f.calls("estimates.get")).toHaveLength(1);
-      expect(s.totalBeforeLimit).toBe(2);
+      // limit に達した時点で残りの顧客(2 件目)の案件の検索を止めるので、候補数は 1(確定ではない。以前は 2)。
+      expect(f.calls("projects.list")).toHaveLength(1);
+      expect(s.totalBeforeLimit).toBe(1);
     });
 
     it("limit にちょうど達して候補が尽きたなら、切ったことにならない", async () => {
@@ -773,6 +775,79 @@ describe("書類 4 種(Go: find_estimate_test.go ほか)", () => {
       expect(e?.code).toBe("argument_error");
       expect(e?.message).toContain('project_name "P" matched 6 entities (cap=5)');
       expect(f.calls("orders.get")).toHaveLength(0);
+    });
+
+    describe("候補の書類の総数の上限(FIND_DOCUMENT_CANDIDATE_CAP = 200)", () => {
+      /** 顧客 n 件、各顧客に案件 m 件(案件 1 件につき見積 1 件)。 */
+      const many = (n: number, m: number) => ({
+        clients: { list: () => entities(n, "A"), get: (id: number) => ({ id }) },
+        projects: {
+          list: (f: { clientIdEq?: number }) =>
+            Array.from({ length: m }, (_, i) =>
+              project((f.clientIdEq ?? 0) * 1000 + i + 1, {
+                estimate: { id: (f.clientIdEq ?? 0) * 1000 + i + 1 },
+                client: { id: f.clientIdEq ?? 0 },
+              }),
+            ),
+        },
+        estimates: { get: (id: number) => ({ id }) },
+      });
+
+      it("200 件を超えたら、書類を 1 件も取らずに argument_error。project_id か limit での絞り込みを促す", async () => {
+        const f = fakeFind(many(3, 70)); // 210 件
+        const e = await rejects(findEstimates(f.session(), { clientName: "A" }));
+        expect(e?.code).toBe("argument_error");
+        expect(e?.message).toContain("200");
+        expect(e?.message).toContain("project_id");
+        expect(e?.message).toContain("limit");
+        expect(f.calls("estimates.get")).toHaveLength(0);
+      });
+
+      it("ちょうど 200 件なら通る", async () => {
+        const f = fakeFind(many(4, 50));
+        expect(await findEstimates(f.session(), { clientName: "A" })).toHaveLength(200);
+      });
+
+      it("上限を超えた時点で候補の収集を止める(残りの顧客の案件は検索しない)", async () => {
+        const f = fakeFind(many(5, 100));
+        await rejects(findEstimates(f.session(), { clientName: "A" }));
+        expect(f.calls("projects.list")).toHaveLength(3); // 100 + 100 + 100 > 200
+      });
+
+      it("limit に達した時点で、残りの顧客の案件の検索を止める。total_before_limit は候補数(確定ではない)", async () => {
+        const f = fakeFind(many(5, 10));
+        const s = f.session();
+        const r = await findEstimates(s, { clientName: "A", limit: 15 });
+        expect(r).toHaveLength(15);
+        expect(f.calls("projects.list")).toHaveLength(2);
+        expect(f.calls("estimates.get")).toHaveLength(15);
+        expect(s.totalBeforeLimit).toBe(20);
+      });
+
+      it("limit が大きく、全顧客を見ても足りなければ、全件を返し limited にしない", async () => {
+        const f = fakeFind(many(3, 10));
+        const s = f.session();
+        expect(await findEstimates(s, { clientName: "A", limit: 100 })).toHaveLength(30);
+        expect(s.totalBeforeLimit).toBeUndefined();
+      });
+
+      it("project_name の経路にも同じ上限が掛かる", async () => {
+        const f = fakeFind({
+          ...many(1, 1),
+          projects: {
+            list: () =>
+              Array.from({ length: 5 }, (_, i) =>
+                project(i + 1, {
+                  deliveries: Array.from({ length: 50 }, (_, j) => ({ id: i * 100 + j + 1 })),
+                }),
+              ),
+          },
+          deliveries: { get: (id: number) => ({ id }) },
+        });
+        const e = await rejects(findDeliveries(f.session(), { projectName: "P" }));
+        expect(e?.code).toBe("argument_error");
+        expect(f.calls("deliveries.get")).toHaveLength(0);
+      });
     });
 
     it("書類の取得が 404 の候補は飛ばす", async () => {

@@ -11,7 +11,12 @@
 import type { ClientEntity, ProjectEntity } from "../board/resources";
 import { BoardError } from "../errors";
 import { DOCUMENT_KIND_INFO, type DocumentKind } from "../repository/document-kinds";
-import { errFanoutTooMany, FANOUT_RESOLVE_CAP } from "./fanout";
+import {
+  errFanoutTooMany,
+  errTooManyDocuments,
+  FANOUT_RESOLVE_CAP,
+  FIND_DOCUMENT_CANDIDATE_CAP,
+} from "./fanout";
 import type { FindSession } from "./session";
 import {
   type DeliveryResult,
@@ -118,6 +123,8 @@ async function fetchAll(
   s: FindSession,
   cands: Candidate[],
   limit: number | undefined,
+  /** 候補の収集を limit で打ち切った(まだ見ていない顧客がある)。このとき候補数は下限でしかない。 */
+  truncated = false,
 ): Promise<AnyDocumentResult[]> {
   const info = DOCUMENT_KIND_INFO[kind];
   const out: AnyDocumentResult[] = [];
@@ -139,7 +146,7 @@ async function fetchAll(
       }),
     );
     if (limit && limit > 0 && out.length >= limit) {
-      if (i < cands.length - 1) s.totalBeforeLimit = cands.length;
+      if (i < cands.length - 1 || truncated) s.totalBeforeLimit = cands.length;
       break;
     }
   }
@@ -181,7 +188,13 @@ async function findDocuments(
       throw errFanoutTooMany("client_name", q.clientName, clients.length);
     }
     const cands: Candidate[] = [];
+    let truncated = false;
     for (const c of clients) {
+      // limit に達したら、残りの顧客の案件は取りに行かない(候補数はここまでに見つけた分)。
+      if (q.limit && q.limit > 0 && cands.length >= q.limit) {
+        truncated = true;
+        break;
+      }
       const projects = await s.search("projects", {
         clientIdEq: c.id,
         ...(q.projectName ? { nameCont: q.projectName } : {}),
@@ -189,8 +202,12 @@ async function findDocuments(
       });
       await s.recordProjects(kind, projects);
       cands.push(...candidatesOf(kind, projects, c));
+      // 書類を取りに行く前に拒否する(limit で足りる場合は上の打ち切りが先に効く)。
+      if (cands.length > FIND_DOCUMENT_CANDIDATE_CAP) {
+        throw errTooManyDocuments("client_name", q.clientName);
+      }
     }
-    return fetchAll(kind, s, cands, q.limit);
+    return fetchAll(kind, s, cands, q.limit, truncated);
   }
 
   // project_name だけ
@@ -199,7 +216,11 @@ async function findDocuments(
     throw errFanoutTooMany("project_name", q.projectName ?? "", projects.length);
   }
   await s.recordProjects(kind, projects);
-  return fetchAll(kind, s, candidatesOf(kind, projects), q.limit);
+  const cands = candidatesOf(kind, projects);
+  if (cands.length > FIND_DOCUMENT_CANDIDATE_CAP) {
+    throw errTooManyDocuments("project_name", q.projectName ?? "");
+  }
+  return fetchAll(kind, s, cands, q.limit);
 }
 
 export const findEstimates = (s: FindSession, q: DocumentQuery) =>

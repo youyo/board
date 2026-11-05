@@ -28,6 +28,7 @@ import { FindSession } from "../../find/session";
 import type { DocumentQuery } from "../../find/types";
 import type { RefreshChoice } from "../../repository";
 import {
+  idOrUndefined,
   optEnum,
   optId,
   optInt,
@@ -125,7 +126,7 @@ function simpleTool(
     handler: async (args, ctx) => {
       const a = args as Common & { id?: number; name?: string };
       const s = newSession(ctx, a.refresh);
-      return output(s, await run(s, { id: a.id, name: a.name, limit: a.limit }));
+      return output(s, await run(s, { id: idOrUndefined(a.id), name: a.name, limit: a.limit }));
     },
   });
 }
@@ -177,7 +178,7 @@ const findProjectsTool = defineTool({
     return output(
       s,
       await findProjects(s, {
-        id: a.id,
+        id: idOrUndefined(a.id),
         clientName: a.client_name,
         name: a.name,
         status: a.status,
@@ -199,7 +200,7 @@ function documentTool(
   return defineTool({
     name: `find_${plural}`,
     title: `${{ estimate: "見積書", order: "注文書", delivery: "納品書", receipt: "領収書" }[kind]}検索`,
-    description: `Search BOARD ${kind} documents by ID, project ID, client name, or project name. Returns ${kind} entities (no Status field on entity, hence no status filter). client_name/project_name perform fanout search across all matching entities (no disambiguation).${RESPONSE_DESC} Each item has ProjectID/ClientID resolved from the document ID (0 with a project_unresolved warning if it could not be resolved in time; retry to continue).`,
+    description: `Search BOARD ${kind} documents by ID, project ID, client name, or project name. Returns ${kind} entities (no Status field on entity, hence no status filter). client_name/project_name perform fanout search across all matching entities (no disambiguation).${RESPONSE_DESC} With client_name and limit, the search stops once limit candidates are found, so total_before_limit is the number of candidates found so far (not exact). More than 200 candidate documents are rejected (argument_error): narrow with project_id or set limit. Each item has ProjectID/ClientID resolved from the document ID (0 with a project_unresolved warning if it could not be resolved in time; retry to continue).`,
     category: "ReadOnly",
     inputSchema: z.strictObject({
       id: optId(`${idWhat} for direct lookup (highest priority).`),
@@ -219,8 +220,8 @@ function documentTool(
       return output(
         s,
         await run(s, {
-          id: a.id,
-          projectId: a.project_id,
+          id: idOrUndefined(a.id),
+          projectId: idOrUndefined(a.project_id),
           clientName: a.client_name,
           projectName: a.project_name,
           limit: a.limit,
@@ -289,7 +290,7 @@ const findInvoicesTool = defineTool({
     return output(
       s,
       await findInvoices(s, {
-        id: a.id,
+        id: idOrUndefined(a.id),
         partnerName: a.client_name,
         status: a.status,
         limit: a.limit,
@@ -328,7 +329,7 @@ const findPurchaseOrdersTool = defineTool({
     return output(
       s,
       await findPurchaseOrders(s, {
-        id: a.id,
+        id: idOrUndefined(a.id),
         partnerName: a.vendor_name,
         status: a.status,
         limit: a.limit,
@@ -367,7 +368,7 @@ const findPaymentsTool = defineTool({
     return output(
       s,
       await findPayments(s, {
-        id: a.id,
+        id: idOrUndefined(a.id),
         partnerName: a.vendor_name,
         status: a.status,
         limit: a.limit,

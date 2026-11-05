@@ -267,3 +267,224 @@ describe("ロック(同時の走査)", () => {
     expect(st?.lock_owner).toBeNull();
   });
 });
+
+/** prepare / bind / run に差し込める D1 のラッパー(実物の文を壊さず、プロパティだけを差し替える)。 */
+function spyDb(opts: {
+  /** SQL がこの接頭辞で始まる文の run の直前に呼ぶ(『読んでからロックを取るまでの間』の再現)。 */
+  beforeRun?: { prefix: string; hook: () => Promise<void> };
+  /** bind の引数の個数を記録する。 */
+  binds?: number[];
+  /** batch に渡した文の数を記録する。 */
+  batches?: number[];
+}): D1Database {
+  const real = testDb();
+  return new Proxy(real, {
+    get(target, prop) {
+      if (prop === "prepare") {
+        return (sql: string) => {
+          const st = target.prepare(sql);
+          const origBind = st.bind.bind(st);
+          st.bind = (...args: unknown[]) => {
+            opts.binds?.push(args.length);
+            const b = origBind(...args);
+            const br = opts.beforeRun;
+            if (br && sql.startsWith(br.prefix)) {
+              const origRun = b.run.bind(b);
+              b.run = (async () => {
+                await br.hook();
+                return origRun();
+              }) as typeof b.run;
+            }
+            return b;
+          };
+          return st;
+        };
+      }
+      if (prop === "batch") {
+        return (stmts: D1PreparedStatement[]) => {
+          opts.batches?.push(stmts.length);
+          return target.batch(stmts);
+        };
+      }
+      const v = Reflect.get(target, prop);
+      return typeof v === "function" ? v.bind(target) : v;
+    },
+  });
+}
+
+describe("ロックを失った保持者は進捗も対応も書かない(stale を奪われた場合)", () => {
+  async function stealDuring(
+    thief: { next_page: number | null; completed_at: string | null },
+    clockMs: () => number,
+  ) {
+    const db = testDb();
+    await db
+      .prepare(
+        `UPDATE document_scan_state SET lock_owner = 'thief', lock_started_at = ?, next_page = ?, started_at = 'S', completed_at = ?
+         WHERE document_kind = 'estimate'`,
+      )
+      .bind(new Date(clockMs()).toISOString(), thief.next_page, thief.completed_at)
+      .run();
+  }
+
+  it("奪われたあと、元の保持者は進捗を巻き戻せず、対応も書けない。その書類は scan_in_progress で縮退する", async () => {
+    const { index, clock } = setup();
+    const api = mockOutboundFetch({
+      [projectsKey]: pagedHandler(
+        () => projects(9),
+        async () => {
+          await stealDuring({ next_page: 7, completed_at: null }, clock.now);
+          return undefined;
+        },
+      ),
+    });
+    const r = await index.lookup("estimate", 1005);
+    expect(r).toEqual({ status: "unresolved", reason: "scan_in_progress" });
+    expect(pagesOf(api.calls)).toEqual([1]); // 以後の走査を中止する
+    const st = await testDb()
+      .prepare("SELECT * FROM document_scan_state WHERE document_kind = 'estimate'")
+      .first<{ next_page: number; started_at: string; lock_owner: string }>();
+    expect(st).toMatchObject({ next_page: 7, started_at: "S", lock_owner: "thief" });
+    expect(await count("SELECT count(*) AS c FROM document_project_map")).toBe(0);
+  });
+
+  it("奪った側の完了印(completed_at)を、元の保持者が消せない", async () => {
+    const { index, clock } = setup();
+    const doneAt = "2026-11-05T00:00:05Z";
+    mockOutboundFetch({
+      [projectsKey]: pagedHandler(
+        () => projects(9),
+        async () => {
+          await stealDuring({ next_page: null, completed_at: doneAt }, clock.now);
+          return undefined;
+        },
+      ),
+    });
+    const r = await index.lookup("estimate", 1005);
+    expect(r).toEqual({ status: "unresolved", reason: "scan_in_progress" });
+    const st = await testDb()
+      .prepare(
+        "SELECT next_page, completed_at, lock_owner FROM document_scan_state WHERE document_kind = 'estimate'",
+      )
+      .first<{ next_page: number | null; completed_at: string | null; lock_owner: string }>();
+    expect(st).toEqual({ next_page: null, completed_at: doneAt, lock_owner: "thief" });
+  });
+});
+
+describe("ロックを取ったあとに走査の状態を読み直す", () => {
+  it("状態を読んでからロックを取るまでの間に別の呼び出しが走査を完了していたら、走査せず not_found", async () => {
+    const clock = fakeClock();
+    const db = spyDb({
+      beforeRun: {
+        prefix: "INSERT OR IGNORE INTO document_scan_state",
+        hook: async () => {
+          await testDb()
+            .prepare(
+              "INSERT OR REPLACE INTO document_scan_state (document_kind, next_page, started_at, completed_at) VALUES ('estimate', NULL, 'S', ?)",
+            )
+            .bind(new Date(clock.now()).toISOString())
+            .run();
+        },
+      },
+    });
+    const index = createDocumentIndex({
+      db,
+      client: testClient(clock.now),
+      now: clock.now,
+      perPage: PER_PAGE,
+    });
+    const api = mockOutboundFetch({ [projectsKey]: pagedHandler(() => projects(9)) });
+    expect(await index.lookup("estimate", 99999)).toEqual({ status: "miss", reason: "not_found" });
+    expect(api.calls).toHaveLength(0);
+    const st = await testDb()
+      .prepare("SELECT lock_owner FROM document_scan_state WHERE document_kind = 'estimate'")
+      .first<{ lock_owner: string | null }>();
+    expect(st?.lock_owner).toBeNull();
+  });
+
+  it("その間に対応表へ入っていたら、走査せずそれを返す", async () => {
+    const clock = fakeClock();
+    const db = spyDb({
+      beforeRun: {
+        prefix: "INSERT OR IGNORE INTO document_scan_state",
+        hook: async () => {
+          await testDb()
+            .prepare(
+              "INSERT OR REPLACE INTO document_project_map (document_kind, document_id, project_id, recorded_at) VALUES ('estimate', 1005, 5, 'x')",
+            )
+            .run();
+        },
+      },
+    });
+    const index = createDocumentIndex({
+      db,
+      client: testClient(clock.now),
+      now: clock.now,
+      perPage: PER_PAGE,
+    });
+    const api = mockOutboundFetch({ [projectsKey]: pagedHandler(() => projects(9)) });
+    expect(await index.lookup("estimate", 1005)).toEqual({ status: "hit", projectId: 5 });
+    expect(api.calls).toHaveLength(0);
+  });
+
+  it("その間に別の呼び出しが進捗を進めていたら、読み直した次のページから続ける", async () => {
+    const clock = fakeClock();
+    const db = spyDb({
+      beforeRun: {
+        prefix: "INSERT OR IGNORE INTO document_scan_state",
+        hook: async () => {
+          await testDb()
+            .prepare(
+              "INSERT OR REPLACE INTO document_scan_state (document_kind, next_page, started_at) VALUES ('estimate', 3, 'S')",
+            )
+            .run();
+        },
+      },
+    });
+    const index = createDocumentIndex({
+      db,
+      client: testClient(clock.now),
+      now: clock.now,
+      perPage: PER_PAGE,
+    });
+    const api = mockOutboundFetch({ [projectsKey]: pagedHandler(() => projects(9)) });
+    await index.lookup("estimate", 1009);
+    expect(pagesOf(api.calls)[0]).toBe(3);
+  });
+});
+
+describe("対応表への記録は複数行にまとめる(D1 のクエリ数とバインド数)", () => {
+  it("1 ページ(100 案件 = 200 対応)の走査の batch は、文の数を抑え、1 文のバインドは 100 以下", async () => {
+    const clock = fakeClock();
+    const binds: number[] = [];
+    const batches: number[] = [];
+    const db = spyDb({ binds, batches });
+    const index = createDocumentIndex({
+      db,
+      client: testClient(clock.now),
+      now: clock.now,
+      perPage: 100,
+    });
+    mockOutboundFetch({ [projectsKey]: pagedHandler(() => projects(100)) });
+    await index.lookup("delivery", 2001);
+    // 200 対応 → 1 文 24 行として 9 文 + 進捗 1 文。1 行 1 文(200 文)ではない。
+    const pageBatch = batches.find((n) => n > 1);
+    expect(pageBatch).toBeLessThanOrEqual(12);
+    expect(Math.max(...binds)).toBeLessThanOrEqual(100);
+    expect(await count("SELECT count(*) AS c FROM document_project_map")).toBe(200);
+  });
+
+  it("record も同様にまとめる。重複する書類 ID があっても全件入る", async () => {
+    const binds: number[] = [];
+    const batches: number[] = [];
+    const index = createDocumentIndex({
+      db: spyDb({ binds, batches }),
+      client: testClient(),
+      perPage: 100,
+    });
+    await index.record("delivery", projects(100) as never);
+    expect(batches[0]).toBeLessThanOrEqual(9);
+    expect(Math.max(...binds)).toBeLessThanOrEqual(100);
+    expect(await count("SELECT count(*) AS c FROM document_project_map")).toBe(200);
+  });
+});

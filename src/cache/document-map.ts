@@ -35,21 +35,51 @@ export async function getProjectId(
   return row?.project_id ?? null;
 }
 
+/**
+ * 1 文に入れる行数。D1 は 1 文あたりのバインド変数が 100 まで(Workers の D1 の制限。docs: Limits の
+ * "Maximum bound parameters per query")。1 行 4 個 + 所有者の条件 2 個で 24 行 = 98 個に収める。
+ */
+export const MAP_ROWS_PER_STATEMENT = 24;
+
+const MAP_COLUMNS = "(document_kind, document_id, project_id, recorded_at)";
+const ROW_PLACEHOLDER = "(?, ?, ?, ?)";
+
+/**
+ * 対応の記録。複数行の 1 文にまとめて、D1 に流すステートメント数を減らす(1 行 1 文だと 1 ページで数百文になる)。
+ * `guardOwner` を渡すと、走査ロックの所有者がその値のときだけ書く(同じ batch の中で判定する。stale を奪われた元の保持者の書き込みを無効にする)。
+ */
 export function recordStatements(
   db: D1Database,
   kind: string,
   pairs: ReadonlyArray<{ documentId: number; projectId: number }>,
   nowMs: number,
+  guardOwner?: string,
 ): D1PreparedStatement[] {
   const at = isoSeconds(nowMs);
-  return pairs.map((p) =>
-    db
-      .prepare(
-        `INSERT OR REPLACE INTO document_project_map (document_kind, document_id, project_id, recorded_at)
-         VALUES (?, ?, ?, ?)`,
-      )
-      .bind(kind, p.documentId, p.projectId, at),
-  );
+  const out: D1PreparedStatement[] = [];
+  for (let i = 0; i < pairs.length; i += MAP_ROWS_PER_STATEMENT) {
+    const chunk = pairs.slice(i, i + MAP_ROWS_PER_STATEMENT);
+    const values = chunk.map(() => ROW_PLACEHOLDER).join(", ");
+    const params = chunk.flatMap((p) => [kind, p.documentId, p.projectId, at]);
+    if (guardOwner === undefined) {
+      out.push(
+        db
+          .prepare(`INSERT OR REPLACE INTO document_project_map ${MAP_COLUMNS} VALUES ${values}`)
+          .bind(...params),
+      );
+    } else {
+      out.push(
+        db
+          .prepare(
+            `INSERT OR REPLACE INTO document_project_map ${MAP_COLUMNS}
+             SELECT * FROM (VALUES ${values})
+             WHERE EXISTS (SELECT 1 FROM document_scan_state WHERE document_kind = ? AND lock_owner = ?)`,
+          )
+          .bind(...params, kind, guardOwner),
+      );
+    }
+  }
+  return out;
 }
 
 export async function getScanState(db: D1Database, kind: string): Promise<ScanState | null> {
@@ -60,20 +90,23 @@ export async function getScanState(db: D1Database, kind: string): Promise<ScanSt
     .first<ScanState>();
 }
 
-/** 進捗の更新(ロック列には触らない)。 */
+/**
+ * 進捗の更新(ロック列には触らない)。走査ロックの所有者が `owner` のときだけ書く。
+ * 結果の `meta.changes` が 1 でなければロックを失っている(呼び出し側は以後の書き込みを中止する)。
+ * 行は tryAcquireScanLock が作るので、UPDATE で足りる。
+ */
 export function saveProgressStatement(
   db: D1Database,
   kind: string,
   p: { nextPage: number | null; startedAt: string; completedAt: string | null },
+  owner: string,
 ): D1PreparedStatement {
   return db
     .prepare(
-      `INSERT INTO document_scan_state (document_kind, next_page, started_at, completed_at)
-       VALUES (?, ?, ?, ?)
-       ON CONFLICT (document_kind) DO UPDATE SET
-         next_page = excluded.next_page, started_at = excluded.started_at, completed_at = excluded.completed_at`,
+      `UPDATE document_scan_state SET next_page = ?, started_at = ?, completed_at = ?
+       WHERE document_kind = ? AND lock_owner = ?`,
     )
-    .bind(kind, p.nextPage, p.startedAt, p.completedAt);
+    .bind(p.nextPage, p.startedAt, p.completedAt, kind, owner);
 }
 
 /** 取れたら true。待たない。 */

@@ -389,10 +389,12 @@ describe("E2E: 逆引き(書類 ID → 案件 ID)の縮退", () => {
       }),
     ]);
     // 締め切り(30 秒)の手前で返っている: 走査は予約(8 秒)を残して止まる。
-    expect(Date.now() - t0).toBeLessThan(30_000 - 8_000 + 10_000);
+    // 1 ページ 10 秒。予約があれば 1 ページ目のあと(経過 10 秒 + 次の 1.5 倍 = 15 秒 > 残り 12 秒)で止まる。
+    // 予約がなければ 2 ページ目まで進んで経過 20 秒になり、ページ数の上限で落ちる。
+    expect(Date.now() - t0).toBeLessThanOrEqual(30_000 - 8_000);
     const scanned = paths(m).filter((p) => p === "/v1/projects").length;
     expect(scanned).toBeGreaterThanOrEqual(1);
-    expect(scanned).toBeLessThanOrEqual(3);
+    expect(scanned).toBeLessThanOrEqual(1);
     const state = await env.DB.prepare(
       "SELECT next_page, completed_at, lock_owner FROM document_scan_state WHERE document_kind = 'estimate'",
     ).first<{ next_page: number; completed_at: string | null; lock_owner: string | null }>();

@@ -108,13 +108,15 @@ Workers は 1 回の呼び出しの締め切りが 30 秒で、書類の取得�
 | 補助情報のメモ | なし(同じ顧客を案件ごとに引く) | 1 回の呼び出しの間は (リソース, ID) ごとに 1 度だけ | 通信と締め切りの節約 |
 | `refresh` の掛かり方 | 全 repository 呼び出しに同じ指定 | リソースごとに最初の 1 回の読み取りにだけ。名前の解決は掛けない(Go と同じ)。書類は 1 件ごと(full = 取り直し) | 列挙のたびに refresh を走らせない |
 | 検証の順序 | 名前の解決 → 検証 → 検索 | 検証(`contract_status` の値も) → 名前の解決 → 検索 | 無駄な通信をしない。結果は同じ |
-| 書類 fanout の候補 | 顧客ごとに案件を取りながら、`limit` に達したら残りの顧客の案件検索を省く | 先に全顧客の案件を取る(最大 5 回)→ 書類を `limit` まで取る | `total_before_limit` を出すため |
+| 書類 fanout の候補 | 顧客ごとに案件を取りながら、`limit` に達したら残りの顧客の案件検索を省く | 同じ。`limit` に達した時点で残りの顧客の案件検索を止める(このとき `total_before_limit` は見つけた候補数で、確定ではない)。候補の書類が 200 件(`FIND_DOCUMENT_CANDIDATE_CAP`)を超えたら、書類を取らずに `argument_error`(`project_id` か `limit` を促す) | 書類は 1 件ずつ取るので、締め切りとレート制限を守る |
+| `contract_status` の検証 | `id` を指定したときは検証しない(ID が優先で、ほかの条件は無視) | `id` を指定したときも検証する(未知の値は `argument_error`) | 通信前に誤りを知らせる。Go との挙動差 |
+| 逆引きの表の有効期限 | (走査の結果を 10 秒だけ持つ in-memory) | 対応(書類 ID → 案件 ID)に有効期限はない。書類は作られた案件にずっと属する前提で、一度覚えたら引き直さない(走査の『完了』だけが 10 分の TTL) | D1 に永続化するため。案件の付け替えがあっても反映されない |
 | 曖昧・fanout 超過・未対応の引数 | 汎用のエラー | `argument_error`(retryable: false)。0 件は `not_found` | エンベロープの code |
 | UI のベース URL | `BOARD_UI_BASE_URL` で上書き可 | `BOARD_BASE_URL` の `://api.` を `://` にして導く(上書きなし) | 設定項目を増やさない(M06 で必要なら追加) |
 | `find_projects` の description | `docs/usage/maintenance-contract-search.md` への参照 | 参照を削除(リポジトリにない) | |
 | 全 description | Go の文面 | Go の文面 + 応答の形(`cache` / `warnings` / `limited`)の説明、fanout 超過の 5 件の上限 | Workers 版で足した応答 |
 | 結果のキー | Go のフィールド名(PascalCase)+ `url` | 同じ | 決定どおり |
-| `id` 引数 | 0・未指定は『指定なし』 | 1 以上の整数(0 は argument_error) | 明示的に誤りを知らせる |
+| `id` 引数 | 0・未指定は『指定なし』 | 同じ(0 は『指定なし』、負の数・小数は argument_error)。`project_id` も同様 | Go に揃える(verifier の指摘で当初の『0 は argument_error』から変更) |
 
 ## テスト
 

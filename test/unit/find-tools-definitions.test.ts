@@ -4,7 +4,8 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { ALL_TOOLS } from "../../src/mcp/tools";
-import { callApiTool } from "../helpers/api-tool";
+import { BASE, callApiTool } from "../helpers/api-tool";
+import { jsonResponse } from "../helpers/mock-fetch";
 
 const FIND_TOOLS: Record<string, string[]> = {
   find_clients: ["id", "name"],
@@ -90,7 +91,11 @@ describe("find 層のツール 11 個", () => {
 describe("引数の検証(BOARD に通信する前に拒否する)", () => {
   const cases: [string, Record<string, unknown>, string][] = [
     ["find_clients", {}, "at least one field required"],
-    ["find_clients", { id: 0 }, "id"],
+    // id: 0 は『指定なし』(Go の getIntArg と同じ)なので、ほかの指定がなければ『少なくとも 1 つ必要』になる。
+    ["find_clients", { id: 0 }, "at least one field required"],
+    ["find_clients", { id: -1 }, "id"],
+    ["find_estimates", { id: 0, project_id: 0 }, "at least one field required"],
+    ["find_estimates", { project_id: -3 }, "project_id"],
     ["find_clients", { id: 1.5 }, "id"],
     ["find_clients", { id: 1, limit: -1 }, "limit"],
     ["find_clients", { id: 1, bogus: true }, "bogus"],
@@ -113,5 +118,36 @@ describe("引数の検証(BOARD に通信する前に拒否する)", () => {
     expect(r.json.error.code).toBe("argument_error");
     expect(r.json.error.message).toContain(message);
     expect(r.calls).toHaveLength(0);
+  });
+});
+
+describe("id: 0 は『指定なし』として扱う(Go の getIntArg と同じ)", () => {
+  it("find_clients {id: 0, name} は name で検索する", async () => {
+    const r = await callApiTool(
+      "find_clients",
+      { id: 0, name: "株式" },
+      {
+        [`GET ${BASE}/v1/clients`]: () => jsonResponse([{ id: 1, name: "株式会社A" }]),
+        [`GET ${BASE}/v1/client_branches`]: () => jsonResponse([]),
+        [`GET ${BASE}/v1/contacts`]: () => jsonResponse([]),
+      },
+    );
+    expect(r.isError, r.text).toBe(false);
+    expect(r.json.items[0].Client.id).toBe(1);
+    expect(r.calls.some((c) => new URL(c.url).pathname === "/v1/clients/0")).toBe(false);
+  });
+
+  it("find_estimates {id: 0, project_id: 5} は project_id で検索する", async () => {
+    const r = await callApiTool(
+      "find_estimates",
+      { id: 0, project_id: 5 },
+      {
+        [`GET ${BASE}/v1/projects/5`]: () => jsonResponse({ id: 5, estimate: { id: 50 } }),
+        [`GET ${BASE}/v1/documents/estimates/50`]: () => jsonResponse({ id: 50 }),
+        [`GET ${BASE}/v1/clients/1`]: () => jsonResponse({ id: 1 }),
+      },
+    );
+    expect(r.isError, r.text).toBe(false);
+    expect(r.json.items[0].ProjectID).toBe(5);
   });
 });

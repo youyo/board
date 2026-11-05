@@ -11,3 +11,16 @@ export function errFanoutTooMany(field: string, value: string, n: number): Argum
     `${field} "${value}" matched ${n} entities (cap=${FANOUT_RESOLVE_CAP}); narrow the query or specify a more specific id/project_id to reduce fanout`,
   );
 }
+
+/**
+ * 書類の fanout(client_name / project_name)が対象にする書類(候補)の総数の上限。
+ * 書類は 1 件ずつ取る(1 件 = BOARD への 1 呼び出し)ので、大量にあると締め切りとレート制限を使い切る。
+ * 超えたら書類を取りに行かず、`project_id` か `limit` での絞り込みを求める。
+ */
+export const FIND_DOCUMENT_CANDIDATE_CAP = 200;
+
+export function errTooManyDocuments(field: string, value: string): ArgumentError {
+  return new ArgumentError(
+    `${field} "${value}" matched more than ${FIND_DOCUMENT_CANDIDATE_CAP} documents (cap=${FIND_DOCUMENT_CANDIDATE_CAP}); narrow with project_id, or set limit to cap the number of documents returned`,
+  );
+}
