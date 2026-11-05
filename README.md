@@ -1,297 +1,128 @@
 # board
 
-[![CI](https://github.com/youyo/board/actions/workflows/ci.yml/badge.svg)](https://github.com/youyo/board/actions/workflows/ci.yml)
-[![Release](https://github.com/youyo/board/actions/workflows/release.yml/badge.svg)](https://github.com/youyo/board/actions/workflows/release.yml)
-
-[日本語版はこちら](README_ja.md)
-
-CLI tool and local MCP server for the [BOARD API](https://api.the-board.jp/v1/). Ships as a single binary `board`.
-
-- **`board api`** — Low-level, API-aligned commands for all 22 resources
-- **`board find`** — High-level, LLM-friendly cross-resource search
-- **`board mcp serve`** — Local HTTP MCP server (for AI assistants)
-- SQLite cache to respect BOARD API rate limits (3,000/day, 3/sec)
-
-## Documentation
-
-- [Installation](docs/installation.md)
-- [Getting Started](docs/guides/getting-started.md)
-- [MCP Server Guide](docs/guides/mcp-server.md)
-- [API Reference](docs/api-reference.md)
-
-## Agent / LLM integration
-
-### Embedded `board docs` subcommand
-
-The `board` binary ships with embedded documentation — no network required:
-
-```sh
-board docs                          # show README
-board docs --list                   # list all embedded docs
-board docs clients                  # extract a resource reference
-board docs clients --format json    # machine-readable output for LLMs
-board docs --search "Ransack"       # full-text search
-```
-
-For the full `--format json` schema and the complete list of embedded docs,
-see [API Reference › board docs subcommand](docs/api-reference.md#board-docs-サブコマンド).
-
-### `/board:docs` Claude Code skill
-
-A thin Claude Code skill (`skills/docs/SKILL.md`) wraps the commands above so
-AI agents can look up BOARD CLI usage on demand. Register this repository as a
-Claude Code plugin (it ships a `.claude-plugin/plugin.json`) to expose the
-skill as `/board:docs`. The skill stays minimal by design — it only points the
-agent at `board docs`, and the binary remains the single source of truth.
-
-## Installation
-
-### Homebrew (macOS / Linux)
-
-```sh
-brew install youyo/tap/board
-```
-
-### GitHub Releases
-
-Download the binary for your platform from [Releases](https://github.com/youyo/board/releases) and place it in your `$PATH`.
-
-### Build from source
-
-```sh
-git clone https://github.com/youyo/board.git
-cd board
-mise run build   # requires mise + Go 1.26
-```
-
-## Quick Start
-
-```sh
-# 1. Configure credentials
-board configure
-
-# 2. Search for a client
-board find client --name "Acme"
-
-# 3. Find projects for that client
-board find project --client-name "Acme"
-
-# 4. Pretty-print output
-board find invoice --client-name "Acme" --pretty
-```
-
-## CLI Commands
-
-### `board configure`
-
-Interactive setup wizard for credentials and settings.
-
-```sh
-board configure              # run wizard
-board configure show         # show current config (secrets masked)
-board configure list-profiles
-board configure use <profile>
-board configure current-profile
-board configure path
-```
-
-### `board api`
-
-Low-level access to the BOARD API. Each resource supports `list` and `get`.
-
-```sh
-board api <resource> list
-board api <resource> list --name-cont "Acme"           # Ransack-style filter
-board api <resource> list --updated-at-gteq 2026-01-01 --show-meta
-board api <resource> get --id <ID>
-board api <resource> get --id <ID> --show-meta         # include _meta (headers) in output
-```
-
-**Available resources** (22):
-
-| Category | Resources |
-|----------|-----------|
-| Core | `clients`, `client-branches`, `contacts`, `projects`, `project-costs` |
-| Documents | `estimates`, `invoices`, `orders`, `deliveries`, `receipts` |
-| Vendors | `vendors`, `vendor-branches`, `vendor-contacts`, `purchase-orders`, `payments` |
-| Masters | `users`, `groups`, `payment-terms`, `project-types`, `purchase-types`, `accounting-types`, `document-send-channels` |
-
-### `board find`
-
-High-level cross-resource search designed for LLM use. Accepts human-readable filters.
-
-```sh
-board find client --name "Acme" --text "keyword"
-board find project --client-name "Acme" --status active
-board find invoice --client-name "Acme" --status draft
-board find vendor --name "Supplier"
-board find purchase-order --vendor-name "Supplier" --status open
-```
-
-**Available resources** (11): `client`, `project`, `estimate`, `invoice`, `order`, `delivery`, `receipt`, `vendor`, `purchase-order`, `payment`, `user`
-
-**Behavior notes** (v0.7.0+):
-
-- **Disambiguate vs fanout**: `find project` / `find invoice` / `find purchase-order` / `find payment` resolve `--client-name` / `--vendor-name` to a single ID (ambiguity error + up to 5 candidates if multiple matches; supply `--id` to disambiguate). Document tools (`find estimate` / `find order` / `find delivery` / `find receipt`) instead **fanout** — they search across all matching clients/projects. Use `--project-id` to narrow.
-- **Status narrowing**: `find project --status` requires another narrowing flag (`--id` / `--client-name` / `--name` / `--text`) to avoid full-scan. `find invoice / purchase-order / payment` accept single `--status` (delegated to BOARD API) but reject `--statuses[]` alone.
-- **Enrichment is non-fatal**: `Result.Project` / `Result.Client` / `Result.Vendor` may be `nil` if enrichment fails (warn logged, primary entity still returned). Check for nil in your client code.
-
-See [docs/migration/v0.7.0.md](docs/migration/v0.7.0.md) for the v0.6.0 → v0.7.0 migration guide.
-
-### `board cache`
-
-Manage the local SQLite cache.
-
-```sh
-board cache status   # show cache state
-board cache expire   # mark cache as expired (triggers refresh on next access)
-board cache clear    # delete all cached data
-board cache path     # show cache file path
-```
-
-### `board mcp serve`
-
-Start a local HTTP MCP server that exposes `board find` as MCP tools.
-
-```sh
-board mcp serve                      # default: 127.0.0.1:3100
-board mcp serve --host 0.0.0.0 --port 8080
-```
-
-### `board completion`
-
-Generate shell completion scripts. Fixed-enum flags (`--response-group`, `--order-status-in`,
-`--delivery-status-in`, `--invoice-timing-kbn-in`, `--format`) ship with value completion — press
-`<TAB>` after the flag to see candidates (with Japanese descriptions in zsh).
-
-```sh
-board completion zsh  | sudo tee /usr/local/share/zsh/site-functions/_board
-board completion bash > /etc/bash_completion.d/board
-```
-
-See [API Reference › CLI 補完値一覧](docs/api-reference.md#cli-補完値一覧) for the full list of
-completion values.
-
-## Global Flags
-
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--profile`, `-p` | (current) | Profile name to use |
-| `--pretty` | false | Pretty-print JSON output |
-| `--limit` | 0 (unlimited) | Max results to return (0 = no limit) |
-| `--refresh` | false | Trigger incremental (delta) cache refresh before reading |
-| `--refresh-full` | false | Trigger full refresh (re-fetch + remove stale entries). Takes priority over `--refresh`. |
-| `--version` | — | Print version |
-
-## Configuration
-
-Config file is TOML, stored at `~/.config/board/config.toml` (XDG: override with `XDG_CONFIG_HOME`). Run `board configure path` to show the resolved path.
-
-```toml
-current_profile = "default"
-timezone = "UTC"
-
-[profiles.default]
-base_url = "https://api.the-board.jp"
-api_key = ""        # x-api-key header
-api_token = ""      # Bearer token
-request_timeout_seconds = 30
-retry_max = 5
-pretty_default = false
-```
-
-### Cache freshness model (LLM-driven)
-
-board does not auto-refresh the cache on a daily schedule. After the initial
-build (`board ... --refresh-full`), the cache is read as-is until you explicitly
-trigger a refresh:
-
-- `--refresh` — incremental (delta) sync, fetches entries updated since last sync
-- `--refresh-full` — full re-fetch (also removes stale entries)
-
-Each `board find` response includes a `cache` array showing the freshness of
-each accessed resource:
-
-```json
-{
-  "items": [...],
-  "cache": [
-    {"resource": "clients",   "cached_at": "2026-04-25T10:00:00Z"},
-    {"resource": "projects",  "cached_at": "2026-04-26T08:30:00Z", "full_refreshed_at": "2026-04-01T12:00:00Z"}
-  ]
-}
-```
-
-The LLM (or human) inspects `cached_at` / `full_refreshed_at` and decides
-whether to retry with `--refresh` or `--refresh-full`. Concurrent refreshes
-return `refresh_in_progress` (HTTP 429-style) immediately so clients can retry
-later without blocking.
-
-Multiple profiles are supported. Switch with `board configure use <profile>` or `-p <profile>` per command.
-
-## MCP Server
-
-`board mcp serve` starts a local HTTP server implementing the [Model Context Protocol](https://modelcontextprotocol.io/). AI assistants (Claude, etc.) can connect to it and call `board find` operations as tools.
-
-**Example Claude Desktop config** (`claude_desktop_config.json`):
-
-```json
-{
-  "mcpServers": {
-    "board": {
-      "command": "board",
-      "args": ["mcp", "serve"]
-    }
-  }
-}
-```
-
-Available MCP tools mirror `board find` (11 tools): `find_client`, `find_project`, `find_estimate`, `find_invoice`, `find_order`, `find_delivery`, `find_receipt`, `find_vendor`, `find_purchase_order`, `find_payment`, `find_user`. (`find_groups` was removed in v0.7.0; use `board api groups list --name-cont <name>` instead.)
-
-**Maintenance contract search**: For step-by-step searches like "verify a customer's maintenance contract", `find_projects` (MCP) and `board find project` (CLI) accept a `contract_status` alias (`active` / `ended` / `prospect` / `all`) and a `statuses[]` / `--statuses` list. See [docs/usage/maintenance-contract-search.md](docs/usage/maintenance-contract-search.md).
-
-### Remote MCP with OIDC auth (Lambda)
-
-`board mcp serve --auth` enables OIDC authentication via [idproxy](https://github.com/youyo/idproxy). Combined with AWS Lambda Function URL + Lambda Web Adapter, you can host a remote MCP server that:
-
-- Authenticates browser sessions via your existing OIDC provider (Google / Entra ID / Auth0 etc.)
-- Issues OAuth 2.1 Bearer Tokens for MCP clients (Dynamic Client Registration supported)
-- Persists session/token state in DynamoDB (required for multi-container Lambda)
-- Forwards requests to the BOARD API using a single shared API key (Lambda env vars)
-
-See [examples/lambroll/](examples/lambroll/) for a complete deployment example with `mise` tasks for `deploy` / `dynamodb-create` / `dynamodb-delete`.
-
-## Architecture
+**BOARD (https://the-board.jp) を AI エージェントから使うための Remote MCP サーバー。**
+BOARD API(`https://api.the-board.jp/v1/`)の 22 リソースを、**54 個**のツールで読み取れる。
+Cloudflare Workers + D1 + Hono で動き、Cloudflare Access(MCP Server Portal + Managed OAuth)の背後に置く。
+
+> Go 製の CLI + ローカル MCP(v0.11.1)を書き直したもの。Go 版は `archive/go-cli` ブランチと、注釈付きタグ `go-cli-final`(= v0.11.1)に残してある。
+> main には含まれない(`git show go-cli-final:<path>` で読める)。CLI 専用の機能(configure / completion / docs / cache path)は移植していない。
+
+## 構成
+
+- Cloudflare Workers + D1 + Hono。Durable Objects は使わない。
+- MCP は `agents` の `createMcpHandler` によるステートレス実装(`@modelcontextprotocol/server` v2)。
+- **認証は Cloudflare Access に任せる**。Worker は OAuth サーバーを持たない。`/healthz` 以外の全リクエストで `Cf-Access-Jwt-Assertion`(署名・iss・aud・exp)を検証する。
+- **BOARD の API キー / トークンは Worker の secret を全員で共有する**(1 デプロイ = 1 BOARD アカウント)。
+- BOARD API の rate limit(3 回/秒・3,000 回/日)を避けるため、エンティティを D1 にキャッシュする。鮮度は LLM が `refresh` 引数で決める。
 
 ```
-CLI / MCP
-  → service/api (low-level)  /  service/find (high-level)
-  → repository  (cache lookup → refresh decision → API fallback)
-  → refresh (daily / delta / force)  +  cache (SQLite)
-  → boardapi (HTTP client, auth, retry, pagination)
+MCP クライアント(Claude など)
+   │  OAuth(Access の Managed OAuth)
+   ▼
+┌──────────── Cloudflare ─────────────────────────────────────────────────────┐
+│ MCP Server Portal(または MCP server application)                          │
+│   │ Cf-Access-Jwt-Assertion                                                  │
+│   ▼                                                                          │
+│ board(Worker)  /healthz(認証なし)  /mcp(JWT 検証 → ツール)                │
+│   │  ツール 54 個                                                             │
+│   ├─▶ D1: resource_cache / sync_state / 書類→案件の逆引き                    │
+│   └─▶ BOARD API(x-api-key + Bearer。直列・再試行・締め切り 30 秒)           │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-## Testing
+設計の理由は [docs/adr/](docs/adr/) を参照。
 
-Unit tests are run on every change. E2E tests that hit the real BOARD API are gated by the `e2e` build tag and **must be executed per-batch** (one Find method at a time) due to the BOARD API rate limit (3 req/sec, 3000/day).
+- [ADR 0001: 共有キー + Access Managed OAuth](docs/adr/0001-shared-key-and-access-managed-oauth.md)
+- [ADR 0002: D1 キャッシュと再開できる refresh](docs/adr/0002-d1-cache-and-resumable-refresh.md)
+- [ADR 0003: 呼び出しの締め切り 30 秒](docs/adr/0003-call-deadline.md)
+- [ADR 0004: 書類 ID から案件 ID への逆引き](docs/adr/0004-document-reverse-lookup.md)
+- [ADR 0005: upstream / 下流モデルのデプロイ](docs/adr/0005-upstream-downstream-deploy.md)
+
+## ツール一覧(54 個)
+
+ツール名に接頭辞は付けていない。MCP Server Portal 経由だと `board_` が前置される(例 `board_list_clients`)。
+
+| グループ | 個数 | ツール |
+|---|---|---|
+| `server` | 1 | `server_info` |
+| `list` | 18 | `list_accounting_types`, `list_client_branches`, `list_clients`, `list_contacts`, `list_document_send_channels`, `list_groups`, `list_invoices`, `list_payment_terms`, `list_payments`, `list_project_costs`, `list_project_types`, `list_projects`, `list_purchase_orders`, `list_purchase_types`, `list_users`, `list_vendor_branches`, `list_vendor_contacts`, `list_vendors` |
+| `get` | 22 | `get_accounting_type`, `get_client`, `get_client_branch`, `get_contact`, `get_delivery`, `get_document_send_channel`, `get_estimate`, `get_group`, `get_invoice`, `get_order`, `get_payment`, `get_payment_term`, `get_project`, `get_project_cost`, `get_project_type`, `get_purchase_order`, `get_purchase_type`, `get_receipt`, `get_user`, `get_vendor`, `get_vendor_branch`, `get_vendor_contact` |
+| `find` | 11 | `find_clients`, `find_deliveries`, `find_estimates`, `find_invoices`, `find_orders`, `find_payments`, `find_projects`, `find_purchase_orders`, `find_receipts`, `find_users`, `find_vendors` |
+| `cache` | 2 | `cache_clear`, `cache_status` |
+
+- **api 層(`list_*` / `get_*`)**: BOARD API に準拠した低レベルの読み取り。BOARD の生データを snake_case のまま返す。`show_meta` で `_meta`(総件数・ページ情報)も返す。
+- **find 層(`find_*`)**: 名前から ID を解決し、関連するエンティティ(顧客・支店・担当者・案件)を付けて返す高レベルの検索。LLM 向け。
+- **cache 層**: `cache_status` は D1 の状態の確認(読み取り専用)、`cache_clear` はキャッシュの削除(破壊的)。`cache_expire` は作っていない(読み取りに影響しないため。[計画書](plans/board-workers-m06-finish.md)参照)。
+- 読み取りツールには引数 `max_response_tokens`(応答サイズの安全網。既定 50000、0 で無効)が付く。超過は切り詰めず `response_too_large`。
+- エラーは `{"schema_version":"1","error":{"code","message","retryable"}}` を `isError: true` で返す。
+
+## 自分の環境にデプロイする
+
+このリポジトリは**公開の upstream** で、実値(Worker 名・D1 の id・ドメイン・Access の設定)は持たない。
+**自分の private リポジトリ(下流)に upstream を取り込み**、そこから自分の Cloudflare アカウントにデプロイする。
 
 ```bash
-# Unit tests (CI default)
-go test ./...
+# 下流を作る(詳細は docs/runbook.md の 0)
+git clone https://github.com/youyo/board.git my-board && cd my-board
+git remote rename origin upstream && git remote add origin <自分の private リポジトリの URL>
+mise install && mise run install
 
-# Compile-only check for e2e files (no credentials needed)
-go vet -tags e2e ./...
-go test -tags e2e -run '^$' ./internal/service/find/ ./internal/mcpserver/
+# 設定を書く(秘密でない値だけ。1 か所)
+cp board.config.example.json board.config.json   # <YOUR_...> を埋める
 
-# E2E per-batch (requires BOARD_API_KEY + BOARD_API_TOKEN, do NOT run all at once)
-go test -tags e2e -v -count=1 -run TestE2E_FindClient   ./internal/service/find/
-go test -tags e2e -v -count=1 -run TestE2E_FindProject  ./internal/service/find/
-# … 11 batches for service layer + 1 batch for mcpserver
-go test -tags e2e -v -count=1 -run TestE2E_MCPHandler   ./internal/mcpserver/
+# 初回のデプロイを 1 本で(何度でも再実行できる)
+pnpm exec wrangler login
+mise run setup
 ```
 
-Skipped tests use a unified `[SKIP:category] message` log format (categories: `no-creds`, `no-data`, `cache-warm`, `rate-limit`) so CI/log analysis can grep them. The 41 service-layer + 5 MCP-handler representative cases (down from the legacy 193) intentionally tolerate `[SKIP:no-data]` in environments where vendors/payments/etc. are empty; in such cases the *effective* coverage may fall below 33. See `docs/specs/board_cli_mcp_ultra_detailed_design_ja.md §39` for the rationale.
+- 下流が書く設定は `board.config.json` だけ。`mise run deploy:config` が upstream の `wrangler.jsonc` と合わせて `deploy/wrangler.jsonc` を生成し、**下流でコミットする**(`mise run deploy:config:check` が、生成し直し忘れ・手での書き換え・upstream の変更の取り込み忘れを検出する)。
+- `mise run setup` は、D1 の作成 → 生成 → デプロイ → secrets(`BOARD_API_KEY` / `BOARD_API_TOKEN`。隠した入力) → `/healthz` の確認まで進める。Access アプリ・Managed OAuth・Portal の登録は画面の作業で、[docs/runbook.md](docs/runbook.md) が案内する。
+- upstream の更新は `git fetch upstream && git merge --ff-only upstream/main`。下流は upstream のファイルを書き換えない。
+- 下流の GitHub Actions からデプロイするなら [docs/deploy-ci.md](docs/deploy-ci.md)(雛形は `deploy.example/deploy.workflow.yml`)。
+- **セットアップを案内するスキル**: [.claude/skills/board-setup/SKILL.md](.claude/skills/board-setup/SKILL.md)。下流リポジトリで Claude Code / Codex に「board をセットアップしたい」と頼むと、Step ごとに進めてくれる(秘密値は受け取らず、デプロイや secret の登録は運用者の承認の後)。
 
-## License
+## 接続方法
 
-[MIT](LICENSE)
+1. 上の『自分の環境にデプロイする』と [docs/runbook.md](docs/runbook.md) に従って Worker をデプロイし、Access の MCP server application(Managed OAuth)を作る。
+2. MCP Server Portal に Worker の URL `https://<domain>/mcp` を登録する。
+3. MCP クライアントから Portal の URL につなぐ(OAuth のログインは Access が行う)。
+
+Worker を直接 MCP クライアントにつなぐ場合も、Access の MCP server application の URL を使う(Worker 自体は OAuth を話さない)。
+
+## 前提
+
+- Cloudflare アカウント(Workers **Paid** プラン推奨。下記)、Cloudflare Access(Zero Trust)、カスタムドメイン。
+- BOARD の API キーとトークン(BOARD の設定画面で発行する)。
+- ローカルの作業: [mise](https://mise.jdx.dev/)(node 24 / pnpm 11 は `mise.toml` が入れる)。
+
+**Workers Free プランでは、1 回の Worker 実行あたりの D1 クエリが 50 まで**(Paid は 1,000。`db.batch()` は 1 回と数える。2026-11 時点の Cloudflare D1 Limits)。
+full refresh や逆引きの走査は 1 回の呼び出しで多数のクエリを使うので、Paid プランを前提にしている。
+
+## 制約と使い方のコツ
+
+- **rate limit**: BOARD API は 3 回/秒・3,000 回/日。Worker は BOARD への通信を直列にし、429 / 5xx は `Retry-After` を尊重して上限つきで再試行する。キャッシュを優先して読む。複数人が同時にキャッシュミスすると 3 回/秒を超えうる(再試行で吸収する)。
+- **締め切り 30 秒**: 1 回のツール呼び出しは 30 秒で打ち切る(MCP クライアントのタイムアウトより前に返すため)。時間内に終わらない処理は途中経過を保存して返し、次の呼び出しで続きから進む。
+- **`refresh`**: 一覧・検索系のツールの引数。`none`(既定。キャッシュをそのまま読む)/ `delta`(前回からの差分を取る)/ `full`(全件を取り直し、消えたものを除く)。
+  どれが要るかは、応答の `cache`(`cached_at` / `full_refreshed_at` / `refresh_state`)か `cache_status` を見て LLM が決める。
+  初めて使うリソースはキャッシュが空なので、`refresh=full` を `refresh_state=complete` になるまで繰り返す。件数の多いリソース(estimates など)は数回かかる。
+  同時に別の refresh が動いていると `refresh_in_progress`(`retry_after_seconds` 秒後に再試行)。
+- **`limit`**: 結果の件数を切る(0・未指定は無制限)。切ったときは `limited: true` と `total_before_limit` が付く。名前が多数にマッチしうる検索では `limit` を付ける。
+- **`find_*` の `warnings`**: 補助情報の取得に失敗した、書類の案件 ID を解決できなかった(逆引きの走査が時間切れ)、などの致命的でない問題。再実行で解消することが多い。
+- **秘密情報**: BOARD の API キー・トークンと Access の JWT は、ログ・エラー・MCP 応答に出さない。
+
+## 開発
+
+```bash
+mise install          # node / pnpm
+mise run install      # 依存パッケージ
+mise run test         # unit + e2e(workerd、node-e2e)。BOARD API には通信しない
+mise run lint         # biome + tsc
+mise run deploy:check # board.config.example.json のダミー値でデプロイ設定を生成し wrangler deploy --dry-run
+mise run test:live    # デプロイ済み Worker への実環境確認(test には含まれない。runbook 参照)
+```
+
+作業規約は [CLAUDE.md](CLAUDE.md)、計画は [plans/](plans/)、実機でしか確かめられない前提は [docs/manual-verification.md](docs/manual-verification.md)。
+
+## ライセンス
+
+MIT(LICENSE)。

@@ -1,0 +1,35 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // このファイルはローカル開発 (wrangler dev) とテスト (vitest) が読むダミー値の設定で、デプロイには使わない。
+  // アカウント固有の値 (D1 の id・Access のチーム / AUD) はここに書かない。
+  // デプロイ用の設定は、下流の board.config.json から `mise run deploy:config` で deploy/wrangler.jsonc に生成する (docs/runbook.md、ADR 0005)。
+  // main と $schema 以外に相対パスを持つキーを足したら、scripts/deploy-config/core.ts を直す。
+  "name": "board",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-13",
+  // compatibility_date は、固定した workerd が対応する最新日。
+  // nodejs_compat は必要になったときだけ足す。
+  "compatibility_flags": [],
+  // カスタムドメインだけで公開する。Access を迂回できる workers.dev の経路は作らない。
+  "workers_dev": false,
+  "observability": { "enabled": true },
+  "d1_databases": [
+    // キャッシュ用 (M03 で使う)。M01 では設定チェックの対象にするだけ。ダミーの database_id。
+    {
+      "binding": "DB",
+      "database_name": "board",
+      "database_id": "00000000-0000-0000-0000-000000000000"
+    }
+  ],
+  "vars": {
+    // いずれもダミー。Cloudflare Access (self-hosted / MCP server application) のチーム名と AUD タグ。
+    "ACCESS_TEAM_DOMAIN": "<team>.cloudflareaccess.com",
+    "ACCESS_AUD": "<access-application-aud>",
+    // BOARD API のベース URL。
+    "BOARD_BASE_URL": "https://api.the-board.jp"
+    // 任意: "BOARD_UI_BASE_URL" (BOARD の UI の URL。find_* の url の組み立てに使う)。省略すると BOARD_BASE_URL の `://api.` を `://` にして導く。https のオリジンのみ。
+  }
+  // secrets (デプロイ先で wrangler secret put / --secrets-file。ローカルは .dev.vars):
+  //   BOARD_API_KEY   BOARD の API キー (x-api-key ヘッダー)。全利用者で共有する
+  //   BOARD_API_TOKEN BOARD の API トークン (Authorization: Bearer)。全利用者で共有する
+}

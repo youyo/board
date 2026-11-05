@@ -1,64 +1,17 @@
-# Go binary (root directory only)
-/board
-
-# lambroll example artifacts
-/examples/lambroll/board
-/examples/lambroll/function.zip
-/examples/lambroll/signing.pem
-
-# E2E raw API response artifacts (may contain customer data; never commit)
-tmp/
-
-# GoReleaser output
-/dist/
-
-# Go build artifacts
-*.exe
-*.exe~
-*.dll
-*.so
-*.dylib
-*.test
-*.out
-
-# Go module cache
-vendor/
-
-# SQLite databases
-*.db
-*.sqlite
-*.sqlite3
-
-# IDE files
-.idea/
-.vscode/
-*.swp
-*.swo
-*~
-
-# OS files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-
-# Mise local overrides
-.mise.local.toml
-
-# Logs
+node_modules/
+dist/
+.wrangler/
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+mise.local.toml
 *.log
-
-# Config with secrets
-config.toml
-
-.serena/
-
-.env
-.envrc
-
-# Claude Code local state
-.claude/scheduled_tasks.lock
+.DS_Store
+.claude/handover
 .claude/settings.local.json
+*.local.json
+
+# 下流の設定と生成物(upstream に実値を入れないため)。下流は `git add -f board.config.json deploy/` で追跡する(docs/runbook.md、ADR 0005)。
+# 一度追跡すれば、以降の変更は通常どおり git status に出る。
+board.config.json
+deploy/

@@ -1,101 +1,81 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+> **下流リポジトリ**(upstream の board を取り込んだ自分の private リポジトリ)のセットアップ・デプロイでは、以下の「デプロイしない」等の規約は適用しない(upstream の開発時の規約)。秘密値の扱い(API キー・トークン・JWT を会話・ファイル・ログに出さない)と、コミットや push はユーザーの指示があるときだけ、は下流でも変わらない。`.claude/skills/board-setup/SKILL.md` に従う(Codex も同じパス。`.agents/skills/` からの symlink)。
 
-## プロジェクト概要
+board(BOARD API 向け Remote MCP サーバー。Cloudflare Workers + Hono + D1。ツール 54 個)の作業規約。
+計画は `plans/`(ロードマップ `plans/board-workers-roadmap.md` と各マイルストーン `plans/board-workers-m*.md`)。使い方は `README.md`、デプロイと運用は `docs/runbook.md`、設計の理由は `docs/adr/`、実機でしか確かめられない前提は `docs/manual-verification.md`。
+構成と規約は姉妹リポジトリ `../logbutler` に揃えている。決定済み事項はロードマップが正で、勝手に覆さない。
+Go 版は `archive/go-cli` ブランチと `go-cli-final` タグにある(このブランチには無い)。
 
-BOARD API（https://api.the-board.jp/v1/）向けの Go 製 CLI + ローカル HTTP MCP サーバー。単一バイナリ `board` として提供。
+## 絶対に守ること
 
-- **CLI**: `board api ...`（low-level、API準拠）+ `board find ...`（high-level、LLM向け）
-- **MCP**: `board mcp serve` でローカル HTTP MCP サーバー起動
-- デフォルト出力は JSON（`--pretty` で整形表示）
-- SQLite キャッシュで BOARD API rate limit（3000/日、3/秒）に対応
+- **TDD**: 失敗するテストを先に書き、`mise run test:unit` / `mise run test:e2e` で期待どおりの理由で失敗するのを確認してから実装する。テストを弱める・skip・削除しない。バグ修正は再現テストが先。
+- **mise**: ランタイムとコマンドは `mise.toml` で管理する。`npm test` や `vitest` を直接叩かず `mise run <task>` を使う。新しいコマンドが要るなら先にタスクへ追加する。
+- 完了条件は `mise run test`(unit + e2e)と `mise run lint` が通ること。デプロイ設定を触ったら `mise run deploy:check` も通す。
+- **Durable Objects / McpAgent は使わない**。MCP はステートレス(`createMcpHandler`)。
+- **BOARD の API キー・トークン(`BOARD_API_KEY` / `BOARD_API_TOKEN`)と Access の JWT を、ログ・エラー・MCP の応答に出さない**。
+- **BOARD API はモックのみ**。unit / e2e テストで実 API に通信しない(`test/helpers/mock-fetch.ts` は未登録の宛先への通信を例外にする)。実 API への確認は `mise run test:live`(デプロイ済み Worker に Access の service token で接続。ユーザーが実行)だけで、`mise run test` と CI には含めない。
+- 依存は公開から 2 週間以上たった正確なバージョンに固定する(`^` `~` を使わない)。`wrangler.jsonc` の `compatibility_date` も、固定した workerd が対応する日付まで。
+- コミット・push・PR・リモート作成・デプロイ(`mise run deploy`、dry-run 以外の `wrangler deploy`)・`wrangler secret put`・D1 の作成・`mise run test:live` の実行は、ユーザーの指示があるときだけ。
+- **ロックで守る書き込みは、必ず所有者条件つきの 1 つの batch で行う**(`WHERE ... lock_owner = ?` / `EXISTS (SELECT 1 ... WHERE lock_owner = ?)` を同じ batch に入れ、`meta.changes` でロックを失っていないか確かめる)。読んで確かめてから別の文で書く方式は、stale ロックを奪われたときに他人の状態を壊す。M03(full の再開)と M05(逆引きの走査)で同じ不具合が 2 回出た。新しいロックを足したら、ロックを奪われた場合のテストを書く。
+- **`git diff` は `--no-ext-diff` を付ける**(外部の diff ツールの設定で出力が変わるのを避ける)。
 
-## 技術スタック
+## 認証
 
-- Go 1.26（mise で管理: `mise use go@1.26`）
-- CLI: spf13/cobra
-- TOML: pelletier/go-toml/v2
-- SQLite: modernc.org/sqlite（CGO不要）
-- MCP: mark3labs/mcp-go
-- ターゲット: macOS + Linux (amd64/arm64)
+- OAuth サーバーは持たない。Worker は Cloudflare Access(self-hosted / MCP server application + Managed OAuth)の背後に置き、**`/healthz` 以外の全パス**で `Cf-Access-Jwt-Assertion`(署名・iss・aud・exp)を検証する(`src/auth/access-jwt.ts`、`src/app.ts` のミドルウェア)。JWT なしは 401、それ以外の失敗(JWKS が取れない場合を含む)は 403。理由は応答に出さずログに種別だけ残す。
+- BOARD の認証情報は Worker の secret を全員で共有する(1 デプロイ = 1 BOARD アカウント)。
+- `workers_dev: false`。カスタムドメインだけで公開し、Access を迂回できる経路を作らない。
 
-## ビルド・テスト
+## 出力規約
 
-```bash
-mise run build    # ./board バイナリ生成
-mise run test     # go test ./...
-mise run vet      # go vet ./...
-mise run fmt      # gofmt -s -w .
+- MCP ツールの出力は JSON を text content で返す(structuredContent は使わない)。BOARD の生データは BOARD のキー(snake_case)のまま。
+- エラーは `{"schema_version":"1","error":{"code":"...","message":"...","retryable":false}}` を `isError: true` で返す(`src/errors.ts`)。想定外の例外は `generic_error` にして message を応答に出さない。
+- 読み取りツールには引数 `max_response_tokens`(応答サイズの安全網。既定 50000、0 で無効)が `defineTool` で自動的に付く。超過は切り詰めず `response_too_large`(logbutler の ADR 0007 と同じ。`src/mcp/response-limit.ts`)。書き込み系は対象外、巨大な応答を返すテストは `max_response_tokens: 0` を付ける。
+- ツール名に接頭辞は付けない(MCP Server Portal が `board_` を前置する)。snake_case。
+- **起動時の設定チェック**(`src/config-check.ts`。logbutler の ADR 0010 と同じ): 必須の vars / secrets / D1(`DB` / `ACCESS_TEAM_DOMAIN` / `ACCESS_AUD` / `BOARD_BASE_URL` / `BOARD_API_KEY` / `BOARD_API_TOKEN`)が欠けている・プレースホルダ(`<...>`)のままなら、`/healthz` は 503、それ以外は 500 で項目名だけを返す。ログにも応答にも**値は出さない**。必須の設定を足したら `checkConfig` と unit / E2E を更新する。
+- GitHub Actions は**コミット SHA で固定**する(`.github/workflows/ci.yml`)。更新時は `gh api repos/<owner>/<repo>/git/ref/tags/<tag>` で実在を確かめる。
+
+## 構成(M06 時点)
+
+```
+src/index.ts              default export { fetch }。checkConfig の後に Hono の app を呼ぶ
+src/app.ts                Hono: GET /healthz(認証なし)、全パスの Access JWT 検証、/mcp(createMcpHandler。リクエストごとに McpServer を生成)
+src/auth/access-jwt.ts    Cf-Access-Jwt-Assertion の検証(jose。JWKS は https://{team}/cdn-cgi/access/certs から取得し isolate 内で 5 分キャッシュ)
+src/config-check.ts       起動時の設定チェック(BOARD_UI_BASE_URL は任意項目。あれば https のオリジン)
+src/env.ts  src/info.ts   Env の型 / サーバー名とバージョン
+src/errors.ts             エラーエンベロープ(BoardError / ArgumentError / ResponseTooLargeError / RefreshInProgressError)
+src/board/                BOARD API クライアント(直列・再試行・Retry-After・ページング・締め切り)と 22 リソースの型(resources/)
+src/cache/                D1 キャッシュ: schema(v2。ensureSchema)・resource-cache・sync-state・document-map(逆引き)・admin(cacheReport / clearCache / clearDocumentMap)・info(応答に同梱する鮮度)
+src/refresh/              lock(D1 の条件付き UPDATE)と refresher(delta / full。full は再開できる)
+src/repository/           cache → refresh → API の統一窓口(22 リソースの表 resources.ts)と書類 → 案件の逆引き(document-index.ts)
+src/find/                 find 層(名前の解決・fanout・contract_status・url。resolveUiBaseUrl)
+src/mcp/                  registry(defineTool / registerTools)・server・args・response-limit・call-context
+src/mcp/tools/            index.ts の ALL_TOOLS に足す: server-info(1)・api(40)・find(11)・cache(2)= 54 個
+scripts/deploy-config/    core.ts(純粋なコア。検証・生成・補助)+ main.ts(入口)。board.config.json と wrangler.jsonc から deploy/wrangler.jsonc を生成・検査
+scripts/setup.sh          mise run setup の本体(前提の確認 → D1 → deploy:config → deploy → secrets → /healthz)。scripts/deploy.sh は mise run deploy の本体
+deploy.example/           下流の CI の雛形(deploy.workflow.yml。下流が .github/workflows/deploy.yml にコピーする)
+board.config.example.json 下流の設定の雛形(<YOUR_...>)。board.config.json と deploy/ は .gitignore(下流は git add -f で追跡する)
+.claude/skills/board-setup/SKILL.md  下流リポジトリのセットアップ案内スキル(`.agents/skills/` から symlink)
+test/unit/  test/e2e/  test/node-e2e/  test/live/  test/helpers/  test/snapshots/(tools/list のスナップショット)
+docs/  plans/
 ```
 
-## アーキテクチャ
+- ツールは `defineTool` で定義し `src/mcp/tools/index.ts` の `ALL_TOOLS` に足す。D1 は `ctx.db()`、repository は `ctx.repositories()`、UI の URL は `ctx.uiBaseUrl`。
+- `cache_expire` は作らない(Go では daily auto-refresh の廃止後、読み取りに影響しない印を付けるだけだったため)。`expireCache` は `src/cache/admin.ts` に残るがツールにはつないでいない。
+- BOARD の UI の URL は `BOARD_UI_BASE_URL`(任意)があればそれ、なければ `BOARD_BASE_URL` の `://api.` を `://` にして導く。
+- **upstream / 下流モデル**(ADR 0005): このリポジトリは公開の upstream で、`wrangler.jsonc` はローカル開発・テスト用のダミー値。**追跡ファイルに実値(Worker 名・D1 の id・ドメイン・Access のチーム / AUD)を書かない**。下流は `board.config.json`(秘密でない値だけ)を書き、`mise run deploy:config` が `deploy/wrangler.jsonc` を生成する(下流でコミット)。`wrangler.jsonc` のトップレベルを変えれば下流に pull で届き、`deploy:config:check` が下流で差分を検出する。`workers_dev: false` は維持する。`wrangler.jsonc` に相対パスを持つキー(`main` / `$schema` 以外)を足したら、`scripts/deploy-config/core.ts`・unit・E2E・runbook を更新する。生成項目を足したときも同じ。
+- `board.config.json` と `deploy/` は upstream の `.gitignore` に入っている。upstream で `git add -f` しない(CI の `no-downstream-files` が止める)。`BOARD_LIVE_*`(`test:live`)は `mise.local.toml` の `[env]` に置く別物。
 
-```
-CLI / MCP
-  → service（api: low-level / find: high-level）
-  → repository（cache参照 + refresh判定 + API fallback）
-  → refresh（daily判定 / delta / force）+ cache（SQLite）
-  → boardapi（HTTP client）
-```
+## テストの書き方
 
-- **cli**: Cobra コマンド定義のみ。業務ロジック禁止
-- **app**: DI コンテナ。config/DB/client/repository/service の組み立て
-- **config**: config.toml の型定義・load/save。profile 管理
-- **boardapi**: BOARD API 生クライアント。認証（x-api-key + Bearer）、retry、pagination
-- **cache**: SQLite。resource_cache（entity単位JSON blob）+ sync_state + cache_meta
-- **refresh**: daily auto refresh 判定、差分/全件取得、ロック制御
-- **repository**: cache→refresh→API の統一参照窓口。resource ごとに1ファイル
-- **service/api**: low-level ユースケース（API準拠 list/get/search）
-- **service/find**: high-level ユースケース（複数resource横断検索）
-- **mcpserver**: ローカル HTTP MCP。high-level service のみ公開
-- **output**: JSON/pretty/mask
+- 実行環境は workerd(`@cloudflare/vitest-plugin`)。`vitest.config.ts` のプロジェクトは `unit` / `e2e`(workerd)、`node-e2e`(Node。生成スクリプトと `setup.sh`〔wrangler・mise・curl を偽物に差し替える〕を実プロセスで起動し、`wrangler deploy --dry-run` まで通す。`mise run test:e2e` に含まれる)、`live`(`mise run test:live` だけ。`test` と CI には含めない)。
+- `test/live/` と `test/node-e2e/` は `tsconfig.json` の対象外(Node 環境)。`test/unit/readme-tools.test.ts` は README のツール表と `ALL_TOOLS` を突き合わせる(ツールを足したら README の表と総数も直す)。
+- D1 を使うテストは `test/helpers/d1.ts` の `testDb()` / `resetCache()`。ツールを呼ぶ unit は `test/helpers/api-tool.ts` の `callApiTool`(実物の D1 + モックした BOARD)。
+- workerd のテストで `cloudflare:test` を import しない(import すると並列実行時に他ファイルの初回リクエストがタイムアウトする)。Worker 全体を任意の env で呼ぶときは `test/helpers/worker.ts` の `callWorker`(`import worker from "../../src/index"` に `cloudflare:workers` の `env` を上書きして渡す)。D1 のスキーマ適用でも `applyD1Migrations` は使わず、Worker が isolate ごとの初回に冪等に適用する(M03)。
+- Access の JWKS は `vi.spyOn(globalThis, "fetch")` で差し替える(`mockOutboundFetch`。同じ isolate で動くので Worker にも効く)。テスト用の鍵と JWT は `test/helpers/access.ts`。JWKS のキャッシュは `clearJwksCache()` で各テストの前にリセットする。
+- 時刻に依存する挙動は `vi.useFakeTimers({ toFake: ["Date"] })` で進める。コード側は `Date.now` の参照を保持せず、呼び出し時に読むこと。
+- ツールを足す・変えたら `test/snapshots/tools_list.json` を意図して更新する: `mise run test:update-snapshots`。
 
-## BOARD API リソース（全22）
+## API の確認
 
-コア: clients, client_branches, contacts, projects, project_costs
-ドキュメント: estimates, invoices, orders, deliveries, receipts
-ベンダー: vendors, vendor_branches, vendor_contacts, purchase_orders, payments
-マスタ: users, groups, payment_terms, project_types, purchase_types, accounting_types, document_send_channels
-
-## 設計原則
-
-- キャッシュ責務は low-level（repository）側に集約。high-level は独自キャッシュ禁止
-- refresh は内部処理。独立 sync コマンドは提供しない
-- daily auto refresh はデフォルト ON（config で OFF 可）
-- CLI command に業務ロジックを書かない
-- secrets をログ・エラー・pretty 出力に出さない
-
-## テスト戦略
-
-### BOARD API 準拠検証ロードマップ
-- **目的**: 全 22 リソース × (List/Get/Search) × (boardapi/find 層) の E2E で、実 API との厳格フィールド突合
-- **実施**: board-compliance roadmap（M01-M38）により 38 マイルストーン完了
-- **検証手法**: StrictFieldDiff helper で生 JSON と Go Entity の全フィールド突合
-- **Rate Limit 対応**: per-batch テスト（M 単位）で段階的実施。単発 `go test -tags e2e ./...` は 3 req/sec 制約で実施不可
-- **詳細**: `plans/board-compliance-roadmap.md` および各 M の plan ファイル、仕様書§39 参照
-
-### テスト実行コマンド
-```bash
-# ユニットテスト
-go test -count=1 ./...
-
-# E2E テスト（per-batch、M 単位で実行）
-go test -tags e2e -v -count=1 -run TestE2E_XXX ./internal/boardapi/
-go test -tags e2e -v -count=1 -run TestE2E_XXX ./internal/service/find/
-
-# 型チェック・フォーマット
-go vet ./...
-gofmt -s -w .
-```
-
-## 計画ファイル
-
-- スペック: `docs/specs/board_cli_mcp_ultra_detailed_design_ja.md`
-- ロードマップ（機能実装、実装完走済・archive 済）: `plans/archive/board-roadmap.md`
-- ロードマップ（準拠検証、42 M 完走済）: `plans/board-compliance-roadmap.md`
-- **ロードマップ（Phase K、進行中）**: `plans/board-phase-k-roadmap.md` — Entity 3 件の全面再設計 + 仕上げ（v0.4.0 向け）
-- マイルストーン詳細:
-  - 進行中: `plans/board-phase-k-m{NN}-{slug}.md`
-  - 準拠検証: `plans/board-compliance-m{NN}-{slug}.md`
-  - 完走済（archive）: `plans/archive/board-m{NN}-{slug}.md`
+`agents` / MCP SDK の API 名は記憶でなく `node_modules` の `.d.ts` と docs(`node_modules/agents/docs/mcp-servers.md`)で確認する。

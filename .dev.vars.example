@@ -1,0 +1,10 @@
+# ローカル開発用の秘密情報の雛形。コピーして .dev.vars を作り、実値を入れる(.dev.vars はコミットしない)。
+# 本番は `wrangler secret put <NAME>` で設定する。
+
+# BOARD の API キーとトークン(全利用者で共有)
+BOARD_API_KEY=
+BOARD_API_TOKEN=
+
+# 以下は秘密ではないが、ローカルでは .dev.vars に置いて wrangler.jsonc の vars を上書きできる
+# ACCESS_TEAM_DOMAIN=your-team.cloudflareaccess.com
+# ACCESS_AUD=

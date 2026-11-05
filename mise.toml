@@ -1,58 +1,73 @@
 [tools]
-go = "1.26"
+node = "24.21.0"
+pnpm = "11.28.5"
 
-[tasks.build]
-description = "Build the board binary"
-run = "go build -ldflags \"-X main.version=dev\" -o board ./cmd/board"
+[tasks.install]
+description = "依存パッケージをロックファイルどおりに入れる"
+run = "pnpm install --frozen-lockfile"
 
-[tasks.test]
-description = "Run all tests"
-run = "go test ./..."
-
-[tasks."test:race"]
-description = "Run unit tests with race detector (excludes e2e)"
-run = "go test -race -count=1 ./..."
-
-[tasks.vet]
-description = "Run go vet"
-run = "go vet ./..."
-
-[tasks.fmt]
-description = "Format Go source code"
-run = "gofmt -s -w ."
+[tasks."test:unit"]
+description = "Unit テスト (workerd 上で実行)"
+run = "pnpm exec vitest run --project unit"
 
 [tasks."test:e2e"]
-description = "Run E2E tests against the real BOARD API (requires BOARD_API_KEY and BOARD_API_TOKEN)"
-run = "go test -tags e2e -v -count=1 ./internal/boardapi/ ./internal/service/find/"
+description = "E2E テスト (Worker 全体に HTTP を送る。Access の JWKS は outbound fetch のモック。node-e2e は生成スクリプトを実プロセスで起動)"
+run = "pnpm exec vitest run --project e2e --project node-e2e"
 
-[tasks."test:e2e:single"]
-description = "Run a single E2E test (rate-limit safe). Usage: mise run test:e2e:single -- -run TestE2E_Foo"
-run = "go test -tags e2e -v -count=1 ./internal/boardapi/ ./internal/service/find/"
+[tasks."test:update-snapshots"]
+description = "tools/list のスナップショットを更新する (ツール定義を意図して変えたときだけ)"
+run = "pnpm exec vitest run --project unit --update test/unit/tools-list-snapshot.test.ts"
+
+[tasks.test]
+description = "Unit + E2E"
+depends = ["test:unit", "test:e2e"]
 
 [tasks.lint]
-description = "Run golangci-lint"
-run = "golangci-lint run"
+description = "Biome + 型検査"
+run = ["pnpm exec biome check .", "pnpm exec tsc --noEmit"]
 
-[tasks.clean]
-description = "Remove build artifacts"
-run = "rm -f board"
+[tasks.fmt]
+description = "Biome で整形"
+run = "pnpm exec biome check --write ."
 
-[tasks.sync-docs]
-description = "Sync docs/ + README.md to internal/docs/assets/ for go:embed"
-run = """
-rm -rf internal/docs/assets
-mkdir -p internal/docs/assets
-cp README.md internal/docs/assets/README.md
-rsync -a --exclude=specs docs/ internal/docs/assets/
-"""
+[tasks.build]
+description = "デプロイせずにバンドルできることを確認する"
+run = "pnpm exec wrangler deploy --dry-run --outdir dist"
 
-[tasks.check-docs-sync]
-description = "Verify internal/docs/assets/ is in sync with docs/ + README.md (fails if drift detected)"
-run = """
-set -e
-tmp=$(mktemp -d)
-cp README.md "$tmp/README.md"
-rsync -a --exclude=specs docs/ "$tmp/"
-diff -r "$tmp" internal/docs/assets
-rm -rf "$tmp"
-"""
+[tasks.dev]
+description = "ローカル開発サーバー"
+run = "pnpm exec wrangler dev"
+
+# ---- デプロイ(下流向け。docs/runbook.md) ----
+# 下流が書く設定は board.config.json(秘密でない値だけ。board.config.example.json をコピー)。
+# deploy:config が upstream の wrangler.jsonc と board.config.json から deploy/wrangler.jsonc を生成する(下流でコミットする)。
+[tasks.setup]
+description = "初回のデプロイを 1 本で行う(前提の確認 → D1 の作成と board.config.json への書き戻し → deploy:config → deploy → secrets → /healthz の確認 → Access / Portal の案内)。何度でも再実行できる。使い方: mise run setup -- [--yes]"
+run = "bash scripts/setup.sh"
+
+[tasks."deploy:config"]
+description = "board.config.json と upstream の wrangler.jsonc から deploy/wrangler.jsonc を生成する(生成物は下流でコミットする)。エラーは項目名だけを出す"
+run = "node scripts/deploy-config/main.ts generate"
+
+[tasks."deploy:config:validate"]
+description = "board.config.json の形式を検証するだけ(d1.databaseId が未作成でもよい。生成も Cloudflare への通信もしない。エラーは項目名だけ)"
+run = "node scripts/deploy-config/main.ts validate --pending-d1"
+
+[tasks."deploy:config:check"]
+description = "deploy/wrangler.jsonc が、board.config.json と upstream の wrangler.jsonc から作り直した結果と一致するかを確かめる(ファイルは書かない。下流の CI 用。資格情報は要らない)"
+run = "node scripts/deploy-config/main.ts check"
+
+[tasks."deploy:check"]
+description = "example の設定(ダミー値)から deploy 用の設定を生成し、wrangler deploy --dry-run が通ることを確かめる(Cloudflare へは何も変更しない。CI でも走る)"
+run = [
+  "node scripts/deploy-config/main.ts generate --example",
+  "pnpm exec wrangler deploy --dry-run -c .wrangler/deploy-example/wrangler.jsonc --outdir dist",
+]
+
+[tasks.deploy]
+description = "deploy/wrangler.jsonc で Cloudflare へデプロイする(実行はユーザー)。deploy/ が無い、または <...> が残っていれば何もせず止まる。先に mise run deploy:config"
+run = "bash scripts/deploy.sh"
+
+[tasks."test:live"]
+description = "実環境の確認 (デプロイ済み Worker に Access の service token で接続し、読み取りツールを呼んで計測する。BOARD_LIVE_URL / BOARD_LIVE_ACCESS_CLIENT_ID / BOARD_LIVE_ACCESS_CLIENT_SECRET が必要。test には含めない)"
+run = "pnpm exec vitest run --project live"

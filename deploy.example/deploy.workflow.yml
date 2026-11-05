@@ -1,0 +1,52 @@
+# GitHub Actions のワークフローの雛形(下流の private リポジトリ用。docs/deploy-ci.md)。
+# 下流が `.github/workflows/deploy.yml` にコピーして使う。upstream では動かさない(.github/workflows/ には置かない)。
+# 書き換える値は無い。Actions secret を、次の名前で登録する(docs/deploy-ci.md の表)。
+#
+#   CLOUDFLARE_API_TOKEN    デプロイ用(wrangler)の API トークン。権限は docs/deploy-ci.md(Workers・D1)
+#
+# 任意: トークンが複数のアカウントに権限を持つ場合は、board.config.json の accountId を指定する(env CLOUDFLARE_ACCOUNT_ID は使わない)。
+#
+# 前提: board.config.json と deploy/wrangler.jsonc がコミット済みであること(docs/runbook.md の 0)。
+#   BOARD_API_KEY / BOARD_API_TOKEN の secret は Worker に登録済みであること(mise run setup または wrangler secret put)。
+#   この CI は secret を扱わない。
+name: deploy
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# 既定は読み取りだけ。
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # main への push が重なったときは順番に流す(進行中のデプロイを止めない)。PR の検査は push のデプロイを待たない
+    concurrency:
+      group: board-${{ github.event_name == 'push' && 'deploy' || github.ref }}
+      cancel-in-progress: false
+    steps:
+      # アクションはコミット SHA で固定している(タグは SHA の横のコメント)。upstream の .github/workflows/ci.yml と同じ SHA。
+      # 更新するときは ci.yml に合わせる。
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # mise.toml の node / pnpm を入れる。
+      - uses: jdx/mise-action@08ae2a091c038e1e05ec6f5115dc5c69d5a2a6b8 # v5.1.2
+        with:
+          version: 2026.10.9 # 公開 2026-10-13(2 週間ルール)
+      - run: mise run install
+      - run: mise run lint
+      - run: mise run test
+      # board.config.json を直したのに生成し直していない / 生成物を手で書き換えた / upstream の変更を取り込んでいない、を検出する。資格情報は要らない
+      - run: mise run deploy:config:check
+      # デプロイは main への push のときだけ。トークンはこのステップだけに渡す
+      - name: deploy
+        if: github.event_name == 'push'
+        run: mise run deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          NO_COLOR: "1"
