@@ -36,6 +36,7 @@ MCP クライアント(Claude など)
 - [ADR 0002: D1 キャッシュと再開できる refresh](docs/adr/0002-d1-cache-and-resumable-refresh.md)
 - [ADR 0003: 呼び出しの締め切り 30 秒](docs/adr/0003-call-deadline.md)
 - [ADR 0004: 書類 ID から案件 ID への逆引き](docs/adr/0004-document-reverse-lookup.md)
+- [ADR 0005: upstream / 下流モデルのデプロイ](docs/adr/0005-upstream-downstream-deploy.md)
 
 ## ツール一覧(54 個)
 
@@ -55,9 +56,34 @@ MCP クライアント(Claude など)
 - 読み取りツールには引数 `max_response_tokens`(応答サイズの安全網。既定 50000、0 で無効)が付く。超過は切り詰めず `response_too_large`。
 - エラーは `{"schema_version":"1","error":{"code","message","retryable"}}` を `isError: true` で返す。
 
+## 自分の環境にデプロイする
+
+このリポジトリは**公開の upstream** で、実値(Worker 名・D1 の id・ドメイン・Access の設定)は持たない。
+**自分の private リポジトリ(下流)に upstream を取り込み**、そこから自分の Cloudflare アカウントにデプロイする。
+
+```bash
+# 下流を作る(詳細は docs/runbook.md の 0)
+git clone https://github.com/youyo/board.git my-board && cd my-board
+git remote rename origin upstream && git remote add origin <自分の private リポジトリの URL>
+mise install && mise run install
+
+# 設定を書く(秘密でない値だけ。1 か所)
+cp board.config.example.json board.config.json   # <YOUR_...> を埋める
+
+# 初回のデプロイを 1 本で(何度でも再実行できる)
+pnpm exec wrangler login
+mise run setup
+```
+
+- 下流が書く設定は `board.config.json` だけ。`mise run deploy:config` が upstream の `wrangler.jsonc` と合わせて `deploy/wrangler.jsonc` を生成し、**下流でコミットする**(`mise run deploy:config:check` が、生成し直し忘れ・手での書き換え・upstream の変更の取り込み忘れを検出する)。
+- `mise run setup` は、D1 の作成 → 生成 → デプロイ → secrets(`BOARD_API_KEY` / `BOARD_API_TOKEN`。隠した入力) → `/healthz` の確認まで進める。Access アプリ・Managed OAuth・Portal の登録は画面の作業で、[docs/runbook.md](docs/runbook.md) が案内する。
+- upstream の更新は `git fetch upstream && git merge --ff-only upstream/main`。下流は upstream のファイルを書き換えない。
+- 下流の GitHub Actions からデプロイするなら [docs/deploy-ci.md](docs/deploy-ci.md)(雛形は `deploy.example/deploy.workflow.yml`)。
+- **セットアップを案内するスキル**: [.claude/skills/board-setup/SKILL.md](.claude/skills/board-setup/SKILL.md)。下流リポジトリで Claude Code / Codex に「board をセットアップしたい」と頼むと、Step ごとに進めてくれる(秘密値は受け取らず、デプロイや secret の登録は運用者の承認の後)。
+
 ## 接続方法
 
-1. [docs/runbook.md](docs/runbook.md) に従って Worker をデプロイし、Access の MCP server application(Managed OAuth)を作る。
+1. 上の『自分の環境にデプロイする』と [docs/runbook.md](docs/runbook.md) に従って Worker をデプロイし、Access の MCP server application(Managed OAuth)を作る。
 2. MCP Server Portal に Worker の URL `https://<domain>/mcp` を登録する。
 3. MCP クライアントから Portal の URL につなぐ(OAuth のログインは Access が行う)。
 
@@ -91,7 +117,7 @@ mise install          # node / pnpm
 mise run install      # 依存パッケージ
 mise run test         # unit + e2e(workerd、node-e2e)。BOARD API には通信しない
 mise run lint         # biome + tsc
-mise run deploy:check # ダミー値でデプロイ設定を生成し wrangler deploy --dry-run
+mise run deploy:check # board.config.example.json のダミー値でデプロイ設定を生成し wrangler deploy --dry-run
 mise run test:live    # デプロイ済み Worker への実環境確認(test には含まれない。runbook 参照)
 ```
 

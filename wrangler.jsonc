@@ -2,7 +2,8 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   // このファイルはローカル開発 (wrangler dev) とテスト (vitest) が読むダミー値の設定で、デプロイには使わない。
   // アカウント固有の値 (D1 の id・Access のチーム / AUD) はここに書かない。
-  // デプロイ用の設定は、mise.local.toml の [env] から `mise run deploy:render` で wrangler.deploy.jsonc (gitignore 済み) に生成する (docs/runbook.md)。
+  // デプロイ用の設定は、下流の board.config.json から `mise run deploy:config` で deploy/wrangler.jsonc に生成する (docs/runbook.md、ADR 0005)。
+  // main と $schema 以外に相対パスを持つキーを足したら、scripts/deploy-config/core.ts を直す。
   "name": "board",
   "main": "src/index.ts",
   "compatibility_date": "2026-10-13",

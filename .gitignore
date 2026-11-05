@@ -11,5 +11,7 @@ mise.local.toml
 .claude/settings.local.json
 *.local.json
 
-# デプロイ用に生成する wrangler 設定(アカウント固有の値を含む)
-wrangler.deploy*.jsonc
+# 下流の設定と生成物(upstream に実値を入れないため)。下流は `git add -f board.config.json deploy/` で追跡する(docs/runbook.md、ADR 0005)。
+# 一度追跡すれば、以降の変更は通常どおり git status に出る。
+board.config.json
+deploy/

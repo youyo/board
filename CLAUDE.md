@@ -1,5 +1,7 @@
 # CLAUDE.md
 
+> **下流リポジトリ**(upstream の board を取り込んだ自分の private リポジトリ)のセットアップ・デプロイでは、以下の「デプロイしない」等の規約は適用しない(upstream の開発時の規約)。秘密値の扱い(API キー・トークン・JWT を会話・ファイル・ログに出さない)と、コミットや push はユーザーの指示があるときだけ、は下流でも変わらない。`.claude/skills/board-setup/SKILL.md` に従う(Codex も同じパス。`.agents/skills/` からの symlink)。
+
 board(BOARD API 向け Remote MCP サーバー。Cloudflare Workers + Hono + D1。ツール 54 個)の作業規約。
 計画は `plans/`(ロードマップ `plans/board-workers-roadmap.md` と各マイルストーン `plans/board-workers-m*.md`)。使い方は `README.md`、デプロイと運用は `docs/runbook.md`、設計の理由は `docs/adr/`、実機でしか確かめられない前提は `docs/manual-verification.md`。
 構成と規約は姉妹リポジトリ `../logbutler` に揃えている。決定済み事項はロードマップが正で、勝手に覆さない。
@@ -9,7 +11,7 @@ Go 版は `archive/go-cli` ブランチと `go-cli-final` タグにある(この
 
 - **TDD**: 失敗するテストを先に書き、`mise run test:unit` / `mise run test:e2e` で期待どおりの理由で失敗するのを確認してから実装する。テストを弱める・skip・削除しない。バグ修正は再現テストが先。
 - **mise**: ランタイムとコマンドは `mise.toml` で管理する。`npm test` や `vitest` を直接叩かず `mise run <task>` を使う。新しいコマンドが要るなら先にタスクへ追加する。
-- 完了条件は `mise run test`(unit + e2e)と `mise run lint` が通ること。
+- 完了条件は `mise run test`(unit + e2e)と `mise run lint` が通ること。デプロイ設定を触ったら `mise run deploy:check` も通す。
 - **Durable Objects / McpAgent は使わない**。MCP はステートレス(`createMcpHandler`)。
 - **BOARD の API キー・トークン(`BOARD_API_KEY` / `BOARD_API_TOKEN`)と Access の JWT を、ログ・エラー・MCP の応答に出さない**。
 - **BOARD API はモックのみ**。unit / e2e テストで実 API に通信しない(`test/helpers/mock-fetch.ts` は未登録の宛先への通信を例外にする)。実 API への確認は `mise run test:live`(デプロイ済み Worker に Access の service token で接続。ユーザーが実行)だけで、`mise run test` と CI には含めない。
@@ -49,7 +51,11 @@ src/repository/           cache → refresh → API の統一窓口(22 リソー
 src/find/                 find 層(名前の解決・fanout・contract_status・url。resolveUiBaseUrl)
 src/mcp/                  registry(defineTool / registerTools)・server・args・response-limit・call-context
 src/mcp/tools/            index.ts の ALL_TOOLS に足す: server-info(1)・api(40)・find(11)・cache(2)= 54 個
-scripts/render-wrangler-config/  core.ts(純粋なコア)+ main.ts(入口)。wrangler.jsonc と BOARD_* 環境変数から wrangler.deploy.jsonc を生成
+scripts/deploy-config/    core.ts(純粋なコア。検証・生成・補助)+ main.ts(入口)。board.config.json と wrangler.jsonc から deploy/wrangler.jsonc を生成・検査
+scripts/setup.sh          mise run setup の本体(前提の確認 → D1 → deploy:config → deploy → secrets → /healthz)。scripts/deploy.sh は mise run deploy の本体
+deploy.example/           下流の CI の雛形(deploy.workflow.yml。下流が .github/workflows/deploy.yml にコピーする)
+board.config.example.json 下流の設定の雛形(<YOUR_...>)。board.config.json と deploy/ は .gitignore(下流は git add -f で追跡する)
+.claude/skills/board-setup/SKILL.md  下流リポジトリのセットアップ案内スキル(`.agents/skills/` から symlink)
 test/unit/  test/e2e/  test/node-e2e/  test/live/  test/helpers/  test/snapshots/(tools/list のスナップショット)
 docs/  plans/
 ```
@@ -57,11 +63,12 @@ docs/  plans/
 - ツールは `defineTool` で定義し `src/mcp/tools/index.ts` の `ALL_TOOLS` に足す。D1 は `ctx.db()`、repository は `ctx.repositories()`、UI の URL は `ctx.uiBaseUrl`。
 - `cache_expire` は作らない(Go では daily auto-refresh の廃止後、読み取りに影響しない印を付けるだけだったため)。`expireCache` は `src/cache/admin.ts` に残るがツールにはつないでいない。
 - BOARD の UI の URL は `BOARD_UI_BASE_URL`(任意)があればそれ、なければ `BOARD_BASE_URL` の `://api.` を `://` にして導く。
-- デプロイ設定は `wrangler.jsonc`(ダミー値。dev / test 用)から `mise run deploy:render` が `wrangler.deploy.jsonc`(gitignore 済み)を生成する。実値は `mise.local.toml` の `[env]`(`BOARD_WORKER_NAME` ほか。docs/runbook.md)。`workers_dev: false` は維持する。
+- **upstream / 下流モデル**(ADR 0005): このリポジトリは公開の upstream で、`wrangler.jsonc` はローカル開発・テスト用のダミー値。**追跡ファイルに実値(Worker 名・D1 の id・ドメイン・Access のチーム / AUD)を書かない**。下流は `board.config.json`(秘密でない値だけ)を書き、`mise run deploy:config` が `deploy/wrangler.jsonc` を生成する(下流でコミット)。`wrangler.jsonc` のトップレベルを変えれば下流に pull で届き、`deploy:config:check` が下流で差分を検出する。`workers_dev: false` は維持する。`wrangler.jsonc` に相対パスを持つキー(`main` / `$schema` 以外)を足したら、`scripts/deploy-config/core.ts`・unit・E2E・runbook を更新する。生成項目を足したときも同じ。
+- `board.config.json` と `deploy/` は upstream の `.gitignore` に入っている。upstream で `git add -f` しない(CI の `no-downstream-files` が止める)。`BOARD_LIVE_*`(`test:live`)は `mise.local.toml` の `[env]` に置く別物。
 
 ## テストの書き方
 
-- 実行環境は workerd(`@cloudflare/vitest-plugin`)。`vitest.config.ts` のプロジェクトは `unit` / `e2e`(workerd)、`node-e2e`(Node。生成スクリプトを実プロセスで起動して `wrangler deploy --dry-run` まで通す。`mise run test:e2e` に含まれる)、`live`(`mise run test:live` だけ。`test` と CI には含めない)。
+- 実行環境は workerd(`@cloudflare/vitest-plugin`)。`vitest.config.ts` のプロジェクトは `unit` / `e2e`(workerd)、`node-e2e`(Node。生成スクリプトと `setup.sh`〔wrangler・mise・curl を偽物に差し替える〕を実プロセスで起動し、`wrangler deploy --dry-run` まで通す。`mise run test:e2e` に含まれる)、`live`(`mise run test:live` だけ。`test` と CI には含めない)。
 - `test/live/` と `test/node-e2e/` は `tsconfig.json` の対象外(Node 環境)。`test/unit/readme-tools.test.ts` は README のツール表と `ALL_TOOLS` を突き合わせる(ツールを足したら README の表と総数も直す)。
 - D1 を使うテストは `test/helpers/d1.ts` の `testDb()` / `resetCache()`。ツールを呼ぶ unit は `test/helpers/api-tool.ts` の `callApiTool`(実物の D1 + モックした BOARD)。
 - workerd のテストで `cloudflare:test` を import しない(import すると並列実行時に他ファイルの初回リクエストがタイムアウトする)。Worker 全体を任意の env で呼ぶときは `test/helpers/worker.ts` の `callWorker`(`import worker from "../../src/index"` に `cloudflare:workers` の `env` を上書きして渡す)。D1 のスキーマ適用でも `applyD1Migrations` は使わず、Worker が isolate ごとの初回に冪等に適用する(M03)。

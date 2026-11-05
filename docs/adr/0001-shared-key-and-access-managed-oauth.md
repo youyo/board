@@ -35,6 +35,6 @@ board は条件が逆である。
 ## 帰結
 
 - **BOARD 側の操作履歴では、誰が呼んだかを区別できない**(全員が同じキー)。必要なら Worker のログ(Access の JWT の `email` など)で追う。現状は JWT の中身をログに出していない。
-- 共有キーが漏れると全員分の権限が漏れる。secret は `wrangler secret put` だけで登録し、リポジトリ・`wrangler.deploy.jsonc` には載せない。
+- 共有キーが漏れると全員分の権限が漏れる。secret は `wrangler secret put` だけで登録し、リポジトリ・`board.config.json`・`deploy/wrangler.jsonc` には載せない。
 - Access の AUD と team domain を間違えると全リクエストが 403 になる。設定チェック(`src/config-check.ts`)が欠けと形式違いを `/healthz` で伝える。
 - logbutler との違い: logbutler は『利用者ごとのトークン + Access なし』、board は『共有キー + Access』。この表は board の方が運用が軽い代わりに、利用者の区別がない。

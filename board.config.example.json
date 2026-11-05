@@ -1,0 +1,15 @@
+{
+  "workerName": "<YOUR_WORKER_NAME>",
+  "customDomain": "<YOUR_CUSTOM_DOMAIN>",
+  "d1": {
+    "databaseId": "<YOUR_D1_DATABASE_ID>",
+    "databaseName": "<YOUR_D1_DATABASE_NAME>"
+  },
+  "access": {
+    "teamDomain": "<YOUR_TEAM>.cloudflareaccess.com",
+    "aud": "<YOUR_ACCESS_AUD>"
+  },
+  "boardBaseUrl": "",
+  "boardUiBaseUrl": "",
+  "accountId": ""
+}
