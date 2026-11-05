@@ -122,6 +122,38 @@ describe("ツール呼び出し", () => {
     expect(logged).not.toContain("SECRETTOKEN");
   });
 
+  it("ハンドラの ctx に MCP のリクエストの abort signal が渡る", async () => {
+    let seen: unknown;
+    const t = defineTool({
+      name: "probe_signal",
+      title: "確認",
+      description: "d",
+      category: "ReadOnly",
+      inputSchema: z.object({}),
+      handler: async (_args, ctx) => {
+        seen = ctx.signal;
+        return {};
+      },
+    });
+    await call(t, {});
+    expect(seen).toBeInstanceOf(AbortSignal);
+  });
+
+  it("repositories が未設定のサーバーでは、ctx.repositories() は例外(generic_error。秘密は出さない)", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const t = defineTool({
+      name: "probe_repos",
+      title: "確認",
+      description: "d",
+      category: "ReadOnly",
+      inputSchema: z.object({}),
+      handler: async (_args, ctx) => ctx.repositories(),
+    });
+    const r = await call(t, {});
+    expect(r.isError).toBe(true);
+    expect(r.json.error.code).toBe("generic_error");
+  });
+
   it("ツール名が重複していると createMcpServer が例外", () => {
     expect(() => createMcpServer({ tools: [echo, echo] })).toThrow(/echo_text/);
   });

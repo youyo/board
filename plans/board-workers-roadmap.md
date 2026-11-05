@@ -44,7 +44,7 @@ Go 製 CLI / ローカル MCP（v0.11.1）を書き直したもの。Go 版は `
 | M01 | 基盤: mise / pnpm / biome / tsconfig / vitest、`/healthz`、設定チェック、Access JWT 検証、`createMcpHandler` とダミーツール 1 個、エラーエンベロープ、応答サイズ上限、CI、CLAUDE.md | 完了（16df333） |
 | M02 | BOARD API クライアント（x-api-key + Bearer、直列、再試行と Retry-After、ページング、`_meta` ヘッダ）と 22 リソースの型。追補: 呼び出し単位の締め切り・キャンセル・isolate 内のクライアント共有 | 完了（2d14f28）、追補は作業中 |
 | M03 | D1 キャッシュ（スキーマ適用、resource_cache / sync_state / cache_meta、名前の正規化）、refresh（enum、差分 / 全件、D1 ロック）、repository 層。full は再開あり | 実装済み（`plans/board-workers-m03-d1-cache.md`）、レビュー待ち |
-| M04 | api 層のツール（22 リソースの list / get） | 未着手 |
+| M04 | api 層のツール（22 リソースの list / get） | 実装済み（`plans/board-workers-m04-api-tools.md`）、レビュー待ち |
 | M05 | find 層のツール 11 個（名前による ID 解決・曖昧な場合のエラー、fanout の上限、逆引きマップ、contract_status、URL、enrichment の失敗を致命的にしない、cache 配列の同梱） | 未着手 |
 | M06 | cache 系ツール、デプロイ設定の生成、runbook（Access アプリ・Managed OAuth・Portal の登録）、README、`test:live` | 未着手 |
 
@@ -54,3 +54,4 @@ Go 製 CLI / ローカル MCP（v0.11.1）を書き直したもの。Go 版は `
 
 - 2026-11-05: 作成。M00・M01・M02 完了。締め切りとキャンセルの決定を追加。
 - 2026-11-05: M03 実装。full refresh の再開方式を決定済み事項に追加。
+- 2026-11-05: M04 実装（api 層 40 ツール）。

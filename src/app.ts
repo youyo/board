@@ -46,7 +46,7 @@ async function accessGuard(
 // リクエストごとに McpServer を作る(ステートレス。Durable Objects もセッションも使わない)。
 // Hono の c.executionCtx の型は tracing / abort を持たない。実体は Workers の ctx そのもの。
 app.all(MCP_PATH, (c) =>
-  createMcpHandler(() => createMcpServer(), { route: MCP_PATH })(
+  createMcpHandler(() => createMcpServer({ env: c.env }), { route: MCP_PATH })(
     c.req.raw,
     c.env,
     c.executionCtx as unknown as ExecutionContext<unknown>,

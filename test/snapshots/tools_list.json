@@ -1,5 +1,2120 @@
 [
   {
+    "name": "get_accounting_type",
+    "title": "勘定科目種別取得",
+    "description": "勘定科目種別を ID で 1 件取得する。勘定科目の種別マスタ。キャッシュにあればそれを返し、なければ BOARD から 1 件取って保存する。refresh=delta / full を指定すると、先に勘定科目種別の一覧キャッシュを更新してから読む。結果は {item, cache, _meta?}。item は BOARD の生データ。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "id": {
+          "type": "number",
+          "description": "勘定科目種別の ID(1 以上の整数)"
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)"
+        },
+        "show_meta": {
+          "type": "boolean",
+          "description": "true で応答に _meta(BOARD の応答ヘッダー由来: total_count / rate_limit_remaining / etag など)を付ける。BOARD から直接取ったときだけ値が入る"
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "勘定科目種別取得",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "get_client",
+    "title": "顧客取得",
+    "description": "顧客を ID で 1 件取得する。顧客(取引先)マスタ。案件・請求書・顧客支店・顧客担当者はこの顧客 ID に紐づく。名前から顧客 ID を探すのに使う。キャッシュにあればそれを返し、なければ BOARD から 1 件取って保存する。refresh=delta / full を指定すると、先に顧客の一覧キャッシュを更新してから読む。結果は {item, cache, _meta?}。item は BOARD の生データ。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "id": {
+          "type": "number",
+          "description": "顧客の ID(1 以上の整数)"
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)"
+        },
+        "show_meta": {
+          "type": "boolean",
+          "description": "true で応答に _meta(BOARD の応答ヘッダー由来: total_count / rate_limit_remaining / etag など)を付ける。BOARD から直接取ったときだけ値が入る"
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "顧客取得",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "get_client_branch",
+    "title": "顧客支店取得",
+    "description": "顧客支店を ID で 1 件取得する。顧客の支店・拠点。顧客 ID(client_id)で顧客に紐づく。キャッシュにあればそれを返し、なければ BOARD から 1 件取って保存する。refresh=delta / full を指定すると、先に顧客支店の一覧キャッシュを更新してから読む。結果は {item, cache, _meta?}。item は BOARD の生データ。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "id": {
+          "type": "number",
+          "description": "顧客支店の ID(1 以上の整数)"
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)"
+        },
+        "show_meta": {
+          "type": "boolean",
+          "description": "true で応答に _meta(BOARD の応答ヘッダー由来: total_count / rate_limit_remaining / etag など)を付ける。BOARD から直接取ったときだけ値が入る"
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "顧客支店取得",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "get_contact",
+    "title": "顧客担当者取得",
+    "description": "顧客担当者を ID で 1 件取得する。顧客の担当者。顧客 ID(client_id)で顧客に紐づく。キャッシュにあればそれを返し、なければ BOARD から 1 件取って保存する。refresh=delta / full を指定すると、先に顧客担当者の一覧キャッシュを更新してから読む。結果は {item, cache, _meta?}。item は BOARD の生データ。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "id": {
+          "type": "number",
+          "description": "顧客担当者の ID(1 以上の整数)"
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)"
+        },
+        "show_meta": {
+          "type": "boolean",
+          "description": "true で応答に _meta(BOARD の応答ヘッダー由来: total_count / rate_limit_remaining / etag など)を付ける。BOARD から直接取ったときだけ値が入る"
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "顧客担当者取得",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "get_delivery",
+    "title": "納品書取得",
+    "description": "納品書を ID で 1 件取得する。納品書(書類)。一覧 API はないので、案件(get_project の response_group)から書類 ID を辿って取る。キャッシュにあればそれを返し(cache に取得時刻)、なければ BOARD から取って保存する。refresh=full はキャッシュを使わず BOARD から取り直す。refresh=delta は何もしない(書類には差分更新がない)。結果は {item, cache, _meta?}。item は BOARD の生データ。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "id": {
+          "type": "number",
+          "description": "納品書の ID(1 以上の整数)"
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "none=キャッシュがあればそれを返す(既定)/ full=キャッシュを使わず BOARD から取り直す / delta=何もしない"
+        },
+        "show_meta": {
+          "type": "boolean",
+          "description": "true で応答に _meta(BOARD の応答ヘッダー由来: total_count / rate_limit_remaining / etag など)を付ける。BOARD から直接取ったときだけ値が入る"
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "納品書取得",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "get_document_send_channel",
+    "title": "書類送付方法取得",
+    "description": "書類送付方法を ID で 1 件取得する。書類の送付方法(メール・郵送など)マスタ。キャッシュにあればそれを返し、なければ BOARD から 1 件取って保存する。refresh=delta / full を指定すると、先に書類送付方法の一覧キャッシュを更新してから読む。結果は {item, cache, _meta?}。item は BOARD の生データ。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "id": {
+          "type": "number",
+          "description": "書類送付方法の ID(1 以上の整数)"
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)"
+        },
+        "show_meta": {
+          "type": "boolean",
+          "description": "true で応答に _meta(BOARD の応答ヘッダー由来: total_count / rate_limit_remaining / etag など)を付ける。BOARD から直接取ったときだけ値が入る"
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "書類送付方法取得",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "get_estimate",
+    "title": "見積書取得",
+    "description": "見積書を ID で 1 件取得する。見積書(書類)。一覧 API はないので、案件(get_project の response_group)から書類 ID を辿って取る。キャッシュにあればそれを返し(cache に取得時刻)、なければ BOARD から取って保存する。refresh=full はキャッシュを使わず BOARD から取り直す。refresh=delta は何もしない(書類には差分更新がない)。結果は {item, cache, _meta?}。item は BOARD の生データ。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "id": {
+          "type": "number",
+          "description": "見積書の ID(1 以上の整数)"
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "none=キャッシュがあればそれを返す(既定)/ full=キャッシュを使わず BOARD から取り直す / delta=何もしない"
+        },
+        "show_meta": {
+          "type": "boolean",
+          "description": "true で応答に _meta(BOARD の応答ヘッダー由来: total_count / rate_limit_remaining / etag など)を付ける。BOARD から直接取ったときだけ値が入る"
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "見積書取得",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "get_group",
+    "title": "グループ取得",
+    "description": "グループを ID で 1 件取得する。ユーザーのグループ(部署など)マスタ。キャッシュにあればそれを返し、なければ BOARD から 1 件取って保存する。refresh=delta / full を指定すると、先にグループの一覧キャッシュを更新してから読む。結果は {item, cache, _meta?}。item は BOARD の生データ。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "id": {
+          "type": "number",
+          "description": "グループの ID(1 以上の整数)"
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)"
+        },
+        "show_meta": {
+          "type": "boolean",
+          "description": "true で応答に _meta(BOARD の応答ヘッダー由来: total_count / rate_limit_remaining / etag など)を付ける。BOARD から直接取ったときだけ値が入る"
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "グループ取得",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "get_invoice",
+    "title": "請求書取得",
+    "description": "請求書を ID で 1 件取得する。請求書。顧客 ID・案件 ID に紐づく。キャッシュにあればそれを返し、なければ BOARD から 1 件取って保存する。refresh=delta / full を指定すると、先に請求書の一覧キャッシュを更新してから読む。結果は {item, cache, _meta?}。item は BOARD の生データ。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "id": {
+          "type": "number",
+          "description": "請求書の ID(1 以上の整数)"
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)"
+        },
+        "show_meta": {
+          "type": "boolean",
+          "description": "true で応答に _meta(BOARD の応答ヘッダー由来: total_count / rate_limit_remaining / etag など)を付ける。BOARD から直接取ったときだけ値が入る"
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "請求書取得",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "get_order",
+    "title": "受注書取得",
+    "description": "受注書を ID で 1 件取得する。受注書(書類)。一覧 API はないので、案件(get_project の response_group)から書類 ID を辿って取る。キャッシュにあればそれを返し(cache に取得時刻)、なければ BOARD から取って保存する。refresh=full はキャッシュを使わず BOARD から取り直す。refresh=delta は何もしない(書類には差分更新がない)。結果は {item, cache, _meta?}。item は BOARD の生データ。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "id": {
+          "type": "number",
+          "description": "受注書の ID(1 以上の整数)"
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "none=キャッシュがあればそれを返す(既定)/ full=キャッシュを使わず BOARD から取り直す / delta=何もしない"
+        },
+        "show_meta": {
+          "type": "boolean",
+          "description": "true で応答に _meta(BOARD の応答ヘッダー由来: total_count / rate_limit_remaining / etag など)を付ける。BOARD から直接取ったときだけ値が入る"
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "受注書取得",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "get_payment",
+    "title": "支払い取得",
+    "description": "支払いを ID で 1 件取得する。仕入先への支払い。仕入先 ID・発注書 ID に紐づく。キャッシュにあればそれを返し、なければ BOARD から 1 件取って保存する。refresh=delta / full を指定すると、先に支払いの一覧キャッシュを更新してから読む。結果は {item, cache, _meta?}。item は BOARD の生データ。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "id": {
+          "type": "number",
+          "description": "支払いの ID(1 以上の整数)"
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)"
+        },
+        "show_meta": {
+          "type": "boolean",
+          "description": "true で応答に _meta(BOARD の応答ヘッダー由来: total_count / rate_limit_remaining / etag など)を付ける。BOARD から直接取ったときだけ値が入る"
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "支払い取得",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "get_payment_term",
+    "title": "支払条件取得",
+    "description": "支払条件を ID で 1 件取得する。支払条件(締め日・支払日の定義)マスタ。キャッシュにあればそれを返し、なければ BOARD から 1 件取って保存する。refresh=delta / full を指定すると、先に支払条件の一覧キャッシュを更新してから読む。結果は {item, cache, _meta?}。item は BOARD の生データ。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "id": {
+          "type": "number",
+          "description": "支払条件の ID(1 以上の整数)"
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)"
+        },
+        "show_meta": {
+          "type": "boolean",
+          "description": "true で応答に _meta(BOARD の応答ヘッダー由来: total_count / rate_limit_remaining / etag など)を付ける。BOARD から直接取ったときだけ値が入る"
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "支払条件取得",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "get_project",
+    "title": "案件取得",
+    "description": "案件を ID で 1 件取得する。案件。見積書・受注書・納品書・請求書・領収書(書類)と案件原価はこの案件に紐づく。顧客 ID(client_id)で顧客に紐づく。キャッシュにあればそれを返し、なければ BOARD から 1 件取って保存する。refresh=delta / full を指定すると、先に案件の一覧キャッシュを更新してから読む。結果は {item, cache, _meta?}。item は BOARD の生データ。response_group(estimate / order / delivery / invoice / receipt / all)を指定すると、該当する書類を埋め込んだ案件を常に BOARD の API から直接取り(キャッシュは使わず、書き込みもしない)、このとき refresh は無視する。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "id": {
+          "type": "number",
+          "description": "案件の ID(1 以上の整数)"
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)"
+        },
+        "show_meta": {
+          "type": "boolean",
+          "description": "true で応答に _meta(BOARD の応答ヘッダー由来: total_count / rate_limit_remaining / etag など)を付ける。BOARD から直接取ったときだけ値が入る"
+        },
+        "response_group": {
+          "type": "string",
+          "enum": [
+            "estimate",
+            "order",
+            "delivery",
+            "invoice",
+            "receipt",
+            "all"
+          ],
+          "description": "埋め込む書類のグループ: estimate / order / delivery / invoice / receipt / all。指定すると BOARD の API を直接呼び、refresh は無視する"
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "案件取得",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "get_project_cost",
+    "title": "案件原価取得",
+    "description": "案件原価を ID で 1 件取得する。案件の原価(外注費・仕入など)。案件 ID(project_id)で案件に紐づく。キャッシュにあればそれを返し、なければ BOARD から 1 件取って保存する。refresh=delta / full を指定すると、先に案件原価の一覧キャッシュを更新してから読む。結果は {item, cache, _meta?}。item は BOARD の生データ。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "id": {
+          "type": "number",
+          "description": "案件原価の ID(1 以上の整数)"
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)"
+        },
+        "show_meta": {
+          "type": "boolean",
+          "description": "true で応答に _meta(BOARD の応答ヘッダー由来: total_count / rate_limit_remaining / etag など)を付ける。BOARD から直接取ったときだけ値が入る"
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "案件原価取得",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "get_project_type",
+    "title": "案件種別取得",
+    "description": "案件種別を ID で 1 件取得する。案件種別マスタ。キャッシュにあればそれを返し、なければ BOARD から 1 件取って保存する。refresh=delta / full を指定すると、先に案件種別の一覧キャッシュを更新してから読む。結果は {item, cache, _meta?}。item は BOARD の生データ。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "id": {
+          "type": "number",
+          "description": "案件種別の ID(1 以上の整数)"
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)"
+        },
+        "show_meta": {
+          "type": "boolean",
+          "description": "true で応答に _meta(BOARD の応答ヘッダー由来: total_count / rate_limit_remaining / etag など)を付ける。BOARD から直接取ったときだけ値が入る"
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "案件種別取得",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "get_purchase_order",
+    "title": "発注書取得",
+    "description": "発注書を ID で 1 件取得する。発注書(仕入側)。仕入先 ID・案件 ID に紐づく。キャッシュにあればそれを返し、なければ BOARD から 1 件取って保存する。refresh=delta / full を指定すると、先に発注書の一覧キャッシュを更新してから読む。結果は {item, cache, _meta?}。item は BOARD の生データ。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "id": {
+          "type": "number",
+          "description": "発注書の ID(1 以上の整数)"
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)"
+        },
+        "show_meta": {
+          "type": "boolean",
+          "description": "true で応答に _meta(BOARD の応答ヘッダー由来: total_count / rate_limit_remaining / etag など)を付ける。BOARD から直接取ったときだけ値が入る"
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "発注書取得",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "get_purchase_type",
+    "title": "購買種別取得",
+    "description": "購買種別を ID で 1 件取得する。購買(仕入)種別マスタ。キャッシュにあればそれを返し、なければ BOARD から 1 件取って保存する。refresh=delta / full を指定すると、先に購買種別の一覧キャッシュを更新してから読む。結果は {item, cache, _meta?}。item は BOARD の生データ。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "id": {
+          "type": "number",
+          "description": "購買種別の ID(1 以上の整数)"
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)"
+        },
+        "show_meta": {
+          "type": "boolean",
+          "description": "true で応答に _meta(BOARD の応答ヘッダー由来: total_count / rate_limit_remaining / etag など)を付ける。BOARD から直接取ったときだけ値が入る"
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "購買種別取得",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "get_receipt",
+    "title": "領収書取得",
+    "description": "領収書を ID で 1 件取得する。領収書(書類)。一覧 API はないので、案件(get_project の response_group)から書類 ID を辿って取る。キャッシュにあればそれを返し(cache に取得時刻)、なければ BOARD から取って保存する。refresh=full はキャッシュを使わず BOARD から取り直す。refresh=delta は何もしない(書類には差分更新がない)。結果は {item, cache, _meta?}。item は BOARD の生データ。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "id": {
+          "type": "number",
+          "description": "領収書の ID(1 以上の整数)"
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "none=キャッシュがあればそれを返す(既定)/ full=キャッシュを使わず BOARD から取り直す / delta=何もしない"
+        },
+        "show_meta": {
+          "type": "boolean",
+          "description": "true で応答に _meta(BOARD の応答ヘッダー由来: total_count / rate_limit_remaining / etag など)を付ける。BOARD から直接取ったときだけ値が入る"
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "領収書取得",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "get_user",
+    "title": "ユーザー取得",
+    "description": "ユーザーを ID で 1 件取得する。BOARD のユーザー(社内の担当者)マスタ。キャッシュにあればそれを返し、なければ BOARD から 1 件取って保存する。refresh=delta / full を指定すると、先にユーザーの一覧キャッシュを更新してから読む。結果は {item, cache, _meta?}。item は BOARD の生データ。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "id": {
+          "type": "number",
+          "description": "ユーザーの ID(1 以上の整数)"
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)"
+        },
+        "show_meta": {
+          "type": "boolean",
+          "description": "true で応答に _meta(BOARD の応答ヘッダー由来: total_count / rate_limit_remaining / etag など)を付ける。BOARD から直接取ったときだけ値が入る"
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "ユーザー取得",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "get_vendor",
+    "title": "仕入先取得",
+    "description": "仕入先を ID で 1 件取得する。仕入先(支払先)マスタ。仕入先支店・仕入先担当者・発注書・支払いはこの仕入先 ID に紐づく。キャッシュにあればそれを返し、なければ BOARD から 1 件取って保存する。refresh=delta / full を指定すると、先に仕入先の一覧キャッシュを更新してから読む。結果は {item, cache, _meta?}。item は BOARD の生データ。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "id": {
+          "type": "number",
+          "description": "仕入先の ID(1 以上の整数)"
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)"
+        },
+        "show_meta": {
+          "type": "boolean",
+          "description": "true で応答に _meta(BOARD の応答ヘッダー由来: total_count / rate_limit_remaining / etag など)を付ける。BOARD から直接取ったときだけ値が入る"
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "仕入先取得",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "get_vendor_branch",
+    "title": "仕入先支店取得",
+    "description": "仕入先支店を ID で 1 件取得する。仕入先の支店・拠点。仕入先 ID(payee_id_eq)で仕入先に紐づく。キャッシュにあればそれを返し、なければ BOARD から 1 件取って保存する。refresh=delta / full を指定すると、先に仕入先支店の一覧キャッシュを更新してから読む。結果は {item, cache, _meta?}。item は BOARD の生データ。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "id": {
+          "type": "number",
+          "description": "仕入先支店の ID(1 以上の整数)"
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)"
+        },
+        "show_meta": {
+          "type": "boolean",
+          "description": "true で応答に _meta(BOARD の応答ヘッダー由来: total_count / rate_limit_remaining / etag など)を付ける。BOARD から直接取ったときだけ値が入る"
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "仕入先支店取得",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "get_vendor_contact",
+    "title": "仕入先担当者取得",
+    "description": "仕入先担当者を ID で 1 件取得する。仕入先の担当者。仕入先 ID(payee_id_eq)で仕入先に紐づく。キャッシュにあればそれを返し、なければ BOARD から 1 件取って保存する。refresh=delta / full を指定すると、先に仕入先担当者の一覧キャッシュを更新してから読む。結果は {item, cache, _meta?}。item は BOARD の生データ。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "id": {
+          "type": "number",
+          "description": "仕入先担当者の ID(1 以上の整数)"
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)"
+        },
+        "show_meta": {
+          "type": "boolean",
+          "description": "true で応答に _meta(BOARD の応答ヘッダー由来: total_count / rate_limit_remaining / etag など)を付ける。BOARD から直接取ったときだけ値が入る"
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "仕入先担当者取得",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "list_accounting_types",
+    "title": "勘定科目種別一覧取得",
+    "description": "勘定科目種別の一覧を返す。勘定科目の種別マスタ。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。結果は {items, cache, truncated?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "name_cont": {
+          "type": "string",
+          "description": "勘定科目種別の名前で絞り込む(部分一致)"
+        },
+        "updated_at_gteq": {
+          "type": "string",
+          "description": "更新日時がこれ以降(`YYYY-MM-DD HH:MM:SS`)"
+        },
+        "updated_at_lteq": {
+          "type": "string",
+          "description": "更新日時がこれ以前(`YYYY-MM-DD HH:MM:SS`)"
+        },
+        "include_archive_flg": {
+          "type": "boolean",
+          "description": "true でアーカイブ済みも含める(include_archive_flg=1)。false を明示すると 0 を送る"
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)"
+        },
+        "limit": {
+          "type": "number",
+          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)"
+        },
+        "show_meta": {
+          "type": "boolean",
+          "description": "true で応答に _meta(BOARD の応答ヘッダー由来: total_count / rate_limit_remaining / etag など)を付ける。BOARD から直接取ったときだけ値が入る"
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "勘定科目種別一覧取得",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "list_client_branches",
+    "title": "顧客支店一覧取得",
+    "description": "顧客支店の一覧を返す。顧客の支店・拠点。顧客 ID(client_id)で顧客に紐づく。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。結果は {items, cache, truncated?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "client_id": {
+          "type": "number",
+          "description": "顧客 ID で絞り込む(完全一致)"
+        },
+        "name_cont": {
+          "type": "string",
+          "description": "顧客支店の名前で絞り込む(部分一致)"
+        },
+        "updated_at_gteq": {
+          "type": "string",
+          "description": "更新日時がこれ以降(`YYYY-MM-DD HH:MM:SS`)"
+        },
+        "updated_at_lteq": {
+          "type": "string",
+          "description": "更新日時がこれ以前(`YYYY-MM-DD HH:MM:SS`)"
+        },
+        "include_archive_flg": {
+          "type": "boolean",
+          "description": "true でアーカイブ済みも含める(include_archive_flg=1)。false を明示すると 0 を送る"
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)"
+        },
+        "limit": {
+          "type": "number",
+          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)"
+        },
+        "show_meta": {
+          "type": "boolean",
+          "description": "true で応答に _meta(BOARD の応答ヘッダー由来: total_count / rate_limit_remaining / etag など)を付ける。BOARD から直接取ったときだけ値が入る"
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "顧客支店一覧取得",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "list_clients",
+    "title": "顧客一覧取得",
+    "description": "顧客の一覧を返す。顧客(取引先)マスタ。案件・請求書・顧客支店・顧客担当者はこの顧客 ID に紐づく。名前から顧客 ID を探すのに使う。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta(差分)か refresh=full(全件)を指定する。絞り込み: name_cont / name_disp_cont / invoice_system_number_eq / custom_no_eq だけを指定した場合は、同期済みならキャッシュを絞って返す。それ以外の引数(updated_at_* / include_archive_flg / tags / response_group などサーバー側の指定を含む)を指定したとき、またはキャッシュが未同期のときは BOARD の API を直接呼び、cache は空になる。結果は {items, cache, truncated?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "name_cont": {
+          "type": "string",
+          "description": "顧客の名前で絞り込む(部分一致)"
+        },
+        "name_disp_cont": {
+          "type": "string",
+          "description": "顧客の表示名(略称)で絞り込む(部分一致)"
+        },
+        "invoice_system_number_eq": {
+          "type": "string",
+          "description": "適格請求書発行事業者番号(インボイス登録番号)が一致する顧客"
+        },
+        "custom_no_eq": {
+          "type": "string",
+          "description": "顧客管理番号(custom_no)が一致する顧客"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "タグで絞り込む(複数指定可)"
+        },
+        "response_group": {
+          "type": "string",
+          "enum": [
+            "small",
+            "large"
+          ],
+          "description": "レスポンスに含める項目のグループ: small / large。large は get 専用の項目も含める。サーバー側の指定なので、指定すると BOARD の API を直接呼ぶ"
+        },
+        "updated_at_gteq": {
+          "type": "string",
+          "description": "更新日時がこれ以降(`YYYY-MM-DD HH:MM:SS`)"
+        },
+        "updated_at_lteq": {
+          "type": "string",
+          "description": "更新日時がこれ以前(`YYYY-MM-DD HH:MM:SS`)"
+        },
+        "include_archive_flg": {
+          "type": "boolean",
+          "description": "true でアーカイブ済みも含める(include_archive_flg=1)。false を明示すると 0 を送る"
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)"
+        },
+        "limit": {
+          "type": "number",
+          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)"
+        },
+        "show_meta": {
+          "type": "boolean",
+          "description": "true で応答に _meta(BOARD の応答ヘッダー由来: total_count / rate_limit_remaining / etag など)を付ける。BOARD から直接取ったときだけ値が入る"
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "顧客一覧取得",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "list_contacts",
+    "title": "顧客担当者一覧取得",
+    "description": "顧客担当者の一覧を返す。顧客の担当者。顧客 ID(client_id)で顧客に紐づく。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。結果は {items, cache, truncated?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "client_id": {
+          "type": "number",
+          "description": "顧客 ID で絞り込む(完全一致)"
+        },
+        "name_cont": {
+          "type": "string",
+          "description": "顧客担当者の名前で絞り込む(部分一致)"
+        },
+        "email_cont": {
+          "type": "string",
+          "description": "メールアドレスで絞り込む(部分一致)"
+        },
+        "updated_at_gteq": {
+          "type": "string",
+          "description": "更新日時がこれ以降(`YYYY-MM-DD HH:MM:SS`)"
+        },
+        "updated_at_lteq": {
+          "type": "string",
+          "description": "更新日時がこれ以前(`YYYY-MM-DD HH:MM:SS`)"
+        },
+        "include_archive_flg": {
+          "type": "boolean",
+          "description": "true でアーカイブ済みも含める(include_archive_flg=1)。false を明示すると 0 を送る"
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)"
+        },
+        "limit": {
+          "type": "number",
+          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)"
+        },
+        "show_meta": {
+          "type": "boolean",
+          "description": "true で応答に _meta(BOARD の応答ヘッダー由来: total_count / rate_limit_remaining / etag など)を付ける。BOARD から直接取ったときだけ値が入る"
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "顧客担当者一覧取得",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "list_document_send_channels",
+    "title": "書類送付方法一覧取得",
+    "description": "書類送付方法の一覧を返す。書類の送付方法(メール・郵送など)マスタ。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。結果は {items, cache, truncated?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "name_cont": {
+          "type": "string",
+          "description": "書類送付方法の名前で絞り込む(部分一致)"
+        },
+        "updated_at_gteq": {
+          "type": "string",
+          "description": "更新日時がこれ以降(`YYYY-MM-DD HH:MM:SS`)"
+        },
+        "updated_at_lteq": {
+          "type": "string",
+          "description": "更新日時がこれ以前(`YYYY-MM-DD HH:MM:SS`)"
+        },
+        "include_archive_flg": {
+          "type": "boolean",
+          "description": "true でアーカイブ済みも含める(include_archive_flg=1)。false を明示すると 0 を送る"
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)"
+        },
+        "limit": {
+          "type": "number",
+          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)"
+        },
+        "show_meta": {
+          "type": "boolean",
+          "description": "true で応答に _meta(BOARD の応答ヘッダー由来: total_count / rate_limit_remaining / etag など)を付ける。BOARD から直接取ったときだけ値が入る"
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "書類送付方法一覧取得",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "list_groups",
+    "title": "グループ一覧取得",
+    "description": "グループの一覧を返す。ユーザーのグループ(部署など)マスタ。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。結果は {items, cache, truncated?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "name_cont": {
+          "type": "string",
+          "description": "グループの名前で絞り込む(部分一致)"
+        },
+        "updated_at_gteq": {
+          "type": "string",
+          "description": "更新日時がこれ以降(`YYYY-MM-DD HH:MM:SS`)"
+        },
+        "updated_at_lteq": {
+          "type": "string",
+          "description": "更新日時がこれ以前(`YYYY-MM-DD HH:MM:SS`)"
+        },
+        "include_archive_flg": {
+          "type": "boolean",
+          "description": "true でアーカイブ済みも含める(include_archive_flg=1)。false を明示すると 0 を送る"
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)"
+        },
+        "limit": {
+          "type": "number",
+          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)"
+        },
+        "show_meta": {
+          "type": "boolean",
+          "description": "true で応答に _meta(BOARD の応答ヘッダー由来: total_count / rate_limit_remaining / etag など)を付ける。BOARD から直接取ったときだけ値が入る"
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "グループ一覧取得",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "list_invoices",
+    "title": "請求書一覧取得",
+    "description": "請求書の一覧を返す。請求書。顧客 ID・案件 ID に紐づく。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta(差分)か refresh=full(全件)を指定する。絞り込み: client_id_eq / project_id_eq / status_eq だけを指定した場合は、同期済みならキャッシュを絞って返す。それ以外の引数(updated_at_* / include_archive_flg / response_group などサーバー側の指定を含む)を指定したとき、またはキャッシュが未同期のときは BOARD の API を直接呼び、cache は空になる。結果は {items, cache, truncated?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "client_id_eq": {
+          "type": "number",
+          "description": "顧客 ID で絞り込む(完全一致)"
+        },
+        "project_id_eq": {
+          "type": "number",
+          "description": "案件 ID で絞り込む(完全一致)"
+        },
+        "status_eq": {
+          "type": "string",
+          "description": "ステータスが一致する請求書(例: sent)"
+        },
+        "response_group": {
+          "type": "string",
+          "enum": [
+            "small",
+            "large"
+          ],
+          "description": "レスポンスに含める項目のグループ: small / large。サーバー側の指定なので、指定すると BOARD の API を直接呼ぶ"
+        },
+        "updated_at_gteq": {
+          "type": "string",
+          "description": "更新日時がこれ以降(`YYYY-MM-DD HH:MM:SS`)"
+        },
+        "updated_at_lteq": {
+          "type": "string",
+          "description": "更新日時がこれ以前(`YYYY-MM-DD HH:MM:SS`)"
+        },
+        "include_archive_flg": {
+          "type": "boolean",
+          "description": "true でアーカイブ済みも含める(include_archive_flg=1)。false を明示すると 0 を送る"
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)"
+        },
+        "limit": {
+          "type": "number",
+          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)"
+        },
+        "show_meta": {
+          "type": "boolean",
+          "description": "true で応答に _meta(BOARD の応答ヘッダー由来: total_count / rate_limit_remaining / etag など)を付ける。BOARD から直接取ったときだけ値が入る"
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "請求書一覧取得",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "list_payment_terms",
+    "title": "支払条件一覧取得",
+    "description": "支払条件の一覧を返す。支払条件(締め日・支払日の定義)マスタ。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。結果は {items, cache, truncated?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "name_cont": {
+          "type": "string",
+          "description": "支払条件の名前で絞り込む(部分一致)"
+        },
+        "updated_at_gteq": {
+          "type": "string",
+          "description": "更新日時がこれ以降(`YYYY-MM-DD HH:MM:SS`)"
+        },
+        "updated_at_lteq": {
+          "type": "string",
+          "description": "更新日時がこれ以前(`YYYY-MM-DD HH:MM:SS`)"
+        },
+        "include_archive_flg": {
+          "type": "boolean",
+          "description": "true でアーカイブ済みも含める(include_archive_flg=1)。false を明示すると 0 を送る"
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)"
+        },
+        "limit": {
+          "type": "number",
+          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)"
+        },
+        "show_meta": {
+          "type": "boolean",
+          "description": "true で応答に _meta(BOARD の応答ヘッダー由来: total_count / rate_limit_remaining / etag など)を付ける。BOARD から直接取ったときだけ値が入る"
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "支払条件一覧取得",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "list_payments",
+    "title": "支払い一覧取得",
+    "description": "支払いの一覧を返す。仕入先への支払い。仕入先 ID・発注書 ID に紐づく。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta(差分)か refresh=full(全件)を指定する。絞り込み: vendor_id_eq / purchase_order_id_eq / status_eq だけを指定した場合は、同期済みならキャッシュを絞って返す。それ以外の引数(updated_at_* / include_archive_flg / response_group などサーバー側の指定を含む)を指定したとき、またはキャッシュが未同期のときは BOARD の API を直接呼び、cache は空になる。結果は {items, cache, truncated?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "vendor_id_eq": {
+          "type": "number",
+          "description": "仕入先 ID で絞り込む(完全一致)"
+        },
+        "purchase_order_id_eq": {
+          "type": "number",
+          "description": "発注書 ID で絞り込む(完全一致)"
+        },
+        "status_eq": {
+          "type": "string",
+          "description": "ステータスが一致する支払い"
+        },
+        "response_group": {
+          "type": "string",
+          "enum": [
+            "small",
+            "large"
+          ],
+          "description": "レスポンスに含める項目のグループ: small / large。サーバー側の指定なので、指定すると BOARD の API を直接呼ぶ"
+        },
+        "updated_at_gteq": {
+          "type": "string",
+          "description": "更新日時がこれ以降(`YYYY-MM-DD HH:MM:SS`)"
+        },
+        "updated_at_lteq": {
+          "type": "string",
+          "description": "更新日時がこれ以前(`YYYY-MM-DD HH:MM:SS`)"
+        },
+        "include_archive_flg": {
+          "type": "boolean",
+          "description": "true でアーカイブ済みも含める(include_archive_flg=1)。false を明示すると 0 を送る"
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)"
+        },
+        "limit": {
+          "type": "number",
+          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)"
+        },
+        "show_meta": {
+          "type": "boolean",
+          "description": "true で応答に _meta(BOARD の応答ヘッダー由来: total_count / rate_limit_remaining / etag など)を付ける。BOARD から直接取ったときだけ値が入る"
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "支払い一覧取得",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "list_project_costs",
+    "title": "案件原価一覧取得",
+    "description": "案件原価の一覧を返す。案件の原価(外注費・仕入など)。案件 ID(project_id)で案件に紐づく。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。結果は {items, cache, truncated?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "project_id": {
+          "type": "number",
+          "description": "案件 ID で絞り込む(完全一致)"
+        },
+        "updated_at_gteq": {
+          "type": "string",
+          "description": "更新日時がこれ以降(`YYYY-MM-DD HH:MM:SS`)"
+        },
+        "updated_at_lteq": {
+          "type": "string",
+          "description": "更新日時がこれ以前(`YYYY-MM-DD HH:MM:SS`)"
+        },
+        "include_archive_flg": {
+          "type": "boolean",
+          "description": "true でアーカイブ済みも含める(include_archive_flg=1)。false を明示すると 0 を送る"
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)"
+        },
+        "limit": {
+          "type": "number",
+          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)"
+        },
+        "show_meta": {
+          "type": "boolean",
+          "description": "true で応答に _meta(BOARD の応答ヘッダー由来: total_count / rate_limit_remaining / etag など)を付ける。BOARD から直接取ったときだけ値が入る"
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "案件原価一覧取得",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "list_project_types",
+    "title": "案件種別一覧取得",
+    "description": "案件種別の一覧を返す。案件種別マスタ。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。結果は {items, cache, truncated?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "name_cont": {
+          "type": "string",
+          "description": "案件種別の名前で絞り込む(部分一致)"
+        },
+        "updated_at_gteq": {
+          "type": "string",
+          "description": "更新日時がこれ以降(`YYYY-MM-DD HH:MM:SS`)"
+        },
+        "updated_at_lteq": {
+          "type": "string",
+          "description": "更新日時がこれ以前(`YYYY-MM-DD HH:MM:SS`)"
+        },
+        "include_archive_flg": {
+          "type": "boolean",
+          "description": "true でアーカイブ済みも含める(include_archive_flg=1)。false を明示すると 0 を送る"
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)"
+        },
+        "limit": {
+          "type": "number",
+          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)"
+        },
+        "show_meta": {
+          "type": "boolean",
+          "description": "true で応答に _meta(BOARD の応答ヘッダー由来: total_count / rate_limit_remaining / etag など)を付ける。BOARD から直接取ったときだけ値が入る"
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "案件種別一覧取得",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "list_projects",
+    "title": "案件一覧取得",
+    "description": "案件の一覧を返す。案件。見積書・受注書・納品書・請求書・領収書(書類)と案件原価はこの案件に紐づく。顧客 ID(client_id)で顧客に紐づく。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta(差分)か refresh=full(全件)を指定する。絞り込み: name_cont / client_id / client_name_cont / project_no_eq / management_no_eq だけを指定した場合は、同期済みならキャッシュを絞って返す。それ以外の引数(updated_at_* / include_archive_flg / tags / response_group などサーバー側の指定を含む)を指定したとき、またはキャッシュが未同期のときは BOARD の API を直接呼び、cache は空になる。結果は {items, cache, truncated?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "name_cont": {
+          "type": "string",
+          "description": "案件の名前で絞り込む(部分一致)"
+        },
+        "client_id": {
+          "type": "number",
+          "description": "顧客 ID で絞り込む(完全一致)"
+        },
+        "client_name_cont": {
+          "type": "string",
+          "description": "顧客名で絞り込む(部分一致)"
+        },
+        "order_status_in": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "description": "受注ステータスで絞り込む(いずれかに一致): 1=見積中(高) / 2=見積中(中) / 3=見積中(低) / 4=受注確定 / 5=受注済 / 8=見積中(除)"
+        },
+        "delivery_status_in": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "description": "納品ステータスで絞り込む(いずれかに一致): 1=未着手 / 2=着手中 / 3=納品済 / 4=検収済"
+        },
+        "project_no_eq": {
+          "type": "string",
+          "description": "案件番号が一致する案件"
+        },
+        "management_no_eq": {
+          "type": "string",
+          "description": "管理番号が一致する案件"
+        },
+        "delivery_date_gteq": {
+          "type": "string",
+          "description": "納品日がこれ以降(`YYYY-MM-DD`)"
+        },
+        "delivery_date_lteq": {
+          "type": "string",
+          "description": "納品日がこれ以前(`YYYY-MM-DD`)"
+        },
+        "invoice_date_gteq": {
+          "type": "string",
+          "description": "請求日がこれ以降(`YYYY-MM-DD`)"
+        },
+        "invoice_date_lteq": {
+          "type": "string",
+          "description": "請求日がこれ以前(`YYYY-MM-DD`)"
+        },
+        "invoice_timing_kbn_in": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "description": "請求タイミングで絞り込む(いずれかに一致): 1=一括請求 / 2=定期請求"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "タグで絞り込む(複数指定可)"
+        },
+        "response_group": {
+          "type": "string",
+          "enum": [
+            "small",
+            "large",
+            "estimate",
+            "order",
+            "delivery",
+            "invoice",
+            "receipt",
+            "all"
+          ],
+          "description": "レスポンスに含める項目のグループ: small / large / estimate / order / delivery / invoice / receipt / all。estimate / order / delivery / invoice / receipt は該当書類を埋め込み、all は全部を含める。サーバー側の指定なので、指定すると BOARD の API を直接呼ぶ"
+        },
+        "created_at_gteq": {
+          "type": "string",
+          "description": "作成日時がこれ以降(`YYYY-MM-DD HH:MM:SS`)"
+        },
+        "created_at_lteq": {
+          "type": "string",
+          "description": "作成日時がこれ以前(`YYYY-MM-DD HH:MM:SS`)"
+        },
+        "include_lost_flg": {
+          "type": "boolean",
+          "description": "true で失注した案件も含める(include_lost_flg=1)"
+        },
+        "updated_at_gteq": {
+          "type": "string",
+          "description": "更新日時がこれ以降(`YYYY-MM-DD HH:MM:SS`)"
+        },
+        "updated_at_lteq": {
+          "type": "string",
+          "description": "更新日時がこれ以前(`YYYY-MM-DD HH:MM:SS`)"
+        },
+        "include_archive_flg": {
+          "type": "boolean",
+          "description": "true でアーカイブ済みも含める(include_archive_flg=1)。false を明示すると 0 を送る"
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)"
+        },
+        "limit": {
+          "type": "number",
+          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)"
+        },
+        "show_meta": {
+          "type": "boolean",
+          "description": "true で応答に _meta(BOARD の応答ヘッダー由来: total_count / rate_limit_remaining / etag など)を付ける。BOARD から直接取ったときだけ値が入る"
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "案件一覧取得",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "list_purchase_orders",
+    "title": "発注書一覧取得",
+    "description": "発注書の一覧を返す。発注書(仕入側)。仕入先 ID・案件 ID に紐づく。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta(差分)か refresh=full(全件)を指定する。絞り込み: vendor_id_eq / project_id_eq / status_eq だけを指定した場合は、同期済みならキャッシュを絞って返す。それ以外の引数(updated_at_* / include_archive_flg / response_group などサーバー側の指定を含む)を指定したとき、またはキャッシュが未同期のときは BOARD の API を直接呼び、cache は空になる。結果は {items, cache, truncated?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "vendor_id_eq": {
+          "type": "number",
+          "description": "仕入先 ID で絞り込む(完全一致)"
+        },
+        "project_id_eq": {
+          "type": "number",
+          "description": "案件 ID で絞り込む(完全一致)"
+        },
+        "status_eq": {
+          "type": "string",
+          "description": "ステータスが一致する発注書"
+        },
+        "response_group": {
+          "type": "string",
+          "enum": [
+            "small",
+            "large"
+          ],
+          "description": "レスポンスに含める項目のグループ: small / large。サーバー側の指定なので、指定すると BOARD の API を直接呼ぶ"
+        },
+        "updated_at_gteq": {
+          "type": "string",
+          "description": "更新日時がこれ以降(`YYYY-MM-DD HH:MM:SS`)"
+        },
+        "updated_at_lteq": {
+          "type": "string",
+          "description": "更新日時がこれ以前(`YYYY-MM-DD HH:MM:SS`)"
+        },
+        "include_archive_flg": {
+          "type": "boolean",
+          "description": "true でアーカイブ済みも含める(include_archive_flg=1)。false を明示すると 0 を送る"
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)"
+        },
+        "limit": {
+          "type": "number",
+          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)"
+        },
+        "show_meta": {
+          "type": "boolean",
+          "description": "true で応答に _meta(BOARD の応答ヘッダー由来: total_count / rate_limit_remaining / etag など)を付ける。BOARD から直接取ったときだけ値が入る"
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "発注書一覧取得",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "list_purchase_types",
+    "title": "購買種別一覧取得",
+    "description": "購買種別の一覧を返す。購買(仕入)種別マスタ。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。結果は {items, cache, truncated?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "name_cont": {
+          "type": "string",
+          "description": "購買種別の名前で絞り込む(部分一致)"
+        },
+        "updated_at_gteq": {
+          "type": "string",
+          "description": "更新日時がこれ以降(`YYYY-MM-DD HH:MM:SS`)"
+        },
+        "updated_at_lteq": {
+          "type": "string",
+          "description": "更新日時がこれ以前(`YYYY-MM-DD HH:MM:SS`)"
+        },
+        "include_archive_flg": {
+          "type": "boolean",
+          "description": "true でアーカイブ済みも含める(include_archive_flg=1)。false を明示すると 0 を送る"
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)"
+        },
+        "limit": {
+          "type": "number",
+          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)"
+        },
+        "show_meta": {
+          "type": "boolean",
+          "description": "true で応答に _meta(BOARD の応答ヘッダー由来: total_count / rate_limit_remaining / etag など)を付ける。BOARD から直接取ったときだけ値が入る"
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "購買種別一覧取得",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "list_users",
+    "title": "ユーザー一覧取得",
+    "description": "ユーザーの一覧を返す。BOARD のユーザー(社内の担当者)マスタ。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta(差分)か refresh=full(全件)を指定する。絞り込み: name_cont / email_cont だけを指定した場合は、同期済みならキャッシュを絞って返す。それ以外の引数(updated_at_* / include_archive_flg / response_group などサーバー側の指定を含む)を指定したとき、またはキャッシュが未同期のときは BOARD の API を直接呼び、cache は空になる。結果は {items, cache, truncated?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "name_cont": {
+          "type": "string",
+          "description": "ユーザーの名前で絞り込む(部分一致)"
+        },
+        "email_cont": {
+          "type": "string",
+          "description": "メールアドレスで絞り込む(部分一致)"
+        },
+        "updated_at_gteq": {
+          "type": "string",
+          "description": "更新日時がこれ以降(`YYYY-MM-DD HH:MM:SS`)"
+        },
+        "updated_at_lteq": {
+          "type": "string",
+          "description": "更新日時がこれ以前(`YYYY-MM-DD HH:MM:SS`)"
+        },
+        "include_archive_flg": {
+          "type": "boolean",
+          "description": "true でアーカイブ済みも含める(include_archive_flg=1)。false を明示すると 0 を送る"
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)"
+        },
+        "limit": {
+          "type": "number",
+          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)"
+        },
+        "show_meta": {
+          "type": "boolean",
+          "description": "true で応答に _meta(BOARD の応答ヘッダー由来: total_count / rate_limit_remaining / etag など)を付ける。BOARD から直接取ったときだけ値が入る"
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "ユーザー一覧取得",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "list_vendor_branches",
+    "title": "仕入先支店一覧取得",
+    "description": "仕入先支店の一覧を返す。仕入先の支店・拠点。仕入先 ID(payee_id_eq)で仕入先に紐づく。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。結果は {items, cache, truncated?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "payee_id_eq": {
+          "type": "number",
+          "description": "仕入先 ID で絞り込む(完全一致)"
+        },
+        "name_cont": {
+          "type": "string",
+          "description": "仕入先支店の名前で絞り込む(部分一致)"
+        },
+        "updated_at_gteq": {
+          "type": "string",
+          "description": "更新日時がこれ以降(`YYYY-MM-DD HH:MM:SS`)"
+        },
+        "updated_at_lteq": {
+          "type": "string",
+          "description": "更新日時がこれ以前(`YYYY-MM-DD HH:MM:SS`)"
+        },
+        "include_archive_flg": {
+          "type": "boolean",
+          "description": "true でアーカイブ済みも含める(include_archive_flg=1)。false を明示すると 0 を送る"
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)"
+        },
+        "limit": {
+          "type": "number",
+          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)"
+        },
+        "show_meta": {
+          "type": "boolean",
+          "description": "true で応答に _meta(BOARD の応答ヘッダー由来: total_count / rate_limit_remaining / etag など)を付ける。BOARD から直接取ったときだけ値が入る"
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "仕入先支店一覧取得",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "list_vendor_contacts",
+    "title": "仕入先担当者一覧取得",
+    "description": "仕入先担当者の一覧を返す。仕入先の担当者。仕入先 ID(payee_id_eq)で仕入先に紐づく。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。結果は {items, cache, truncated?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "payee_id_eq": {
+          "type": "number",
+          "description": "仕入先 ID で絞り込む(完全一致)"
+        },
+        "name_cont": {
+          "type": "string",
+          "description": "仕入先担当者の名前で絞り込む(部分一致)"
+        },
+        "email_cont": {
+          "type": "string",
+          "description": "メールアドレスで絞り込む(部分一致)"
+        },
+        "updated_at_gteq": {
+          "type": "string",
+          "description": "更新日時がこれ以降(`YYYY-MM-DD HH:MM:SS`)"
+        },
+        "updated_at_lteq": {
+          "type": "string",
+          "description": "更新日時がこれ以前(`YYYY-MM-DD HH:MM:SS`)"
+        },
+        "include_archive_flg": {
+          "type": "boolean",
+          "description": "true でアーカイブ済みも含める(include_archive_flg=1)。false を明示すると 0 を送る"
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)"
+        },
+        "limit": {
+          "type": "number",
+          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)"
+        },
+        "show_meta": {
+          "type": "boolean",
+          "description": "true で応答に _meta(BOARD の応答ヘッダー由来: total_count / rate_limit_remaining / etag など)を付ける。BOARD から直接取ったときだけ値が入る"
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "仕入先担当者一覧取得",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "list_vendors",
+    "title": "仕入先一覧取得",
+    "description": "仕入先の一覧を返す。仕入先(支払先)マスタ。仕入先支店・仕入先担当者・発注書・支払いはこの仕入先 ID に紐づく。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta(差分)か refresh=full(全件)を指定する。絞り込み: name_cont だけを指定した場合は、同期済みならキャッシュを絞って返す。それ以外の引数(updated_at_* / include_archive_flg / response_group などサーバー側の指定を含む)を指定したとき、またはキャッシュが未同期のときは BOARD の API を直接呼び、cache は空になる。結果は {items, cache, truncated?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "inputSchema": {
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "name_cont": {
+          "type": "string",
+          "description": "仕入先の名前で絞り込む(部分一致)"
+        },
+        "updated_at_gteq": {
+          "type": "string",
+          "description": "更新日時がこれ以降(`YYYY-MM-DD HH:MM:SS`)"
+        },
+        "updated_at_lteq": {
+          "type": "string",
+          "description": "更新日時がこれ以前(`YYYY-MM-DD HH:MM:SS`)"
+        },
+        "include_archive_flg": {
+          "type": "boolean",
+          "description": "true でアーカイブ済みも含める(include_archive_flg=1)。false を明示すると 0 を送る"
+        },
+        "refresh": {
+          "type": "string",
+          "enum": [
+            "none",
+            "delta",
+            "full"
+          ],
+          "description": "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)"
+        },
+        "limit": {
+          "type": "number",
+          "description": "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)"
+        },
+        "show_meta": {
+          "type": "boolean",
+          "description": "true で応答に _meta(BOARD の応答ヘッダー由来: total_count / rate_limit_remaining / etag など)を付ける。BOARD から直接取ったときだけ値が入る"
+        },
+        "max_response_tokens": {
+          "type": "number",
+          "description": "Safety limit on the estimated response size in tokens (default: 50000, 0 disables). If exceeded, the call fails with response_too_large instead of returning a truncated result"
+        }
+      },
+      "additionalProperties": false
+    },
+    "annotations": {
+      "title": "仕入先一覧取得",
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
     "name": "server_info",
     "title": "サーバー情報",
     "description": "Returns the name and version of this MCP server. Use it to check connectivity.",

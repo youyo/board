@@ -5,6 +5,7 @@
 import type { McpServer, StandardSchemaWithJSON } from "@modelcontextprotocol/server";
 import type { z } from "zod";
 import { ArgumentError, BoardError, toErrorEnvelope } from "../errors";
+import type { Repositories } from "../repository";
 import {
   assertWithinResponseLimit,
   maxResponseTokensShape,
@@ -53,10 +54,14 @@ export function annotationsFor(category: ToolCategory, title: string): ToolAnnot
   }
 }
 
-/** ハンドラに渡す実行時の文脈。M02 以降で BOARD クライアントなどを足す。 */
+/** ハンドラに渡す実行時の文脈。 */
 export interface ToolContext {
   /** 現在時刻(テストで差し替える)。ツールは `Date.now()` を直接呼ばない。 */
   now: () => Date;
+  /** MCP クライアントが呼び出しを取り消したら abort される(SDK の `ctx.mcpReq.signal`)。BOARD への通信まで渡す。 */
+  signal?: AbortSignal;
+  /** 22 リソースの repository(D1 + BOARD クライアント)。設定されていないサーバーでは呼ぶと例外。 */
+  repositories: () => Repositories;
 }
 
 export interface ToolDefinitionInput<S extends z.ZodObject> {
@@ -111,7 +116,13 @@ export function defineTool<S extends z.ZodObject>(input: ToolDefinitionInput<S>)
 export interface RegisterDeps {
   /** 現在時刻。省略時は `new Date()`。 */
   now?: () => Date;
+  /** repository の取得口。省略時、ツールが `ctx.repositories()` を呼ぶと例外(generic_error)。 */
+  repositories?: () => Repositories;
 }
+
+const noRepositories = (): Repositories => {
+  throw new Error("repositories are not configured for this server");
+};
 
 function textResult(text: string, isError = false) {
   return { ...(isError ? { isError: true } : {}), content: [{ type: "text" as const, text }] };
@@ -168,7 +179,7 @@ export function registerTools(
         inputSchema: advertiseOnly(tool.inputSchema),
         annotations: tool.annotations,
       },
-      async (args: unknown) => {
+      async (args: unknown, extra: { mcpReq?: { signal?: AbortSignal } } | undefined) => {
         try {
           const parsed = tool.inputSchema.safeParse(args ?? {});
           if (!parsed.success) throw new ArgumentError(describeIssues(parsed.error));
@@ -180,6 +191,8 @@ export function registerTools(
             : undefined;
           const result = await tool.handler(parsed.data, {
             now: deps.now ?? (() => new Date()),
+            signal: extra?.mcpReq?.signal,
+            repositories: deps.repositories ?? noRepositories,
           });
           const text = JSON.stringify(result ?? null);
           if (responseLimit !== undefined) assertWithinResponseLimit(text, responseLimit);
