@@ -26,6 +26,10 @@ export interface McpServerDeps {
   uiBaseUrl?: string;
   /** テスト用: 現在時刻。 */
   now?: () => Date;
+  /** ログの相関 ID(cf-ray など)。 */
+  requestId?: string;
+  /** 操作した主体(Access の JWT の email、service token なら Client ID)。書き込み系の操作のログにだけ出す。 */
+  actor?: string;
 }
 
 /** リクエストごとに生成する(createMcpHandler の要件。同時リクエスト間で状態を共有しない)。 */
@@ -33,6 +37,9 @@ export function createMcpServer(deps: McpServerDeps = {}): McpServer {
   const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION });
   registerTools(server, deps.tools ?? ALL_TOOLS, {
     now: deps.now,
+    requestId: deps.requestId,
+    actor: deps.actor,
+    secrets: deps.env ? [deps.env.BOARD_API_KEY, deps.env.BOARD_API_TOKEN] : undefined,
     db: deps.db ?? (deps.env ? dbFromEnv(deps.env) : undefined),
     repositories: deps.repositories ?? repositoriesFromEnv(deps.env),
     documentIndex: deps.documentIndex ?? documentIndexFromEnv(deps.env),

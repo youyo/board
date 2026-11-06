@@ -15,6 +15,8 @@
 | V7 | Workers Paid プランで full refresh と逆引きの走査が 1 回の呼び出しの D1 クエリ上限に収まる | `test:live` が最後まで通ること。D1 のエラー(`generic_error`)が出ないこと | Free プランでは収まらない(runbook 9) |
 | V8 | 書類(見積・受注・納品・領収)の逆引きが 1〜2 回の呼び出しで覚え切る | 書類の ID を `find_estimates` などで引き、`cache_status` の `document_scans` が `complete` に進むのを見る | 初回のみ `project_unresolved` の警告が続く |
 | V9 | Portal 経由のツール名が `board_` 付きで見え、`tools/list` の 54 個がすべて出る | Portal 経由でツール一覧を確認 | 名前の前提(README)が違う |
+| V12 | workers.dev ホストで、`/healthz` だけを対象にした Bypass の Access アプリが、ホスト全体のアプリより優先される(未確認) | runbook の 5 の手順で作り、JWT なしで `/healthz` が 200、`/mcp` が Access に止められることを見る | `/healthz` が Access の内側のまま。ブラウザでログインして開く、または `wrangler tail` で確認する |
+| V13 | 下流の `deploy.yml` が、main への push で `ci.yml` が成功したあとに `workflow_run` で起動し、Environment `production` の secrets が渡ってデプロイが通る(未確認) | 下流で main に push し、Actions の実行を確認する。PR の CI では起動せず、`ci.yml` が失敗したときは skipped になる | 自動デプロイが動かない。手動の `mise run deploy` に戻す(docs/deploy-ci.md) |
 
 ## 記入欄
 
@@ -78,6 +80,14 @@
 - 確認: 2026-11-06、運用者が下流の環境で確認した。
 - 結果: [x] 確認済み。MCP Portal 経由と Managed OAuth 経由のどちらも `Origin` を付けず、ツール呼び出しが通る / メモ: ブラウザから直接呼ぶクライアント(MCP Inspector など)は 403 になる
 
+### V12 workers.dev ホストで `/healthz` の Bypass アプリが優先される(2026-11-06 追加。**未確認**)
+- 前提: Worker の workers.dev に Enable Cloudflare Access して、ホスト全体を保護するアプリがある状態で、同じホストの `/healthz` パスだけを対象にした self-hosted アプリ(Bypass ポリシー)を別に作る(docs/runbook.md の 5)。
+- 期待: 「パスつきのアプリがホスト全体のアプリより優先される」ので、`/healthz` だけ認証なしで 200 になり、`/mcp` などそれ以外のパスは Access の内側のまま(JWT なしは Access のログインへの 302 か 401)。
+- 確認日 / 確認者:
+- `curl -i https://<worker>.<subdomain>.workers.dev/healthz` が 200 になる: [ ] はい  [ ] いいえ(Access に止められる)
+- `/mcp` は引き続き Access に止められる(Bypass が広がっていない): [ ] はい  [ ] いいえ
+- 外れたときの影響: `/healthz` は Access の内側のまま。runbook の確認手順(ブラウザでログインして開く / `wrangler tail`)を使う。`mise run setup` は Access の手前で止まったと案内して失敗にしない。
+
 ### V13 下流の `deploy.yml` が `workflow_run` で起動し、Environment の secrets が渡る(2026-11-06 追加。未確認)
 - 確認日 / 確認者:
 - `ci.yml` が main への push で成功したあとに `deploy.yml` が起動する: [ ] はい  [ ] いいえ(メモ:      )
@@ -86,4 +96,3 @@
 - `ref: head_sha` で CI が検査したコミットが checkout される(push が重なっても取り違えない): [ ] はい  [ ] いいえ
 - Environment `production` の `CLOUDFLARE_API_TOKEN` が `deploy` のステップに渡り、デプロイが通る: [ ] はい  [ ] いいえ
 - 下流で `deploy/wrangler.jsonc` をコミットするときの pre-commit の gitleaks が、upstream の `.gitleaks.toml` で `ACCESS_AUD` を止めない: [ ] はい  [ ] いいえ
-

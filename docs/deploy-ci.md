@@ -35,7 +35,7 @@ Cloudflare ダッシュボードのアカウント API トークンで作る。b
 | D1 | Edit | D1 のバインディングを持つ Worker のデプロイ(`wrangler deploy` が D1 を参照する) |
 | Workers Routes / Zone(カスタムドメイン) | Edit(対象のゾーン) | `customDomain` の登録(`custom_domain: true` のルート)に DNS レコードと証明書が作られる |
 
-- `customDomain` を使わない(workers.dev で公開する)場合、Zone の権限は不要になる見込み。**【未確認】** 実アカウントで確かめていない。
+- `customDomain` を使わない(workers.dev で公開する)場合、Zone の権限は不要。Account の Workers Scripts: Edit と D1: Edit で足りる。既存の Worker の再デプロイで確認した(下流の CI が main への push で `mise run deploy` まで成功した)。D1 の新規作成と、workers.dev のサブドメインの初回の有効化は確認していない(手元で `wrangler login` して行った)。
 - 「Edit Cloudflare Workers」テンプレートは Workers Scripts・Workers Routes などを含む。D1 の権限を足す。
 - 対象は、このアカウントとゾーンだけに絞る。
 - **【未検証】** 最小の権限の組み合わせは実アカウントで確かめていない(特に、カスタムドメインの登録に Zone のどの権限が要るか)。足りないときは wrangler のエラーに出る権限名を手がかりに足す。最小にしたいときは、足した権限を 1 つずつ外してデプロイが通るか確かめる。

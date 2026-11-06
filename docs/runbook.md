@@ -110,7 +110,10 @@ mise run setup                     # 何度でも再実行できる。--yes で 
 2. `mise run deploy:config`
 3. `mise run deploy`
 4. 未登録の secret(`BOARD_API_KEY` / `BOARD_API_TOKEN`)だけを `wrangler secret put`(隠した入力)。値はスクリプトを通らず、引数・env・ファイル・ログに残らない。登録済みのものは上書きしない。対話端末でなければ飛ばして手順を案内する。
-5. `https://<customDomain>/healthz` で確認する。503 なら、欠けている項目名を表示する。DNS・証明書の反映待ちで届かないことがあるので数回再試行する。`customDomain` が空なら、`wrangler deploy` の出力の `https://<worker>.<subdomain>.workers.dev` で確認する。URL を取れなければ失敗にせず、`https://<worker>.<アカウントのサブドメイン>.workers.dev/healthz` を手で確認する案内を出して続ける。
+5. `https://<customDomain>/healthz` で確認する。503 なら、欠けている項目名を表示する。DNS・証明書の反映待ちで届かないことがあるので、5 秒おきに 6 回(約 30 秒)再試行する。`customDomain` が空なら、`wrangler deploy` の出力の `https://<worker>.<subdomain>.workers.dev` で確認する。workers.dev の新しいホスト名は反映に時間がかかることがあるので、再試行は約 2 分(5 秒おきに 24 回)まで伸ばす。
+   - それでも届かない(workers.dev のとき)場合は、失敗にしない。デプロイと secrets は済んでいるので、警告を出して終わる(exit 0)。`/healthz` を手で確認し、しばらくして `mise run setup` を再実行すれば続きから進む。カスタムドメインのときは、届かなければ失敗で終わる。
+   - URL を取れなければ失敗にせず、`https://<worker>.<アカウントのサブドメイン>.workers.dev/healthz` を手で確認する案内を出して続ける。
+   - Access が `/healthz` の手前で止めているとき(Access のログインへの 302、または JSON でない 401 / 403)も失敗にしない。「Access が有効」と案内する。確認の方法は 5 の『`/healthz` の確認』。
 6. 画面の作業(Access・Portal)は 5〜7 を案内して終わる。
 
 途中で失敗・中断しても、原因を直して `mise run setup` を再実行すればよい(D1・登録済みの secret・生成物は冪等)。
@@ -149,8 +152,9 @@ mise run deploy          # wrangler deploy -c deploy/wrangler.jsonc
 
 - `mise run deploy` は、`deploy/wrangler.jsonc` が無い、または `<...>` のプレースホルダが残っていると、何も実行せずに止まる。
 - 事前の動作確認は `mise run deploy:check`(example の設定をダミー値にして生成し、`wrangler deploy --dry-run`。Cloudflare には何も送らない。upstream の CI でも走る)。
-- デプロイ直後は `curl https://<domain>/healthz` で確認する。`{"status":"ok"}` なら設定がそろっている。`503` なら本文の `missing` / `invalid` に項目名が出る(値は出ない)。
-  Access の保護前でも `/healthz` だけは認証なしで返る。それ以外のパスは JWT がなければ 401。
+- デプロイ直後(Access を付ける前)は `curl https://<domain>/healthz` で確認する。`{"status":"ok"}` なら設定がそろっている。`503` なら本文の `missing` / `invalid` に項目名が出る(値は出ない)。
+  Worker は `/healthz` だけ認証なしで返す。それ以外のパスは JWT がなければ 401。
+  **Access を付けた後は、アプリケーションがホスト全体を保護するので `/healthz` も Access の内側に入り、`curl` は Worker まで届かない**(Access のログインへの 302、または 401)。確認の方法は 5 の『`/healthz` の確認』。
 
 ## 4. upstream の更新の取り込み
 
@@ -193,6 +197,36 @@ Worker は OAuth サーバーを持たず、Access が発行した JWT(`Cf-Acces
 3. Portal の HTTP URL は `https://<worker>.<subdomain>.workers.dev/mcp`(6)。
 4. **【未検証】** MCP server application 型を workers.dev ホストで作れるか、workers.dev で Access と Managed OAuth が動き JWT が Worker に届くかは実機で確かめていない(`docs/manual-verification.md` の V10)。作れなければ self-hosted application で足りるかを確かめる。
 5. Access を付けるまでの間も、Worker は `/healthz` 以外で JWT を検証するので、workers.dev に直接来ても 401 / 403 になる(Access の代わりにはならない。多層防御の 2 枚目)。
+
+### `/healthz` の確認(Access を付けた後)
+
+Access のアプリケーションはホスト全体を保護するので、Access を付けた後は `curl .../healthz` が Worker に届かない。次のどれかで確認する。
+
+**A. `/healthz` を Bypass にする**(`curl` で確認できるようになる)
+
+`/healthz` は設定の項目名(`missing` / `invalid`)しか返さず、値は返さない設計なので、認証なしで公開してよい。
+
+1. Zero Trust ダッシュボード → **Access controls** → **Applications** → self-hosted application を別に作る。
+2. 公開ホスト名は、Worker のホスト(`customDomain`、または `<worker>.<subdomain>.workers.dev`)と同じ。**パスは `/healthz` だけ**にする(Worker 全体のアプリは変えない)。
+3. ポリシーは **Bypass** を 1 つだけ付ける(Include は Everyone)。Managed OAuth は有効にしない。
+4. 確認: `curl -i https://<domain>/healthz` が 200 になる。`/mcp` は引き続き Access に止められる(JWT なしで 302 か 401)ことも見る。広がっていたらこのアプリのパスを見直す。
+
+- **【未確認】** 「パスつきのアプリがホスト全体のアプリより優先される」ことは、実機で確かめていない(workers.dev ホストについて `docs/manual-verification.md` の V12)。優先されないときは `/healthz` が Access の内側のままになるので、B か C を使う。
+- Bypass にするのは `/healthz` だけ。`/mcp` など他のパスを含めない。
+
+**B. ブラウザでログインしてから開く**
+
+Bypass にしない場合は、ブラウザで `https://<domain>/healthz` を開く。Access のログインを通ると、Worker の応答(`{"status":"ok"}`、または 503 と項目名)が見える。
+
+**C. `wrangler tail` で見る**
+
+```bash
+pnpm exec wrangler tail --config deploy/wrangler.jsonc
+```
+
+ログインしたブラウザなどから Worker にリクエストを送り、ログに種別だけが出るのを見る(`access jwt rejected: <理由>` など。JWT や値は出ない)。
+
+`mise run setup` は、`/healthz` が Access の手前で止まっていると分かったら失敗にせず、「Access が有効」と案内して終わる。
 
 ## 6. MCP Server Portal への登録
 
@@ -244,8 +278,10 @@ mise run test:live
 
 ### ログ
 - Workers Logs(`observability.enabled: true`)で `wrangler tail --config deploy/wrangler.jsonc` かダッシュボードの Observability を見る。
-- 想定外の例外は `tool <name> failed unexpectedly: <例外名>: <message>` が出る(Bearer と x-api-key の値は伏せる)。応答は `generic_error`。
-- JWT の拒否は `access jwt rejected: <理由>`(種別だけ。JWT は出ない)。設定の欠けは `{"event":"config_invalid","missing":[...],"invalid":[...]}`(項目名だけ)。
+- ログは JSON の 1 行(`level` / `event` / `request_id` + 各イベントの項目)。`request_id` はリクエストの `cf-ray`(なければ生成した UUID)で、1 回のリクエストのログを束ねて検索できる。
+- 想定外の例外は `{"event":"tool_failed_unexpectedly","tool":"<name>","error_name":"...","error_message":"..."}` (Bearer と x-api-key の値、BOARD_API_KEY / BOARD_API_TOKEN の実値とその URL エンコード形は伏せる。`error_message` は 500 文字まで)。応答は `generic_error`。
+- JWT の拒否は `{"event":"access_jwt_rejected","reason":"<種別>"}`(種別だけ。JWT は出ない)。設定の欠けは `{"event":"config_invalid","missing":[...],"invalid":[...]}`(項目名だけ)。
+- 書き込み系の操作(`cache_clear`、`refresh=delta|full` を付けた呼び出し)は `{"event":"write_operation","tool":"...","refresh":"...","actor":"<email>"}` を残す。BOARD の認証情報は全員で共有するので、誰が実行したかはこのログで追う。`actor` は Access の JWT の email(service token は Client ID)。読み取りだけの呼び出しでは主体を出さない。`write_operation` は試行の記録で、成否は問わない(失敗しても残る)。document 系に `refresh=delta` を渡した場合も記録される。
 - API キー・トークン・JWT はログにも応答にも出さない。
 
 ### キャッシュの初回構築
@@ -267,7 +303,7 @@ BOARD を呼ばずに D1 の状態を返す(読み取り専用)。見るとこ�
 
 ### rate limit
 - BOARD API は **3 回/秒・3,000 回/日**。Worker は BOARD への通信を直列化し、429 / 5xx は `Retry-After` を尊重して最大 3 回まで再試行する(残り時間を超える待ちは待たずに `retryable: true` で失敗)。
-- 複数人が同時にキャッシュミスすると 3 回/秒を超えうる(再試行で吸収する)。問題になったら Durable Objects による全体制御を再検討する(ロードマップの決定済み事項)。
+- 複数人が同時にキャッシュミスすると 3 回/秒を超えうる(再試行で吸収する)。直列化(`src/board/client.ts` の `serialize`)は 1 つの isolate の中でしか効かず、Workers は負荷に応じて複数の isolate を同時に動かすため、isolate をまたぐと合計が上限を超えることがある。超えた分は BOARD が 429(`rate_limited`)で返し、上記の再試行で吸収する。設計どおりの挙動である(ADR 0003)。問題になったら Durable Objects による全体制御を再検討する(ロードマップの決定済み事項)。
 - 1 日の上限が近いときは `refresh` を使わずキャッシュを読む。
 
 ## 9. 注意: Workers Free プランの D1 クエリ上限
@@ -278,13 +314,13 @@ Free プランで動かすと、`refresh=full` や `find_*` の途中で D1 の�
 
 ## 10. 障害の切り分け
 
-まず `curl -s https://<domain>/healthz`。
+まず `curl -s https://<domain>/healthz`(Access を付けた後で `/healthz` を Bypass にしていないときは、Worker まで届かない。5 の『`/healthz` の確認』のとおり、ブラウザでログインして開くか、`wrangler tail` で見る)。
 
 | 症状 | 原因と対処 |
 |---|---|
 | `/healthz` が 503(本文に `missing` / `invalid`) | 本文の項目名が直す箇所(値は出ない)。`BOARD_API_KEY` / `BOARD_API_TOKEN` は secret の登録漏れ → 3 の secrets(または `mise run setup` の再実行)。`ACCESS_TEAM_DOMAIN` / `ACCESS_AUD` / `DB` / `BOARD_BASE_URL` / `BOARD_UI_BASE_URL` は `board.config.json` を直して `deploy:config` → `deploy` |
 | Access で 401 | JWT がない。Access を通っていない(アプリケーションの公開ホスト名が違う)、Portal が `Cf-Access-Jwt-Assertion` を付けていない(docs/manual-verification.md の V1) |
-| Access で 403 | JWT の検証に失敗。`access.aud` / `access.teamDomain` の誤り(5 の 3)、JWKS が取れない。`wrangler tail --config deploy/wrangler.jsonc` で `access jwt rejected: <理由>` を見る(理由の種別だけ。JWT は出ない) |
+| Access で 403 | JWT の検証に失敗。`access.aud` / `access.teamDomain` の誤り(5 の 3)、JWKS が取れない。`wrangler tail --config deploy/wrangler.jsonc` で `access_jwt_rejected` の `reason` を見る(理由の種別だけ。JWT は出ない) |
 | `/mcp` が 403(Access は通っている) | `Origin` ヘッダー付きのリクエストは 403 にしている(CORS 無効・Origin の許可リストが空。ADR 0001 の追記)。ブラウザから呼ぶクライアント(MCP Inspector など)が該当する。Portal や Managed OAuth の経路は `Origin` を付けない(docs/manual-verification.md の V11)。ブラウザ経由ではなく、Portal かサーバー側のクライアントから呼ぶ |
 | `refresh_in_progress` | 同じリソースの別の refresh が動いている。`retry_after_seconds` 後に再試行する。長く続くなら `cache_status` の `locked` を見る(stale なロックは 10 分で奪われる) |
 | `rate_limited` | BOARD の 3 回/秒・3,000 回/日(8)。`retryable: true` なら待って再試行する。日次の上限が近いなら `refresh` を使わずキャッシュを読む |
