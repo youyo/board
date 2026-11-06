@@ -86,7 +86,8 @@ cli generate --config "$cfg" --dir "$dir"
 echo "==> deploy"
 body="$(mktemp)"
 deploylog="$(mktemp)"
-trap 'rm -f "$body" "$deploylog"' EXIT
+hdrs="$(mktemp)"
+trap 'rm -f "$body" "$deploylog" "$hdrs"' EXIT
 # 出力はそのまま見せつつ、workers.dev の URL を取るために控える(pipefail で deploy.sh の失敗は伝わる)
 BOARD_DEPLOY_DIR="$dir" bash "$root/scripts/deploy.sh" 2>&1 | tee "$deploylog"
 
@@ -129,7 +130,6 @@ else
   if [ -n "$domain" ]; then default_tries=6; else default_tries=24; fi
   tries="${BOARD_SETUP_HEALTHZ_TRIES:-$default_tries}"
   nap="${BOARD_SETUP_HEALTHZ_SLEEP:-5}"
-  hdrs="$(mktemp)"
   health="unreachable"
   i=0
   while [ "$i" -lt "$tries" ]; do
@@ -144,7 +144,6 @@ else
     fi
     [ "$i" -lt "$tries" ] && sleep "$nap"
   done
-  rm -f "$hdrs"
   case "$health" in
     access)
       echo "  Access が有効で、/healthz は Access の手前で止まっている(Worker の不具合ではない)"
