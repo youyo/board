@@ -359,27 +359,25 @@ export function createBoardClientFromEnv(
   env: BoardEnv,
   overrides: Partial<BoardClientOptions> = {},
 ): BoardClient {
-  const create = () =>
-    createBoardClient({
-      baseUrl: env.BOARD_BASE_URL,
-      apiKey: env.BOARD_API_KEY,
-      apiToken: env.BOARD_API_TOKEN,
-      ...overrides,
-    });
+  // `wrangler secret put` 経由などで末尾に改行が付いた値でも動くよう、前後の空白を除いて使う(checkConfig と同じ基準)。
+  const baseUrl = env.BOARD_BASE_URL.trim();
+  const apiKey = env.BOARD_API_KEY.trim();
+  const apiToken = env.BOARD_API_TOKEN.trim();
+  const create = () => createBoardClient({ baseUrl, apiKey, apiToken, ...overrides });
   if (Object.keys(overrides).length > 0) return create();
   const hit = clientCache.find(
     (e) =>
-      e.env.BOARD_BASE_URL === env.BOARD_BASE_URL &&
-      e.env.BOARD_API_KEY === env.BOARD_API_KEY &&
-      e.env.BOARD_API_TOKEN === env.BOARD_API_TOKEN,
+      e.env.BOARD_BASE_URL === baseUrl &&
+      e.env.BOARD_API_KEY === apiKey &&
+      e.env.BOARD_API_TOKEN === apiToken,
   );
   if (hit) return hit.client;
   const client = create();
   clientCache.push({
     env: {
-      BOARD_BASE_URL: env.BOARD_BASE_URL,
-      BOARD_API_KEY: env.BOARD_API_KEY,
-      BOARD_API_TOKEN: env.BOARD_API_TOKEN,
+      BOARD_BASE_URL: baseUrl,
+      BOARD_API_KEY: apiKey,
+      BOARD_API_TOKEN: apiToken,
     },
     client,
   });

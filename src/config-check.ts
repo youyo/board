@@ -56,9 +56,8 @@ export function checkConfig(env: Record<string, unknown>): ConfigCheckResult {
       missing.push(name);
       return;
     }
-    const v = value as string;
-    // 実際に使う値は trim しないので、前後に空白・改行がある値は使えないものとして扱う(値は出さない)。
-    if (v !== v.trim() || PLACEHOLDER.test(v) || (valid && !valid(v))) invalid.push(name);
+    const v = (value as string).trim();
+    if (PLACEHOLDER.test(v) || (valid && !valid(v))) invalid.push(name);
   };
   text("ACCESS_TEAM_DOMAIN", (v) => HOST.test(v));
   text("ACCESS_AUD");

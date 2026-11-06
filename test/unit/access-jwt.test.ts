@@ -35,6 +35,13 @@ describe("verifyAccessJwt", () => {
     expect(identity).toEqual({ kind: "user", email: "bob@example.com", subject: "access-user-1" });
   });
 
+  it("AUD・チームドメインの前後に空白・改行があっても、trim した値で検証して通る", async () => {
+    mockOutboundFetch({ [CERTS]: () => jwksResponse(key) });
+    const token = await signAccessJwt(key, { email: "bob@example.com" });
+    const identity = await verifyAccessJwt(token, { teamDomain: `${TEAM}\n`, aud: `${AUD} ` });
+    expect(identity.kind).toBe("user");
+  });
+
   it("service token の JWT(email なし・sub 空・common_name = Client ID)を受け入れる", async () => {
     mockOutboundFetch({ [CERTS]: () => jwksResponse(key) });
     const token = await signAccessJwt(key, { serviceClientId: "abc123.access" });

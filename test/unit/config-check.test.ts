@@ -36,20 +36,15 @@ describe("checkConfig", () => {
     expect(result.missing).toEqual(["BOARD_API_KEY", "BOARD_API_TOKEN"]);
   });
 
-  it("前後に空白がある値は invalid(検証した値と実際に使う値を食い違わせない。値は結果に出さない)", () => {
+  it("前後に空白・改行がある値も、空白を除いた値で検証して ok(使う側が trim する)", () => {
     const result = checkConfig({
       ...valid,
-      BOARD_API_KEY: " api-key-value",
-      BOARD_API_TOKEN: "api-token-value\n",
-      BOARD_BASE_URL: " https://api.the-board.jp",
+      BOARD_API_KEY: "api-key-value\n",
+      BOARD_API_TOKEN: " api-token-value",
+      BOARD_BASE_URL: "https://api.the-board.jp\n",
       ACCESS_AUD: "aud-tag-value ",
     });
-    expect(result).toEqual({
-      ok: false,
-      missing: [],
-      invalid: ["ACCESS_AUD", "BOARD_BASE_URL", "BOARD_API_KEY", "BOARD_API_TOKEN"],
-    });
-    expect(JSON.stringify(result)).not.toContain("api-key-value");
+    expect(result).toEqual({ ok: true, missing: [], invalid: [] });
   });
 
   it("D1 バインディングが D1 でない値(文字列など)なら missing", () => {
