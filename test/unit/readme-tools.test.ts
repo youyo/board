@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import readme from "../../README.md?raw";
+import readmeEn from "../../README.md?raw";
+import readmeJa from "../../README_ja.md?raw";
 import { ALL_TOOLS } from "../../src/mcp/tools";
 
 /** ツール名からグループを決める(README の表の『グループ』列)。 */
@@ -11,7 +12,12 @@ function groupOf(name: string): string {
 }
 
 /** README のツール一覧(グループごとの表)が、実際に登録されているツールと一致していること。 */
-describe("README のツール一覧", () => {
+const READMES = [
+  { file: "README.md", text: readmeEn, total: (n: number) => `${n} tools` },
+  { file: "README_ja.md", text: readmeJa, total: (n: number) => `${n} 個` },
+];
+
+describe.each(READMES)("$file のツール一覧", ({ file, text: readme, total }) => {
   const byGroup = new Map<string, string[]>();
   for (const tool of ALL_TOOLS) {
     const list = byGroup.get(groupOf(tool.name)) ?? [];
@@ -20,15 +26,20 @@ describe("README のツール一覧", () => {
   }
 
   it("総数が本文に書かれている", () => {
-    expect(readme).toContain(`${ALL_TOOLS.length} 個`);
+    expect(readme).toContain(total(ALL_TOOLS.length));
   });
 
   it.each([...byGroup])("グループ %s の行に、件数と全ツール名がある", (group, names) => {
     const row = readme.split("\n").find((l) => l.startsWith(`| \`${group}\` |`));
-    expect(row, `README にグループ ${group} の行がない`).toBeDefined();
+    expect(row, `${file} にグループ ${group} の行がない`).toBeDefined();
     const cells = (row ?? "").split("|").map((c) => c.trim());
     expect(cells[2]).toBe(String(names.length));
     for (const name of names) expect(row).toContain(`\`${name}\``);
+  });
+
+  it("相互リンクがある", () => {
+    const other = file === "README.md" ? "README_ja.md" : "README.md";
+    expect(readme.split("\n").slice(0, 3).join("\n")).toContain(`](${other})`);
   });
 
   it("表に載っているツール名が、実在しないものを含まない", () => {
@@ -38,7 +49,7 @@ describe("README のツール一覧", () => {
     for (const row of rows) {
       const cell = row.split("|")[3] ?? "";
       for (const m of cell.matchAll(/`([a-z_0-9]+)`/g)) {
-        expect(real.has(m[1] as string), `README の ${m[1]} は登録されていない`).toBe(true);
+        expect(real.has(m[1] as string), `${file} の ${m[1]} は登録されていない`).toBe(true);
       }
     }
   });

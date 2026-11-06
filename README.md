@@ -1,48 +1,50 @@
 # board
 
-**BOARD (https://the-board.jp) を AI エージェントから使うための Remote MCP サーバー。**
-BOARD API(`https://api.the-board.jp/v1/`)の 22 リソースを、**54 個**のツールで読み取れる。
-Cloudflare Workers + D1 + Hono で動き、Cloudflare Access(MCP Server Portal + Managed OAuth)の背後に置く。
+English | [日本語](README_ja.md)
 
-> Go 製の CLI + ローカル MCP(v0.11.1)を書き直したもの。Go 版は `archive/go-cli` ブランチと、注釈付きタグ `go-cli-final`(= v0.11.1)に残してある。
-> main には含まれない(`git show go-cli-final:<path>` で読める)。CLI 専用の機能(configure / completion / docs / cache path)は移植していない。
+**A Remote MCP server for using BOARD (https://the-board.jp) from AI agents.**
+It reads the 22 resources of the BOARD API (`https://api.the-board.jp/v1/`) through **54 tools**.
+It runs on Cloudflare Workers + D1 + Hono, and sits behind Cloudflare Access (MCP Server Portal + Managed OAuth).
 
-## 構成
+> A rewrite of the Go CLI + local MCP (v0.11.1). The Go version is kept on the `archive/go-cli` branch and the annotated tag `go-cli-final` (= v0.11.1).
+> It is not included in main (read it with `git show go-cli-final:<path>`). CLI-only features (configure / completion / docs / cache path) were not ported.
 
-- Cloudflare Workers + D1 + Hono。Durable Objects は使わない。
-- MCP は `agents` の `createMcpHandler` によるステートレス実装(`@modelcontextprotocol/server` v2)。
-- **認証は Cloudflare Access に任せる**。Worker は OAuth サーバーを持たない。`/healthz` 以外の全リクエストで `Cf-Access-Jwt-Assertion`(署名・iss・aud・exp)を検証する。
-- **BOARD の API キー / トークンは Worker の secret を全員で共有する**(1 デプロイ = 1 BOARD アカウント)。
-- BOARD API の rate limit(3 回/秒・3,000 回/日)を避けるため、エンティティを D1 にキャッシュする。鮮度は LLM が `refresh` 引数で決める。
+## Architecture
+
+- Cloudflare Workers + D1 + Hono. No Durable Objects.
+- MCP is a stateless implementation using `createMcpHandler` from `agents` (`@modelcontextprotocol/server` v2).
+- **Authentication is delegated to Cloudflare Access.** The Worker has no OAuth server. It verifies `Cf-Access-Jwt-Assertion` (signature, iss, aud, exp) on every request except `/healthz`.
+- **The BOARD API key / token are Worker secrets shared by everyone** (1 deployment = 1 BOARD account).
+- To stay within the BOARD API rate limit (3 requests/second, 3,000 requests/day), entities are cached in D1. The LLM decides freshness with the `refresh` argument.
 
 ```
-MCP クライアント(Claude など)
-   │  OAuth(Access の Managed OAuth)
+MCP client (Claude, etc.)
+   │  OAuth (Access Managed OAuth)
    ▼
 ┌──────────── Cloudflare ─────────────────────────────────────────────────────┐
-│ MCP Server Portal(または MCP server application)                          │
+│ MCP Server Portal (or MCP server application)                               │
 │   │ Cf-Access-Jwt-Assertion                                                  │
 │   ▼                                                                          │
-│ board(Worker)  /healthz(認証なし)  /mcp(JWT 検証 → ツール)                │
-│   │  ツール 54 個                                                             │
-│   ├─▶ D1: resource_cache / sync_state / 書類→案件の逆引き                    │
-│   └─▶ BOARD API(x-api-key + Bearer。直列・再試行・締め切り 30 秒)           │
+│ board (Worker)  /healthz (no auth)  /mcp (JWT check → tools)                 │
+│   │  54 tools                                                                │
+│   ├─▶ D1: resource_cache / sync_state / document → project reverse lookup    │
+│   └─▶ BOARD API (x-api-key + Bearer. serial, retries, 30 s deadline)         │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-設計の理由は [docs/adr/](docs/adr/) を参照。
+See [docs/adr/](docs/adr/) for the reasons behind the design (the ADRs are written in Japanese).
 
-- [ADR 0001: 共有キー + Access Managed OAuth](docs/adr/0001-shared-key-and-access-managed-oauth.md)
-- [ADR 0002: D1 キャッシュと再開できる refresh](docs/adr/0002-d1-cache-and-resumable-refresh.md)
-- [ADR 0003: 呼び出しの締め切り 30 秒](docs/adr/0003-call-deadline.md)
-- [ADR 0004: 書類 ID から案件 ID への逆引き](docs/adr/0004-document-reverse-lookup.md)
-- [ADR 0005: upstream / 下流モデルのデプロイ](docs/adr/0005-upstream-downstream-deploy.md)
+- [ADR 0001: Shared key + Access Managed OAuth](docs/adr/0001-shared-key-and-access-managed-oauth.md)
+- [ADR 0002: D1 cache and resumable refresh](docs/adr/0002-d1-cache-and-resumable-refresh.md)
+- [ADR 0003: 30-second call deadline](docs/adr/0003-call-deadline.md)
+- [ADR 0004: Reverse lookup from document ID to project ID](docs/adr/0004-document-reverse-lookup.md)
+- [ADR 0005: Upstream / downstream deployment model](docs/adr/0005-upstream-downstream-deploy.md)
 
-## ツール一覧(54 個)
+## Tools (54 tools)
 
-ツール名に接頭辞は付けていない。MCP Server Portal 経由だと `board_` が前置される(例 `board_list_clients`)。
+Tool names have no prefix. Through an MCP Server Portal, `board_` is prepended (for example `board_list_clients`).
 
-| グループ | 個数 | ツール |
+| Group | Count | Tools |
 |---|---|---|
 | `server` | 1 | `server_info` |
 | `list` | 18 | `list_accounting_types`, `list_client_branches`, `list_clients`, `list_contacts`, `list_document_send_channels`, `list_groups`, `list_invoices`, `list_payment_terms`, `list_payments`, `list_project_costs`, `list_project_types`, `list_projects`, `list_purchase_orders`, `list_purchase_types`, `list_users`, `list_vendor_branches`, `list_vendor_contacts`, `list_vendors` |
@@ -50,81 +52,81 @@ MCP クライアント(Claude など)
 | `find` | 11 | `find_clients`, `find_deliveries`, `find_estimates`, `find_invoices`, `find_orders`, `find_payments`, `find_projects`, `find_purchase_orders`, `find_receipts`, `find_users`, `find_vendors` |
 | `cache` | 2 | `cache_clear`, `cache_status` |
 
-- **api 層(`list_*` / `get_*`)**: BOARD API に準拠した低レベルの読み取り。BOARD の生データを snake_case のまま返す。`show_meta` で `_meta`(総件数・ページ情報)も返す。
-- **find 層(`find_*`)**: 名前から ID を解決し、関連するエンティティ(顧客・支店・担当者・案件)を付けて返す高レベルの検索。LLM 向け。
-- **cache 層**: `cache_status` は D1 の状態の確認(読み取り専用)、`cache_clear` はキャッシュの削除(破壊的)。`cache_expire` は作っていない(読み取りに影響しないため。[計画書](plans/board-workers-m06-finish.md)参照)。
-- 読み取りツールには引数 `max_response_tokens`(応答サイズの安全網。既定 50000、0 で無効)が付く。超過は切り詰めず `response_too_large`。
-- エラーは `{"schema_version":"1","error":{"code","message","retryable"}}` を `isError: true` で返す。
+- **api layer (`list_*` / `get_*`)**: low-level reads that follow the BOARD API. They return BOARD's raw data in snake_case. `show_meta` also returns `_meta` (total count and paging info).
+- **find layer (`find_*`)**: high-level search that resolves IDs from names and returns related entities (client, branch, contact, project) alongside. Meant for LLMs.
+- **cache layer**: `cache_status` inspects the D1 state (read-only); `cache_clear` deletes the cache (destructive). `cache_expire` was not created (it does not affect reads; see the [plan](plans/board-workers-m06-finish.md), in Japanese).
+- Read tools take a `max_response_tokens` argument (a safety net for response size; default 50000, 0 disables it). An oversized response is not truncated; it returns `response_too_large`.
+- Errors are returned as `{"schema_version":"1","error":{"code","message","retryable"}}` with `isError: true`.
 
-## 自分の環境にデプロイする
+## Deploy to your own environment
 
-このリポジトリは**公開の upstream** で、実値(Worker 名・D1 の id・ドメイン・Access の設定)は持たない。
-**自分の private リポジトリ(下流)に upstream を取り込み**、そこから自分の Cloudflare アカウントにデプロイする。
+This repository is a **public upstream**. It holds no real values (Worker name, D1 id, domain, Access settings).
+**Pull the upstream into your own private repository (the downstream)** and deploy from there to your own Cloudflare account.
 
 ```bash
-# 下流を作る(詳細は docs/runbook.md の 0)
+# Create the downstream (details: section 0 of docs/runbook.md)
 git clone https://github.com/youyo/board.git my-board && cd my-board
-git remote rename origin upstream && git remote add origin <自分の private リポジトリの URL>
+git remote rename origin upstream && git remote add origin <URL of your private repository>
 mise install && mise run install
 
-# 設定を書く(秘密でない値だけ。1 か所)
-cp board.config.example.json board.config.json   # <YOUR_...> を埋める
+# Write the settings (non-secret values only, in one place)
+cp board.config.example.json board.config.json   # fill in the <YOUR_...> values
 
-# 初回のデプロイを 1 本で(何度でも再実行できる)
+# First deployment in one command (safe to re-run)
 pnpm exec wrangler login
 mise run setup
 ```
 
-- 下流が書く設定は `board.config.json` だけ。`mise run deploy:config` が upstream の `wrangler.jsonc` と合わせて `deploy/wrangler.jsonc` を生成し、**下流でコミットする**(`mise run deploy:config:check` が、生成し直し忘れ・手での書き換え・upstream の変更の取り込み忘れを検出する)。
-- `mise run setup` は、D1 の作成 → 生成 → デプロイ → secrets(`BOARD_API_KEY` / `BOARD_API_TOKEN`。隠した入力) → `/healthz` の確認まで進める。Access アプリ・Managed OAuth・Portal の登録は画面の作業で、[docs/runbook.md](docs/runbook.md) が案内する。
-- upstream の更新は `git fetch upstream && git merge --ff-only upstream/main`。下流は upstream のファイルを書き換えない。
-- 下流の GitHub Actions からデプロイするなら [docs/deploy-ci.md](docs/deploy-ci.md)(雛形は `deploy.example/deploy.workflow.yml`)。
-- **セットアップを案内するスキル**: [.claude/skills/board-setup/SKILL.md](.claude/skills/board-setup/SKILL.md)。下流リポジトリで Claude Code / Codex に「board をセットアップしたい」と頼むと、Step ごとに進めてくれる(秘密値は受け取らず、デプロイや secret の登録は運用者の承認の後)。
+- The only setting file the downstream writes is `board.config.json`. `mise run deploy:config` combines it with the upstream `wrangler.jsonc` to generate `deploy/wrangler.jsonc`, which **you commit in the downstream** (`mise run deploy:config:check` detects a forgotten regeneration, hand edits, and unmerged upstream changes).
+- `mise run setup` goes through: create D1 → generate → deploy → secrets (`BOARD_API_KEY` / `BOARD_API_TOKEN`, hidden input) → check `/healthz`. The Access application, Managed OAuth, and Portal registration are done in the dashboard; [docs/runbook.md](docs/runbook.md) guides you.
+- To take upstream updates: `git fetch upstream && git merge --ff-only upstream/main`. The downstream never edits upstream files.
+- To deploy from the downstream's GitHub Actions, see [docs/deploy-ci.md](docs/deploy-ci.md) (template: `deploy.example/deploy.workflow.yml`).
+- **A skill that guides the setup**: [.claude/skills/board-setup/SKILL.md](.claude/skills/board-setup/SKILL.md). In the downstream repository, ask Claude Code / Codex to "set up board" and it walks you through step by step (it does not take secret values, and deploys and secret registration happen only after the operator approves).
 
-## 接続方法
+## Connecting
 
-1. 上の『自分の環境にデプロイする』と [docs/runbook.md](docs/runbook.md) に従って Worker をデプロイし、Access の MCP server application(Managed OAuth)を作る。
-2. MCP Server Portal に Worker の URL `https://<domain>/mcp` を登録する。
-3. MCP クライアントから Portal の URL につなぐ(OAuth のログインは Access が行う)。
+1. Deploy the Worker following "Deploy to your own environment" above and [docs/runbook.md](docs/runbook.md), and create an Access MCP server application (Managed OAuth).
+2. Register the Worker URL `https://<domain>/mcp` in an MCP Server Portal.
+3. Connect the MCP client to the Portal URL (Access handles the OAuth login).
 
-Worker を直接 MCP クライアントにつなぐ場合も、Access の MCP server application の URL を使う(Worker 自体は OAuth を話さない)。
+To connect an MCP client directly to the Worker, use the URL of the Access MCP server application (the Worker itself does not speak OAuth).
 
-## 前提
+## Prerequisites
 
-- Cloudflare アカウント(Workers **Paid** プラン推奨。下記)、Cloudflare Access(Zero Trust)、カスタムドメイン(任意。なければ workers.dev で公開する。[docs/runbook.md](docs/runbook.md) の 5)。
-- BOARD の API キーとトークン(BOARD の設定画面で発行する)。
-- ローカルの作業: [mise](https://mise.jdx.dev/)(node 24 / pnpm 11 は `mise.toml` が入れる)。
+- A Cloudflare account (Workers **Paid** plan recommended; see below), Cloudflare Access (Zero Trust), and optionally a custom domain (without one, the Worker is published on workers.dev; see section 5 of [docs/runbook.md](docs/runbook.md)).
+- A BOARD API key and token (issued in BOARD's settings screen).
+- Local work: [mise](https://mise.jdx.dev/) (`mise.toml` installs node 24 / pnpm 11).
 
-**Workers Free プランでは、1 回の Worker 実行あたりの D1 クエリが 50 まで**(Paid は 1,000。`db.batch()` は 1 回と数える。2026-11 時点の Cloudflare D1 Limits)。
-full refresh や逆引きの走査は 1 回の呼び出しで多数のクエリを使うので、Paid プランを前提にしている。
+**On the Workers Free plan, a single Worker invocation is limited to 50 D1 queries** (Paid: 1,000; `db.batch()` counts as one; per Cloudflare D1 Limits as of 2026-11).
+A full refresh or a reverse-lookup scan uses many queries in one call, so the Paid plan is assumed.
 
-## 制約と使い方のコツ
+## Limits and usage tips
 
-- **rate limit**: BOARD API は 3 回/秒・3,000 回/日。Worker は BOARD への通信を直列にし、429 / 5xx は `Retry-After` を尊重して上限つきで再試行する。キャッシュを優先して読む。複数人が同時にキャッシュミスすると 3 回/秒を超えうる(再試行で吸収する)。
-- **締め切り 30 秒**: 1 回のツール呼び出しは 30 秒で打ち切る(MCP クライアントのタイムアウトより前に返すため)。時間内に終わらない処理は途中経過を保存して返し、次の呼び出しで続きから進む。
-- **`refresh`**: 一覧・検索系のツールの引数。`none`(既定。キャッシュをそのまま読む)/ `delta`(前回からの差分を取る)/ `full`(全件を取り直し、消えたものを除く)。
-  どれが要るかは、応答の `cache`(`cached_at` / `full_refreshed_at` / `refresh_state`)か `cache_status` を見て LLM が決める。
-  初めて使うリソースはキャッシュが空なので、`refresh=full` を `refresh_state=complete` になるまで繰り返す。件数の多いリソース(estimates など)は数回かかる。
-  `delta` / `full` は共有の D1 キャッシュに書き込み、BOARD API の 1 日あたりの上限(3,000 回)を消費する。BOARD のデータは書き換えないので、読み取りツールの注釈(`readOnlyHint: true`)はそのままにしている。読み取りツールを自動で承認するクライアントは、確認なしに refresh を実行する。必要なときだけ指定する(各ツールの `refresh` 引数の説明にも書いてある)。
-  同時に別の refresh が動いていると `refresh_in_progress`(`retry_after_seconds` 秒後に再試行)。
-- **入力の上限**: 文字列は 1,000 文字、配列は 100 件まで。超えると `argument_error`。
-- **`limit`**: 結果の件数を切る(0・未指定は無制限)。切ったときは `limited: true` と `total_before_limit` が付く。名前が多数にマッチしうる検索では `limit` を付ける。
-- **`find_*` の `warnings`**: 補助情報の取得に失敗した、書類の案件 ID を解決できなかった(逆引きの走査が時間切れ)、などの致命的でない問題。再実行で解消することが多い。
-- **秘密情報**: BOARD の API キー・トークンと Access の JWT は、ログ・エラー・MCP 応答に出さない。
+- **Rate limit**: the BOARD API allows 3 requests/second and 3,000 requests/day. The Worker serializes its BOARD calls and retries 429 / 5xx with a cap, honoring `Retry-After`. Prefer reading from the cache. If several people hit a cache miss at once, the 3 requests/second limit can be exceeded (retries absorb this).
+- **30-second deadline**: one tool call is cut off at 30 seconds (so it returns before the MCP client times out). Work that cannot finish in time saves its progress and returns, and the next call continues from there.
+- **`refresh`**: an argument of the list and search tools. `none` (default; read the cache as is) / `delta` (fetch the changes since last time) / `full` (re-fetch everything and drop what disappeared).
+  The LLM decides which one is needed by looking at the `cache` field in the response (`cached_at` / `full_refreshed_at` / `refresh_state`) or at `cache_status`.
+  A resource used for the first time has an empty cache, so repeat `refresh=full` until `refresh_state=complete`. Resources with many records (such as estimates) take several calls.
+  `delta` / `full` write to the shared D1 cache and consume the BOARD API daily limit (3,000 requests). They do not modify BOARD data, so the read tools keep their annotation (`readOnlyHint: true`). A client that auto-approves read tools will run a refresh without asking. Specify it only when needed (each tool's `refresh` argument description says so too).
+  If another refresh is running at the same time, you get `refresh_in_progress` (retry after `retry_after_seconds` seconds).
+- **Input limits**: strings up to 1,000 characters, arrays up to 100 items. Anything larger returns `argument_error`.
+- **`limit`**: truncates the number of results (0 or unset means unlimited). When truncated, `limited: true` and `total_before_limit` are added. Use `limit` for searches whose name may match many records.
+- **`warnings` in `find_*`**: non-fatal problems, such as failing to fetch auxiliary information or being unable to resolve a document's project ID (the reverse-lookup scan timed out). Re-running often resolves them.
+- **Secrets**: the BOARD API key and token and the Access JWT are never written to logs, errors, or MCP responses.
 
-## 開発
+## Development
 
 ```bash
 mise install          # node / pnpm
-mise run install      # 依存パッケージ
-mise run test         # unit + e2e(workerd、node-e2e)。BOARD API には通信しない
+mise run install      # dependencies
+mise run test         # unit + e2e (workerd, node-e2e). Does not contact the BOARD API
 mise run lint         # biome + tsc
-mise run deploy:check # board.config.example.json のダミー値でデプロイ設定を生成し wrangler deploy --dry-run
-mise run test:live    # デプロイ済み Worker への実環境確認(test には含まれない。runbook 参照)
+mise run deploy:check # generate the deploy config from the dummy values in board.config.example.json and run wrangler deploy --dry-run
+mise run test:live    # check against a deployed Worker (not part of test; see the runbook)
 ```
 
-作業規約は [CLAUDE.md](CLAUDE.md)、計画は [plans/](plans/)、実機でしか確かめられない前提は [docs/manual-verification.md](docs/manual-verification.md)。
+Working conventions: [CLAUDE.md](CLAUDE.md). Plans: [plans/](plans/). Assumptions that can only be verified on a real environment: [docs/manual-verification.md](docs/manual-verification.md).
 
-## ライセンス
+## License
 
-MIT(LICENSE)。
+MIT (LICENSE).

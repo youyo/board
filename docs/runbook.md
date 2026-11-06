@@ -284,6 +284,7 @@ Free プランで動かすと、`refresh=full` や `find_*` の途中で D1 の�
 | `/healthz` が 503(本文に `missing` / `invalid`) | 本文の項目名が直す箇所(値は出ない)。`BOARD_API_KEY` / `BOARD_API_TOKEN` は secret の登録漏れ → 3 の secrets(または `mise run setup` の再実行)。`ACCESS_TEAM_DOMAIN` / `ACCESS_AUD` / `DB` / `BOARD_BASE_URL` / `BOARD_UI_BASE_URL` は `board.config.json` を直して `deploy:config` → `deploy` |
 | Access で 401 | JWT がない。Access を通っていない(アプリケーションの公開ホスト名が違う)、Portal が `Cf-Access-Jwt-Assertion` を付けていない(docs/manual-verification.md の V1) |
 | Access で 403 | JWT の検証に失敗。`access.aud` / `access.teamDomain` の誤り(5 の 3)、JWKS が取れない。`wrangler tail --config deploy/wrangler.jsonc` で `access jwt rejected: <理由>` を見る(理由の種別だけ。JWT は出ない) |
+| `/mcp` が 403(Access は通っている) | `Origin` ヘッダー付きのリクエストは 403 にしている(CORS 無効・Origin の許可リストが空。ADR 0001 の追記)。ブラウザから呼ぶクライアント(MCP Inspector など)が該当する。Portal や Managed OAuth の経路は `Origin` を付けない(docs/manual-verification.md の V11)。ブラウザ経由ではなく、Portal かサーバー側のクライアントから呼ぶ |
 | `refresh_in_progress` | 同じリソースの別の refresh が動いている。`retry_after_seconds` 後に再試行する。長く続くなら `cache_status` の `locked` を見る(stale なロックは 10 分で奪われる) |
 | `rate_limited` | BOARD の 3 回/秒・3,000 回/日(8)。`retryable: true` なら待って再試行する。日次の上限が近いなら `refresh` を使わずキャッシュを読む |
 | 締め切り(30 秒) | 時間内に終わらない処理は、進捗を保存して `refresh_state: partial` で返る。同じ `refresh=full` を繰り返すと最後に取り終えたページから進む(8) |

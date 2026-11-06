@@ -8,6 +8,7 @@ import deployCi from "../../docs/deploy-ci.md?raw";
 import runbook from "../../docs/runbook.md?raw";
 import miseToml from "../../mise.toml?raw";
 import readme from "../../README.md?raw";
+import readmeJa from "../../README_ja.md?raw";
 
 // 存在確認だけなので中身は読まない(キーのパスだけを使う)。
 const FILES = import.meta.glob(
@@ -33,6 +34,7 @@ const DOCS: Record<string, string> = {
   "docs/runbook.md": runbook,
   "docs/deploy-ci.md": deployCi,
   "README.md": readme,
+  "README_ja.md": readmeJa,
   "CLAUDE.md": claudeMd,
   "deploy.example/deploy.workflow.yml": workflow,
 };

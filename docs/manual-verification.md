@@ -72,3 +72,8 @@
 - workers.dev で Managed OAuth が動き、`Cf-Access-Jwt-Assertion` が Worker に届く(JWT なしは 401、ログイン後は 200): [ ] はい  [ ] いいえ
 - Version URL(`<version>-<worker>.<subdomain>.workers.dev`)が無効になっている(`preview_urls: false`。アクセスすると 404 などで Worker に届かない): [ ] 無効  [ ] 有効のまま(メモ:      )
 - Portal に `https://<worker>.<subdomain>.workers.dev/mcp` を登録して Ready になる: [ ] はい  [ ] いいえ
+
+### V11 Portal と Managed OAuth の経路が `Origin` を付けない(2026-11-06 追加。確認済み)
+- `/mcp` は `Origin` ヘッダー付きのリクエストを 403 にする(`allowedOriginHostnames: []`、CORS 無効。ADR 0001 の追記)。
+- 確認: 2026-11-06、運用者が下流の環境で確認した。
+- 結果: [x] 確認済み。MCP Portal 経由と Managed OAuth 経由のどちらも `Origin` を付けず、ツール呼び出しが通る / メモ: ブラウザから直接呼ぶクライアント(MCP Inspector など)は 403 になる
