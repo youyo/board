@@ -6,6 +6,7 @@ useDefault = true
 
 [[allowlists]]
 description = "Access の AUD タグは秘密値ではない(JWT の aud に入る値。ADR 0005)。下流の deploy/wrangler.jsonc が generic-api-key に当たる"
+condition = "AND"
 paths = ['''^deploy/wrangler\.jsonc$''']
 regexTarget = "line"
 regexes = ['''"ACCESS_AUD":''']

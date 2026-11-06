@@ -200,7 +200,7 @@ describe("下流 CI の雛形(デプロイだけ。検査は ci.yml が実行す
   });
 
   it("CI が検査したコミット(head_sha)を checkout し、GitHub Environment を使う", () => {
-    expect(workflow).toContain("ref: ${{ github.event.workflow_run.head_sha }}");
+    expect(workflow).toMatch(/ref: \$\{\{ github\.event\.workflow_run\.head_sha \}\}/);
     expect(workflow).toMatch(/^ {4}environment: production$/m);
   });
 
@@ -241,6 +241,9 @@ describe("upstream の CI の検査(gitleaks・pinact・依存監査)", () => {
     const cfg = (await import("../../.gitleaks.toml?raw")).default;
     expect(cfg).toMatch(/\[extend\]\s*\nuseDefault = true/);
     expect(cfg).toContain('"ACCESS_AUD":');
+    // paths と regexes は condition = "AND" で両方に合う行だけを許可する(無いと OR になり、deploy/wrangler.jsonc の全行や他ファイルの ACCESS_AUD 行まで許可される)
+    const block = cfg.split("[[allowlists]]").find((b) => b.includes('"ACCESS_AUD":')) ?? "";
+    expect(block).toMatch(/^condition = "AND"$/m);
     expect(cfg).toContain("internal/cli/configure_show_test");
   });
 });
