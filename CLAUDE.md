@@ -70,6 +70,7 @@ docs/  plans/
 
 ## テストの書き方
 
+- node-e2e の作業ディレクトリは `mkdtemp` を直接使わず `test/node-e2e/tmp.ts`(`.tmp/node-e2e/`。`BOARD_TEST_TMPDIR` で変えられる)を使い、子プロセスの `TMPDIR` もそこへ向ける。サンドボックスで node-e2e が落ちる場合は、失敗の全文を issue #14 に記録する(サンドボックス内で通るかは未確認)。
 - 実行環境は workerd(`@cloudflare/vitest-plugin`)。`vitest.config.ts` のプロジェクトは `unit` / `e2e`(workerd)、`node-e2e`(Node。生成スクリプトと `setup.sh`〔wrangler・mise・curl を偽物に差し替える〕を実プロセスで起動し、`wrangler deploy --dry-run` まで通す。`mise run test:e2e` に含まれる)、`live`(`mise run test:live` だけ。`test` と CI には含めない)。
 - `test/live/` と `test/node-e2e/` は `tsconfig.json` の対象外(Node 環境)。`test/unit/readme-tools.test.ts` は `README.md` と `README_ja.md` の両方のツール表と `ALL_TOOLS` を突き合わせる(ツールを足したら両方の表と総数〔`N tools` / `N 個`〕を直す。READMEを変えたら、もう一方の言語も合わせる)。
 - D1 を使うテストは `test/helpers/d1.ts` の `testDb()` / `resetCache()`。ツールを呼ぶ unit は `test/helpers/api-tool.ts` の `callApiTool`(実物の D1 + モックした BOARD)。
