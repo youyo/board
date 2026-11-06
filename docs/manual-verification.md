@@ -77,3 +77,13 @@
 - `/mcp` は `Origin` ヘッダー付きのリクエストを 403 にする(`allowedOriginHostnames: []`、CORS 無効。ADR 0001 の追記)。
 - 確認: 2026-11-06、運用者が下流の環境で確認した。
 - 結果: [x] 確認済み。MCP Portal 経由と Managed OAuth 経由のどちらも `Origin` を付けず、ツール呼び出しが通る / メモ: ブラウザから直接呼ぶクライアント(MCP Inspector など)は 403 になる
+
+### V13 下流の `deploy.yml` が `workflow_run` で起動し、Environment の secrets が渡る(2026-11-06 追加。未確認)
+- 確認日 / 確認者:
+- `ci.yml` が main への push で成功したあとに `deploy.yml` が起動する: [ ] はい  [ ] いいえ(メモ:      )
+- PR の CI(`event` が `pull_request`)ではデプロイが起動しない(`workflow_run` の対象は `branches: [main]` だけ): [ ] はい  [ ] いいえ
+- `ci.yml` が失敗したとき、`deploy.yml` はデプロイしない(job が skipped): [ ] はい  [ ] いいえ
+- `ref: head_sha` で CI が検査したコミットが checkout される(push が重なっても取り違えない): [ ] はい  [ ] いいえ
+- Environment `production` の `CLOUDFLARE_API_TOKEN` が `deploy` のステップに渡り、デプロイが通る: [ ] はい  [ ] いいえ
+- 下流で `deploy/wrangler.jsonc` をコミットするときの pre-commit の gitleaks が、upstream の `.gitleaks.toml` で `ACCESS_AUD` を止めない: [ ] はい  [ ] いいえ
+

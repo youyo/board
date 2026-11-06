@@ -1,0 +1,15 @@
+# gitleaks の設定(upstream が持つ。下流は fast-forward のマージで受け取る。docs/deploy-ci.md)。
+# 秘密値の走査は `mise run secrets:scan`(CI でも全履歴に対して走る)。
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Access の AUD タグは秘密値ではない(JWT の aud に入る値。ADR 0005)。下流の deploy/wrangler.jsonc が generic-api-key に当たる"
+paths = ['''^deploy/wrangler\.jsonc$''']
+regexTarget = "line"
+regexes = ['''"ACCESS_AUD":''']
+
+[[allowlists]]
+description = "Go 版 CLI 時代のテストのダミー値(今のツリーには無いが、全履歴の走査に当たる)"
+paths = ['''^internal/cli/configure_show_test\.go$''']
