@@ -285,4 +285,13 @@ describe("resolveUiBaseUrl", () => {
     expect(resolveUiBaseUrl({ ...base, BOARD_UI_BASE_URL: "" })).toBe("https://the-board.jp");
     expect(resolveUiBaseUrl({ ...base, BOARD_UI_BASE_URL: "  " })).toBe("https://the-board.jp");
   });
+
+  it("BOARD_BASE_URL の前後の空白・改行は除いて導く", () => {
+    expect(resolveUiBaseUrl({ BOARD_BASE_URL: "https://api.the-board.jp\n" })).toBe(
+      "https://the-board.jp",
+    );
+    expect(resolveUiBaseUrl({ BOARD_BASE_URL: "  https://api.the-board.jp/ \r\n" })).toBe(
+      "https://the-board.jp",
+    );
+  });
 });

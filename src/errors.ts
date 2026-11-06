@@ -64,7 +64,8 @@ export class RefreshInProgressError extends BoardError {
     const elapsedSeconds = info.elapsedSeconds ?? 0;
     super(
       "refresh_in_progress",
-      `Refresh in progress for ${resource} (holder=${holder}, elapsed=${elapsedSeconds}s). ` +
+      // 保持者の識別子(UUID)は利用者に見せない。フィールド(holder)には残す。
+      `Refresh in progress for ${resource} (elapsed=${elapsedSeconds}s). ` +
         `Retry after ${REFRESH_RETRY_AFTER_SECONDS} seconds.`,
       true,
     );

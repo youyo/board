@@ -363,10 +363,18 @@ export function findD1ByName(listJson: string, name: string): string | undefined
   return undefined;
 }
 
+/** 端末にそのまま出ないよう、制御文字(C0・DEL・C1)を除く。 */
+export function stripControlChars(s: string): string {
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: 制御文字を除くのが目的
+  return s.replace(/[\u0000-\u001f\u007f-\u009f]/g, "");
+}
+
 /** /healthz の 503 の本文から、欠けている項目名と不正な項目名を取り出す(文字列の配列だけ)。 */
 export function healthzReport(body: string): { missing: string[]; invalid: string[] } {
   const strings = (v: unknown): string[] =>
-    Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+    Array.isArray(v)
+      ? v.filter((x): x is string => typeof x === "string").map(stripControlChars)
+      : [];
   try {
     const j = JSON.parse(body) as unknown;
     if (isObj(j)) return { missing: strings(j.missing), invalid: strings(j.invalid) };

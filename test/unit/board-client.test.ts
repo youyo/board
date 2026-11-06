@@ -85,6 +85,24 @@ describe("認証とURL (Go の auth.go / NewRequest)", () => {
     expect(m.calls[0]?.headers.get("x-api-key")).toBe(KEY);
   });
 
+  it("createBoardClientFromEnv は前後の空白・改行を除いた値を使う(redact も効く)", async () => {
+    const m = mockOutboundFetch({
+      "GET https://api.board.test/v1/groups": () =>
+        new Response(JSON.stringify({ message: `bad ${KEY} ${TOKEN}` }), { status: 400 }),
+    });
+    const client = createBoardClientFromEnv({
+      BOARD_BASE_URL: `${BASE}\n`,
+      BOARD_API_KEY: `${KEY}\n`,
+      BOARD_API_TOKEN: ` ${TOKEN}\n`,
+    });
+    const e = await client.get("/v1/groups").catch((x) => x);
+    expect(m.calls[0]?.headers.get("x-api-key")).toBe(KEY);
+    expect(m.calls[0]?.headers.get("authorization")).toBe(`Bearer ${TOKEN}`);
+    expect(m.calls[0]?.url).toBe(`${BASE}/v1/groups`);
+    expect(String(e.message)).not.toContain(KEY);
+    expect(String(e.message)).not.toContain(TOKEN);
+  });
+
   it("成功時は本文(JSON)とヘッダーを返す", async () => {
     mockOutboundFetch({
       "GET https://api.board.test/v1/clients/1": () =>
@@ -825,5 +843,18 @@ describe("秘密情報を出さない", () => {
     expect(client.redact(`a ${KEY} b ${TOKEN} c`)).toBe("a [REDACTED] b [REDACTED] c");
     const empty = createBoardClient({ baseUrl: BASE, apiKey: "", apiToken: "" });
     expect(empty.redact("abc")).toBe("abc");
+  });
+
+  it("redact は encodeURIComponent した形のキー・トークンも伏せる", () => {
+    const key = "k/ey+1=a b&c";
+    const token = "t:ok@en#2%";
+    const c = createBoardClient({ baseUrl: BASE, apiKey: key, apiToken: token });
+    const text = `url ?k=${encodeURIComponent(key)}&t=${encodeURIComponent(token)} raw ${key} ${token}`;
+    const out = c.redact(text);
+    expect(out).not.toContain(encodeURIComponent(key));
+    expect(out).not.toContain(encodeURIComponent(token));
+    expect(out).not.toContain(key);
+    expect(out).not.toContain(token);
+    expect(out).toBe("url ?k=[REDACTED]&t=[REDACTED] raw [REDACTED] [REDACTED]");
   });
 });

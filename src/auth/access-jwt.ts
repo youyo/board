@@ -108,8 +108,10 @@ async function verifyOnce(token: string, cfg: AccessJwtConfig, forceRefresh: boo
 
 export async function verifyAccessJwt(
   token: string | null | undefined,
-  cfg: AccessJwtConfig,
+  rawCfg: AccessJwtConfig,
 ): Promise<AccessIdentity> {
+  // secret 登録時に付いた前後の空白・改行で検証が落ちないよう、使う前に除く(checkConfig と同じ基準)。
+  const cfg = { teamDomain: rawCfg.teamDomain.trim(), aud: rawCfg.aud.trim() };
   if (!token) throw new AccessJwtError("missing", "Cf-Access-Jwt-Assertion is missing");
 
   let result: Awaited<ReturnType<typeof verifyOnce>>;

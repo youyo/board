@@ -413,6 +413,13 @@ describe("healthzReport(setup の /healthz 確認)", () => {
     });
     expect(healthzReport(body)).toEqual({ missing: ["BOARD_API_KEY"], invalid: ["ACCESS_AUD"] });
   });
+  it("項目名から制御文字(ESC・改行・NUL・C1 など)を除く", () => {
+    const body = JSON.stringify({
+      missing: ["A\u001b[31mB\n\u0000C\u009bD\u007f"],
+      invalid: ["X\r\tY"],
+    });
+    expect(healthzReport(body)).toEqual({ missing: ["A[31mBCD"], invalid: ["XY"] });
+  });
   it("読めない本文は空", () => {
     expect(healthzReport("<html>")).toEqual({ missing: [], invalid: [] });
     expect(healthzReport(JSON.stringify({ missing: [1, "A"], invalid: "x" }))).toEqual({
