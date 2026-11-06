@@ -1,11 +1,11 @@
 // 生成スクリプトを実プロセスとして起動し、終了コードと生成ファイルを確かめる。
 // 生成物が実際の `wrangler deploy --dry-run -c` を通ることも確認する(Cloudflare へは何も送らない)。
 import { execFile } from "node:child_process";
-import { cp, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { cp, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { childTmpEnv, makeWorkDir } from "./tmp";
 
 const run = promisify(execFile);
 const REPO = resolve(import.meta.dirname, "../..");
@@ -24,7 +24,7 @@ const VALID = {
 
 /** 親プロセスの Cloudflare の認証情報などを持ち込まない、最小の環境。 */
 function cleanEnv(extra: Record<string, string> = {}): NodeJS.ProcessEnv {
-  return { PATH: process.env.PATH, HOME: process.env.HOME, ...extra };
+  return { PATH: process.env.PATH, HOME: process.env.HOME, ...childTmpEnv(), ...extra };
 }
 
 async function main(
@@ -46,7 +46,7 @@ async function main(
 
 let work: string;
 beforeEach(async () => {
-  work = await mkdtemp(join(tmpdir(), "deploy-config-"));
+  work = await makeWorkDir("deploy-config-");
 });
 afterEach(async () => {
   await rm(work, { recursive: true, force: true });

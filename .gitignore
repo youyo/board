@@ -19,3 +19,6 @@ deploy/
 # 秘密値の置き場(誤ってコミットしない)
 .env
 .env.*
+
+# テストの作業ディレクトリ(test/node-e2e/tmp.ts)
+.tmp/
