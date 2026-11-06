@@ -82,4 +82,15 @@ describe("refresh_in_progress(M03 で追加した仕様)", () => {
       "retry_after_seconds",
     );
   });
+
+  it("文言にロック保持者(UUID)を出さない。保持者は例外のフィールドに残る", async () => {
+    const { RefreshInProgressError } = await import("../../src/errors");
+    const holder = "3f2b8c1e-aaaa-4bbb-8ccc-0123456789ab";
+    const e = new RefreshInProgressError("clients", { holder, elapsedSeconds: 3 });
+    expect(e.message).not.toContain(holder);
+    expect(e.message).not.toContain("holder");
+    expect(e.message).toContain("clients");
+    expect(e.holder).toBe(holder);
+    expect(JSON.stringify(toErrorEnvelope(e))).not.toContain(holder);
+  });
 });

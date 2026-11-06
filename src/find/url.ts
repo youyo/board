@@ -24,5 +24,5 @@ export function resolveUiBaseUrl(env: {
   BOARD_UI_BASE_URL?: string;
 }): string {
   const override = env.BOARD_UI_BASE_URL?.trim();
-  return override ? override.replace(/\/+$/, "") : uiBaseUrlFromApiBase(env.BOARD_BASE_URL);
+  return override ? override.replace(/\/+$/, "") : uiBaseUrlFromApiBase(env.BOARD_BASE_URL.trim());
 }
