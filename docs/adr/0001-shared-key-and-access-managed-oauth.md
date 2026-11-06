@@ -46,3 +46,9 @@ board は条件が逆である。
 Access を迂回できない根拠は、公開経路ではなく、Worker が `/healthz` 以外の全パスで JWT を検証すること(`src/` は変えない)。workers.dev に直接来ても 401 / 403 になる。
 `preview_urls: false` を両方の場合で明示し、Version URL という Access を付け忘れやすい経路を作らない。
 workers.dev で Access と Managed OAuth が実際に動くかは未確認(`docs/manual-verification.md` の V10)。
+
+## 追記(2026-11-06): /mcp の CORS と Origin を明示する
+
+`/mcp` は CORS を無効にし(`corsOptions: false`)、Origin の許可リストを空にした(`allowedOriginHostnames: []`)。ライブラリの既定値(localhost と workers.dev を許す)に頼らず、`src/app.ts` の `MCP_HANDLER_OPTIONS` で明示している。
+`Origin` ヘッダーを付けたリクエストは 403 になる。ブラウザからの呼び出しは想定しない。
+MCP Portal と Managed OAuth の経路が `Origin` を付けないことは、実機で確認済み(`docs/manual-verification.md` の V11)。

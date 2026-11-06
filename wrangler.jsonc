@@ -10,7 +10,8 @@
   // compatibility_date は、固定した workerd が対応する最新日。
   // nodejs_compat は必要になったときだけ足す。
   "compatibility_flags": [],
-  // カスタムドメインだけで公開する。Access を迂回できる workers.dev の経路は作らない。
+  // ローカル開発・テスト用の値。デプロイ用の workers_dev は、生成側 (scripts/deploy-config/core.ts) が board.config.json の customDomain の有無で決める (あれば false、なければ true)。
+  // preview_urls (Version URL) は生成側が両方の場合で false にする。安全性は Worker が /healthz 以外で Access の JWT を検証することで保つ (ADR 0001・0005)。
   "workers_dev": false,
   "observability": { "enabled": true },
   "d1_databases": [
