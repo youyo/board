@@ -3,10 +3,10 @@
 // 実際の wrangler / Cloudflare に届かないようにする。確かめること:
 //   前提が欠けていれば何も実行せずに止まる / 再実行しても安全 / 秘密を出力・引数・ログに載せない / 順序
 import { spawn } from "node:child_process";
-import { chmod, cp, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { chmod, cp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { childTmpEnv, makeWorkDir } from "./tmp";
 
 const REPO = resolve(import.meta.dirname, "../..");
 const SENTINEL = "SECRET-SENTINEL-DO-NOT-PRINT";
@@ -28,7 +28,7 @@ let bin: string;
 let state: string;
 
 beforeEach(async () => {
-  work = await mkdtemp(join(tmpdir(), "setup-"));
+  work = await makeWorkDir("setup-");
   root = join(work, "root");
   bin = join(work, "bin");
   state = join(work, "state");
@@ -137,6 +137,7 @@ function sh(
       env: {
         PATH: opts.path ?? `${bin}:/usr/bin:/bin`,
         HOME: work,
+        ...childTmpEnv(),
         // 秘密の持ち込み確認用: スクリプトはこれを読まない・出力しない
         BOARD_API_KEY: SENTINEL,
         BOARD_API_TOKEN: SENTINEL,

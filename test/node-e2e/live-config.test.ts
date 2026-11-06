@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
 import { LiveClient, loadLiveConfig, parseRpcBody, summarize } from "../live/helpers/live";
+import { childTmpEnv } from "./tmp";
 
 const run = promisify(execFile);
 const REPO = resolve(import.meta.dirname, "../..");
@@ -114,7 +115,7 @@ describe("mise run test:live の skip", () => {
     const { stdout, stderr } = await run(
       resolve(REPO, "node_modules/.bin/vitest"),
       ["run", "--project", "live"],
-      { cwd: REPO, env: { PATH: process.env.PATH, HOME: process.env.HOME } },
+      { cwd: REPO, env: { PATH: process.env.PATH, HOME: process.env.HOME, ...childTmpEnv() } },
     );
     const out = stdout + stderr;
     expect(out).toContain("BOARD_LIVE_URL");
