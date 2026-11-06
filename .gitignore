@@ -15,3 +15,7 @@ mise.local.toml
 # 一度追跡すれば、以降の変更は通常どおり git status に出る。
 board.config.json
 deploy/
+
+# 秘密値の置き場(誤ってコミットしない)
+.env
+.env.*

@@ -826,4 +826,17 @@ describe("秘密情報を出さない", () => {
     const empty = createBoardClient({ baseUrl: BASE, apiKey: "", apiToken: "" });
     expect(empty.redact("abc")).toBe("abc");
   });
+
+  it("redact は encodeURIComponent した形のキー・トークンも伏せる", () => {
+    const key = "k/ey+1=a b&c";
+    const token = "t:ok@en#2%";
+    const c = createBoardClient({ baseUrl: BASE, apiKey: key, apiToken: token });
+    const text = `url ?k=${encodeURIComponent(key)}&t=${encodeURIComponent(token)} raw ${key} ${token}`;
+    const out = c.redact(text);
+    expect(out).not.toContain(encodeURIComponent(key));
+    expect(out).not.toContain(encodeURIComponent(token));
+    expect(out).not.toContain(key);
+    expect(out).not.toContain(token);
+    expect(out).toBe("url ?k=[REDACTED]&t=[REDACTED] raw [REDACTED] [REDACTED]");
+  });
 });

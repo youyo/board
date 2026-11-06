@@ -212,7 +212,11 @@ export function createBoardClient(opts: BoardClientOptions): BoardClient {
   const redact = (text: string): string => {
     let out = text;
     for (const secret of [opts.apiKey, opts.apiToken]) {
-      if (secret) out = out.split(secret).join("[REDACTED]");
+      if (!secret) continue;
+      // 生の値と、URL に載ったときの encodeURIComponent した形の両方を伏せる。
+      for (const form of new Set([secret, encodeURIComponent(secret)])) {
+        out = out.split(form).join("[REDACTED]");
+      }
     }
     return out;
   };
