@@ -125,24 +125,46 @@ if [ -z "$base" ]; then
   echo "  https://${workername}.<アカウントのサブドメイン>.workers.dev/healthz を手で確認する(200 なら設定はそろっている。<アカウントのサブドメイン> は Cloudflare のダッシュボードの Workers & Pages に出る)"
 else
   echo "==> $base/healthz を確認する"
-  tries="${BOARD_SETUP_HEALTHZ_TRIES:-6}"
+  # 既定は 5 秒おきに 6 回(約 30 秒)。workers.dev は新しいホスト名の反映が遅いことがあるので 24 回(約 2 分)にする
+  if [ -n "$domain" ]; then default_tries=6; else default_tries=24; fi
+  tries="${BOARD_SETUP_HEALTHZ_TRIES:-$default_tries}"
   nap="${BOARD_SETUP_HEALTHZ_SLEEP:-5}"
+  hdrs="$(mktemp)"
   health="unreachable"
   i=0
   while [ "$i" -lt "$tries" ]; do
     i=$((i + 1))
-    code="$(curl -sS -m 10 -o "$body" -w '%{http_code}' "$base/healthz" 2> /dev/null)" || code="000"
+    code="$(curl -sS -m 10 -D "$hdrs" -o "$body" -w '%{http_code}' "$base/healthz" 2> /dev/null)" || code="000"
     if [ "$code" = "200" ]; then health="ok"; break; fi
     if [ "$code" = "503" ]; then health="misconfigured"; break; fi
+    # Access が /healthz の手前で止めている: Access のログインへの 302、または JSON でない 401 / 403(Worker は /healthz で 401 / 403 を返さない)
+    if [ "$code" = "302" ] && grep -Eiq '^location:.*cloudflareaccess\.com' "$hdrs" 2> /dev/null; then health="access"; break; fi
+    if [ "$code" = "401" ] || [ "$code" = "403" ]; then
+      if ! tr -d '[:space:]' < "$body" 2> /dev/null | grep -q '^{'; then health="access"; break; fi
+    fi
     [ "$i" -lt "$tries" ] && sleep "$nap"
   done
+  rm -f "$hdrs"
   case "$health" in
+    access)
+      echo "  Access が有効で、/healthz は Access の手前で止まっている(Worker の不具合ではない)"
+      echo "  ブラウザでログインしてから $base/healthz を開く、または /healthz を Access の Bypass にして確認する(docs/runbook.md の 5)"
+      ;;
     ok) echo "  OK(設定はそろっている)" ;;
     misconfigured)
       echo "  NG 503: 設定が足りない(項目名のみ)" >&2
       cli healthz-report < "$body" >&2 || true
       ;;
-    *) echo "  NG 到達できなかった(DNS・証明書の反映待ちかもしれない。しばらくしてもう一度 mise run setup)" >&2 ;;
+    *)
+      if [ -n "$domain" ]; then
+        echo "  NG 到達できなかった(DNS・証明書の反映待ちかもしれない。しばらくしてもう一度 mise run setup)" >&2
+      else
+        # workers.dev: デプロイと secrets は済んでいるので失敗にしない
+        health="unreachable_soft"
+        echo "  警告: 到達できなかった(workers.dev の新しいホスト名は反映に時間がかかることがある)。デプロイと secrets は済んでいる" >&2
+        echo "  $base/healthz を手で確認する(200 なら設定はそろっている)。しばらくして mise run setup を再実行すれば続きから進む" >&2
+      fi
+      ;;
   esac
 fi
 
@@ -176,7 +198,7 @@ if [ -n "$secrets_pending" ]; then
   for name in $secrets_pending; do echo "  pnpm exec wrangler secret put $name -c $dir/wrangler.jsonc" >&2; done
   exit 1
 fi
-# 確認できなかった(workers.dev の URL が取れない)ときは失敗にしない。手で確認する案内を出してある
-[ "$health" = "ok" ] || [ "$health" = "unknown" ] || exit 1
+# 確認できなかった(workers.dev の URL が取れない・workers.dev で届かない)ときと、Access が止めているときは失敗にしない。手で確認する案内を出してある
+case "$health" in ok | unknown | access | unreachable_soft) ;; *) exit 1 ;; esac
 echo
 echo "完了($workername)。"

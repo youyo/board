@@ -77,8 +77,9 @@ exit 0
     "curl",
     `#!/bin/bash
 echo "curl $*" >> "${state}/calls.log"
-out=""; prev=""
-for a in "$@"; do [ "$prev" = "-o" ] && out="$a"; prev="$a"; done
+out=""; hdr=""; prev=""
+for a in "$@"; do [ "$prev" = "-o" ] && out="$a"; [ "$prev" = "-D" ] && hdr="$a"; prev="$a"; done
+[ -n "$hdr" ] && cat "${state}/healthz.headers" 2>/dev/null > "$hdr"
 code="$(cat "${state}/healthz.code" 2>/dev/null || echo 200)"
 body="$(cat "${state}/healthz.body" 2>/dev/null || echo '{"status":"ok"}')"
 [ -n "$out" ] && printf '%s' "$body" > "$out"
@@ -379,6 +380,44 @@ describe("/healthz の確認", () => {
   });
 });
 
+describe("/healthz が Access の手前で止まるとき", () => {
+  const cases: [string, string, string, string][] = [
+    [
+      "302 で Location が cloudflareaccess.com",
+      "302",
+      "HTTP/2 302\r\nlocation: https://team.cloudflareaccess.com/cdn-cgi/access/login/x\r\n\r\n",
+      "",
+    ],
+    ["JSON でない 401", "401", "HTTP/2 401\r\n\r\n", "Unauthorized"],
+    ["JSON でない 403", "403", "HTTP/2 403\r\n\r\n", "<html>Forbidden</html>"],
+  ];
+  it.each(cases)("%s: 失敗にせず、Access が有効と案内する", async (_n, code, headers, body) => {
+    await put("healthz.code", code);
+    await put("healthz.headers", headers);
+    await put("healthz.body", body);
+    const r = await setup();
+    expect(r.code).toBe(0);
+    expect((await calls()).filter((x) => x.startsWith("curl")).length).toBe(1);
+    expect(r.out).toContain("Access が有効");
+    expect(r.out).toContain("Bypass");
+    expect(r.out).toContain("docs/runbook.md");
+  });
+
+  it("302 でも Location が Access でなければ失敗のまま", async () => {
+    await put("healthz.code", "302");
+    await put("healthz.headers", "HTTP/2 302\r\nlocation: https://example.org/\r\n\r\n");
+    const r = await setup();
+    expect(r.code).not.toBe(0);
+  });
+
+  it("JSON の 403 は Access ではないので失敗のまま", async () => {
+    await put("healthz.code", "403");
+    await put("healthz.body", '{"error":"x"}');
+    const r = await setup();
+    expect(r.code).not.toBe(0);
+  });
+});
+
 // wrangler deploy の出力(workers.dev のとき): `Deployed <worker> triggers (x sec)` の次の行に `  https://<worker>.<subdomain>.workers.dev`
 // (node_modules/wrangler/wrangler-dist/cli.js の triggersDeploy が logger.log する)。
 const DEPLOY_OUT_WORKERS_DEV = `Total Upload: 1.00 KiB / gzip: 0.50 KiB
@@ -433,6 +472,36 @@ describe("customDomain が無いとき(workers.dev で公開)", () => {
     expect(r.out).toContain("https://e2e-board.<アカウントのサブドメイン>.workers.dev/healthz");
     expect(r.out).toContain("Enable Cloudflare Access");
     expect(r.out).toContain("docs/runbook.md");
+  });
+
+  it("到達できなくても失敗にしない(警告と、手で確認する案内、再実行の案内を出して exit 0)", async () => {
+    await writeConfig(NO_DOMAIN);
+    await put("deploy.out", DEPLOY_OUT_WORKERS_DEV);
+    await put("healthz.code", "000");
+    const r = await setup();
+    expect(r.code).toBe(0);
+    expect((await calls()).filter((x) => x.startsWith("curl")).length).toBe(2);
+    expect(r.out).toContain("https://e2e-board.e2e-sub.workers.dev/healthz");
+    expect(r.out).toContain("手で確認");
+    expect(r.out).toContain("mise run setup");
+    expect(r.out).toContain("Enable Cloudflare Access");
+  });
+
+  it("再試行の既定は約 2 分(24 回 x 5 秒)。上書きが無ければ curl を 24 回呼ぶ", async () => {
+    await writeConfig(NO_DOMAIN);
+    await put("deploy.out", DEPLOY_OUT_WORKERS_DEV);
+    await put("healthz.code", "000");
+    const r = await setup(["--yes"], {
+      env: { BOARD_SETUP_HEALTHZ_TRIES: "", BOARD_SETUP_HEALTHZ_SLEEP: "0" },
+    });
+    expect(r.code).toBe(0);
+    expect((await calls()).filter((x) => x.startsWith("curl")).length).toBe(24);
+  });
+
+  it("customDomain があるときは、到達できなければこれまでどおり失敗で終わる", async () => {
+    await put("healthz.code", "000");
+    const r = await setup();
+    expect(r.code).not.toBe(0);
   });
 
   it("URL が取れた上で /healthz が 503 なら、これまでどおり失敗で終わる", async () => {
