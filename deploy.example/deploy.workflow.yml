@@ -1,6 +1,11 @@
 # GitHub Actions のワークフローの雛形(下流の private リポジトリ用。docs/deploy-ci.md)。
 # 下流が `.github/workflows/deploy.yml` にコピーして使う。upstream では動かさない(.github/workflows/ には置かない)。
-# 書き換える値は無い。Actions secret を、次の名前で登録する(docs/deploy-ci.md の表)。
+#
+# デプロイだけを行う。lint・test などの検査は upstream の `.github/workflows/ci.yml`(下流でも動く)が実行する。
+# ci.yml が main への push で成功したあとに workflow_run で起動し、CI が検査したコミットをデプロイする。
+# `workflows: ["CI"]` は ci.yml の `name:` と一致させる(下流は ci.yml を書き換えないので、名前は変わらない)。
+#
+# secret は GitHub Environment `production` に置く(リポジトリの Secrets には置かない。docs/deploy-ci.md)。
 #
 #   CLOUDFLARE_API_TOKEN    デプロイ用(wrangler)の API トークン。権限は docs/deploy-ci.md(Workers・D1)
 #
@@ -12,8 +17,9 @@
 name: deploy
 
 on:
-  pull_request:
-  push:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
     branches: [main]
 
 # 既定は読み取りだけ。
@@ -22,30 +28,33 @@ permissions:
 
 jobs:
   deploy:
+    # ci.yml が成功し、かつ main への push で起動したものだけ(PR の CI ではデプロイしない)
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # main への push が重なったときは順番に流す(進行中のデプロイを止めない)。PR の検査は push のデプロイを待たない
+    # GitHub Environment。secrets はここに置く。承認ルールやブランチ制限もここで付けられる
+    environment: production
+    # main への push が重なったときは順番に流す(進行中のデプロイを止めない)
     concurrency:
-      group: board-${{ github.event_name == 'push' && 'deploy' || github.ref }}
+      group: board-deploy
       cancel-in-progress: false
     steps:
       # アクションはコミット SHA で固定している(タグは SHA の横のコメント)。upstream の .github/workflows/ci.yml と同じ SHA。
       # 更新するときは ci.yml に合わせる。
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # CI が検査したコミットをデプロイする(workflow_run は既定でデフォルトブランチの最新を取るため、明示する)
+          ref: ${{ github.event.workflow_run.head_sha }}
           persist-credentials: false
       # mise.toml の node / pnpm を入れる。
       - uses: jdx/mise-action@08ae2a091c038e1e05ec6f5115dc5c69d5a2a6b8 # v5.1.2
         with:
           version: 2026.10.9 # 公開 2026-10-13(2 週間ルール)
       - run: mise run install
-      - run: mise run lint
-      - run: mise run test
       # board.config.json を直したのに生成し直していない / 生成物を手で書き換えた / upstream の変更を取り込んでいない、を検出する。資格情報は要らない
       - run: mise run deploy:config:check
-      # デプロイは main への push のときだけ。トークンはこのステップだけに渡す
+      # トークンはこのステップだけに渡す
       - name: deploy
-        if: github.event_name == 'push'
         run: mise run deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

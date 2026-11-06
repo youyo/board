@@ -16,6 +16,7 @@
 | V8 | 書類(見積・受注・納品・領収)の逆引きが 1〜2 回の呼び出しで覚え切る | 書類の ID を `find_estimates` などで引き、`cache_status` の `document_scans` が `complete` に進むのを見る | 初回のみ `project_unresolved` の警告が続く |
 | V9 | Portal 経由のツール名が `board_` 付きで見え、`tools/list` の 54 個がすべて出る | Portal 経由でツール一覧を確認 | 名前の前提(README)が違う |
 | V12 | workers.dev ホストで、`/healthz` だけを対象にした Bypass の Access アプリが、ホスト全体のアプリより優先される(未確認) | runbook の 5 の手順で作り、JWT なしで `/healthz` が 200、`/mcp` が Access に止められることを見る | `/healthz` が Access の内側のまま。ブラウザでログインして開く、または `wrangler tail` で確認する |
+| V13 | 下流の `deploy.yml` が、main への push で `ci.yml` が成功したあとに `workflow_run` で起動し、Environment `production` の secrets が渡ってデプロイが通る(未確認) | 下流で main に push し、Actions の実行を確認する。PR の CI では起動せず、`ci.yml` が失敗したときは skipped になる | 自動デプロイが動かない。手動の `mise run deploy` に戻す(docs/deploy-ci.md) |
 
 ## 記入欄
 
@@ -86,3 +87,12 @@
 - `curl -i https://<worker>.<subdomain>.workers.dev/healthz` が 200 になる: [ ] はい  [ ] いいえ(Access に止められる)
 - `/mcp` は引き続き Access に止められる(Bypass が広がっていない): [ ] はい  [ ] いいえ
 - 外れたときの影響: `/healthz` は Access の内側のまま。runbook の確認手順(ブラウザでログインして開く / `wrangler tail`)を使う。`mise run setup` は Access の手前で止まったと案内して失敗にしない。
+
+### V13 下流の `deploy.yml` が `workflow_run` で起動し、Environment の secrets が渡る(2026-11-06 追加。未確認)
+- 確認日 / 確認者:
+- `ci.yml` が main への push で成功したあとに `deploy.yml` が起動する: [ ] はい  [ ] いいえ(メモ:      )
+- PR の CI(`event` が `pull_request`)ではデプロイが起動しない(`workflow_run` の対象は `branches: [main]` だけ): [ ] はい  [ ] いいえ
+- `ci.yml` が失敗したとき、`deploy.yml` はデプロイしない(job が skipped): [ ] はい  [ ] いいえ
+- `ref: head_sha` で CI が検査したコミットが checkout される(push が重なっても取り違えない): [ ] はい  [ ] いいえ
+- Environment `production` の `CLOUDFLARE_API_TOKEN` が `deploy` のステップに渡り、デプロイが通る: [ ] はい  [ ] いいえ
+- 下流で `deploy/wrangler.jsonc` をコミットするときの pre-commit の gitleaks が、upstream の `.gitleaks.toml` で `ACCESS_AUD` を止めない: [ ] はい  [ ] いいえ

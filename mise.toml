@@ -1,6 +1,9 @@
 [tools]
 node = "24.21.0"
 pnpm = "11.28.5"
+# 公開から 2 週間以上たったバージョンに固定する(gitleaks 8.30.1: 2026-03-21、pinact 5.0.1: 2026-10-22)
+"aqua:gitleaks/gitleaks" = "8.30.1"
+"aqua:suzuki-shunsuke/pinact" = "5.0.1"
 
 [tasks.install]
 description = "依存パッケージをロックファイルどおりに入れる"
@@ -73,3 +76,16 @@ run = "bash scripts/deploy.sh"
 [tasks."test:live"]
 description = "実環境の確認 (デプロイ済み Worker に Access の service token で接続し、読み取りツールを呼んで計測する。BOARD_LIVE_URL / BOARD_LIVE_ACCESS_CLIENT_ID / BOARD_LIVE_ACCESS_CLIENT_SECRET が必要。test には含めない)"
 run = "pnpm exec vitest run --project live"
+
+# ---- 検査(CI でも同じタスクを走らせる) ----
+[tasks."secrets:scan"]
+description = "gitleaks で全履歴を走査する(設定は .gitleaks.toml。GitHub Action の gitleaks-action は使わない)"
+run = "gitleaks git --redact --no-banner --verbose ."
+
+[tasks."pinact:check"]
+description = "GitHub Actions が SHA で固定されているか検査する(pinact run --check)"
+run = "pinact run --check"
+
+[tasks.audit]
+description = "本番依存の脆弱性監査(high 以上で失敗)"
+run = "pnpm audit --prod --audit-level=high"

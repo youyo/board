@@ -63,6 +63,7 @@ git commit -m "下流の設定を追加"      # コミットは運用者が行�
 `wrangler.jsonc` / `mise.toml` / `scripts/` など upstream のファイルも書き換えない。直したい点は upstream への提案にする。
 
 upstream 専用の CI(`.github/workflows/ci.yml` の `github.repository == 'youyo/board'` のジョブ)は、下流では自動で止まる。
+`deploy/wrangler.jsonc` の `ACCESS_AUD` は gitleaks の `generic-api-key` に当たるが、秘密値ではない。upstream の `.gitleaks.toml` で許可済みなので、下流で設定を足す必要はない([deploy-ci.md の 5](deploy-ci.md))。
 
 ## 1. `board.config.json`
 

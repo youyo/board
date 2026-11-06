@@ -28,6 +28,49 @@ jobs:
       # board.config.example.json のダミー値でデプロイ設定を生成し、wrangler deploy --dry-run が通ることを確かめる(Cloudflare へは何も送らない)。
       - run: mise run deploy:check
 
+  # 秘密値の走査(全履歴。設定は .gitleaks.toml)。gitleaks-action は組織ではライセンスが要るので使わず、mise で固定した gitleaks を直接走らせる。
+  secrets-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # 全履歴
+          persist-credentials: false
+      - uses: jdx/mise-action@08ae2a091c038e1e05ec6f5115dc5c69d5a2a6b8 # v5.1.2
+        with:
+          version: 2026.10.9 # 公開 2026-10-13（2 週間ルール）
+      - run: mise run secrets:scan
+
+  # Actions の SHA 固定が保たれているか(pinact run --check)。
+  pinact:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@08ae2a091c038e1e05ec6f5115dc5c69d5a2a6b8 # v5.1.2
+        with:
+          version: 2026.10.9 # 公開 2026-10-13（2 週間ルール）
+      - run: mise run pinact:check
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+  # 本番依存の監査(開発用の依存は対象外)。
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@08ae2a091c038e1e05ec6f5115dc5c69d5a2a6b8 # v5.1.2
+        with:
+          version: 2026.10.9 # 公開 2026-10-13（2 週間ルール）
+      - run: mise run install
+      - run: mise run audit
+
   # upstream 専用(下流では github.repository が違うので自動で止まる。下流は board.config.json と deploy/ を追跡するのが正しい)。
   # 下流の設定(実値を含む)を upstream に追跡させない。.gitignore に入っているが、git add -f で入るのを防ぐ。
   no-downstream-files:

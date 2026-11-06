@@ -164,14 +164,10 @@ describe("runbook の節番号の参照は実在する", () => {
   });
 });
 
-describe("下流 CI の雛形", () => {
-  it("lint → test → deploy:config:check → deploy の順で、アクションは SHA で固定している", () => {
-    const order = [
-      "mise run lint",
-      "mise run test",
-      "mise run deploy:config:check",
-      "mise run deploy",
-    ];
+describe("下流 CI の雛形(デプロイだけ。検査は ci.yml が実行する)", () => {
+  it("lint と test は重複させず、install → deploy:config:check → deploy の順で、アクションは SHA で固定している", () => {
+    expect(workflow).not.toMatch(/run: mise run (lint|test)\b/);
+    const order = ["mise run install", "mise run deploy:config:check", "mise run deploy"];
     let at = -1;
     for (const step of order) {
       const i = workflow.indexOf(`run: ${step}`, at + 1);
@@ -190,9 +186,65 @@ describe("下流 CI の雛形", () => {
     for (const s of shas(workflow)) expect(shas(ci).has(s), s).toBe(true);
   });
 
+  it("ci.yml の成功後に workflow_run で起動する(名前は ci.yml の name と一致、main の push のみ)", async () => {
+    const ci = (await import("../../.github/workflows/ci.yml?raw")).default;
+    const ciName = ci.match(/^name: (.+)$/m)?.[1]?.trim();
+    expect(ciName).toBeTruthy();
+    expect(workflow).toMatch(/^on:\n {2}workflow_run:/m);
+    expect(workflow).toContain(`workflows: ["${ciName}"]`);
+    expect(workflow).toContain("types: [completed]");
+    expect(workflow).toContain("branches: [main]");
+    expect(workflow).not.toMatch(/^ {2}(pull_request|push):/m);
+    expect(workflow).toContain("github.event.workflow_run.conclusion == 'success'");
+    expect(workflow).toContain("github.event.workflow_run.event == 'push'");
+  });
+
+  it("CI が検査したコミット(head_sha)を checkout し、GitHub Environment を使う", () => {
+    expect(workflow).toMatch(/ref: \$\{\{ github\.event\.workflow_run\.head_sha \}\}/);
+    expect(workflow).toMatch(/^ {4}environment: production$/m);
+  });
+
+  it("permissions は contents: read だけ", () => {
+    const perms = [...workflow.matchAll(/^ *permissions:\n((?: +\S.*\n)+)/gm)];
+    expect(perms.length).toBeGreaterThan(0);
+    for (const m of perms) expect((m[1] as string).trim()).toBe("contents: read");
+  });
+
   it("トークンは GitHub Secrets から読み、デプロイのステップだけに渡す", () => {
     expect(workflow).toMatch(/\$\{\{ secrets\.CLOUDFLARE_API_TOKEN \}\}/);
     expect(workflow.match(/CLOUDFLARE_API_TOKEN: /g)?.length).toBe(1);
+  });
+});
+
+describe("upstream の CI の検査(gitleaks・pinact・依存監査)", () => {
+  it("ci.yml が 3 つの検査を mise run で実行し、gitleaks は全履歴を取得する", async () => {
+    const ci = (await import("../../.github/workflows/ci.yml?raw")).default;
+    for (const t of ["secrets:scan", "pinact:check", "audit"]) {
+      expect(ci, t).toContain(`run: mise run ${t}`);
+    }
+    expect(ci).toMatch(/fetch-depth: 0/);
+    expect(ci).not.toContain("gitleaks/gitleaks-action");
+  });
+
+  it("mise.toml に gitleaks・pinact を固定し、3 つのタスクを定義している", async () => {
+    const mise = (await import("../../mise.toml?raw")).default;
+    expect(mise).toMatch(/gitleaks[^\n]*= "\d+\.\d+\.\d+"/);
+    expect(mise).toMatch(/pinact[^\n]*= "\d+\.\d+\.\d+"/);
+    for (const t of ["secrets:scan", "pinact:check", "audit"]) {
+      expect(mise, t).toMatch(new RegExp(`\\[tasks\\.("?)${t}\\1\\]`));
+    }
+    const pkg = JSON.parse((await import("../../package.json?raw")).default);
+    expect(pkg.packageManager).toMatch(/^pnpm@\d+\.\d+\.\d+$/);
+  });
+
+  it(".gitleaks.toml は既定のルールを拡張し、ACCESS_AUD の行と Go 版のテストを許可する", async () => {
+    const cfg = (await import("../../.gitleaks.toml?raw")).default;
+    expect(cfg).toMatch(/\[extend\]\s*\nuseDefault = true/);
+    expect(cfg).toContain('"ACCESS_AUD":');
+    // paths と regexes は condition = "AND" で両方に合う行だけを許可する(無いと OR になり、deploy/wrangler.jsonc の全行や他ファイルの ACCESS_AUD 行まで許可される)
+    const block = cfg.split("[[allowlists]]").find((b) => b.includes('"ACCESS_AUD":')) ?? "";
+    expect(block).toMatch(/^condition = "AND"$/m);
+    expect(cfg).toContain("internal/cli/configure_show_test");
   });
 });
 
