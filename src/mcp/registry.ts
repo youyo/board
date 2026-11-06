@@ -5,6 +5,7 @@
 import type { McpServer, StandardSchemaWithJSON } from "@modelcontextprotocol/server";
 import type { z } from "zod";
 import { ArgumentError, BoardError, toErrorEnvelope } from "../errors";
+import { logEvent } from "../log";
 import type { Repositories } from "../repository";
 import type { DocumentIndex } from "../repository/document-index";
 import {
@@ -139,6 +140,19 @@ export interface RegisterDeps {
   repositories?: () => Repositories;
   documentIndex?: () => DocumentIndex;
   uiBaseUrl?: string;
+  /** ログの相関 ID。 */
+  requestId?: string;
+  /** 操作した主体。書き込み系の操作のログにだけ出す。 */
+  actor?: string;
+  /** ログから伏せる秘密の実値(BOARD の API キー / トークン)。 */
+  secrets?: readonly string[];
+}
+
+/** 書き込み系の操作: cache_clear と、refresh が delta / full の呼び出し。 */
+function isWriteOperation(toolName: string, args: unknown): boolean {
+  if (toolName === "cache_clear") return true;
+  const refresh = (args as { refresh?: unknown } | null)?.refresh;
+  return refresh === "delta" || refresh === "full";
 }
 
 const noDb = (): D1Database => {
@@ -177,14 +191,32 @@ function advertiseOnly(schema: z.ZodObject): StandardSchemaWithJSON {
  * 想定外の例外(generic_error にするもの)を調べられるよう、例外名と message をログに残す。応答には出さない。
  * message に API キー / トークンが混ざりうるので、Bearer と x-api-key の値は伏せる。
  */
-function logUnexpected(toolName: string, e: unknown): void {
+function logUnexpected(
+  toolName: string,
+  e: unknown,
+  requestId: string | undefined,
+  secrets: readonly string[] = [],
+): void {
   const name = e instanceof Error ? e.name : typeof e;
   const raw = e instanceof Error ? e.message : String(e);
-  const redacted = raw
+  let redacted = raw
     .replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer [REDACTED]")
     .replace(/(x-api-key["']?\s*[:=]\s*)\S+/gi, "$1[REDACTED]");
-  console.error(`tool ${toolName} failed unexpectedly: ${name}: ${redacted}`);
+  // 実値と、その encodeURIComponent した形(長いものから)。正規表現では覆えない記号入りの値のため。
+  const needles = secrets
+    .map((v) => v.trim())
+    .filter((v) => v !== "")
+    .flatMap((v) => [v, encodeURIComponent(v)])
+    .sort((a, b) => b.length - a.length);
+  for (const n of needles) redacted = redacted.split(n).join("[REDACTED]");
+  logEvent("error", "tool_failed_unexpectedly", requestId, {
+    tool: toolName,
+    error_name: name,
+    error_message: redacted.slice(0, MAX_ERROR_MESSAGE_LENGTH),
+  });
 }
+
+const MAX_ERROR_MESSAGE_LENGTH = 500;
 
 export function registerTools(
   server: McpServer,
@@ -216,6 +248,15 @@ export function registerTools(
                 (parsed.data as { max_response_tokens?: number }).max_response_tokens,
               )
             : undefined;
+          // 共有の BOARD 認証情報の下で誰が操作したかを残す。読み取りだけの呼び出しでは主体を出さない。
+          if (isWriteOperation(tool.name, parsed.data)) {
+            const refresh = (parsed.data as { refresh?: string }).refresh;
+            logEvent("info", "write_operation", deps.requestId, {
+              tool: tool.name,
+              ...(refresh ? { refresh } : {}),
+              actor: deps.actor ?? "unknown",
+            });
+          }
           const result = await tool.handler(parsed.data, {
             now: deps.now ?? (() => new Date()),
             signal: extra?.mcpReq?.signal,
@@ -228,7 +269,7 @@ export function registerTools(
           if (responseLimit !== undefined) assertWithinResponseLimit(text, responseLimit);
           return textResult(text);
         } catch (e) {
-          if (!(e instanceof BoardError)) logUnexpected(tool.name, e);
+          if (!(e instanceof BoardError)) logUnexpected(tool.name, e, deps.requestId, deps.secrets);
           return textResult(JSON.stringify(toErrorEnvelope(e)), true);
         }
       },

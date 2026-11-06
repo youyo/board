@@ -243,8 +243,10 @@ mise run test:live
 
 ### ログ
 - Workers Logs(`observability.enabled: true`)で `wrangler tail --config deploy/wrangler.jsonc` かダッシュボードの Observability を見る。
-- 想定外の例外は `tool <name> failed unexpectedly: <例外名>: <message>` が出る(Bearer と x-api-key の値は伏せる)。応答は `generic_error`。
-- JWT の拒否は `access jwt rejected: <理由>`(種別だけ。JWT は出ない)。設定の欠けは `{"event":"config_invalid","missing":[...],"invalid":[...]}`(項目名だけ)。
+- ログは JSON の 1 行(`level` / `event` / `request_id` + 各イベントの項目)。`request_id` はリクエストの `cf-ray`(なければ生成した UUID)で、1 回のリクエストのログを束ねて検索できる。
+- 想定外の例外は `{"event":"tool_failed_unexpectedly","tool":"<name>","error_name":"...","error_message":"..."}` (Bearer と x-api-key の値、BOARD_API_KEY / BOARD_API_TOKEN の実値とその URL エンコード形は伏せる。`error_message` は 500 文字まで)。応答は `generic_error`。
+- JWT の拒否は `{"event":"access_jwt_rejected","reason":"<種別>"}`(種別だけ。JWT は出ない)。設定の欠けは `{"event":"config_invalid","missing":[...],"invalid":[...]}`(項目名だけ)。
+- 書き込み系の操作(`cache_clear`、`refresh=delta|full` を付けた呼び出し)は `{"event":"write_operation","tool":"...","refresh":"...","actor":"<email>"}` を残す。BOARD の認証情報は全員で共有するので、誰が実行したかはこのログで追う。`actor` は Access の JWT の email(service token は Client ID)。読み取りだけの呼び出しでは主体を出さない。`write_operation` は試行の記録で、成否は問わない(失敗しても残る)。document 系に `refresh=delta` を渡した場合も記録される。
 - API キー・トークン・JWT はログにも応答にも出さない。
 
 ### キャッシュの初回構築
@@ -266,7 +268,7 @@ BOARD を呼ばずに D1 の状態を返す(読み取り専用)。見るとこ�
 
 ### rate limit
 - BOARD API は **3 回/秒・3,000 回/日**。Worker は BOARD への通信を直列化し、429 / 5xx は `Retry-After` を尊重して最大 3 回まで再試行する(残り時間を超える待ちは待たずに `retryable: true` で失敗)。
-- 複数人が同時にキャッシュミスすると 3 回/秒を超えうる(再試行で吸収する)。問題になったら Durable Objects による全体制御を再検討する(ロードマップの決定済み事項)。
+- 複数人が同時にキャッシュミスすると 3 回/秒を超えうる(再試行で吸収する)。直列化(`src/board/client.ts` の `serialize`)は 1 つの isolate の中でしか効かず、Workers は負荷に応じて複数の isolate を同時に動かすため、isolate をまたぐと合計が上限を超えることがある。超えた分は BOARD が 429(`rate_limited`)で返し、上記の再試行で吸収する。設計どおりの挙動である(ADR 0003)。問題になったら Durable Objects による全体制御を再検討する(ロードマップの決定済み事項)。
 - 1 日の上限が近いときは `refresh` を使わずキャッシュを読む。
 
 ## 9. 注意: Workers Free プランの D1 クエリ上限
@@ -283,7 +285,7 @@ Free プランで動かすと、`refresh=full` や `find_*` の途中で D1 の�
 |---|---|
 | `/healthz` が 503(本文に `missing` / `invalid`) | 本文の項目名が直す箇所(値は出ない)。`BOARD_API_KEY` / `BOARD_API_TOKEN` は secret の登録漏れ → 3 の secrets(または `mise run setup` の再実行)。`ACCESS_TEAM_DOMAIN` / `ACCESS_AUD` / `DB` / `BOARD_BASE_URL` / `BOARD_UI_BASE_URL` は `board.config.json` を直して `deploy:config` → `deploy` |
 | Access で 401 | JWT がない。Access を通っていない(アプリケーションの公開ホスト名が違う)、Portal が `Cf-Access-Jwt-Assertion` を付けていない(docs/manual-verification.md の V1) |
-| Access で 403 | JWT の検証に失敗。`access.aud` / `access.teamDomain` の誤り(5 の 3)、JWKS が取れない。`wrangler tail --config deploy/wrangler.jsonc` で `access jwt rejected: <理由>` を見る(理由の種別だけ。JWT は出ない) |
+| Access で 403 | JWT の検証に失敗。`access.aud` / `access.teamDomain` の誤り(5 の 3)、JWKS が取れない。`wrangler tail --config deploy/wrangler.jsonc` で `access_jwt_rejected` の `reason` を見る(理由の種別だけ。JWT は出ない) |
 | `/mcp` が 403(Access は通っている) | `Origin` ヘッダー付きのリクエストは 403 にしている(CORS 無効・Origin の許可リストが空。ADR 0001 の追記)。ブラウザから呼ぶクライアント(MCP Inspector など)が該当する。Portal や Managed OAuth の経路は `Origin` を付けない(docs/manual-verification.md の V11)。ブラウザ経由ではなく、Portal かサーバー側のクライアントから呼ぶ |
 | `refresh_in_progress` | 同じリソースの別の refresh が動いている。`retry_after_seconds` 後に再試行する。長く続くなら `cache_status` の `locked` を見る(stale なロックは 10 分で奪われる) |
 | `rate_limited` | BOARD の 3 回/秒・3,000 回/日(8)。`retryable: true` なら待って再試行する。日次の上限が近いなら `refresh` を使わずキャッシュを読む |
