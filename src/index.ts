@@ -1,6 +1,7 @@
 import { app } from "./app";
 import { checkConfig } from "./config-check";
 import type { Env } from "./env";
+import { logEvent, requestIdOf } from "./log";
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -14,13 +15,10 @@ export default {
         );
       }
       // 詳細(項目名だけ。値は出さない)はログへ。応答には出さない。
-      console.error(
-        JSON.stringify({
-          event: "config_invalid",
-          missing: config.missing,
-          invalid: config.invalid,
-        }),
-      );
+      logEvent("error", "config_invalid", requestIdOf(request), {
+        missing: config.missing,
+        invalid: config.invalid,
+      });
       return Response.json(
         { error: "server_misconfigured" },
         { status: 500, headers: { "Cache-Control": "no-store" } },

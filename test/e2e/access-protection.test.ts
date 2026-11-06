@@ -79,6 +79,39 @@ describe("E2E: /healthz 以外はすべて Cf-Access-Jwt-Assertion が必要", (
     expect(logged).not.toContain(jwt);
   });
 
+  it("拒否のログは JSON 1 行で、cf-ray を request_id として持つ", async () => {
+    const key = await createTestKey("kid-1");
+    mockOutboundFetch({ [CERTS]: () => jwksResponse(key) });
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const jwt = await signAccessJwt(key, { aud: "another-app" });
+    await callWorker("/mcp", {
+      jwt,
+      init: { method: "POST", headers: { "cf-ray": "ray-xyz-NRT" } },
+    });
+    expect(spy).toHaveBeenCalledTimes(1);
+    const entry = JSON.parse(String(spy.mock.calls[0]?.[0]));
+    expect(entry).toMatchObject({
+      level: "warn",
+      event: "access_jwt_rejected",
+      reason: "invalid",
+      request_id: "ray-xyz-NRT",
+    });
+    expect(JSON.stringify(entry)).not.toContain(jwt);
+  });
+
+  it("cache_clear を呼ぶと、JWT の email が主体としてログに残る(JWT 自体は残らない)", async () => {
+    const key = await createTestKey("kid-1");
+    mockOutboundFetch({ [CERTS]: () => jwksResponse(key) });
+    const spy = vi.spyOn(console, "info").mockImplementation(() => {});
+    const jwt = await signAccessJwt(key, { email: "bob@example.com" });
+    await mcpCall(jwt, "tools/call", { name: "cache_clear", arguments: {} });
+    const entries = spy.mock.calls.map((c) => JSON.parse(String(c[0])));
+    const w = entries.find((e) => e.event === "write_operation");
+    expect(w).toMatchObject({ tool: "cache_clear", actor: "bob@example.com" });
+    expect(typeof w.request_id).toBe("string");
+    expect(JSON.stringify(entries)).not.toContain(jwt);
+  });
+
   it("正しい JWT なら /mcp に到達する(200)", async () => {
     const key = await createTestKey("kid-1");
     mockOutboundFetch({ [CERTS]: () => jwksResponse(key) });

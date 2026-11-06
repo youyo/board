@@ -2,9 +2,10 @@ import { createMcpHandler } from "agents/mcp/server";
 import { type Context, Hono } from "hono";
 import { type AccessIdentity, AccessJwtError, verifyAccessJwt } from "./auth/access-jwt";
 import type { Env } from "./env";
+import { logEvent, requestIdOf } from "./log";
 import { createMcpServer } from "./mcp/server";
 
-type AppEnv = { Bindings: Env; Variables: { access: AccessIdentity } };
+type AppEnv = { Bindings: Env; Variables: { access: AccessIdentity; requestId: string } };
 
 export const MCP_PATH = "/mcp";
 
@@ -24,6 +25,8 @@ async function accessGuard(
   c: Context<AppEnv>,
   next: () => Promise<void>,
 ): Promise<Response | undefined> {
+  const requestId = requestIdOf(c.req.raw);
+  c.set("requestId", requestId);
   try {
     const identity = await verifyAccessJwt(c.req.header("Cf-Access-Jwt-Assertion"), {
       teamDomain: c.env.ACCESS_TEAM_DOMAIN,
@@ -33,7 +36,7 @@ async function accessGuard(
   } catch (e) {
     // 理由の種別だけを残す。応答にもログにも JWT・鍵は出さない。
     const reason = e instanceof AccessJwtError ? e.reason : "error";
-    console.warn(`access jwt rejected: ${reason}`);
+    logEvent("warn", "access_jwt_rejected", requestId, { reason });
     const headers = { "Cache-Control": "no-store" };
     return reason === "missing"
       ? c.json({ error: "unauthorized" }, 401, headers)
@@ -41,6 +44,11 @@ async function accessGuard(
   }
   await next();
   return undefined;
+}
+
+/** ログに残す主体。人は email、service token は Client ID(sub が空のため)。JWT 自体は渡さない。 */
+function actorOf(identity: AccessIdentity): string {
+  return identity.kind === "user" ? identity.email || identity.subject : identity.clientId;
 }
 
 /**
@@ -59,9 +67,13 @@ export const MCP_HANDLER_OPTIONS = {
 // リクエストごとに McpServer を作る(ステートレス。Durable Objects もセッションも使わない)。
 // Hono の c.executionCtx の型は tracing / abort を持たない。実体は Workers の ctx そのもの。
 app.all(MCP_PATH, (c) =>
-  createMcpHandler(() => createMcpServer({ env: c.env }), MCP_HANDLER_OPTIONS)(
-    c.req.raw,
-    c.env,
-    c.executionCtx as unknown as ExecutionContext<unknown>,
-  ),
+  createMcpHandler(
+    () =>
+      createMcpServer({
+        env: c.env,
+        requestId: c.get("requestId"),
+        actor: actorOf(c.get("access")),
+      }),
+    MCP_HANDLER_OPTIONS,
+  )(c.req.raw, c.env, c.executionCtx as unknown as ExecutionContext<unknown>),
 );
