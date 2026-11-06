@@ -144,6 +144,8 @@ export interface RegisterDeps {
   requestId?: string;
   /** 操作した主体。書き込み系の操作のログにだけ出す。 */
   actor?: string;
+  /** ログから伏せる秘密の実値(BOARD の API キー / トークン)。 */
+  secrets?: readonly string[];
 }
 
 /** 書き込み系の操作: cache_clear と、refresh が delta / full の呼び出し。 */
@@ -189,18 +191,32 @@ function advertiseOnly(schema: z.ZodObject): StandardSchemaWithJSON {
  * 想定外の例外(generic_error にするもの)を調べられるよう、例外名と message をログに残す。応答には出さない。
  * message に API キー / トークンが混ざりうるので、Bearer と x-api-key の値は伏せる。
  */
-function logUnexpected(toolName: string, e: unknown, requestId: string | undefined): void {
+function logUnexpected(
+  toolName: string,
+  e: unknown,
+  requestId: string | undefined,
+  secrets: readonly string[] = [],
+): void {
   const name = e instanceof Error ? e.name : typeof e;
   const raw = e instanceof Error ? e.message : String(e);
-  const redacted = raw
+  let redacted = raw
     .replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer [REDACTED]")
     .replace(/(x-api-key["']?\s*[:=]\s*)\S+/gi, "$1[REDACTED]");
+  // 実値と、その encodeURIComponent した形(長いものから)。正規表現では覆えない記号入りの値のため。
+  const needles = secrets
+    .map((v) => v.trim())
+    .filter((v) => v !== "")
+    .flatMap((v) => [v, encodeURIComponent(v)])
+    .sort((a, b) => b.length - a.length);
+  for (const n of needles) redacted = redacted.split(n).join("[REDACTED]");
   logEvent("error", "tool_failed_unexpectedly", requestId, {
     tool: toolName,
     error_name: name,
-    error_message: redacted,
+    error_message: redacted.slice(0, MAX_ERROR_MESSAGE_LENGTH),
   });
 }
+
+const MAX_ERROR_MESSAGE_LENGTH = 500;
 
 export function registerTools(
   server: McpServer,
@@ -253,7 +269,7 @@ export function registerTools(
           if (responseLimit !== undefined) assertWithinResponseLimit(text, responseLimit);
           return textResult(text);
         } catch (e) {
-          if (!(e instanceof BoardError)) logUnexpected(tool.name, e, deps.requestId);
+          if (!(e instanceof BoardError)) logUnexpected(tool.name, e, deps.requestId, deps.secrets);
           return textResult(JSON.stringify(toErrorEnvelope(e)), true);
         }
       },

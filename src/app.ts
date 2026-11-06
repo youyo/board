@@ -47,7 +47,7 @@ async function accessGuard(
 }
 
 /** ログに残す主体。人は email、service token は Client ID(sub が空のため)。JWT 自体は渡さない。 */
-function actorOf(identity: AccessIdentity): string {
+export function actorOf(identity: AccessIdentity): string {
   return identity.kind === "user" ? identity.email || identity.subject : identity.clientId;
 }
 

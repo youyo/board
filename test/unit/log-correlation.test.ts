@@ -1,13 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
+import { actorOf } from "../../src/app";
 import { requestIdOf } from "../../src/log";
 import { defineTool, type ToolDefinition } from "../../src/mcp/registry";
 import { createMcpServer } from "../../src/mcp/server";
 import { firstText, rpcTo } from "../helpers/mcp";
 
 afterEach(() => vi.restoreAllMocks());
-
-const JWT = ["fake-header", "fake-payload", "SIGNATURE_PART"].join(".");
 
 const cacheClear = defineTool({
   name: "cache_clear",
@@ -122,11 +121,73 @@ describe("想定外の例外のログ", () => {
   });
 });
 
-describe("JWT をログに出さない", () => {
-  it("書き込みのログにも JWT 文字列は含まれない", async () => {
+describe("主体の決め方(actorOf)", () => {
+  it("人は email", () => {
+    expect(actorOf({ kind: "user", email: "a@example.com", subject: "sub-1" })).toBe(
+      "a@example.com",
+    );
+  });
+  it("email が空で sub だけなら sub", () => {
+    expect(actorOf({ kind: "user", email: "", subject: "sub-1" })).toBe("sub-1");
+  });
+  it("service token は clientId", () => {
+    expect(actorOf({ kind: "service", clientId: "abc123.access" })).toBe("abc123.access");
+  });
+});
+
+describe("想定外の例外のログの伏せ字(実値)", () => {
+  const KEY = "  k/e y+&=?#%  ";
+  const TOKEN = "tok:en@;,!*'()";
+  const env = {
+    BOARD_BASE_URL: "https://api.board.example",
+    BOARD_API_KEY: KEY,
+    BOARD_API_TOKEN: TOKEN,
+  } as never;
+  const leaky = defineTool({
+    name: "leaky",
+    title: "漏れ",
+    description: "d",
+    category: "ReadOnly",
+    inputSchema: z.object({}),
+    handler: async () => {
+      const k = KEY.trim();
+      const t = TOKEN.trim();
+      throw new Error(`raw ${k} ${t} enc ${encodeURIComponent(k)} ${encodeURIComponent(t)} end`);
+    },
+  });
+
+  it("実値と encodeURIComponent した形を伏せる", async () => {
     const spies = spyAll();
-    await call(cacheClear, {}, "alice@example.com");
-    expect(JSON.stringify(lines(spies))).not.toContain(JWT);
-    expect(JSON.stringify(lines(spies))).not.toContain("SIGNATURE_PART");
+    await rpcTo(() => createMcpServer({ tools: [leaky], requestId: "r", env }), "tools/call", {
+      name: "leaky",
+      arguments: {},
+    });
+    const entry = lines(spies).find((l) => l.event === "tool_failed_unexpectedly");
+    const msg = String(entry?.error_message);
+    const k = KEY.trim();
+    const t = TOKEN.trim();
+    for (const v of [k, t, encodeURIComponent(k), encodeURIComponent(t)]) {
+      expect(msg).not.toContain(v);
+    }
+    expect(msg).toContain("[REDACTED]");
+    expect(msg).toContain("raw");
+    expect(msg).toContain("end");
+  });
+
+  it("error_message は 500 文字で切る", async () => {
+    const long = defineTool({
+      name: "long_err",
+      title: "長い",
+      description: "d",
+      category: "ReadOnly",
+      inputSchema: z.object({}),
+      handler: async () => {
+        throw new Error("x".repeat(2000));
+      },
+    });
+    const spies = spyAll();
+    await call(long, {});
+    const entry = lines(spies).find((l) => l.event === "tool_failed_unexpectedly");
+    expect(String(entry?.error_message).length).toBeLessThanOrEqual(500);
   });
 });

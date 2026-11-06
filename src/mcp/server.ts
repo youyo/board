@@ -39,6 +39,7 @@ export function createMcpServer(deps: McpServerDeps = {}): McpServer {
     now: deps.now,
     requestId: deps.requestId,
     actor: deps.actor,
+    secrets: deps.env ? [deps.env.BOARD_API_KEY, deps.env.BOARD_API_TOKEN] : undefined,
     db: deps.db ?? (deps.env ? dbFromEnv(deps.env) : undefined),
     repositories: deps.repositories ?? repositoriesFromEnv(deps.env),
     documentIndex: deps.documentIndex ?? documentIndexFromEnv(deps.env),

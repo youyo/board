@@ -244,9 +244,9 @@ mise run test:live
 ### ログ
 - Workers Logs(`observability.enabled: true`)で `wrangler tail --config deploy/wrangler.jsonc` かダッシュボードの Observability を見る。
 - ログは JSON の 1 行(`level` / `event` / `request_id` + 各イベントの項目)。`request_id` はリクエストの `cf-ray`(なければ生成した UUID)で、1 回のリクエストのログを束ねて検索できる。
-- 想定外の例外は `{"event":"tool_failed_unexpectedly","tool":"<name>","error_name":"...","error_message":"..."}` (Bearer と x-api-key の値は伏せる)。応答は `generic_error`。
+- 想定外の例外は `{"event":"tool_failed_unexpectedly","tool":"<name>","error_name":"...","error_message":"..."}` (Bearer と x-api-key の値、BOARD_API_KEY / BOARD_API_TOKEN の実値とその URL エンコード形は伏せる。`error_message` は 500 文字まで)。応答は `generic_error`。
 - JWT の拒否は `{"event":"access_jwt_rejected","reason":"<種別>"}`(種別だけ。JWT は出ない)。設定の欠けは `{"event":"config_invalid","missing":[...],"invalid":[...]}`(項目名だけ)。
-- 書き込み系の操作(`cache_clear`、`refresh=delta|full` を付けた呼び出し)は `{"event":"write_operation","tool":"...","refresh":"...","actor":"<email>"}` を残す。BOARD の認証情報は全員で共有するので、誰が実行したかはこのログで追う。`actor` は Access の JWT の email(service token は Client ID)。読み取りだけの呼び出しでは主体を出さない。
+- 書き込み系の操作(`cache_clear`、`refresh=delta|full` を付けた呼び出し)は `{"event":"write_operation","tool":"...","refresh":"...","actor":"<email>"}` を残す。BOARD の認証情報は全員で共有するので、誰が実行したかはこのログで追う。`actor` は Access の JWT の email(service token は Client ID)。読み取りだけの呼び出しでは主体を出さない。`write_operation` は試行の記録で、成否は問わない(失敗しても残る)。document 系に `refresh=delta` を渡した場合も記録される。
 - API キー・トークン・JWT はログにも応答にも出さない。
 
 ### キャッシュの初回構築
