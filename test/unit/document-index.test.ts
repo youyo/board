@@ -8,9 +8,11 @@ import { createBoardClient } from "../../src/board/client";
 import {
   COMPLETE_TTL_MS,
   createDocumentIndex,
+  MAX_SCAN_PAGES_PER_CALL,
   SCAN_LOCK_STALE_MS,
   SCAN_RESERVE_MS,
 } from "../../src/repository/document-index";
+import { DOCUMENT_KIND_INFO } from "../../src/repository/document-kinds";
 import { BASE, pagedHandler, testClient } from "../helpers/board-list";
 import { fakeClock, resetCache, testDb } from "../helpers/d1";
 import { jsonResponse, mockOutboundFetch } from "../helpers/mock-fetch";
@@ -486,5 +488,98 @@ describe("対応表への記録は複数行にまとめる(D1 のクエリ数と
     expect(batches[0]).toBeLessThanOrEqual(9);
     expect(Math.max(...binds)).toBeLessThanOrEqual(100);
     expect(await count("SELECT count(*) AS c FROM document_project_map")).toBe(200);
+  });
+});
+
+describe("1 回の呼び出しあたりのページ上限", () => {
+  it("上限のページ数を取ったら、未解決(deadline)で止める。進捗は保存され、ロックは解放される", async () => {
+    const { index } = setup();
+    const api = mockOutboundFetch({
+      [projectsKey]: pagedHandler(() => projects(PER_PAGE * (MAX_SCAN_PAGES_PER_CALL + 5))),
+    });
+    expect(await index.lookup("estimate", 999999)).toEqual({
+      status: "unresolved",
+      reason: "deadline",
+    });
+    expect(api.calls).toHaveLength(MAX_SCAN_PAGES_PER_CALL);
+    expect(pagesOf(api.calls)).toEqual(
+      Array.from({ length: MAX_SCAN_PAGES_PER_CALL }, (_, i) => i + 1),
+    );
+    const st = await testDb()
+      .prepare("SELECT * FROM document_scan_state WHERE document_kind = 'estimate'")
+      .first<{ next_page: number; completed_at: string | null; lock_owner: string | null }>();
+    expect(st?.next_page).toBe(MAX_SCAN_PAGES_PER_CALL + 1);
+    expect(st?.completed_at).toBeNull();
+    expect(st?.lock_owner).toBeNull();
+  });
+
+  it("次の呼び出しは保存した次のページから続け、残りを走査し終えれば not_found になる", async () => {
+    const { index } = setup();
+    const api = mockOutboundFetch({
+      [projectsKey]: pagedHandler(() => projects(PER_PAGE * (MAX_SCAN_PAGES_PER_CALL + 5))),
+    });
+    await index.lookup("estimate", 999999);
+    api.calls.length = 0;
+    expect(await index.lookup("estimate", 999999)).toEqual({ status: "miss", reason: "not_found" });
+    expect(pagesOf(api.calls)[0]).toBe(MAX_SCAN_PAGES_PER_CALL + 1);
+    expect(api.calls.length).toBeLessThanOrEqual(MAX_SCAN_PAGES_PER_CALL);
+  });
+
+  it("上限ちょうどのページで見つかれば hit(上限のために見逃さない)", async () => {
+    const { index } = setup();
+    mockOutboundFetch({
+      [projectsKey]: pagedHandler(() => projects(PER_PAGE * (MAX_SCAN_PAGES_PER_CALL + 5))),
+    });
+    const lastPageProject = PER_PAGE * MAX_SCAN_PAGES_PER_CALL;
+    expect(await index.lookup("estimate", 1000 + lastPageProject)).toEqual({
+      status: "hit",
+      projectId: lastPageProject,
+    });
+  });
+});
+
+describe("上流の ID の確認(正の安全な整数だけを使う)", () => {
+  const BAD = [0, -1, 1.5, Number.NaN, 2 ** 53, "7", null];
+
+  it.each(Object.values(DOCUMENT_KIND_INFO))(
+    "$kind: 書類 ID が不正なものは取り出さない",
+    (info) => {
+      const doc = (id: unknown) => ({ id });
+      const p = {
+        id: 1,
+        estimate: doc(10),
+        order: doc(10),
+        deliveries: [doc(10), ...BAD.map(doc)],
+        receipts: [doc(10), ...BAD.map(doc)],
+      };
+      const bad = {
+        id: 1,
+        estimate: doc(BAD[1]),
+        order: doc(BAD[2]),
+      };
+      expect(info.ids(p as never)).toEqual([10]);
+      expect(info.ids(bad as never)).toEqual([]);
+    },
+  );
+
+  it("案件 ID が不正な案件の書類は、対応表に覚えない", async () => {
+    const { index } = setup();
+    mockOutboundFetch({});
+    await index.record("estimate", [
+      ...BAD.map((id, i) => ({ id, estimate: { id: 500 + i } })),
+      { id: 3, estimate: { id: 600 } },
+    ] as never);
+    expect(await count("SELECT count(*) AS c FROM document_project_map")).toBe(1);
+    expect(await index.lookup("estimate", 600)).toEqual({ status: "hit", projectId: 3 });
+  });
+
+  it("走査で見つけた案件 ID が不正なら hit にしない", async () => {
+    const { index } = setup();
+    mockOutboundFetch({
+      [projectsKey]: pagedHandler(() => [{ id: -5, estimate: { id: 777 }, deliveries: [] }]),
+    });
+    const r = await index.lookup("estimate", 777);
+    expect(r.status).not.toBe("hit");
+    expect(await count("SELECT count(*) AS c FROM document_project_map")).toBe(0);
   });
 });

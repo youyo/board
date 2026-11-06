@@ -74,6 +74,62 @@ describe("cursorAfterFull(full の完了後の delta カーソル)", () => {
   });
 });
 
+describe("カーソルの元になる updated_at は形式が正しいものだけを使う", () => {
+  const GARBAGE = [
+    "zzzz-not-a-date",
+    "9999 garbage",
+    "2099-99",
+    "' OR 1=1 --",
+    "2026-13-45T25:61:61Z0",
+  ];
+
+  it("full: 解釈できない値(辞書順で大きい)は最大値に使わない", async () => {
+    const { db, deps } = setup();
+    const data = [
+      { id: 1, name: "a", updated_at: "2026-02-01T00:00:00.000+09:00" },
+      ...GARBAGE.map((g, i) => ({ id: 10 + i, name: "g", updated_at: g })),
+    ];
+    mockOutboundFetch({ [KEY]: pagedHandler(() => data) });
+    await refreshResource(deps, clients, "full");
+    expect((await getSyncState(db, "clients"))?.cursor_updated_at).toBe(
+      "2026-02-01T00:00:00.000+09:00",
+    );
+  });
+
+  it("delta: 解釈できない値はカーソルにも gteq にも入らない", async () => {
+    const { db, deps, clock } = setup();
+    mockOutboundFetch({
+      [KEY]: pagedHandler(() => [
+        { id: 1, name: "a", updated_at: "2026-02-01T00:00:00.000+09:00" },
+      ]),
+    });
+    await refreshResource(deps, clients, "full");
+    vi.restoreAllMocks();
+
+    clock.advance(3_600_000);
+    mockOutboundFetch({
+      [KEY]: pagedHandler(() => [
+        { id: 2, name: "b", updated_at: "2026-03-01T10:00:00.000+09:00" },
+        ...GARBAGE.map((g, i) => ({ id: 20 + i, name: "g", updated_at: g })),
+      ]),
+    });
+    const out = await refreshResource(deps, clients, "delta");
+    expect(out.state).toBe("complete");
+    expect((await getSyncState(db, "clients"))?.cursor_updated_at).toBe(
+      "2026-03-01T10:00:00.000+09:00",
+    );
+  });
+
+  it("形式が正しい値がひとつもなければ、カーソルは動かない(null のまま)", async () => {
+    const { db, deps } = setup();
+    mockOutboundFetch({
+      [KEY]: pagedHandler(() => GARBAGE.map((g, i) => ({ id: 1 + i, name: "g", updated_at: g }))),
+    });
+    await refreshResource(deps, clients, "full");
+    expect((await getSyncState(db, "clients"))?.cursor_updated_at).toBeNull();
+  });
+});
+
 describe("full refresh", () => {
   it("全ページを取って complete にし、世代 1 で保存して full_refreshed_at と cursor を記録する", async () => {
     const { db, deps, clock } = setup();

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { ArgumentError, BoardError } from "../../src/errors";
 import { annotationsFor, defineTool, type ToolDefinition } from "../../src/mcp/registry";
 import { createMcpServer } from "../../src/mcp/server";
+import { ALL_TOOLS } from "../../src/mcp/tools";
 import { firstText, rpcTo } from "../helpers/mcp";
 
 afterEach(() => vi.restoreAllMocks());
@@ -163,4 +164,30 @@ describe("ツール呼び出し", () => {
   it("ツール名が重複していると createMcpServer が例外", () => {
     expect(() => createMcpServer({ tools: [echo, echo] })).toThrow(/echo_text/);
   });
+});
+
+describe("refresh 引数の説明(注釈は ReadOnly のまま、副作用を説明で伝える)", () => {
+  const withRefresh = ALL_TOOLS.map((t) => ({
+    name: t.name,
+    readOnly: t.annotations?.readOnlyHint,
+    prop: (
+      z.toJSONSchema(t.inputSchema as z.ZodObject) as {
+        properties: Record<string, { description?: string }>;
+      }
+    ).properties.refresh,
+  })).filter((t) => t.prop !== undefined);
+
+  it("refresh を持つツールは list 18 + get 22 + find 11 = 51 個で、いずれも readOnlyHint のまま", () => {
+    expect(withRefresh).toHaveLength(51);
+    for (const t of withRefresh) expect(t.readOnly, t.name).toBe(true);
+  });
+
+  it.each(withRefresh)(
+    "$name: refresh の説明に D1 キャッシュへの書き込みと BOARD の 1 日の上限の消費を書く",
+    (t) => {
+      const d = t.prop?.description ?? "";
+      expect(d).toMatch(/D1/);
+      expect(d).toMatch(/3,?000/);
+    },
+  );
 });

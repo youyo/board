@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getEntry } from "../../src/cache/resource-cache";
+import { clearCache } from "../../src/cache/admin";
+import { countEntries, getEntry, upsertEntities } from "../../src/cache/resource-cache";
 import { getSyncState } from "../../src/cache/sync-state";
 import { RefreshInProgressError } from "../../src/errors";
-import { tryAcquireLock } from "../../src/refresh/lock";
+import { LOCK_STALE_MS, tryAcquireLock } from "../../src/refresh/lock";
 import { createRepositories } from "../../src/repository";
 import { BASE, makeEntities, pagedHandler, testClient } from "../helpers/board-list";
 import { fakeClock, resetCache, testDb } from "../helpers/d1";
@@ -143,6 +144,23 @@ describe("cache-first リソース(clients)", () => {
     expect(exact.totalBeforeLimit).toBeUndefined();
     const none = await repos.clients.list({}, {});
     expect(none.totalBeforeLimit).toBeUndefined();
+  });
+
+  it("絞り込みのないキャッシュ読みは SQL の LIMIT で必要な件数だけ読む(件数の先の行は解析しない)。totalBeforeLimit は件数の照会で出す", async () => {
+    const { repos, db } = setup();
+    mockOutboundFetch({ [clientsKey]: pagedHandler(clientRows) });
+    await repos.clients.list({}, { refresh: "full" });
+    // 並びの最後(updated_at が最大)に、JSON として解析できない行を足す。全行を解析する実装ならここで例外になる。
+    await db
+      .prepare(
+        "INSERT INTO resource_cache (resource_name, entity_id, payload_json, updated_at, fetched_at, generation) VALUES ('clients', 9999, '{broken', '9999-01-01T00:00:00Z', '2026-11-05T00:00:00Z', 1)",
+      )
+      .run();
+    const cut = await repos.clients.list({}, { limit: 2 });
+    expect(cut.items.map((c) => (c as { id: number }).id)).toEqual([1, 2]);
+    expect(cut.totalBeforeLimit).toBe(6);
+    const all = await repos.clients.list({}, { limit: 6 }).catch((e: unknown) => e);
+    expect(all).toBeInstanceOf(SyntaxError); // 解析が必要な範囲に入れば、従来どおり壊れた行は検出される
   });
 
   it("limit はフィルタのあとに適用する", async () => {
@@ -314,7 +332,7 @@ describe("document リソース(estimates など。get のみ)", () => {
   });
 
   it("refresh=full はキャッシュを使わず取り直して上書きする。delta は何もしない(キャッシュを使う)", async () => {
-    const { repos } = setup();
+    const { repos, clock } = setup();
     let total = "100";
     const api = mockOutboundFetch({ [key]: () => doc(10, total) });
     await repos.estimates.get(10);
@@ -323,6 +341,7 @@ describe("document リソース(estimates など。get のみ)", () => {
       total: "100",
     });
     expect(api.calls).toHaveLength(1);
+    clock.advance(1_000); // fetched_at は秒精度で、同じ秒の行は上書きしない(新しい行を守る)ので、時計を進める
     const fresh = await repos.estimates.get(10, { refresh: "full" });
     expect(fresh).toMatchObject({ source: "api", item: { total: "200" } });
     expect((await repos.estimates.get(10)).item).toMatchObject({ total: "200" });
@@ -366,5 +385,177 @@ describe("締め切りとキャンセルは呼び出し元の CallContext に従
     mockOutboundFetch({ [clientsKey]: () => jsonResponse({}, 500) });
     await repos.clients.list({}, { refresh: "full" }).catch(() => undefined);
     expect((await getSyncState(db, "clients"))?.refresh_owner).toBeNull();
+  });
+});
+
+describe("単体取得のキャッシュ書き込み(世代・ロック・ID の確認)", () => {
+  const itemKey = `GET ${BASE}/v1/clients/*`;
+  const idOf = (url: string) => Number(url.split("/").pop());
+  const gen = async (db: D1Database, id: number) => (await getEntry(db, "clients", id))?.generation;
+
+  it("世代は INSERT の中で sync_state から読む(読んでから書くまでの間に変わっても、書く時点の世代になる)", async () => {
+    const { repos, db } = setup();
+    await db
+      .prepare("INSERT INTO sync_state (resource_name, full_generation) VALUES ('clients', 4)")
+      .run();
+    mockOutboundFetch({
+      [itemKey]: async (c) => {
+        // API を待っている間に世代が進んだ(別の呼び出しの full)。
+        await db
+          .prepare("UPDATE sync_state SET full_generation = 7 WHERE resource_name = 'clients'")
+          .run();
+        return jsonResponse({ id: idOf(c.url), name: "x" });
+      },
+    });
+    const r = await repos.clients.get(10);
+    expect(r.source).toBe("api");
+    expect(await gen(db, 10)).toBe(7);
+  });
+
+  it("sync_state の行がなければ世代 0", async () => {
+    const { repos, db } = setup();
+    mockOutboundFetch({ [itemKey]: (c) => jsonResponse({ id: idOf(c.url), name: "x" }) });
+    await repos.clients.get(10);
+    expect(await gen(db, 10)).toBe(0);
+  });
+
+  it("cache_clear の直後に戻った行は世代 0 になり、次の full で消える(古い大きい世代で残らない)", async () => {
+    const { repos, db, clock } = setup();
+    const rows = () => makeEntities(5);
+    mockOutboundFetch({
+      [clientsKey]: pagedHandler(rows),
+      [itemKey]: async (c) => {
+        // API を待っている間に cache_clear が走る。
+        await clearCache(db, { now: clock.now, resources: ["clients"] });
+        return jsonResponse({ id: idOf(c.url), name: "stale" });
+      },
+    });
+    await repos.clients.refresh("full");
+    await repos.clients.refresh("full");
+    expect(await gen(db, 1)).toBe(2);
+
+    await repos.clients.get(77);
+    expect(await gen(db, 77)).toBe(0); // 古い世代 2 を引きずらない
+    expect(await getSyncState(db, "clients")).toBeNull();
+
+    clock.advance(1_000);
+    await repos.clients.refresh("full"); // 世代 1 に数え直し
+    expect((await repos.clients.refresh("full")).state).toBe("complete");
+    expect(await getEntry(db, "clients", 77)).toBeNull();
+    expect(await countEntries(db, "clients")).toBe(5);
+  });
+
+  it("その resource のロックが取られている間は書かない。応答は返す。解放後は書く", async () => {
+    const { repos, db, clock } = setup();
+    mockOutboundFetch({ [itemKey]: (c) => jsonResponse({ id: idOf(c.url), name: "x" }) });
+    const lock = await tryAcquireLock(db, "clients", { now: clock.now, owner: "other" });
+    const r = await repos.clients.get(10);
+    expect(r).toMatchObject({ source: "api", item: { id: 10 } });
+    expect(await getEntry(db, "clients", 10)).toBeNull();
+    // 他の resource のロックは関係ない。
+    expect(lock.resource).toBe("clients");
+
+    await db.prepare("UPDATE sync_state SET refresh_started_at = NULL, refresh_owner = NULL").run();
+    await repos.clients.get(10);
+    expect(await getEntry(db, "clients", 10)).not.toBeNull();
+  });
+
+  it("stale になったロック(既存のロックの定義と同じ LOCK_STALE_MS 超)は書き込みを止めない。ちょうど境界までは止める", async () => {
+    const { repos, db, clock } = setup();
+    mockOutboundFetch({ [itemKey]: (c) => jsonResponse({ id: idOf(c.url), name: "x" }) });
+    await tryAcquireLock(db, "clients", { now: clock.now, owner: "other" });
+    clock.advance(LOCK_STALE_MS);
+    await repos.clients.get(10);
+    expect(await getEntry(db, "clients", 10)).toBeNull(); // 取得側の奪取条件(started < now - STALE)を満たさない = まだ保持中
+    clock.advance(1_000);
+    await repos.clients.get(10);
+    expect(await getEntry(db, "clients", 10)).not.toBeNull();
+  });
+
+  it("別の resource のロックは書き込みを止めない", async () => {
+    const { repos, db, clock } = setup();
+    mockOutboundFetch({ [itemKey]: (c) => jsonResponse({ id: idOf(c.url), name: "x" }) });
+    await tryAcquireLock(db, "vendors", { now: clock.now, owner: "other" });
+    await repos.clients.get(10);
+    expect(await getEntry(db, "clients", 10)).not.toBeNull();
+  });
+
+  it.each([
+    ["別の ID", { id: 11, name: "x" }],
+    ["id が文字列", { id: "10", name: "x" }],
+    ["id がない", { name: "x" }],
+    ["id が小数", { id: 10.5, name: "x" }],
+    ["id が null", { id: null, name: "x" }],
+  ])(
+    "応答の item.id が要求した ID と違う(%s)ときはキャッシュしないが、応答は返す",
+    async (_n, body) => {
+      const { repos, db } = setup();
+      mockOutboundFetch({ [itemKey]: () => jsonResponse(body) });
+      const r = await repos.clients.get(10);
+      expect(r).toMatchObject({ source: "api", item: body });
+      expect(await countEntries(db, "clients")).toBe(0);
+    },
+  );
+
+  it("書類の取得も同じ: ID が違えばキャッシュしない / 一致すれば保存する", async () => {
+    const { repos, db } = setup();
+    const key = `GET ${BASE}/v1/documents/estimates/*`;
+    mockOutboundFetch({
+      [key]: (c) => jsonResponse({ id: idOf(c.url) === 10 ? 99 : idOf(c.url) }),
+    });
+    expect((await repos.estimates.get(10)).item).toEqual({ id: 99 });
+    expect(await countEntries(db, "estimates")).toBe(0);
+    await repos.estimates.get(11);
+    expect(await getEntry(db, "estimates", 11)).not.toBeNull();
+  });
+
+  it("書類の取得も、その resource のロック(同名の sync_state)があれば書かない", async () => {
+    const { repos, db, clock } = setup();
+    const key = `GET ${BASE}/v1/documents/estimates/*`;
+    mockOutboundFetch({ [key]: (c) => jsonResponse({ id: idOf(c.url) }) });
+    await tryAcquireLock(db, "estimates", { now: clock.now, owner: "other" });
+    await repos.estimates.get(11);
+    expect(await countEntries(db, "estimates")).toBe(0);
+  });
+  it("API を待っている間に別の書き込みが同じ ID の新しい行を書いたら、取得結果で上書きしない(list 型)", async () => {
+    const { repos, db, clock } = setup();
+    mockOutboundFetch({
+      [itemKey]: async (c) => {
+        clock.advance(2_000);
+        await upsertEntities(db, "clients", [{ id: idOf(c.url), name: "fresh" }], {
+          now: clock.now(),
+        });
+        return jsonResponse({ id: idOf(c.url), name: "stale" });
+      },
+    });
+    const r = await repos.clients.get(10);
+    expect(r).toMatchObject({ source: "api", item: { name: "stale" } });
+    expect((await getEntry<{ name: string }>(db, "clients", 10))?.entity.name).toBe("fresh");
+  });
+
+  it("書類も同じ: 取得中に書かれた新しい行を残す", async () => {
+    const { repos, db, clock } = setup();
+    const key = `GET ${BASE}/v1/documents/estimates/*`;
+    mockOutboundFetch({
+      [key]: async (c) => {
+        clock.advance(2_000);
+        await upsertEntities(db, "estimates", [{ id: idOf(c.url), name: "fresh" }], {
+          now: clock.now(),
+        });
+        return jsonResponse({ id: idOf(c.url), name: "stale" });
+      },
+    });
+    await repos.estimates.get(11);
+    expect((await getEntry<{ name: string }>(db, "estimates", 11))?.entity.name).toBe("fresh");
+  });
+
+  it("書類の refresh=full は、古い既存の行を取り直した結果で更新する", async () => {
+    const { repos, db, clock } = setup();
+    const key = `GET ${BASE}/v1/documents/estimates/*`;
+    await upsertEntities(db, "estimates", [{ id: 11, name: "old" }], { now: clock.now() });
+    clock.advance(5_000);
+    mockOutboundFetch({ [key]: (c) => jsonResponse({ id: idOf(c.url), name: "new" }) });
+    await repos.estimates.get(11, { refresh: "full" });
+    expect((await getEntry<{ name: string }>(db, "estimates", 11))?.entity.name).toBe("new");
   });
 });

@@ -43,10 +43,23 @@ async function accessGuard(
   return undefined;
 }
 
+/**
+ * ブラウザからの呼び出しは想定しないので、ライブラリの既定値に頼らず明示する(将来既定値が変わっても影響を受けない)。
+ * - `corsOptions: false`: CORS ヘッダーを付けない(`Access-Control-*` は応答から取り除かれる)。
+ * - `allowedOriginHostnames: []`: Origin ヘッダーのある要求はすべて 403。Origin のない MCP クライアントだけを通す。
+ *   空配列は `undefined`(= localhost・workers.dev を許す既定値)とは別物で、既定値には fallback しない
+ *   (node_modules/agents/dist/handler-stateless-*.js の `acceptedOriginHostnames === void 0` のときだけ既定値を作る)。
+ */
+export const MCP_HANDLER_OPTIONS = {
+  route: MCP_PATH,
+  corsOptions: false,
+  allowedOriginHostnames: [],
+} as const satisfies Parameters<typeof createMcpHandler>[1];
+
 // リクエストごとに McpServer を作る(ステートレス。Durable Objects もセッションも使わない)。
 // Hono の c.executionCtx の型は tracing / abort を持たない。実体は Workers の ctx そのもの。
 app.all(MCP_PATH, (c) =>
-  createMcpHandler(() => createMcpServer({ env: c.env }), { route: MCP_PATH })(
+  createMcpHandler(() => createMcpServer({ env: c.env }), MCP_HANDLER_OPTIONS)(
     c.req.raw,
     c.env,
     c.executionCtx as unknown as ExecutionContext<unknown>,

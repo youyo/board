@@ -164,6 +164,16 @@ describe("url", () => {
     expect(clientUrl("", 5)).toBe("");
     expect(vendorUrl(base, 0)).toBe("");
   });
+  it.each([-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, 2 ** 53, "7", null])(
+    "上流の ID が正の安全な整数でなければ URL を作らない(%s)",
+    (bad) => {
+      const id = bad as unknown as number;
+      expect(projectUrl(base, id)).toBe("");
+      expect(documentUrl(base, id)).toBe("");
+      expect(clientUrl(base, id)).toBe("");
+      expect(vendorUrl(base, id)).toBe("");
+    },
+  );
   it("UI のベースは API のオリジンの '://api.' を '://' にして導く", () => {
     expect(uiBaseUrlFromApiBase("https://api.the-board.jp")).toBe("https://the-board.jp");
     expect(uiBaseUrlFromApiBase("https://api.board.test/")).toBe("https://board.test");

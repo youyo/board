@@ -1,7 +1,8 @@
-/** BOARD の UI の URL(Go 版 `url.go`)。id=0 またはベースが空なら空文字(= URL を付けない)。 */
+/** BOARD の UI の URL(Go 版 `url.go`)。ID が 1 以上の安全な整数でない、またはベースが空なら空文字(= URL を付けない)。 */
 
+// 上流の ID は信用しない: 1 以上の安全な整数でなければ URL を作らない(0 の『なし』も含む)。
 const url = (base: string, path: string, id: number) =>
-  id === 0 || base === "" ? "" : `${base}/${path}/${id}/edit`;
+  !Number.isSafeInteger(id) || id < 1 || base === "" ? "" : `${base}/${path}/${id}/edit`;
 
 export const projectUrl = (base: string, id: number) => url(base, "projects", id);
 export const documentUrl = (base: string, id: number) => url(base, "documents", id);

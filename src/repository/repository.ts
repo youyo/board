@@ -10,7 +10,7 @@ import { type CallContext, resolveContext } from "../board/context";
 import type { CommonListOptions } from "../board/resources";
 import { assertId } from "../board/resources";
 import { type CacheInfo, cacheInfoFromState } from "../cache/info";
-import { getEntry, listEntries, upsertEntities } from "../cache/resource-cache";
+import { cacheFetchedEntity, countEntries, getEntry, listEntries } from "../cache/resource-cache";
 import { ensureSchema } from "../cache/schema";
 import { getSyncState, hasSynced } from "../cache/sync-state";
 import { systemClock } from "../cache/time";
@@ -127,12 +127,14 @@ function createListRepository<E, F extends CommonListOptions>(
     }
 
     // ゼロフィルタ: キャッシュ全件。空なら空(未取得は cache の cached_at が無いことで分かる。API は呼ばない)。
-    const entries = await listEntries<E>(deps.db, resource);
+    // limit があるときは SQL の LIMIT で必要な件数だけ読む。切ったかどうかは件数の照会で分かる(totalBeforeLimit)。
+    const limit = readOpts.limit !== undefined && readOpts.limit > 0 ? readOpts.limit : undefined;
+    const entries = await listEntries<E>(deps.db, resource, { limit });
+    const items = entries.map((e) => e.entity);
+    const total =
+      limit !== undefined && items.length >= limit ? await countEntries(deps.db, resource) : 0;
     return {
-      ...limitResult(
-        entries.map((e) => e.entity),
-        readOpts.limit,
-      ),
+      ...(total > items.length ? { items, totalBeforeLimit: total } : { items }),
       source: "cache",
       cache: [await info(outcome)],
     } satisfies ListReadResult<E>;
@@ -153,13 +155,13 @@ function createListRepository<E, F extends CommonListOptions>(
       } satisfies GetReadResult<E>;
     }
 
-    // キャッシュにない: API から 1 件取って保存する(世代は最新のものを付ける)。
+    // キャッシュにない: API から 1 件取って保存する。世代の読み取り・ロックの確認・ID の照合は 1 文の中で行う。
+    const fetchStartedAt = now();
     const res = await spec.get(deps.client, id, ctx);
-    const state = await getSyncState(deps.db, resource);
-    await upsertEntities(deps.db, resource, [res.item], {
+    await cacheFetchedEntity(deps.db, resource, res.item, {
+      requestedId: id,
+      fetchStartedAt,
       now: now(),
-      generation: state?.full_generation ?? 0,
-      entityId: id,
     });
     return {
       item: res.item,
@@ -195,8 +197,13 @@ function createDocumentRepository<E>(
         } satisfies GetReadResult<E>;
       }
     }
+    const fetchStartedAt = now();
     const res = await spec.get(deps.client, id, ctx);
-    await upsertEntities(deps.db, resource, [res.item], { now: now(), entityId: id });
+    await cacheFetchedEntity(deps.db, resource, res.item, {
+      requestedId: id,
+      fetchStartedAt,
+      now: now(),
+    });
     return {
       item: res.item,
       source: "api",

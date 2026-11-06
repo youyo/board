@@ -89,6 +89,15 @@ export function isoToBoardDateTime(s: string): string {
   return m ? `${m[1]} ${m[3]}` : s;
 }
 
+function isValidUpdatedAt(s: string): boolean {
+  const m = OFFSET_RE.exec(s);
+  if (!m) return false;
+  // 月日・時刻の範囲まで確かめる(正規表現だけでは 2026-13-45 を通してしまう)。UTC として組み直して同じ値になること。
+  const iso = `${m[1]}T${m[3]}Z`;
+  const t = Date.parse(iso);
+  return !Number.isNaN(t) && new Date(t).toISOString().startsWith(`${m[1]}T${m[3]}`);
+}
+
 function offsetMinutes(offset: string | undefined): number {
   if (!offset || offset === "Z") return 0;
   const m = /^([+-])(\d{2}):?(\d{2})$/.exec(offset);
@@ -122,11 +131,12 @@ function maxString(a: string | null, b: string | null): string | null {
   return b > a ? b : a;
 }
 
+/** 形式が正しい(ISO 8601 の日時として解釈できる)updated_at だけを最大値の計算に使う。解釈できない値は無視する。 */
 function maxUpdatedAt(items: readonly unknown[]): string | null {
   let max: string | null = null;
   for (const e of items) {
     const v = (e as { updated_at?: unknown } | null)?.updated_at;
-    if (typeof v === "string" && v !== "") max = maxString(max, v);
+    if (typeof v === "string" && isValidUpdatedAt(v)) max = maxString(max, v);
   }
   return max;
 }

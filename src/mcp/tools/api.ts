@@ -51,8 +51,16 @@ function fieldSchema(f: FieldDef): z.ZodType {
   }
 }
 
+/**
+ * refresh の副作用の注意(注釈は ReadOnly のまま。BOARD 自体は書き換えないため)。
+ * delta / full は共有の D1 キャッシュに書き込み、BOARD API の 1 日あたりの上限(3,000 回)を消費する。
+ */
+const REFRESH_SIDE_EFFECT_DESC =
+  "注意: delta / full は共有の D1 キャッシュに書き込み、BOARD API の 1 日あたりの上限(3,000 回)を消費する(BOARD のデータは書き換えない)。必要なときだけ指定する";
+
 const REFRESH_LIST_DESC =
-  "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)";
+  "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)。" +
+  REFRESH_SIDE_EFFECT_DESC;
 const LIMIT_DESC =
   "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)。件数を切ったときだけ、応答に limited: true と total_before_limit(切る前の件数)が付く。truncated(BOARD のページ巡回の打ち切り)とは別の意味";
 const SHOW_META_DESC =
@@ -183,9 +191,11 @@ function getTool(def: ResourceDef): ToolDefinition {
     id: idArg(`${def.label}の ID(1 以上の整数)`),
     refresh: optEnum(
       REFRESH_CHOICES,
-      def.mode === "document"
-        ? "none=キャッシュがあればそれを返す(既定)/ full=キャッシュを使わず BOARD から取り直す / delta=何もしない"
-        : "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)",
+      `${
+        def.mode === "document"
+          ? "none=キャッシュがあればそれを返す(既定)/ full=キャッシュを使わず BOARD から取り直す / delta=何もしない"
+          : "none=更新しない(既定)/ delta=差分更新してから読む / full=全件を取り直してから読む(件数が多いと partial になる。続きはもう一度 refresh=full)"
+      }。${REFRESH_SIDE_EFFECT_DESC}`,
     ),
     show_meta: optBool(SHOW_META_DESC),
   };

@@ -105,7 +105,9 @@ full refresh や逆引きの走査は 1 回の呼び出しで多数のクエリ�
 - **`refresh`**: 一覧・検索系のツールの引数。`none`(既定。キャッシュをそのまま読む)/ `delta`(前回からの差分を取る)/ `full`(全件を取り直し、消えたものを除く)。
   どれが要るかは、応答の `cache`(`cached_at` / `full_refreshed_at` / `refresh_state`)か `cache_status` を見て LLM が決める。
   初めて使うリソースはキャッシュが空なので、`refresh=full` を `refresh_state=complete` になるまで繰り返す。件数の多いリソース(estimates など)は数回かかる。
+  `delta` / `full` は共有の D1 キャッシュに書き込み、BOARD API の 1 日あたりの上限(3,000 回)を消費する。BOARD のデータは書き換えないので、読み取りツールの注釈(`readOnlyHint: true`)はそのままにしている。読み取りツールを自動で承認するクライアントは、確認なしに refresh を実行する。必要なときだけ指定する(各ツールの `refresh` 引数の説明にも書いてある)。
   同時に別の refresh が動いていると `refresh_in_progress`(`retry_after_seconds` 秒後に再試行)。
+- **入力の上限**: 文字列は 1,000 文字、配列は 100 件まで。超えると `argument_error`。
 - **`limit`**: 結果の件数を切る(0・未指定は無制限)。切ったときは `limited: true` と `total_before_limit` が付く。名前が多数にマッチしうる検索では `limit` を付ける。
 - **`find_*` の `warnings`**: 補助情報の取得に失敗した、書類の案件 ID を解決できなかった(逆引きの走査が時間切れ)、などの致命的でない問題。再実行で解消することが多い。
 - **秘密情報**: BOARD の API キー・トークンと Access の JWT は、ログ・エラー・MCP 応答に出さない。
