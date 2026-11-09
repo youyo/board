@@ -534,6 +534,9 @@ describe("E2E: 名前の曖昧さと fanout", () => {
     expect(r.isError, r.text).toBe(false);
     expect(r.json.items.map((x: { ProjectID: number }) => x.ProjectID)).toEqual([10, 20]);
     expect(r.json.items[1].Client).toMatchObject({ id: 2 });
+    // 案件に埋め込まれた書類本体は Estimate にだけ入り、Project には重ねて入れない。
+    expect(r.json.items[1].Estimate).toMatchObject({ id: 200 });
+    expect("estimate" in r.json.items[1].Project).toBe(false);
     const projectCalls = boardCalls(m).filter((c) => c.url.includes("/v1/projects"));
     expect(projectCalls.map((c) => new URL(c.url).searchParams.get("response_group"))).toEqual([
       "estimate",

@@ -67,7 +67,7 @@ const NO_DELTA_NOTE =
 const LIMIT_DESC =
   "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)。件数を切ったときだけ、応答に limited: true と total_before_limit(切る前の件数)が付く。truncated(BOARD のページ巡回の打ち切り)とは別の意味";
 const SHOW_META_DESC =
-  "true で応答に _meta(BOARD の応答ヘッダー由来: total_count / rate_limit_remaining / etag など)を付ける。BOARD から直接取ったときだけ値が入る";
+  "true で応答に _meta(BOARD の応答ヘッダー由来: total_count / etag など)を付ける。BOARD から直接取ったときだけ値が入る";
 
 /** list の入力: Go 版 CLI のフィルタフラグ + refresh / limit / show_meta(max_response_tokens は defineTool が足す)。 */
 function listShape(def: ResourceDef): Record<string, z.ZodType> {

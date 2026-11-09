@@ -31,8 +31,8 @@ MCP ツールにはまだつなげない(M04)。D1 キャッシュもまだ持�
 - 秘密情報: キー・トークンはエラーメッセージ・ログ・例外の原因に出さない。通信の例外は原因を捨てて固定文にする。クライアントはログを出さない
 
 ### `_meta`(`src/board/meta.ts`、Go の `result.go`)
-- 一覧: `total_count` / `page` / `per_page` / `rate_limit_remaining` / `rate_limit_limit` / `rate_limit_reset`(ISO 8601 UTC)/
-  `retry_after` / `etag` / `last_modified`。0・空は出さない。一覧は最終ページの応答ヘッダーから作る
+- 一覧: `total_count` / `page` / `per_page` /
+  `retry_after` / `etag` / `last_modified`。0・空は出さない。一覧は最終ページの応答ヘッダーから作る(`rate_limit_*` は v1.7.0 で削除: BOARD の OpenAPI に `X-Ratelimit-*` の記載が無く、実 API も返さない。issue #33)
 - 単体: 上のうちページング関係と `retry_after` を除いたもの
 
 ### ページング(`src/board/paging.ts`、Go の `pagination.go`)

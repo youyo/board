@@ -1118,6 +1118,98 @@ describe("書類 4 種(Go: find_estimate_test.go ほか)", () => {
   });
 });
 
+describe("書類 4 種: Project に書類本体を二重に入れない(issue #33)", () => {
+  // response_group=<種別> 付きの案件は書類本体を埋め込んでいる。Project にそのまま入れると
+  // 書類本体が Estimate などと Project の両方に入り、応答がほぼ倍になる。
+  const CASES = [
+    { kind: "estimate", find: findEstimates, resultKey: "Estimate", embedKey: "estimate" },
+    { kind: "order", find: findOrders, resultKey: "Order", embedKey: "order" },
+    { kind: "delivery", find: findDeliveries, resultKey: "Delivery", embedKey: "deliveries" },
+    { kind: "receipt", find: findReceipts, resultKey: "Receipt", embedKey: "receipts" },
+  ] as const;
+  const embed = (embedKey: string) =>
+    embedKey === "deliveries" || embedKey === "receipts"
+      ? [{ id: 900, lines: ["明細"] }]
+      : { id: 900, lines: ["明細"] };
+  const withDoc = (id: number, embedKey: string, extra: object = {}) => ({
+    id,
+    name: `案件${id}`,
+    client: { id: 7 },
+    order_status_name: "受注済",
+    [embedKey]: embed(embedKey),
+    ...extra,
+  });
+  const docs = {
+    clients: {
+      list: () => [{ id: 7, name: "顧客7" }],
+      get: (id: number) => ({ id, name: `顧客${id}` }),
+    },
+    estimates: { get: (id: number) => ({ id, lines: ["明細"] }) },
+    orders: { get: (id: number) => ({ id, lines: ["明細"] }) },
+    deliveries: { get: (id: number) => ({ id, lines: ["明細"] }) },
+    receipts: { get: (id: number) => ({ id, lines: ["明細"] }) },
+  };
+
+  describe.each(CASES)("$kind", ({ find, resultKey, embedKey }) => {
+    const check = (r: Record<string, unknown>[]) => {
+      expect(r.length).toBeGreaterThan(0);
+      for (const x of r) {
+        expect(x[resultKey]).toMatchObject({ lines: ["明細"] });
+        const p = x.Project as Record<string, unknown>;
+        expect(embedKey in p).toBe(false);
+        // 書類以外の案件の項目は残る。
+        expect(p).toMatchObject({ order_status_name: "受注済", client: { id: 7 } });
+      }
+    };
+
+    it("project_id", async () => {
+      const f = fakeFind({
+        ...docs,
+        projectsWithGroup: (id) => withDoc(id, embedKey, { id: 42 }),
+      });
+      check((await find(f.session(), { projectId: 42 })) as unknown as Record<string, unknown>[]);
+    });
+
+    it("client_name", async () => {
+      const f = fakeFind({
+        ...docs,
+        projects: { list: () => [withDoc(42, embedKey)] },
+      });
+      check(
+        (await find(f.session(), { clientName: "顧客" })) as unknown as Record<string, unknown>[],
+      );
+    });
+
+    it("project_name", async () => {
+      const f = fakeFind({
+        ...docs,
+        projects: { list: () => [withDoc(42, embedKey)] },
+      });
+      check(
+        (await find(f.session(), { projectName: "案件" })) as unknown as Record<string, unknown>[],
+      );
+    });
+  });
+
+  it("案件のオブジェクトは書き換えない(逆引きへの記録など、元の案件を他でも読む)", async () => {
+    const original = withDoc(42, "estimate");
+    const f = fakeFind({ ...docs, projectsWithGroup: () => original });
+    const r = await findEstimates(f.session(), { projectId: 42 });
+    expect("estimate" in (r[0]?.Project ?? {})).toBe(false);
+    expect(original.estimate).toEqual({ id: 900, lines: ["明細"] });
+    expect(f.calls("index.record")).toEqual(["index.record estimate 42"]);
+  });
+
+  it("他の種別の埋め込みは落とさない(estimate の検索で deliveries は残す)", async () => {
+    const f = fakeFind({
+      ...docs,
+      projectsWithGroup: () => withDoc(42, "estimate", { deliveries: [{ id: 1 }] }),
+    });
+    const r = await findEstimates(f.session(), { projectId: 42 });
+    expect(r[0]?.Project).toMatchObject({ deliveries: [{ id: 1 }] });
+  });
+});
+
 describe("共通の振る舞い(session)", () => {
   it("refresh はリソースごとに最初の 1 回の読み取りにだけ付く。書類は 1 件ごとに効く", async () => {
     const f = fakeFind(

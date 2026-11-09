@@ -107,6 +107,29 @@ describe("E2E: get_delivery", () => {
   });
 });
 
+describe("E2E: API 経路の limit と _meta(issue #33)", () => {
+  it("limit=1 は 1 ページで止まり limited:true / total_before_limit が付く。_meta に rate_limit_* は出ない", async () => {
+    const m = boardMocks({
+      [`GET ${BASE}/v1/clients`]: (call) => {
+        const res = pagedHandler(() => makeEntities(263), undefined, { totalHeader: true })(call);
+        return res.then((r) => {
+          r.headers.set("X-Ratelimit-Remaining", "2999");
+          r.headers.set("X-Ratelimit-Limit", "3000");
+          return r;
+        });
+      },
+    });
+    const r = await tool("list_clients", { custom_no_eq: "X", limit: 1, show_meta: true });
+    expect(r.isError, r.text).toBe(false);
+    expect(r.json.items).toHaveLength(1);
+    expect(r.json.limited).toBe(true);
+    expect(r.json.total_before_limit).toBe(263);
+    expect(boardCalls(m)).toHaveLength(1);
+    expect(r.json._meta.total_count).toBe(263);
+    expect(Object.keys(r.json._meta).some((k) => k.startsWith("rate_limit"))).toBe(false);
+  });
+});
+
 describe("E2E: list_contacts(非ゼロのフィルタ)", () => {
   it("キャッシュを経由せず BOARD を直接呼び、refresh は無視される", async () => {
     const m = boardMocks({
