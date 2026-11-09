@@ -87,10 +87,29 @@ function createListRepository<E, F extends CommonListOptions>(
     const cacheOnly = cf?.cacheOnlyKeys?.filter((k) => !isZeroFilter({ [k]: filter[k] })) ?? [];
     const apiFilter = { ...filter } as F;
     for (const k of cacheOnly) delete apiFilter[k];
-    const r = await spec.list(deps.client, apiFilter, undefined, ctx);
-    const items = cf && cacheOnly.length > 0 ? r.items.filter((e) => cf.match(e, filter)) : r.items;
+    // match で後から絞る場合は、何件で足りるか分からないので全ページを取る。それ以外は limit に達したページで止める。
+    const postFiltered = cf !== undefined && cacheOnly.length > 0;
+    const limit = readOpts.limit !== undefined && readOpts.limit > 0 ? readOpts.limit : undefined;
+    const stopAt = !postFiltered ? limit : undefined;
+    const r = await spec.list(
+      deps.client,
+      apiFilter,
+      stopAt !== undefined ? { limit: stopAt } : undefined,
+      ctx,
+    );
+    const items = postFiltered ? r.items.filter((e) => cf.match(e, filter)) : r.items;
+    const cut = limitResult(items, readOpts.limit);
+    // 途中で止めたときは items.length が総数ではない。X-Total-Count が limit を超えていればそれを切る前の件数にする。
+    const total = r._meta?.total_count ?? 0;
+    const totalBeforeLimit =
+      stopAt !== undefined && items.length >= stopAt && total > Math.min(items.length, stopAt)
+        ? { totalBeforeLimit: Math.max(total, items.length) }
+        : cut.totalBeforeLimit !== undefined
+          ? { totalBeforeLimit: cut.totalBeforeLimit }
+          : {};
     return {
-      ...limitResult(items, readOpts.limit),
+      items: cut.items,
+      ...totalBeforeLimit,
       source: "api",
       // refresh を走らせたうえで API にフォールバックしたときは、その結果(partial / failed)を落とさない。
       cache: outcome ? [await info(outcome)] : [],

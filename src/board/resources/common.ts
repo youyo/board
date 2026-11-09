@@ -41,6 +41,8 @@ export interface ItemResult<T> {
 export interface ListPaging {
   /** 辿るページ数の上限(既定 10)。 */
   maxPages?: number;
+  /** 正の整数なら、この件数に達したページで巡回を止める(API 経路の limit)。 */
+  limit?: number;
 }
 
 /**
@@ -84,7 +86,7 @@ export async function listResource<T, O extends CommonListOptions>(
       }
       return { items: res.body as T[], headers: res.headers };
     },
-    { perPage: opts.perPage, maxPages: paging.maxPages, ctx },
+    { perPage: opts.perPage, maxPages: paging.maxPages, limit: paging.limit, ctx },
   );
   return { items: all.items, _meta: parseListMeta(all.headers), truncated: all.truncated };
 }
