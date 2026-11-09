@@ -574,6 +574,32 @@ describe("find_invoices(Go: find_invoice_test.go + issue #27)", () => {
       expect(f.calls("projects.list")).toHaveLength(0);
       expect(f.calls("invoices.list")).toHaveLength(0);
     });
+
+    it("id と client_name の併用: 顧客を検索せず(clients.list を呼ばない)、id の請求書だけ返す", async () => {
+      // clients.list / invoices.list のハンドラは定義しない(呼ぶと fake が例外にする)。
+      const f = fakeFind({
+        ...base,
+        clients: { get: (id: number) => ({ id }) },
+        invoices: { get: (id: number) => inv(id) },
+      });
+      const r = await findInvoices(f.session(), { id: 9, partnerName: "A" });
+      expect(r.map((x) => x.Invoice.id)).toEqual([9]);
+      expect(f.calls("clients.list")).toHaveLength(0);
+      expect(f.calls("invoices.list")).toHaveLength(0);
+      expect(f.calls("invoices.get")).toHaveLength(1);
+    });
+
+    it("存在しない project_id は not_found(請求書は引かない)", async () => {
+      const f = fakeFind({
+        ...base,
+        projects: { get: () => Promise.reject(notFound()) },
+      });
+      expect((await rejects(findInvoices(f.session(), { projectId: 999 })))?.code).toBe(
+        "not_found",
+      );
+      expect(f.calls("projects.get")[0]).toContain("projects.get 999");
+      expect(f.calls("invoices.list")).toHaveLength(0);
+    });
   });
 });
 
