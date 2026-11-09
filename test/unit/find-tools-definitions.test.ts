@@ -88,6 +88,67 @@ describe("find 層のツール 11 個", () => {
   });
 });
 
+describe("ステータス名の引数の説明(issue #27)", () => {
+  const status = (n: string) => schemaOf(n).properties.status?.description ?? "";
+  const tool = (n: string) => byName.get(n)?.description ?? "";
+
+  it("find_invoices: 請求ステータスの『コード=名称』を全部書く。名称で受け、知らない名称は argument_error", () => {
+    for (const d of [status("find_invoices"), tool("find_invoices")]) {
+      for (const s of [
+        "1=未請求",
+        "4=請求OK",
+        "2=請求済",
+        "5=一部入金済",
+        "3=入金済",
+        "9=回収不能",
+      ]) {
+        expect(d).toContain(s);
+      }
+    }
+    expect(status("find_invoices")).toContain("argument_error");
+  });
+
+  it("find_purchase_orders: 発注ステータスと進捗状況の両方を書き、どちらの名称でも受けると書く", () => {
+    for (const d of [status("find_purchase_orders"), tool("find_purchase_orders")]) {
+      for (const s of [
+        "1=見積中(高)",
+        "2=見積中(中)",
+        "3=見積中(低)",
+        "8=見積中(除)",
+        "4=発注確定",
+        "5=発注済",
+        "9=見送り",
+        "1=未着手",
+        "2=着手中",
+        "3=納品済",
+        "4=検収済",
+      ]) {
+        expect(d).toContain(s);
+      }
+    }
+    expect(status("find_purchase_orders")).toContain("argument_error");
+  });
+
+  it("find_payments: 支払ステータスの『コード=名称』を全部書く", () => {
+    for (const d of [status("find_payments"), tool("find_payments")]) {
+      for (const s of ["1=請求書未受領", "2=請求書受領済", "4=振込予約済", "3=支払済"]) {
+        expect(d).toContain(s);
+      }
+    }
+  });
+
+  it("説明に『status_eq で API に委譲』のような旧い言い回しが残っていない", () => {
+    for (const n of ["find_invoices", "find_purchase_orders", "find_payments"]) {
+      expect(tool(n), n).not.toContain("API delegated");
+      expect(status(n), n).not.toContain("API delegated");
+    }
+  });
+
+  it("find_users: name は姓・名・姓名の部分一致と書く", () => {
+    expect(schemaOf("find_users").properties.name?.description).toContain("last/first");
+  });
+});
+
 describe("引数の検証(BOARD に通信する前に拒否する)", () => {
   const cases: [string, Record<string, unknown>, string][] = [
     ["find_clients", {}, "at least one field required"],

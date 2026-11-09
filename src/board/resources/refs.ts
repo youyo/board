@@ -42,6 +42,15 @@ export interface VendorRef {
   [key: string]: unknown;
 }
 
+/** 発注書・支払の `project`(medium 以上の response_group で入る)。 */
+export interface ProjectRef {
+  id: number;
+  name: string;
+  project_no: number | null;
+  management_no: string | null;
+  [key: string]: unknown;
+}
+
 export interface HubspotRef {
   hubspot_deal_id: string | null;
   [key: string]: unknown;

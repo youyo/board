@@ -167,11 +167,11 @@ const LIST_CASES: ListCase[] = [
     path: "/v1/invoices",
     build: R.buildInvoicesQuery,
     list: R.listInvoices,
-    opts: { clientIdEq: 1, projectIdEq: 2, statusEq: "paid", responseGroup: "small" },
+    opts: { projectClientIdEq: 1, invoiceStatusIn: [2, 5], responseGroup: "small" },
     params: [
-      ["client_id_eq", "1"],
-      ["project_id_eq", "2"],
-      ["status_eq", "paid"],
+      ["project_client_id_eq", "1"],
+      ["invoice_status_in[]", "2"],
+      ["invoice_status_in[]", "5"],
       ["response_group", "small"],
     ],
   },
@@ -211,11 +211,19 @@ const LIST_CASES: ListCase[] = [
     path: "/v1/expenditures",
     build: R.buildPurchaseOrdersQuery,
     list: R.listPurchaseOrders,
-    opts: { vendorIdEq: 9, projectIdEq: 8, statusEq: "ordered", responseGroup: "large" },
+    opts: {
+      payeeIdEq: 9,
+      projectIdEq: 8,
+      expenditureStatusIn: [5, 4],
+      deliveryStatusIn: [2],
+      responseGroup: "large",
+    },
     params: [
-      ["vendor_id_eq", "9"],
+      ["payee_id_eq", "9"],
       ["project_id_eq", "8"],
-      ["status_eq", "ordered"],
+      ["expenditure_status_in[]", "5"],
+      ["expenditure_status_in[]", "4"],
+      ["delivery_status_in[]", "2"],
       ["response_group", "large"],
     ],
   },
@@ -224,11 +232,17 @@ const LIST_CASES: ListCase[] = [
     path: "/v1/expenditure_payments",
     build: R.buildPaymentsQuery,
     list: R.listPayments,
-    opts: { vendorIdEq: 9, purchaseOrderIdEq: 6, statusEq: "paid", responseGroup: "large" },
+    opts: {
+      expenditurePayeeIdEq: 9,
+      paymentStatusIn: [3, 4],
+      expenditureExpenditureNoEq: 6,
+      responseGroup: "large",
+    },
     params: [
-      ["vendor_id_eq", "9"],
-      ["purchase_order_id_eq", "6"],
-      ["status_eq", "paid"],
+      ["expenditure_payee_id_eq", "9"],
+      ["payment_status_in[]", "3"],
+      ["payment_status_in[]", "4"],
+      ["expenditure_expenditure_no_eq", "6"],
       ["response_group", "large"],
     ],
   },
@@ -237,11 +251,9 @@ const LIST_CASES: ListCase[] = [
     path: "/v1/users",
     build: R.buildUsersQuery,
     list: R.listUsers,
+    // name_cont / email_cont はキャッシュ専用のキー。BOARD の API には送らない(送れるのは email_eq だけ)。
     opts: { nameCont: "立花", emailCont: "@board.example" },
-    params: [
-      ["name_cont", "立花"],
-      ["email_cont", "@board.example"],
-    ],
+    params: [],
   },
   NAME_ONLY("groups", "/v1/groups", R.buildGroupsQuery, R.listGroups),
   NAME_ONLY("payment_terms", "/v1/payment_terms", R.buildPaymentTermsQuery, R.listPaymentTerms),
@@ -309,7 +321,9 @@ describe("22 リソースの一覧(Go の internal/boardapi と internal/cli/api
 
 describe.each(LIST_CASES)("list $resource (GET $path)", (c) => {
   it("オプションなしは page と per_page だけ", () => {
-    expect(c.build({}, 1, 100)).toBe("page=1&per_page=100");
+    // 発注書の一覧だけは response_group 未指定で medium を送る(案件 project を含めるため。issue #27)
+    const extra = c.resource === "purchase_orders" ? "&response_group=medium" : "";
+    expect(c.build({}, 1, 100)).toBe(`page=1&per_page=100${extra}`);
   });
 
   it("Go の build*Query と同じパラメーターを送る", () => {

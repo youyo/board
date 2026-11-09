@@ -9,34 +9,83 @@ import {
   type ListResult,
   listResource,
 } from "./common";
+import type { ClientBranchRef, ClientRef, CompanyBranchRef, ContactRef, UserRef } from "./refs";
 
 /**
- * 請求書。GET /v1/invoices の応答 1 要素(Go の InvoiceEntity)。
- * 注意: Go 版の構造体をそのまま写した。実 API の応答は未知のフィールドも含むので、生データを信頼すること。
+ * 請求書。GET /v1/invoices の応答 1 要素。
+ * BOARD の OpenAPI(v1.9.0)の応答項目だけを持つ。顧客は入れ子の `client`、ステータスは数値の `invoice_status`
+ * (名称は `invoice_status_name`)。`client_id` / `status` は無い(issue #27)。金額は文字列("110000.0")。
+ * 必須にしたのは find 層・キャッシュの絞り込みが読む項目と共通項目だけで、残りは response_group によって入らないことがある。
  */
 export interface InvoiceEntity {
   id: number;
-  client_id: number;
   project_id: number;
-  title: string;
-  total_amount: number;
-  status: string;
-  /** ISO 8601 の日付 */
-  invoice_date: string;
-  due_date: string;
-  memo: string;
-  updated_at: string;
+  project_no?: number | null;
+  management_no?: string | null;
+  /** 案件名 */
+  name: string;
+  client: ClientRef | null;
+  client_branch?: ClientBranchRef | null;
+  contact?: ContactRef | null;
+  company_branch?: CompanyBranchRef | null;
+  user?: UserRef | null;
+  total?: string | null;
+  tax?: string | null;
+  cost_total?: number;
+  cost_tax?: number;
+  invoice_date?: string | null;
+  payment_limit_date?: string | null;
+  order_status: number;
+  order_status_name: string;
+  /** 請求ステータス: 1 未請求 / 4 請求OK / 2 請求済 / 5 一部入金済 / 3 入金済 / 9 回収不能 */
+  invoice_status: number;
+  invoice_status_name: string;
+  payment_method_kbn?: number;
+  payment_method_kbn_name?: string;
+  project_type_id?: number | null;
+  project_type_name?: string | null;
+  project_type2_id?: number | null;
+  project_type2_name?: string | null;
+  project_type3_id?: number | null;
+  project_type3_name?: string | null;
+  group_id?: number | null;
+  group_name?: string | null;
+  paid_date?: string | null;
+  tags?: string[];
+  accounting_type_id?: number | null;
+  accounting_type_name?: string | null;
+  accounting_type2_id?: number | null;
+  accounting_type2_name?: string | null;
+  accounting_type3_id?: number | null;
+  accounting_type3_name?: string | null;
+  lock_flg?: number;
+  currency?: string;
+  lang_kbn?: number;
+  lang_kbn_name?: string;
+  exchange_rate?: string | null;
+  total_jpy?: number;
+  tax_jpy?: number;
   created_at: string;
-  [key: string]: unknown;
+  updated_at: string;
+  /** response_group で書類を付けたときの請求書の本体 */
+  invoice?: unknown;
 }
 
+/** 請求ステータス(数値コード → 名称)。`invoice_status_in[]` に送る値。 */
+export const INVOICE_STATUSES = {
+  1: "未請求",
+  4: "請求OK",
+  2: "請求済",
+  5: "一部入金済",
+  3: "入金済",
+  9: "回収不能",
+} as const;
+
 export interface InvoiceListOptions extends CommonListOptions {
-  /** 顧客 ID の完全一致(client_id_eq) */
-  clientIdEq?: number;
-  /** 案件 ID の完全一致(project_id_eq) */
-  projectIdEq?: number;
-  /** ステータスの完全一致(status_eq) */
-  statusEq?: string;
+  /** 顧客 ID の完全一致(project_client_id_eq) */
+  projectClientIdEq?: number;
+  /** 請求ステータス(invoice_status_in[]) */
+  invoiceStatusIn?: number[];
   /** "small" / "large" */
   responseGroup?: string;
 }
@@ -47,9 +96,8 @@ export function buildInvoicesQuery(
   perPage: number,
 ): string {
   return baseQuery(opts, page, perPage)
-    .intEq("client_id", opts.clientIdEq)
-    .intEq("project_id", opts.projectIdEq)
-    .strEq("status", opts.statusEq)
+    .intEq("project_client_id", opts.projectClientIdEq)
+    .intIn("invoice_status", opts.invoiceStatusIn)
     .responseGroup(opts.responseGroup)
     .encode();
 }

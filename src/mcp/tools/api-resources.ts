@@ -73,14 +73,17 @@ const strs = (arg: string, opt: string, description: string): FieldDef => ({
   kind: { type: "strs" },
   description,
 });
-const ints = (arg: string, opt: string, description: string): FieldDef => ({
+const ints = (arg: string, opt: string, description: string, cacheable = false): FieldDef => ({
   arg,
   opt,
   kind: { type: "ints" },
   description,
+  ...(cacheable ? { cacheable } : {}),
 });
 
 export const RESPONSE_GROUPS_COMMON = ["small", "large"] as const;
+/** 発注書(expenditures)の一覧。medium は案件 `project` を含む。未指定なら medium を送る。 */
+export const RESPONSE_GROUPS_PURCHASE_ORDERS = ["small", "medium", "large"] as const;
 export const RESPONSE_GROUPS_PROJECTS_LIST = [
   "small",
   "large",
@@ -235,13 +238,23 @@ export const API_RESOURCES: readonly ResourceDef[] = [
     singular: "invoice",
     mode: "cache-first",
     label: "請求書",
-    summary: "請求書。顧客 ID・案件 ID に紐づく",
+    summary:
+      "請求書。案件(project_id)と顧客(client の入れ子。顧客 ID は client.id)に紐づく。請求ステータスは数値コード(invoice_status)と名称(invoice_status_name)で返る",
     goFile: "api_invoices.go",
     responseGroups: RESPONSE_GROUPS_COMMON,
     fields: [
-      int("client_id_eq", "clientIdEq", "顧客 ID で絞り込む(完全一致)", true),
-      int("project_id_eq", "projectIdEq", "案件 ID で絞り込む(完全一致)", true),
-      str("status_eq", "statusEq", "ステータスが一致する請求書(例: sent)", true),
+      int(
+        "project_client_id_eq",
+        "projectClientIdEq",
+        "顧客 ID で絞り込む(完全一致。請求書の client.id)",
+        true,
+      ),
+      ints(
+        "invoice_status_in",
+        "invoiceStatusIn",
+        "請求ステータスで絞り込む(いずれかに一致): 1=未請求 / 4=請求OK / 2=請求済 / 5=一部入金済 / 3=入金済 / 9=回収不能",
+        true,
+      ),
       responseGroup(RESPONSE_GROUPS_COMMON, ""),
     ],
   },
@@ -315,14 +328,38 @@ export const API_RESOURCES: readonly ResourceDef[] = [
     singular: "purchase_order",
     mode: "cache-first",
     label: "発注書",
-    summary: "発注書(仕入側)。仕入先 ID・案件 ID に紐づく",
+    summary:
+      "発注書(仕入側。BOARD の API では expenditures)。支払先(payee の入れ子。仕入先 ID は payee.id)と案件(project の入れ子)に紐づく。発注ステータスは expenditure_status、進捗状況は delivery_status(数値コードと _name の名称)で返る",
     goFile: "api_purchase_orders.go",
-    responseGroups: RESPONSE_GROUPS_COMMON,
+    responseGroups: RESPONSE_GROUPS_PURCHASE_ORDERS,
     fields: [
-      int("vendor_id_eq", "vendorIdEq", "仕入先 ID で絞り込む(完全一致)", true),
-      int("project_id_eq", "projectIdEq", "案件 ID で絞り込む(完全一致)", true),
-      str("status_eq", "statusEq", "ステータスが一致する発注書", true),
-      responseGroup(RESPONSE_GROUPS_COMMON, ""),
+      int(
+        "payee_id_eq",
+        "payeeIdEq",
+        "支払先(仕入先)ID で絞り込む(完全一致。発注書の payee.id)",
+        true,
+      ),
+      int(
+        "project_id_eq",
+        "projectIdEq",
+        "案件 ID で絞り込む(完全一致)。サーバー側の指定なので、指定すると BOARD の API を直接呼ぶ(キャッシュでは絞らない)",
+      ),
+      ints(
+        "expenditure_status_in",
+        "expenditureStatusIn",
+        "発注ステータスで絞り込む(いずれかに一致): 1=見積中(高) / 2=見積中(中) / 3=見積中(低) / 8=見積中(除) / 4=発注確定 / 5=発注済 / 9=見送り",
+        true,
+      ),
+      ints(
+        "delivery_status_in",
+        "deliveryStatusIn",
+        "進捗状況で絞り込む(いずれかに一致): 1=未着手 / 2=着手中 / 3=納品済 / 4=検収済",
+        true,
+      ),
+      responseGroup(
+        RESPONSE_GROUPS_PURCHASE_ORDERS,
+        "未指定なら medium を送る(案件 project を含む)。small は project を含まない。",
+      ),
     ],
   },
   {
@@ -330,13 +367,29 @@ export const API_RESOURCES: readonly ResourceDef[] = [
     singular: "payment",
     mode: "cache-first",
     label: "支払い",
-    summary: "仕入先への支払い。仕入先 ID・発注書 ID に紐づく",
+    summary:
+      "仕入先への支払い(BOARD の API では expenditure_payments)。支払先(payee の入れ子。仕入先 ID は payee.id)と発注(expenditure_id / expenditure_no)に紐づく。支払ステータスは payment_status(数値コードと payment_status_name の名称)で返る",
     goFile: "api_payments.go",
     responseGroups: RESPONSE_GROUPS_COMMON,
     fields: [
-      int("vendor_id_eq", "vendorIdEq", "仕入先 ID で絞り込む(完全一致)", true),
-      int("purchase_order_id_eq", "purchaseOrderIdEq", "発注書 ID で絞り込む(完全一致)", true),
-      str("status_eq", "statusEq", "ステータスが一致する支払い", true),
+      int(
+        "expenditure_payee_id_eq",
+        "expenditurePayeeIdEq",
+        "支払先(仕入先)ID で絞り込む(完全一致。支払の payee.id)",
+        true,
+      ),
+      ints(
+        "payment_status_in",
+        "paymentStatusIn",
+        "支払ステータスで絞り込む(いずれかに一致): 1=請求書未受領 / 2=請求書受領済 / 4=振込予約済 / 3=支払済",
+        true,
+      ),
+      int(
+        "expenditure_expenditure_no_eq",
+        "expenditureExpenditureNoEq",
+        "発注 No で絞り込む(完全一致)。発注の ID ではなく、発注書の expenditure_no(支払の expenditure_no と同じ値)",
+        true,
+      ),
       responseGroup(RESPONSE_GROUPS_COMMON, ""),
     ],
   },
@@ -345,11 +398,22 @@ export const API_RESOURCES: readonly ResourceDef[] = [
     singular: "user",
     mode: "cache-first",
     label: "ユーザー",
-    summary: "BOARD のユーザー(社内の担当者)マスタ",
+    summary:
+      "BOARD のユーザー(社内の担当者)マスタ。姓名は last_name / first_name に分かれていて、name という項目は無い",
     goFile: "api_users.go",
     fields: [
-      nameCont("ユーザー", true),
-      str("email_cont", "emailCont", "メールアドレスで絞り込む(部分一致)", true),
+      str(
+        "name_cont",
+        "nameCont",
+        "ユーザーの姓・名・姓名(連結、または空白区切り)で絞り込む(部分一致。キャッシュ専用: BOARD の API に名前の絞り込みは無いので、未同期なら絞り込みなしで全件を取ってからこちらで絞る)",
+        true,
+      ),
+      str(
+        "email_cont",
+        "emailCont",
+        "メールアドレスで絞り込む(部分一致。キャッシュ専用: name_cont と同じ扱い)",
+        true,
+      ),
     ],
   },
   {

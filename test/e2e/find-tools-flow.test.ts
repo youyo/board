@@ -5,6 +5,7 @@ import { clearBoardClientCache } from "../../src/board/client";
 import { createTestKey, jwksResponse, signAccessJwt, type TestKey } from "../helpers/access";
 import { BASE, pagedHandler } from "../helpers/board-list";
 import { resetCache } from "../helpers/d1";
+import { invoiceEntity, paymentEntity, purchaseOrderEntity, userEntity } from "../helpers/entities";
 import { firstText, readRpc } from "../helpers/mcp";
 import { jsonResponse, mockOutboundFetch } from "../helpers/mock-fetch";
 import { mcpCall } from "../helpers/worker";
@@ -51,6 +52,7 @@ async function tool(name: string, args: Record<string, unknown>, id = 1) {
 const get = (p: string) => `GET ${BASE}${p}`;
 const one = (body: unknown) => () => jsonResponse(body);
 const list = (rows: unknown[]) => pagedHandler(() => rows);
+const ref = (id: number, name: string) => ({ id, name, name_disp: name, custom_no: "" });
 
 describe("E2E: tools/list", () => {
   it("find 層 11 個が読み取り専用で出る(合計 54 個)", async () => {
@@ -126,11 +128,44 @@ describe("E2E: 11 ツールの代表的な成功パス", () => {
     expect(new URL(q?.url ?? "").searchParams.get("payee_id_eq")).toBe("5");
   });
 
-  it("find_users: 名前で検索", async () => {
-    boardMocks({ [get("/v1/users")]: list([{ id: 3, name: "田中" }]) });
-    const r = await tool("find_users", { name: "田中" });
-    expect(r.isError, r.text).toBe(false);
-    expect(r.json.items).toEqual([{ User: { id: 3, name: "田中" } }]);
+  it("find_users: 姓・名・姓名で検索(キャッシュ未同期: 絞り込みなしで全件を取って絞る。API に名前は送らない)", async () => {
+    const users = [
+      userEntity({ id: 3, last_name: "田中", first_name: "一郎" }),
+      userEntity({ id: 4, last_name: "鈴木", first_name: "花子" }),
+    ];
+    const m = boardMocks({ [get("/v1/users")]: list(users) });
+    for (const [name, id] of [
+      ["田中", 3], // 姓
+      ["花子", 4], // 名
+      ["田中一郎", 3], // 姓名
+      ["鈴木 花子", 4], // 姓 名
+    ] as const) {
+      const r = await tool("find_users", { name }, id);
+      expect(r.isError, r.text).toBe(false);
+      expect(r.json.items).toEqual([{ User: users.find((u) => u.id === id) }]);
+    }
+    expect(boardCalls(m).length).toBeGreaterThan(0);
+    for (const c of boardCalls(m)) {
+      const q = new URL(c.url).searchParams;
+      expect([...q.keys()].filter((k) => k !== "page" && k !== "per_page")).toEqual([]);
+    }
+  });
+
+  it("find_users: キャッシュ同期済み(refresh=full のあと)は姓名をキャッシュで絞る。該当なしは 0 件", async () => {
+    const users = [
+      userEntity({ id: 3, last_name: "田中", first_name: "一郎" }),
+      userEntity({ id: 4, last_name: "鈴木", first_name: "花子" }),
+    ];
+    const m = boardMocks({ [get("/v1/users")]: list(users) });
+    const first = await tool("find_users", { name: "田中", refresh: "full" });
+    expect(first.json.items).toEqual([{ User: users[0] }]);
+    expect(first.json.cache[0]).toMatchObject({ resource: "users", refresh_state: "complete" });
+    const before = boardCalls(m).length;
+    const again = await tool("find_users", { name: "花子" }, 2);
+    expect(again.json.items).toEqual([{ User: users[1] }]);
+    const none = await tool("find_users", { name: "存在しない" }, 3);
+    expect(none.json.items).toEqual([]);
+    expect(boardCalls(m)).toHaveLength(before); // 同期済みなので追加の通信なし
   });
 
   it("find_projects: client_name を解決 → 案件を client_id_eq で検索 → 顧客が付く。contract_status で絞る", async () => {
@@ -195,14 +230,15 @@ describe("E2E: 11 ツールの代表的な成功パス", () => {
     expect("warnings" in r.json).toBe(false);
   });
 
-  it("find_invoices: client_name を解決 → 請求書 + 顧客 + 案件", async () => {
-    boardMocks({
+  it("find_invoices: client_name を解決 → 請求書 + 顧客 + 案件(キャッシュ未同期: API に project_client_id_eq と invoice_status_in[] を送る)", async () => {
+    const mine = invoiceEntity({ id: 9, project_id: 42, client: ref(7, "A"), invoice_status: 2 });
+    const m = boardMocks({
       [get("/v1/clients")]: list([{ id: 7, name: "A" }]),
       [get("/v1/clients/7")]: one({ id: 7, name: "A" }),
       [get("/v1/projects/42")]: one({ id: 42, name: "案件" }),
-      [get("/v1/invoices")]: list([{ id: 9, client_id: 7, project_id: 42, status: "sent" }]),
+      [get("/v1/invoices")]: list([mine]),
     });
-    const r = await tool("find_invoices", { client_name: "A", status: "sent" });
+    const r = await tool("find_invoices", { client_name: "A", status: "請求済" });
     expect(r.isError, r.text).toBe(false);
     expect(r.json.items[0]).toMatchObject({
       Invoice: { id: 9 },
@@ -210,6 +246,56 @@ describe("E2E: 11 ツールの代表的な成功パス", () => {
       Project: { id: 42 },
       url: `${UI}/documents/42/edit`,
     });
+    const q = new URL(boardCalls(m).find((c) => c.url.includes("/v1/invoices"))?.url ?? "")
+      .searchParams;
+    expect(q.get("project_client_id_eq")).toBe("7");
+    expect(q.getAll("invoice_status_in[]")).toEqual(["2"]);
+  });
+
+  it("find_invoices: キャッシュ同期済みなら client_name と status をキャッシュで絞る(別の顧客・別のステータスは除く)", async () => {
+    const rows = [
+      invoiceEntity({ id: 1, client: ref(7, "A"), invoice_status: 2 }),
+      invoiceEntity({ id: 2, client: ref(7, "A"), invoice_status: 3 }),
+      invoiceEntity({ id: 3, client: ref(8, "B"), invoice_status: 2 }),
+    ];
+    const m = boardMocks({
+      [get("/v1/clients")]: list([{ id: 7, name: "A" }]),
+      [get("/v1/clients/7")]: one({ id: 7, name: "A" }),
+      [get("/v1/projects/100")]: one({ id: 100, name: "案件" }),
+      [get("/v1/invoices")]: list(rows),
+    });
+    // 同期(refresh=full)と同時に検索する
+    const r = await tool("find_invoices", { client_name: "A", status: "請求済", refresh: "full" });
+    expect(r.isError, r.text).toBe(false);
+    expect(r.json.items.map((x: { Invoice: { id: number } }) => x.Invoice.id)).toEqual([1]);
+    expect(r.json.items[0].Client).toMatchObject({ id: 7 });
+    const before = boardCalls(m).filter((c) => c.url.includes("/v1/invoices")).length;
+    const paid = await tool("find_invoices", { client_name: "A", status: "入金済" }, 2);
+    expect(paid.json.items.map((x: { Invoice: { id: number } }) => x.Invoice.id)).toEqual([2]);
+    expect(boardCalls(m).filter((c) => c.url.includes("/v1/invoices"))).toHaveLength(before);
+  });
+
+  it("find_invoices: ID 指定で Client が付く(請求書の client.id から取る)", async () => {
+    const m = boardMocks({
+      [get("/v1/invoices/9")]: one(invoiceEntity({ id: 9, project_id: 42, client: ref(7, "A") })),
+      [get("/v1/clients/7")]: one({ id: 7, name: "A" }),
+      [get("/v1/projects/42")]: one({ id: 42, name: "案件" }),
+    });
+    const r = await tool("find_invoices", { id: 9 });
+    expect(r.isError, r.text).toBe(false);
+    expect(r.json.items[0].Client).toEqual({ id: 7, name: "A" });
+    expect(r.json.items[0].Project).toEqual({ id: 42, name: "案件" });
+    expect(paths(m)).toContain("/v1/clients/7");
+    expect("warnings" in r.json).toBe(false);
+  });
+
+  it("find_invoices: 知らないステータス名は argument_error(受け付ける名称つき)で、BOARD には通信しない", async () => {
+    const m = boardMocks({});
+    const r = await tool("find_invoices", { status: "sent" });
+    expect(r.isError).toBe(true);
+    expect(r.json.error.code).toBe("argument_error");
+    expect(r.json.error.message).toContain("請求済");
+    expect(boardCalls(m)).toHaveLength(0);
   });
 
   it("find_orders / find_deliveries / find_receipts: project_id から書類(納品・領収は配列の全件)", async () => {
@@ -245,36 +331,108 @@ describe("E2E: 11 ツールの代表的な成功パス", () => {
     });
   });
 
-  it("find_purchase_orders: vendor_name を解決 → 発注書 + 仕入先 + 案件", async () => {
-    boardMocks({
+  it("find_purchase_orders: vendor_name を解決 → 発注書 + 仕入先(payee.id)+ 案件(project.id)。一覧は response_group=medium(キャッシュ未同期)", async () => {
+    const mine = purchaseOrderEntity({
+      id: 5,
+      payee: ref(3, "仕入先A"),
+      project: { id: 42, name: "案件", project_no: 1, management_no: null },
+      expenditure_status: 5,
+    });
+    const m = boardMocks({
       [get("/v1/payees")]: list([{ id: 3, name: "仕入先A" }]),
       [get("/v1/payees/3")]: one({ id: 3, name: "仕入先A" }),
       [get("/v1/projects/42")]: one({ id: 42, name: "案件" }),
-      [get("/v1/expenditures")]: list([{ id: 5, vendor_id: 3, project_id: 42, status: "open" }]),
+      [get("/v1/expenditures")]: list([mine]),
     });
-    const r = await tool("find_purchase_orders", { vendor_name: "仕入先" });
+    const r = await tool("find_purchase_orders", { vendor_name: "仕入先", status: "発注済" });
     expect(r.isError, r.text).toBe(false);
     expect(r.json.items[0]).toMatchObject({
       PurchaseOrder: { id: 5 },
       Vendor: { id: 3 },
       Project: { id: 42 },
+      url: `${UI}/documents/42/edit`,
     });
+    const q = new URL(boardCalls(m).find((c) => c.url.includes("/v1/expenditures"))?.url ?? "")
+      .searchParams;
+    expect(q.get("payee_id_eq")).toBe("3");
+    expect(q.getAll("expenditure_status_in[]")).toEqual(["5"]);
+    expect(q.get("response_group")).toBe("medium");
   });
 
-  it("find_payments: status で検索 → 仕入先が付き、Project は null・url なし", async () => {
-    boardMocks({
-      [get("/v1/expenditure_payments")]: list([{ id: 8, vendor_id: 3, status: "paid" }]),
+  it("find_purchase_orders: 同期済みなら発注ステータス / 進捗状況の名称をキャッシュで絞る", async () => {
+    const rows = [
+      purchaseOrderEntity({ id: 1, payee: ref(3, "A"), expenditure_status: 5, delivery_status: 2 }),
+      purchaseOrderEntity({ id: 2, payee: ref(3, "A"), expenditure_status: 4, delivery_status: 3 }),
+      purchaseOrderEntity({ id: 3, payee: ref(9, "B"), expenditure_status: 5, delivery_status: 2 }),
+    ];
+    const m = boardMocks({
+      [get("/v1/payees/3")]: one({ id: 3, name: "A" }),
+      [get("/v1/payees/9")]: one({ id: 9, name: "B" }),
+      [get("/v1/projects/100")]: one({ id: 100, name: "案件" }),
+      [get("/v1/expenditures")]: list(rows),
+    });
+    const ids = (r: { json: { items: { PurchaseOrder: { id: number } }[] } }) =>
+      r.json.items.map((x) => x.PurchaseOrder.id);
+    expect(ids(await tool("find_purchase_orders", { status: "発注済", refresh: "full" }))).toEqual([
+      1, 3,
+    ]);
+    const before = boardCalls(m).filter((c) => c.url.includes("/v1/expenditures")).length;
+    expect(ids(await tool("find_purchase_orders", { status: "納品済" }, 2))).toEqual([2]);
+    expect(ids(await tool("find_purchase_orders", { status: "着手中" }, 3))).toEqual([1, 3]);
+    expect(boardCalls(m).filter((c) => c.url.includes("/v1/expenditures"))).toHaveLength(before);
+  });
+
+  it("find_purchase_orders: 知らないステータス名は argument_error", async () => {
+    const m = boardMocks({});
+    const r = await tool("find_purchase_orders", { status: "open" });
+    expect(r.isError).toBe(true);
+    expect(r.json.error.code).toBe("argument_error");
+    expect(r.json.error.message).toContain("発注済");
+    expect(r.json.error.message).toContain("着手中");
+    expect(boardCalls(m)).toHaveLength(0);
+  });
+
+  it("find_payments: status で検索 → 仕入先(payee.id)が付き、Project は null・url なし(キャッシュ未同期)", async () => {
+    const mine = paymentEntity({ id: 8, payee: ref(3, "仕入先A"), payment_status: 3 });
+    const m = boardMocks({
+      [get("/v1/expenditure_payments")]: list([mine]),
       [get("/v1/payees/3")]: one({ id: 3, name: "仕入先A" }),
     });
-    const r = await tool("find_payments", { status: "paid" });
+    const r = await tool("find_payments", { status: "支払済" });
     expect(r.isError, r.text).toBe(false);
     expect(r.json.items).toEqual([
-      {
-        Payment: { id: 8, vendor_id: 3, status: "paid" },
-        Vendor: { id: 3, name: "仕入先A" },
-        Project: null,
-      },
+      { Payment: mine, Vendor: { id: 3, name: "仕入先A" }, Project: null },
     ]);
+    const q = new URL(
+      boardCalls(m).find((c) => c.url.includes("/v1/expenditure_payments"))?.url ?? "",
+    ).searchParams;
+    expect(q.getAll("payment_status_in[]")).toEqual(["3"]);
+  });
+
+  it("find_payments: 同期済みなら vendor_name の解決 + status をキャッシュで絞る", async () => {
+    const rows = [
+      paymentEntity({ id: 1, payee: ref(3, "A"), payment_status: 3 }),
+      paymentEntity({ id: 2, payee: ref(3, "A"), payment_status: 1 }),
+      paymentEntity({ id: 3, payee: ref(9, "B"), payment_status: 3 }),
+    ];
+    const m = boardMocks({
+      [get("/v1/payees")]: list([{ id: 3, name: "A社" }]),
+      [get("/v1/payees/3")]: one({ id: 3, name: "A社" }),
+      [get("/v1/expenditure_payments")]: list(rows),
+    });
+    const a = await tool("find_payments", {
+      vendor_name: "A社",
+      status: "支払済",
+      refresh: "full",
+    });
+    expect(a.isError, a.text).toBe(false);
+    expect(a.json.items.map((x: { Payment: { id: number } }) => x.Payment.id)).toEqual([1]);
+    const before = boardCalls(m).filter((c) => c.url.includes("/v1/expenditure_payments")).length;
+    const b = await tool("find_payments", { vendor_name: "A社", status: "請求書未受領" }, 2);
+    expect(b.json.items.map((x: { Payment: { id: number } }) => x.Payment.id)).toEqual([2]);
+    expect(boardCalls(m).filter((c) => c.url.includes("/v1/expenditure_payments"))).toHaveLength(
+      before,
+    );
   });
 });
 
@@ -491,8 +649,8 @@ describe("E2E: limit・cache・警告", () => {
   it("limit で切ったときだけ limited:true と total_before_limit が付く", async () => {
     boardMocks({
       [get("/v1/users")]: list([
-        { id: 1, name: "田中A" },
-        { id: 2, name: "田中B" },
+        userEntity({ id: 1, last_name: "田中", first_name: "A" }),
+        userEntity({ id: 2, last_name: "田中", first_name: "B" }),
       ]),
     });
     const cut = await tool("find_users", { name: "田中", limit: 1 });

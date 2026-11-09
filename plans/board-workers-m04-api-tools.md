@@ -93,13 +93,13 @@ get は `id` `refresh` `show_meta` `max_response_tokens`(projects は `response_
 | `list_contacts` | contacts | nonzero-api | `client_id` `name_cont` `email_cont` | `api_contacts.go` |
 | `list_projects` | projects | cache-first | `name_cont` `client_id` `client_name_cont` `order_status_in` `delivery_status_in` `project_no_eq` `management_no_eq` `delivery_date_gteq` `delivery_date_lteq` `invoice_date_gteq` `invoice_date_lteq` `invoice_timing_kbn_in` `tags` `response_group`(8 種) `created_at_gteq` `created_at_lteq` `include_lost_flg` | `api_projects.go` |
 | `list_project_costs` | project_costs | nonzero-api | `project_id` | `api_project_costs.go` |
-| `list_invoices` | invoices | cache-first | `client_id_eq` `project_id_eq` `status_eq` `response_group`(small/large) | `api_invoices.go` |
+| `list_invoices` | invoices | cache-first | `project_client_id_eq` `invoice_status_in` `response_group`(small/large) | `api_invoices.go`。**仕様に照らした訂正(issue #27)**: Go の `client_id_eq` `project_id_eq` `status_eq` は BOARD に実在しない(絞り込みが 0 件になる)ので OpenAPI v1.9.0 に合わせた |
 | `list_vendors` | vendors | cache-first | `name_cont` | `api_vendors.go` |
 | `list_vendor_branches` | vendor_branches | nonzero-api | `payee_id_eq` `name_cont` | `api_vendor_branches.go` |
 | `list_vendor_contacts` | vendor_contacts | nonzero-api | `payee_id_eq` `name_cont` `email_cont` | `api_vendor_contacts.go` |
-| `list_purchase_orders` | purchase_orders | cache-first | `vendor_id_eq` `project_id_eq` `status_eq` `response_group`(small/large) | `api_purchase_orders.go` |
-| `list_payments` | payments | cache-first | `vendor_id_eq` `purchase_order_id_eq` `status_eq` `response_group`(small/large) | `api_payments.go` |
-| `list_users` | users | cache-first | `name_cont` `email_cont` | `api_users.go` |
+| `list_purchase_orders` | purchase_orders | cache-first | `payee_id_eq` `project_id_eq`(サーバー専用) `expenditure_status_in` `delivery_status_in` `response_group`(small/medium/large。未指定は medium) | `api_purchase_orders.go`。**仕様に照らした訂正(issue #27)**: `vendor_id_eq` `status_eq` を `payee_id_eq` `expenditure_status_in` `delivery_status_in` に |
+| `list_payments` | payments | cache-first | `expenditure_payee_id_eq` `payment_status_in` `expenditure_expenditure_no_eq`(発注 No) `response_group`(small/large) | `api_payments.go`。**仕様に照らした訂正(issue #27)**: `vendor_id_eq` `purchase_order_id_eq` `status_eq` を左の BOARD のクエリ名に |
+| `list_users` | users | cache-first | `name_cont` `email_cont`(どちらもキャッシュ専用) | `api_users.go`。**仕様に照らした訂正(issue #27)**: BOARD の API に名前・メールの絞り込みは無い(`email_eq` だけ)。未同期なら絞り込みなしで全ページ取り、姓・名・姓名の部分一致で絞る |
 | `list_groups` | groups | nonzero-api | `name_cont` | `api_groups.go` |
 | `list_payment_terms` | payment_terms | nonzero-api | `name_cont` | `api_payment_terms.go` |
 | `list_project_types` | project_types | nonzero-api | `name_cont` | `api_project_types.go` |

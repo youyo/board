@@ -82,9 +82,15 @@ function createListRepository<E, F extends CommonListOptions>(
     ctx: CallContext,
     outcome?: RefreshOutcome,
   ): Promise<ListReadResult<E>> {
-    const r = await spec.list(deps.client, filter, undefined, ctx);
+    // キャッシュ専用のキー(users の name_cont など)は API に送らない。絞り込みなしで取ってから match で絞る。
+    const cf = spec.kind === "cache-first" ? spec.cacheFirst : undefined;
+    const cacheOnly = cf?.cacheOnlyKeys?.filter((k) => !isZeroFilter({ [k]: filter[k] })) ?? [];
+    const apiFilter = { ...filter } as F;
+    for (const k of cacheOnly) delete apiFilter[k];
+    const r = await spec.list(deps.client, apiFilter, undefined, ctx);
+    const items = cf && cacheOnly.length > 0 ? r.items.filter((e) => cf.match(e, filter)) : r.items;
     return {
-      ...limitResult(r.items, readOpts.limit),
+      ...limitResult(items, readOpts.limit),
       source: "api",
       // refresh を走らせたうえで API にフォールバックしたときは、その結果(partial / failed)を落とさない。
       cache: outcome ? [await info(outcome)] : [],

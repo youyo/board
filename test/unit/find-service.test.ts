@@ -3,6 +3,7 @@
  * repository は偽物(test/helpers/find-fakes.ts)。想定外の呼び出しは例外になる。
  */
 import { describe, expect, it } from "vitest";
+import type { InvoiceEntity, PaymentEntity, PurchaseOrderEntity } from "../../src/board/resources";
 import {
   findClients,
   findDeliveries,
@@ -17,6 +18,7 @@ import {
   findVendors,
 } from "../../src/find/service";
 import { MAX_WARNINGS } from "../../src/find/session";
+import { invoiceEntity, paymentEntity, purchaseOrderEntity, userEntity } from "../helpers/entities";
 import { apiError, entities, fakeFind, notFound } from "../helpers/find-fakes";
 
 const rejects = (p: Promise<unknown>) =>
@@ -139,17 +141,6 @@ describe("find_vendors", () => {
       url: "https://the-board.jp/payees/9/edit",
     });
     expect(f.calls("vendor_branches.list")[0]).toContain('"payeeIdEq":9');
-  });
-});
-
-describe("find_users(Go: find_user_test.go)", () => {
-  it("id / name / limit。補助情報なし・url なし", async () => {
-    const f = fakeFind({
-      users: { get: (id: number) => ({ id, name: "U" }), list: () => entities(3, "U") },
-    });
-    expect(await findUsers(f.session(), { id: 2 })).toEqual([{ User: { id: 2, name: "U" } }]);
-    expect(await findUsers(f.session(), { name: "U", limit: 2 })).toHaveLength(2);
-    expect(f.calls("users.list")[0]).toContain('{"nameCont":"U"}');
   });
 });
 
@@ -353,28 +344,48 @@ describe("find_projects(Go: find_project_test.go)", () => {
   });
 });
 
-describe("find_invoices(Go: find_invoice_test.go)", () => {
-  const inv = (id: number, extra: object = {}) => ({
-    id,
-    client_id: 7,
-    project_id: 42,
-    status: "sent",
-    ...extra,
+describe("find_users(issue #27: 姓・名で検索する)", () => {
+  it("name は repository に nameCont で渡す。結果の User は姓名の分かれた実データの形", async () => {
+    const f = fakeFind({ users: { list: () => [userEntity({ id: 3 })] } });
+    const r = await findUsers(f.session(), { name: "山田 太郎" });
+    expect(f.calls("users.list")[0]).toContain('{"nameCont":"山田 太郎"}');
+    expect(r).toEqual([{ User: userEntity({ id: 3 }) }]);
   });
+});
+
+describe("find_invoices(Go: find_invoice_test.go + issue #27)", () => {
+  const inv = (id: number, extra: Partial<InvoiceEntity> = {}) => invoiceEntity({ id, ...extra });
+  const client = (id: number) => ({ id, name: "顧客", name_disp: "顧客", custom_no: "" });
   const base = {
     clients: { get: (id: number) => ({ id, name: "顧客" }) },
     projects: { get: (id: number) => ({ id, name: "案件" }) },
   };
 
-  it("id: 顧客と案件が付き、url は documents/{project_id}/edit", async () => {
-    const f = fakeFind({ ...base, invoices: { get: (id: number) => inv(id) } });
+  it("id: 顧客(client.id で引く)と案件が付き、url は documents/{project_id}/edit", async () => {
+    const f = fakeFind({
+      ...base,
+      invoices: { get: (id: number) => inv(id, { client: client(7), project_id: 42 }) },
+    });
     const r = await findInvoices(f.session(), { id: 9 });
     expect(r[0]).toEqual({
-      Invoice: inv(9),
+      Invoice: inv(9, { client: client(7), project_id: 42 }),
       Project: { id: 42, name: "案件" },
       Client: { id: 7, name: "顧客" },
       url: "https://the-board.jp/documents/42/edit",
     });
+    expect(f.calls("clients.get")).toEqual(["clients.get 7 {}"]);
+  });
+
+  it("client が null の請求書は顧客を取りに行かない(Client は null、警告なし)", async () => {
+    const f = fakeFind({
+      projects: base.projects,
+      invoices: { get: (id: number) => inv(id, { client: null }) },
+    });
+    const s = f.session();
+    const r = await findInvoices(s, { id: 9 });
+    expect(r[0]?.Client).toBeNull();
+    expect(f.calls("clients.")).toHaveLength(0);
+    expect(s.warnings).toEqual([]);
   });
 
   it("案件の取得に失敗しても致命的でない", async () => {
@@ -390,29 +401,45 @@ describe("find_invoices(Go: find_invoice_test.go)", () => {
     expect(s.warnings[0]).toMatchObject({ code: "enrichment_failed", resource: "projects" });
   });
 
-  it("client_id → clientIdEq、client_id + status → 両方、status 単独は statusEq に委譲", async () => {
+  it("client_id → projectClientIdEq、status 名はコードに変えて invoiceStatusIn に渡す", async () => {
     const f = fakeFind({ ...base, invoices: { list: () => [inv(1)] } });
     await findInvoices(f.session(), { partnerId: 7 });
-    await findInvoices(f.session(), { partnerId: 7, status: "sent" });
-    await findInvoices(f.session(), { status: "paid" });
+    await findInvoices(f.session(), { partnerId: 7, status: "請求済" });
+    await findInvoices(f.session(), { status: "入金済" });
     expect(f.calls("invoices.list").map((l) => l.split(" ")[1])).toEqual([
-      '{"clientIdEq":7}',
-      '{"clientIdEq":7,"statusEq":"sent"}',
-      '{"statusEq":"paid"}',
+      '{"projectClientIdEq":7}',
+      '{"projectClientIdEq":7,"invoiceStatusIn":[2]}',
+      '{"invoiceStatusIn":[3]}',
     ]);
   });
 
-  it("statuses は後段で絞る。id 指定では掛けない", async () => {
+  it("statuses(複数)は名称の配列をコードの配列にして invoiceStatusIn に渡す(API でもキャッシュでも効く)", async () => {
+    const f = fakeFind({ ...base, invoices: { list: () => [inv(1)] } });
+    await findInvoices(f.session(), { partnerId: 7, statuses: ["請求済", "入金済"] });
+    expect(f.calls("invoices.list")[0]).toContain(
+      '{"projectClientIdEq":7,"invoiceStatusIn":[2,3]}',
+    );
+  });
+
+  it("知らないステータス名は argument_error(受け付ける名称を message に載せ、通信しない)", async () => {
+    const f = fakeFind({ ...base, invoices: { list: () => [inv(1)] } });
+    for (const q of [{ status: "sent" }, { partnerId: 7, statuses: ["請求済", "paid"] }]) {
+      const e = await rejects(findInvoices(f.session(), q));
+      expect(e?.code).toBe("argument_error");
+      for (const name of ["未請求", "請求OK", "請求済", "一部入金済", "入金済", "回収不能"]) {
+        expect(e?.message).toContain(name);
+      }
+    }
+    expect(f.log).toEqual([]);
+  });
+
+  it("id 指定ではステータスを掛けない(名称も検査しない)", async () => {
     const f = fakeFind({
       ...base,
-      invoices: {
-        list: () => [inv(1, { status: "a" }), inv(2, { status: "b" }), inv(3, { status: "c" })],
-        get: (id: number) => inv(id, { status: "zzz" }),
-      },
+      invoices: { get: (id: number) => inv(id, { invoice_status: 9 }) },
     });
-    const r = await findInvoices(f.session(), { partnerId: 7, statuses: ["a", "c"] });
-    expect(r.map((x) => x.Invoice.id)).toEqual([1, 3]);
-    expect(await findInvoices(f.session(), { id: 1, statuses: ["a"] })).toHaveLength(1);
+    expect(await findInvoices(f.session(), { id: 1, statuses: ["請求済"] })).toHaveLength(1);
+    expect(f.calls("invoices.list")).toHaveLength(0);
   });
 
   it("statuses 単独・空のクエリは拒否 / id が優先 / limit", async () => {
@@ -420,7 +447,7 @@ describe("find_invoices(Go: find_invoice_test.go)", () => {
       ...base,
       invoices: { list: () => [inv(1), inv(2), inv(3)], get: (id: number) => inv(id) },
     });
-    expect((await rejects(findInvoices(f.session(), { statuses: ["a"] })))?.code).toBe(
+    expect((await rejects(findInvoices(f.session(), { statuses: ["請求済"] })))?.code).toBe(
       "argument_error",
     );
     expect((await rejects(findInvoices(f.session(), {})))?.code).toBe("argument_error");
@@ -431,14 +458,14 @@ describe("find_invoices(Go: find_invoice_test.go)", () => {
     expect(s.totalBeforeLimit).toBe(3);
   });
 
-  it("client_name は解決してから clientIdEq にする", async () => {
+  it("client_name は解決してから projectClientIdEq にする", async () => {
     const f = fakeFind({
       clients: { list: () => [{ id: 7, name: "A" }], get: (id: number) => ({ id }) },
       projects: base.projects,
       invoices: { list: () => [inv(1)] },
     });
     await findInvoices(f.session(), { partnerName: "A" });
-    expect(f.calls("invoices.list")[0]).toContain('{"clientIdEq":7}');
+    expect(f.calls("invoices.list")[0]).toContain('{"projectClientIdEq":7}');
   });
 
   it("get の失敗は伝わる", async () => {
@@ -447,24 +474,18 @@ describe("find_invoices(Go: find_invoice_test.go)", () => {
   });
 });
 
-describe("find_purchase_orders(Go: find_purchase_order_test.go)", () => {
-  const po = (id: number, extra: object = {}) => ({
-    id,
-    vendor_id: 3,
-    project_id: 42,
-    status: "open",
-    ...extra,
-  });
+describe("find_purchase_orders(Go: find_purchase_order_test.go + issue #27)", () => {
+  const partner = (id: number) => ({ id, name: "仕入先", name_disp: "仕入先", custom_no: "" });
+  const proj = (id: number) => ({ id, name: "案件", project_no: 1, management_no: null });
+  const po = (id: number, extra: Partial<PurchaseOrderEntity> = {}) =>
+    purchaseOrderEntity({ id, payee: partner(3), project: proj(42), ...extra });
   const base = {
     vendors: { get: (id: number) => ({ id, name: "仕入先" }) },
     projects: { get: (id: number) => ({ id, name: "案件" }) },
   };
-  it("id: 仕入先と案件が付く。vendor_name は仕入先の解決 → vendorIdEq", async () => {
-    const f = fakeFind({
-      ...base,
-      vendors: { ...base.vendors, list: () => [{ id: 3, name: "V" }] },
-      purchase_orders: { get: (id: number) => po(id), list: () => [po(1)] },
-    });
+
+  it("id: 仕入先(payee.id)と案件(project.id)が付く。url は project.id から", async () => {
+    const f = fakeFind({ ...base, purchase_orders: { get: (id: number) => po(id) } });
     const r = await findPurchaseOrders(f.session(), { id: 1 });
     expect(r[0]).toMatchObject({
       PurchaseOrder: { id: 1 },
@@ -472,9 +493,76 @@ describe("find_purchase_orders(Go: find_purchase_order_test.go)", () => {
       Project: { id: 42 },
       url: "https://the-board.jp/documents/42/edit",
     });
-    await findPurchaseOrders(f.session(), { partnerName: "V", status: "open" });
-    expect(f.calls("purchase_orders.list")[0]).toContain('{"vendorIdEq":3,"statusEq":"open"}');
+    expect(f.calls("vendors.get")).toEqual(["vendors.get 3 {}"]);
+    expect(f.calls("projects.get")).toEqual(["projects.get 42 {}"]);
   });
+
+  it("project も payee も無い発注書は何も取りに行かない(url なし)", async () => {
+    const f = fakeFind({
+      purchase_orders: { get: (id: number) => po(id, { payee: null, project: undefined }) },
+    });
+    const r = await findPurchaseOrders(f.session(), { id: 1 });
+    expect(r[0]).toMatchObject({ Vendor: null, Project: null });
+    expect("url" in (r[0] ?? {})).toBe(false);
+    expect(f.calls("vendors.")).toHaveLength(0);
+    expect(f.calls("projects.")).toHaveLength(0);
+  });
+
+  it("vendor_name は仕入先の解決 → payeeIdEq。status 名は発注ステータス / 進捗状況のコードにする", async () => {
+    const f = fakeFind({
+      ...base,
+      vendors: { ...base.vendors, list: () => [{ id: 3, name: "V" }] },
+      purchase_orders: { list: () => [po(1)] },
+    });
+    await findPurchaseOrders(f.session(), { partnerName: "V", status: "発注済" });
+    await findPurchaseOrders(f.session(), { partnerId: 3, status: "着手中" });
+    await findPurchaseOrders(f.session(), { partnerId: 3, statuses: ["発注済", "発注確定"] });
+    expect(f.calls("purchase_orders.list").map((l) => l.split(" ")[1])).toEqual([
+      '{"payeeIdEq":3,"expenditureStatusIn":[5]}',
+      '{"payeeIdEq":3,"deliveryStatusIn":[2]}',
+      '{"payeeIdEq":3,"expenditureStatusIn":[5,4]}',
+    ]);
+  });
+
+  it("発注ステータスと進捗状況の名称が混ざる statuses は OR(後段で絞る)", async () => {
+    const f = fakeFind({
+      ...base,
+      purchase_orders: {
+        list: () => [
+          po(1, { expenditure_status: 5, delivery_status: 1 }), // 発注済
+          po(2, { expenditure_status: 4, delivery_status: 2 }), // 着手中
+          po(3, { expenditure_status: 4, delivery_status: 1 }), // どちらでもない
+        ],
+      },
+    });
+    const r = await findPurchaseOrders(f.session(), {
+      partnerId: 3,
+      statuses: ["発注済", "着手中"],
+    });
+    expect(r.map((x) => x.PurchaseOrder.id)).toEqual([1, 2]);
+    // API には絞り込みなしで取りに行く(AND にならないように)
+    expect(f.calls("purchase_orders.list")[0]).toContain('{"payeeIdEq":3}');
+  });
+
+  it("知らないステータス名は argument_error(発注ステータスと進捗状況の名称を載せる)", async () => {
+    const f = fakeFind({ ...base, purchase_orders: { list: () => [] } });
+    const e = await rejects(findPurchaseOrders(f.session(), { status: "open" }));
+    expect(e?.code).toBe("argument_error");
+    for (const name of [
+      "見積中(高)",
+      "発注確定",
+      "発注済",
+      "見送り",
+      "未着手",
+      "着手中",
+      "納品済",
+      "検収済",
+    ]) {
+      expect(e?.message).toContain(name);
+    }
+    expect(f.log).toEqual([]);
+  });
+
   it("複数の仕入先にマッチしたら曖昧エラー(vendors)", async () => {
     const f = fakeFind({ vendors: { list: () => entities(2, "V") }, purchase_orders: {} });
     const e = await rejects(findPurchaseOrders(f.session(), { partnerName: "V" }));
@@ -482,9 +570,11 @@ describe("find_purchase_orders(Go: find_purchase_order_test.go)", () => {
   });
 });
 
-describe("find_payments(Go: find_payment_test.go)", () => {
-  const pay = (id: number, extra: object = {}) => ({ id, vendor_id: 3, status: "paid", ...extra });
-  it("id: Project は常に null、url は付かない。仕入先は付く", async () => {
+describe("find_payments(Go: find_payment_test.go + issue #27)", () => {
+  const partner = (id: number) => ({ id, name: "V", name_disp: "V", custom_no: "" });
+  const pay = (id: number, extra: Partial<PaymentEntity> = {}) =>
+    paymentEntity({ id, payee: partner(3), ...extra });
+  it("id: Project は常に null、url は付かない。仕入先(payee.id)は付く", async () => {
     const f = fakeFind({
       payments: { get: (id: number) => pay(id) },
       vendors: { get: (id: number) => ({ id, name: "V" }) },
@@ -494,7 +584,7 @@ describe("find_payments(Go: find_payment_test.go)", () => {
     expect("url" in (r[0] ?? {})).toBe(false);
     expect(f.calls("projects.")).toHaveLength(0);
   });
-  it("仕入先の取得に失敗しても致命的でない / vendor_id がなければ取りに行かない", async () => {
+  it("仕入先の取得に失敗しても致命的でない / payee がなければ取りに行かない", async () => {
     const f1 = fakeFind({
       payments: { get: (id: number) => pay(id) },
       vendors: { get: () => Promise.reject(apiError()) },
@@ -502,22 +592,33 @@ describe("find_payments(Go: find_payment_test.go)", () => {
     const s = f1.session();
     expect((await findPayments(s, { id: 1 }))[0]?.Vendor).toBeNull();
     expect(s.warnings).toHaveLength(1);
-    const f2 = fakeFind({ payments: { get: (id: number) => pay(id, { vendor_id: 0 }) } });
+    const f2 = fakeFind({ payments: { get: (id: number) => pay(id, { payee: null }) } });
     await findPayments(f2.session(), { id: 1 });
     expect(f2.calls("vendors.")).toHaveLength(0);
   });
-  it("vendor_id / status は API に委譲、statuses は後段、statuses 単独は拒否", async () => {
+  it("vendor / status 名は expenditurePayeeIdEq / paymentStatusIn に委譲、statuses 単独は拒否", async () => {
     const f = fakeFind({
-      payments: { list: () => [pay(1, { status: "a" }), pay(2, { status: "b" })] },
+      payments: { list: () => [pay(1)] },
       vendors: { get: (id: number) => ({ id }) },
     });
-    await findPayments(f.session(), { status: "paid" });
-    expect(f.calls("payments.list")[0]).toContain('{"statusEq":"paid"}');
-    const r = await findPayments(f.session(), { partnerId: 3, statuses: ["b"] });
-    expect(r.map((x) => x.Payment.id)).toEqual([2]);
-    expect((await rejects(findPayments(f.session(), { statuses: ["a"] })))?.code).toBe(
+    await findPayments(f.session(), { status: "支払済" });
+    await findPayments(f.session(), { partnerId: 3, statuses: ["請求書未受領", "振込予約済"] });
+    expect(f.calls("payments.list").map((l) => l.split(" ")[1])).toEqual([
+      '{"paymentStatusIn":[3]}',
+      '{"expenditurePayeeIdEq":3,"paymentStatusIn":[1,4]}',
+    ]);
+    expect((await rejects(findPayments(f.session(), { statuses: ["支払済"] })))?.code).toBe(
       "argument_error",
     );
+  });
+  it("知らないステータス名は argument_error(受け付ける名称を載せる)", async () => {
+    const f = fakeFind({ payments: { list: () => [] } });
+    const e = await rejects(findPayments(f.session(), { status: "paid" }));
+    expect(e?.code).toBe("argument_error");
+    for (const name of ["請求書未受領", "請求書受領済", "振込予約済", "支払済"]) {
+      expect(e?.message).toContain(name);
+    }
+    expect(f.log).toEqual([]);
   });
 });
 

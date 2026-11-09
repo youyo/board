@@ -91,12 +91,25 @@ const GO_LIST_FLAGS: Record<string, string[]> = {
     "include_lost_flg",
   ],
   project_costs: ["project_id"],
-  invoices: ["client_id_eq", "project_id_eq", "status_eq", "response_group"],
+  // invoices / purchase_orders / payments / users の引数は、Go 版の写しが BOARD に実在しない項目だったため
+  // OpenAPI v1.9.0 に合わせて訂正した(issue #27)。
+  invoices: ["project_client_id_eq", "invoice_status_in", "response_group"],
   vendors: ["name_cont"],
   vendor_branches: ["payee_id_eq", "name_cont"],
   vendor_contacts: ["payee_id_eq", "name_cont", "email_cont"],
-  purchase_orders: ["vendor_id_eq", "project_id_eq", "status_eq", "response_group"],
-  payments: ["vendor_id_eq", "purchase_order_id_eq", "status_eq", "response_group"],
+  purchase_orders: [
+    "payee_id_eq",
+    "project_id_eq",
+    "expenditure_status_in",
+    "delivery_status_in",
+    "response_group",
+  ],
+  payments: [
+    "expenditure_payee_id_eq",
+    "payment_status_in",
+    "expenditure_expenditure_no_eq",
+    "response_group",
+  ],
   users: ["name_cont", "email_cont"],
   groups: ["name_cont"],
   payment_terms: ["name_cont"],
@@ -229,9 +242,11 @@ describe("list の引数は Go 版 CLI のフィルタフラグと一致する",
       "receipt",
       "all",
     ]);
-    for (const t of ["list_clients", "list_invoices", "list_purchase_orders", "list_payments"]) {
+    for (const t of ["list_clients", "list_invoices", "list_payments"]) {
       expect(rg(t), t).toEqual(["small", "large"]);
     }
+    // 発注書(expenditures)は medium(案件 project を含む)も選べる(issue #27)
+    expect(rg("list_purchase_orders")).toEqual(["small", "medium", "large"]);
     expect(rg("get_project")).toEqual([
       "estimate",
       "order",
@@ -309,7 +324,17 @@ describe("引数の検証(いずれも argument_error。BOARD には通信しな
       .map((f): [string, string] => [`list_${d.resource}`, f.arg]),
   );
   it("表に ID の引数がある", () => {
-    expect(idArgs.length).toBeGreaterThanOrEqual(12);
+    // invoices の project_id_eq が API に無いため削除し、12 → 11(issue #27)
+    expect(idArgs.length).toBeGreaterThanOrEqual(11);
+    for (const pair of [
+      ["list_invoices", "project_client_id_eq"],
+      ["list_purchase_orders", "payee_id_eq"],
+      ["list_purchase_orders", "project_id_eq"],
+      ["list_payments", "expenditure_payee_id_eq"],
+      ["list_payments", "expenditure_expenditure_no_eq"],
+    ]) {
+      expect(idArgs).toContainEqual(pair);
+    }
   });
   it.each(idArgs)("%s の %s が負なら argument_error", async (tool, arg) => {
     const r = await callApiTool(tool, { [arg]: -1 });
@@ -358,5 +383,82 @@ describe("表と repository の整合", () => {
     }
     expect(API_RESOURCES).toHaveLength(22);
     expect(API_RESOURCES.filter((d) => d.mode !== "document")).toHaveLength(18);
+  });
+});
+
+describe("4 リソースの引数の説明(issue #27)", () => {
+  const description = (tool: string, arg: string) => {
+    const schema = z.toJSONSchema(byName.get(tool)?.inputSchema as z.ZodObject) as {
+      properties: Record<string, { description?: string }>;
+    };
+    return schema.properties[arg]?.description ?? "";
+  };
+
+  it("ステータスの引数は数値コードの『コード=名称』を全部書く", () => {
+    const invoice = description("list_invoices", "invoice_status_in");
+    for (const s of [
+      "1=未請求",
+      "4=請求OK",
+      "2=請求済",
+      "5=一部入金済",
+      "3=入金済",
+      "9=回収不能",
+    ]) {
+      expect(invoice).toContain(s);
+    }
+    const expenditure = description("list_purchase_orders", "expenditure_status_in");
+    for (const s of [
+      "1=見積中(高)",
+      "2=見積中(中)",
+      "3=見積中(低)",
+      "8=見積中(除)",
+      "4=発注確定",
+      "5=発注済",
+      "9=見送り",
+    ]) {
+      expect(expenditure).toContain(s);
+    }
+    const delivery = description("list_purchase_orders", "delivery_status_in");
+    for (const s of ["1=未着手", "2=着手中", "3=納品済", "4=検収済"]) expect(delivery).toContain(s);
+    const payment = description("list_payments", "payment_status_in");
+    for (const s of ["1=請求書未受領", "2=請求書受領済", "4=振込予約済", "3=支払済"]) {
+      expect(payment).toContain(s);
+    }
+  });
+
+  it("発注 No の引数は発注 ID ではないことを書く。project_id_eq はサーバー専用(API を直接呼ぶ)", () => {
+    expect(description("list_payments", "expenditure_expenditure_no_eq")).toContain("発注 No");
+    expect(description("list_payments", "expenditure_expenditure_no_eq")).toContain("ID ではなく");
+    expect(description("list_purchase_orders", "project_id_eq")).toContain("API を直接呼ぶ");
+  });
+
+  it("response_group: 発注書は medium も選べ、未指定なら medium を送ると書く", () => {
+    const d = description("list_purchase_orders", "response_group");
+    expect(d).toContain("medium");
+    expect(d).toContain("未指定");
+    const schema = z.toJSONSchema(
+      byName.get("list_purchase_orders")?.inputSchema as z.ZodObject,
+    ) as {
+      properties: Record<string, { enum?: string[] }>;
+    };
+    expect(schema.properties.response_group?.enum).toEqual(["small", "medium", "large"]);
+  });
+
+  it("users: name_cont / email_cont は姓・名の部分一致で、BOARD の API は呼ばずキャッシュ専用と書く", () => {
+    const d = description("list_users", "name_cont");
+    expect(d).toContain("姓");
+    expect(d).toContain("キャッシュ");
+  });
+
+  it("旧引数は受け付けない(additionalProperties は false のまま)", async () => {
+    for (const [tool, args] of [
+      ["list_invoices", { client_id_eq: 1 }],
+      ["list_invoices", { status_eq: "paid" }],
+      ["list_purchase_orders", { vendor_id_eq: 1 }],
+      ["list_payments", { purchase_order_id_eq: 1 }],
+    ] as const) {
+      const r = await callApiTool(tool, args);
+      expect(r.isError, `${tool} ${JSON.stringify(args)}`).toBe(true);
+    }
   });
 });

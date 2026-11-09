@@ -10,6 +10,12 @@
  * ツール呼び出しごとに `CallContext` は 1 つ(締め切りは全体で共有する)。
  */
 import { z } from "zod";
+import {
+  EXPENDITURE_DELIVERY_STATUSES,
+  EXPENDITURE_STATUSES,
+  INVOICE_STATUSES,
+  PAYMENT_STATUSES,
+} from "../../board/resources";
 import { ArgumentError } from "../../errors";
 import {
   findClients,
@@ -49,6 +55,16 @@ const fanoutNameDesc = (target: string, narrowProp: string) =>
 
 const notYetSupportedDesc = (field: string, scope: string) =>
   `(NOT YET SUPPORTED) Will filter ${scope} by ${field} in a future release. Currently returns an error.`;
+
+/** ステータスの表を『コード=名称』の並びにする(例: `1=未請求 / 4=請求OK`)。 */
+const codeList = (table: Readonly<Record<number, string>>) =>
+  Object.entries(table)
+    .map(([code, name]) => `${code}=${name}`)
+    .join(" / ");
+
+const INVOICE_STATUS_LIST = codeList(INVOICE_STATUSES);
+const PURCHASE_ORDER_STATUS_LIST = `order status (${codeList(EXPENDITURE_STATUSES)}) or progress (${codeList(EXPENDITURE_DELIVERY_STATUSES)})`;
+const PAYMENT_STATUS_LIST = codeList(PAYMENT_STATUSES);
 
 const REFRESH_DESC =
   'Trigger a refresh before reading cache. "none" (default) reads cache as-is. "delta" fetches incremental changes since last sync. "full" re-fetches all entries and removes stale ones (use periodically; a large resource may need several calls, see refresh_state=partial in cache). Concurrent refreshes return refresh_in_progress; clients should wait and retry. Note: delta / full write to the shared D1 cache and consume the BOARD API daily quota (3,000 calls/day); BOARD data itself is never modified. Pass them only when needed.';
@@ -119,7 +135,11 @@ function simpleTool(
       id: optId(
         `${kind[0]?.toUpperCase()}${kind.slice(1)} ID for direct lookup (highest priority; ignores name).`,
       ),
-      name: optStr(`Substring match on ${kind} name.`),
+      name: optStr(
+        kind === "user"
+          ? "Substring match on the user's last name, first name, or both combined (last/first, with or without a space; case and width are ignored). BOARD has no single name field for users."
+          : `Substring match on ${kind} name.`,
+      ),
       ...commonShape(),
     }),
     handler: async (args, ctx) => {
@@ -262,14 +282,14 @@ const findReceiptsTool = documentTool(
 const findInvoicesTool = defineTool({
   name: "find_invoices",
   title: "請求書検索",
-  description: `Search BOARD invoices by ID, client name, or status. Fields combine with AND (ID overrides others). Returns invoice entities. client_name resolves with ambiguity error on multiple matches. status accepts a single status (API delegated; no narrowing required). project_name is not yet supported.${RESPONSE_DESC}`,
+  description: `Search BOARD invoices by ID, client name, or status. Fields combine with AND (ID overrides others). Returns invoice entities. client_name resolves with ambiguity error on multiple matches. status is a status NAME that is converted to BOARD's numeric code (invoice_status: ${INVOICE_STATUS_LIST}); an unknown name is rejected with argument_error listing the accepted names. It narrows in the cache and in the API (no extra narrowing required). Each item has the invoice with its Client (from the invoice's client.id) and Project. project_name is not yet supported.${RESPONSE_DESC}`,
   category: "ReadOnly",
   inputSchema: z.strictObject({
     id: optId(idDesc("Invoice")),
     client_name: optStr(disambiguateNameDesc("client", "invoice")),
     project_name: optStr(notYetSupportedDesc("project name", "invoices")),
     status: optStr(
-      "Filter by invoice status (single value; API delegated, no narrowing required).",
+      `Filter by invoice status NAME (single value): ${INVOICE_STATUS_LIST} (code=name). Pass the name (e.g. 請求済), not the code; an unknown name is rejected with argument_error. No extra narrowing required.`,
     ),
     ...commonShape(),
   }),
@@ -301,14 +321,14 @@ const findInvoicesTool = defineTool({
 const findPurchaseOrdersTool = defineTool({
   name: "find_purchase_orders",
   title: "発注書検索",
-  description: `Search BOARD purchase orders by ID, vendor name, or status. Fields combine with AND (ID overrides others). Returns purchase order entities. vendor_name resolves with ambiguity error on multiple matches. status accepts a single status (API delegated; no narrowing required). project_name is not yet supported.${RESPONSE_DESC}`,
+  description: `Search BOARD purchase orders by ID, vendor name, or status. Fields combine with AND (ID overrides others). Returns purchase order entities. vendor_name resolves with ambiguity error on multiple matches. vendor_name is matched against the purchase order's payee (支払先, payee.id). status is a status NAME converted to BOARD's numeric code; it accepts an ${PURCHASE_ORDER_STATUS_LIST} name (code=name), and an unknown name is rejected with argument_error listing the accepted names. It narrows in the cache and in the API (no extra narrowing required). Each item has the purchase order with its Vendor (from payee.id) and Project (from project.id; the list is fetched with response_group=medium so project is included). project_name is not yet supported.${RESPONSE_DESC}`,
   category: "ReadOnly",
   inputSchema: z.strictObject({
     id: optId(idDesc("Purchase order")),
     vendor_name: optStr(disambiguateNameDesc("vendor", "purchase order")),
     project_name: optStr(notYetSupportedDesc("project name", "purchase orders")),
     status: optStr(
-      "Filter by purchase order status (single value; API delegated, no narrowing required).",
+      `Filter by purchase order status NAME (single value). Either an order status (${codeList(EXPENDITURE_STATUSES)}) or a progress (${codeList(EXPENDITURE_DELIVERY_STATUSES)}) (code=name). Pass the name (e.g. 発注済, 着手中), not the code; an unknown name is rejected with argument_error. No extra narrowing required.`,
     ),
     ...commonShape(),
   }),
@@ -340,14 +360,14 @@ const findPurchaseOrdersTool = defineTool({
 const findPaymentsTool = defineTool({
   name: "find_payments",
   title: "支払検索",
-  description: `Search BOARD payments by ID, vendor name, or status. Fields combine with AND (ID overrides others). Returns payment entities. vendor_name resolves with ambiguity error on multiple matches. status accepts a single status (API delegated; no narrowing required). purchase_order_id is not yet supported.${RESPONSE_DESC}`,
+  description: `Search BOARD payments by ID, vendor name, or status. Fields combine with AND (ID overrides others). Returns payment entities. vendor_name resolves with ambiguity error on multiple matches. vendor_name is matched against the payment's payee (支払先, payee.id). status is a status NAME converted to BOARD's numeric code (payment_status: ${PAYMENT_STATUS_LIST}); an unknown name is rejected with argument_error listing the accepted names. It narrows in the cache and in the API (no extra narrowing required). Each item has the payment with its Vendor (from payee.id); Project is always null. purchase_order_id is not yet supported.${RESPONSE_DESC}`,
   category: "ReadOnly",
   inputSchema: z.strictObject({
     id: optId(idDesc("Payment")),
     vendor_name: optStr(disambiguateNameDesc("vendor", "payment")),
     purchase_order_id: optId(notYetSupportedDesc("purchase order ID", "payments")),
     status: optStr(
-      "Filter by payment status (single value; API delegated, no narrowing required).",
+      `Filter by payment status NAME (single value): ${PAYMENT_STATUS_LIST} (code=name). Pass the name (e.g. 支払済), not the code; an unknown name is rejected with argument_error. No extra narrowing required.`,
     ),
     ...commonShape(),
   }),

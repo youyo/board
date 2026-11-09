@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { applyLimit, isCacheableFilter, isZeroFilter } from "../../src/repository/filter";
 import { SPECS } from "../../src/repository/resources";
+import { invoiceEntity, paymentEntity, purchaseOrderEntity, userEntity } from "../helpers/entities";
 
 describe("isZeroFilter(Go の *FilterIsZero)", () => {
   it("空・未指定・0・空文字・空配列はゼロ値", () => {
@@ -196,32 +197,86 @@ describe("projects のキャッシュ側フィルタ", () => {
   });
 });
 
+const partner = (id: number) => ({ id, name: "取引先", name_disp: "取引先", custom_no: "" });
+
 describe("invoices / purchase_orders / payments / vendors / users のキャッシュ側フィルタ", () => {
   const c = (o: Record<string, unknown>) => o as never;
 
-  it("invoices: client_id / project_id / status", () => {
+  it("invoices: 顧客(client?.id)と請求ステータス(invoice_status を含む)", () => {
     const s = SPECS.invoices.cacheFirst;
-    const e = c({ id: 1, client_id: 3, project_id: 4, status: "paid" });
-    expect(s.match(e, c({ clientIdEq: 3 }))).toBe(true);
-    expect(s.match(e, c({ clientIdEq: 9 }))).toBe(false);
-    expect(s.match(e, c({ projectIdEq: 4, statusEq: "paid" }))).toBe(true);
-    expect(s.match(e, c({ statusEq: "draft" }))).toBe(false);
+    const e = invoiceEntity({
+      id: 1,
+      client: partner(3),
+      invoice_status: 2,
+    });
+    expect(s.match(e, c({ projectClientIdEq: 3 }))).toBe(true);
+    expect(s.match(e, c({ projectClientIdEq: 9 }))).toBe(false);
+    expect(s.match(e, c({ invoiceStatusIn: [2, 3] }))).toBe(true);
+    expect(s.match(e, c({ invoiceStatusIn: [3, 9] }))).toBe(false);
+    expect(s.match(e, c({ projectClientIdEq: 3, invoiceStatusIn: [2] }))).toBe(true);
+    expect(s.match(e, c({ projectClientIdEq: 3, invoiceStatusIn: [9] }))).toBe(false);
+    // 顧客が無い請求書は顧客 ID の絞り込みに一致しない
+    expect(s.match(invoiceEntity({ client: null }), c({ projectClientIdEq: 3 }))).toBe(false);
     expect(isCacheableFilter({ responseGroup: "x" }, s.keys)).toBe(false);
-    expect(isCacheableFilter({ clientIdEq: 1, statusEq: "a", projectIdEq: 2 }, s.keys)).toBe(true);
+    expect(isCacheableFilter({ projectClientIdEq: 1, invoiceStatusIn: [2] }, s.keys)).toBe(true);
   });
 
-  it("purchase_orders: vendor_id / project_id / status", () => {
+  it("invoices: 旧キー(client_id / status)を持つ行は一致しない(実在しない項目を見ない)", () => {
+    const s = SPECS.invoices.cacheFirst;
+    const legacy = c({ id: 1, client_id: 3, project_id: 4, status: "paid" });
+    expect(s.match(legacy, c({ projectClientIdEq: 3 }))).toBe(false);
+    expect(s.match(legacy, c({ invoiceStatusIn: [2] }))).toBe(false);
+  });
+
+  it("purchase_orders: 支払先(payee?.id)・発注ステータス・進捗状況。案件はキャッシュで絞らない", () => {
     const s = SPECS.purchase_orders.cacheFirst;
-    const e = c({ id: 1, vendor_id: 3, project_id: 4, status: "sent" });
-    expect(s.match(e, c({ vendorIdEq: 3, projectIdEq: 4, statusEq: "sent" }))).toBe(true);
-    expect(s.match(e, c({ vendorIdEq: 4 }))).toBe(false);
+    const e = purchaseOrderEntity({
+      payee: partner(3),
+      expenditure_status: 5,
+      delivery_status: 2,
+    });
+    expect(s.match(e, c({ payeeIdEq: 3 }))).toBe(true);
+    expect(s.match(e, c({ payeeIdEq: 4 }))).toBe(false);
+    expect(s.match(e, c({ expenditureStatusIn: [4, 5] }))).toBe(true);
+    expect(s.match(e, c({ expenditureStatusIn: [4] }))).toBe(false);
+    expect(s.match(e, c({ deliveryStatusIn: [2] }))).toBe(true);
+    expect(s.match(e, c({ deliveryStatusIn: [3, 4] }))).toBe(false);
+    expect(s.match(purchaseOrderEntity({ payee: null }), c({ payeeIdEq: 3 }))).toBe(false);
+    // project_id_eq はサーバー専用: cacheable の対象ではない(指定されたら API に回る)
+    expect(s.keys).not.toContain("projectIdEq");
+    expect(isCacheableFilter({ projectIdEq: 100 }, s.keys)).toBe(false);
+    expect(isCacheableFilter({ payeeIdEq: 1, expenditureStatusIn: [5] }, s.keys)).toBe(true);
   });
 
-  it("payments: vendor_id / purchase_order_id / status", () => {
+  it("purchase_orders: 旧キー(vendor_id / status)を持つ行は一致しない", () => {
+    const s = SPECS.purchase_orders.cacheFirst;
+    const legacy = c({ id: 1, vendor_id: 3, project_id: 4, status: "sent" });
+    expect(s.match(legacy, c({ payeeIdEq: 3 }))).toBe(false);
+    expect(s.match(legacy, c({ expenditureStatusIn: [5] }))).toBe(false);
+  });
+
+  it("payments: 支払先(payee?.id)・支払ステータス・発注 No(expenditure_no)", () => {
     const s = SPECS.payments.cacheFirst;
-    const e = c({ id: 1, vendor_id: 3, purchase_order_id: 8, status: "paid" });
-    expect(s.match(e, c({ vendorIdEq: 3, purchaseOrderIdEq: 8, statusEq: "paid" }))).toBe(true);
-    expect(s.match(e, c({ purchaseOrderIdEq: 9 }))).toBe(false);
+    const e = paymentEntity({
+      payee: partner(3),
+      payment_status: 3,
+      expenditure_no: 2001,
+    });
+    expect(s.match(e, c({ expenditurePayeeIdEq: 3 }))).toBe(true);
+    expect(s.match(e, c({ expenditurePayeeIdEq: 4 }))).toBe(false);
+    expect(s.match(e, c({ paymentStatusIn: [1, 3] }))).toBe(true);
+    expect(s.match(e, c({ paymentStatusIn: [1, 2] }))).toBe(false);
+    expect(s.match(e, c({ expenditureExpenditureNoEq: 2001 }))).toBe(true);
+    expect(s.match(e, c({ expenditureExpenditureNoEq: 2002 }))).toBe(false);
+    expect(s.match(paymentEntity({ payee: null }), c({ expenditurePayeeIdEq: 3 }))).toBe(false);
+  });
+
+  it("payments: 旧キー(vendor_id / purchase_order_id / status)を持つ行は一致しない", () => {
+    const s = SPECS.payments.cacheFirst;
+    const legacy = c({ id: 1, vendor_id: 3, purchase_order_id: 8, status: "paid" });
+    expect(s.match(legacy, c({ expenditurePayeeIdEq: 3 }))).toBe(false);
+    expect(s.match(legacy, c({ expenditureExpenditureNoEq: 8 }))).toBe(false);
+    expect(s.match(legacy, c({ paymentStatusIn: [3] }))).toBe(false);
   });
 
   it("vendors: name だけ(fold)", () => {
@@ -231,11 +286,43 @@ describe("invoices / purchase_orders / payments / vendors / users のキャッ�
     expect(isCacheableFilter({ nameCont: "a", perPage: 5 }, s.keys)).toBe(false);
   });
 
-  it("users: name と email(どちらも fold)", () => {
+  it("users: 名前は姓・名・姓名(連結 / 空白つき)の fold 部分一致、メールは fold 部分一致", () => {
     const s = SPECS.users.cacheFirst;
-    const e = c({ id: 1, name: "山田 太郎", email: "Taro@Example.com" });
-    expect(s.match(e, c({ nameCont: "太郎" }))).toBe(true);
+    const e = userEntity({
+      id: 1,
+      last_name: "山田",
+      first_name: "太郎",
+      email: "Taro@Example.com",
+    });
+    expect(s.match(e, c({ nameCont: "山田" }))).toBe(true); // 姓
+    expect(s.match(e, c({ nameCont: "太郎" }))).toBe(true); // 名
+    expect(s.match(e, c({ nameCont: "山田太郎" }))).toBe(true); // 連結
+    expect(s.match(e, c({ nameCont: "山田 太郎" }))).toBe(true); // 空白つき
+    expect(s.match(e, c({ nameCont: "田太" }))).toBe(true); // 連結の部分一致
+    expect(s.match(e, c({ nameCont: "次郎" }))).toBe(false);
     expect(s.match(e, c({ emailCont: "taro@example" }))).toBe(true);
     expect(s.match(e, c({ emailCont: "jiro" }))).toBe(false);
+    expect(s.match(e, c({ nameCont: "太郎", emailCont: "jiro" }))).toBe(false);
+    const wide = userEntity({ last_name: "Ｓｍｉｔｈ", first_name: "ジョン" });
+    expect(s.match(wide, c({ nameCont: "smith ジョン" }))).toBe(true);
+  });
+
+  it("users: 旧キー(name)を持つ行は名前の絞り込みに一致しない(実在しない項目を見ない)", () => {
+    const s = SPECS.users.cacheFirst;
+    expect(
+      s.match(c({ id: 1, name: "山田 太郎", email: "a@example.com" }), c({ nameCont: "太郎" })),
+    ).toBe(false);
+  });
+
+  it("users: name_cont / email_cont は『キャッシュ専用』のキー(API には送れない)", () => {
+    const s = SPECS.users.cacheFirst;
+    expect([...(s.cacheOnlyKeys ?? [])].sort()).toEqual(["emailCont", "nameCont"]);
+    expect([...s.keys].sort()).toEqual(["emailCont", "nameCont"]);
+    // 他のリソースにはキャッシュ専用のキーが無い
+    for (const spec of Object.values(SPECS)) {
+      if (spec.kind === "cache-first" && spec.resource !== "users") {
+        expect((spec.cacheFirst as { cacheOnlyKeys?: unknown }).cacheOnlyKeys).toBeUndefined();
+      }
+    }
   });
 });
