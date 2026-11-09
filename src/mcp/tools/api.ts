@@ -136,7 +136,12 @@ function getOutput(r: GetReadResult<unknown>, showMeta: boolean | undefined) {
 
 function listDescription(def: ResourceDef): string {
   const head = `${def.label}の一覧を返す。${def.summary}。`;
+  // キャッシュも API 経路も、このサーバーはアーカイブ済み(projects は失注も)を含めて返す(BOARD の既定の除外とは逆。issue #35)。
+  const archive = LIST_FILTER_SUPPORT[def.resource]?.includeArchiveFlg
+    ? `アーカイブ済み${def.resource === "projects" ? "・失注" : ""}のレコードも含めて返す(BOARD の既定とは逆。API 経路で除外するには include_archive_flg=false${def.resource === "projects" ? " / include_lost_flg=false" : ""})。`
+    : "";
   const common =
+    archive +
     "結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。";
   if (def.mode === "cache-first") {
     const keys = def.fields.filter((f) => f.cacheable).map((f) => f.arg);

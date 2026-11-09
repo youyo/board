@@ -19,6 +19,7 @@
 | V13 | 下流の `deploy.yml` が、main への push で `ci.yml` が成功したあとに `workflow_run` で起動し、Environment `production` の secrets が渡ってデプロイが通る(未確認) | 下流で main に push し、Actions の実行を確認する。PR の CI では起動せず、`ci.yml` が失敗したときは skipped になる | 自動デプロイが動かない。手動の `mise run deploy` に戻す(docs/deploy-ci.md) |
 | V14 | 仕様(OpenAPI v1.9.0)に無い `GET /v1/{invoices,expenditure_payments,users,groups,payment_terms,project_types,expenditure_types,accounting_types,document_send_channels}/{id}` の 9 本が、実 API に存在するか(未確認。仕様には一覧しか無い) | `cache_clear` のあとに、対応する `get_*`(`get_invoice` / `get_payment` / `get_user` / `get_group` / `get_payment_term` / `get_project_type` / `get_purchase_type` / `get_accounting_type` / `get_document_send_channel`)を一覧で見えた ID で呼ぶ。キャッシュに当たると確認にならないので、必ず先に `cache_clear` する | 存在しなければ `not_found` になる(見えるエラー)。その場合は `get_*` を一覧から引く方式に変える |
 | V15 | 請求書を案件で絞る(issue #31。未確認): `list_invoices` の `project_project_no_eq` / `project_name_cont` / `project_management_no_eq` と、`find_invoices` の `project_name` / `project_id` が、その案件の請求書だけを返す。実 API が `project_project_no_eq` を効かせるか | `find_invoices project_name=<案件名>` と `list_invoices project_project_no_eq=<案件番号>` を、請求書を持つ案件で呼ぶ。キャッシュに当たると API の確認にならないので、`cache_clear` のあとに呼ぶ | 他の案件の請求書が混ざる(`find_invoices` は後段で `project_id` を突き合わせるので混ざらないが、`list_invoices` は混ざる)。その場合は API が無視している |
+| V16 | アーカイブ・失注を含めて取る(issue #35。未確認): (a) `list_projects refresh=full` を complete まで実行したあと、`cache_status` の projects の `row_count` が、BOARD の `include_archive_flg=1` かつ `include_lost_flg=1` の `total_count` と一致する。(b) `include_archive_flg=1` だけ、`include_lost_flg=1` だけの組み合わせの意味(失注・アーカイブのどちらが増えるか、両方が要るか)。(c) 案件をアーカイブ(または失注)にする操作で `updated_at` が更新され、`refresh=delta` で拾える | (a) `list_projects`(API 直接。`show_meta: true`)の `total_count` を、(指定なし / `include_archive_flg=1` / `include_lost_flg=1` / 両方)で比べる。次に `refresh=full` を complete まで回して `cache_status` の `row_count` を見る。(c) テスト用の案件をアーカイブして `refresh=delta` し、その案件の行が `archive_flg=1`(`response_group=large` の `get_project`)になるか見る | (a) 一致しなければ、どちらかのフラグの意味が想定と違う。refresh の既定のクエリを見直す。(c) アーカイブで `updated_at` が動かなければ、delta ではアーカイブへの変更を拾えない(次の `refresh=full` で入れ替わる。それまでは古い行のまま) |
 
 ## 記入欄
 
@@ -122,3 +123,14 @@
 - `list_invoices project_project_no_eq=<案件番号>` がその案件の請求書だけを返す(キャッシュを空にして API 経由で): [ ] はい  [ ] いいえ
 - `list_invoices project_name_cont=<案件名の一部>` / `project_management_no_eq=<管理番号>` が同様に効く: [ ] はい  [ ] いいえ
 - 外れたときの影響: `list_invoices` が他の案件の請求書を返す。`find_invoices` は後段の `project_id` で除くので正しいが、取得件数が増える。
+
+### V16 アーカイブ・失注を含めて取る(2026-11-10 追加。issue #35。未確認)
+- 前提: `GET /v1/projects` は `include_archive_flg` / `include_lost_flg` を送らないとアーカイブ済み・失注を除外する(実機で、指定なし約 2,900 件、`include_archive_flg=true` 約 4,700 件、両方約 5,900 件。issue #35)。v1.8.0 の refresh と API 経路は、未指定なら両方 `=1` を送る。版(`query_version`)を見るのは `include_archive_flg` を受ける 14 リソースだけ。書類の逆引き走査の状態(`document_scan_state`)にも版があり、旧版は page 1 から走査し直す。
+- 手順: `list_projects`(API 直接、`show_meta: true`)で件数を 4 通り(指定なし / `include_archive_flg=true` / `include_lost_flg=true` / 両方)取る。`list_projects refresh=full` を complete まで回し、`cache_status` を見る。
+- 確認日 / 確認者:
+- `cache_status` の projects の `row_count` が、両方 `true` の `total_count` と一致する: [ ] はい  [ ] いいえ(`row_count` = ____ / `total_count` = ____)
+- `include_archive_flg=true` だけ・`include_lost_flg=true` だけの件数(それぞれが何を増やすか): ____ / ____
+- 上げた直後、`cache_status` の `document_scans` が `not_started`、invoices / users などが `complete` のまま: [ ] はい  [ ] いいえ
+- 案件をアーカイブすると `updated_at` が更新される(`refresh=delta` で拾える): [ ] はい  [ ] いいえ
+- 同名の案件の片方がアーカイブ済みのとき、`find_invoices project_name=<案件名>` が曖昧エラー(候補 2 件)になる: [ ] はい  [ ] いいえ
+- 外れたときの影響: `row_count` が合わなければ、キャッシュに欠け(または余り)がある。アーカイブで `updated_at` が動かなければ、`delta` は変更を拾えない(`full` で入れ替える)。

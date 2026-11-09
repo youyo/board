@@ -129,7 +129,7 @@ const COMMON_FILTERS: readonly FieldDef[] = [
   bool(
     "include_archive_flg",
     "includeArchiveFlg",
-    "true でアーカイブ済みも含める(include_archive_flg=1)。false を明示すると 0 を送る",
+    "未指定ならアーカイブ済みも含める(このサーバーの既定。BOARD の既定とは逆)。false で除外する(include_archive_flg=0 を送る)。response_group が small(既定)の一覧応答には archive_flg が無いので、どれがアーカイブ済みかは応答から判別できない",
   ),
 ];
 
@@ -241,7 +241,11 @@ export const API_RESOURCES: readonly ResourceDef[] = [
       ),
       str("created_at_gteq", "createdAtGteq", "作成日時がこれ以降(`YYYY-MM-DD HH:MM:SS`)"),
       str("created_at_lteq", "createdAtLteq", "作成日時がこれ以前(`YYYY-MM-DD HH:MM:SS`)"),
-      bool("include_lost_flg", "includeLostFlg", "true で失注した案件も含める(include_lost_flg=1)"),
+      bool(
+        "include_lost_flg",
+        "includeLostFlg",
+        "未指定なら失注した案件も含める(このサーバーの既定。BOARD の既定とは逆)。false で除外する(include_lost_flg=0 を送る)。失注かどうかは応答の order_status_name で分かる",
+      ),
     ],
   },
   {

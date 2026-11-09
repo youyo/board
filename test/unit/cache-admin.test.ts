@@ -8,7 +8,7 @@ import {
 } from "../../src/cache/admin";
 import { recordStatements, tryAcquireScanLock } from "../../src/cache/document-map";
 import { countEntries, upsertEntities } from "../../src/cache/resource-cache";
-import { getSyncState } from "../../src/cache/sync-state";
+import { CACHE_QUERY_VERSION, getSyncState } from "../../src/cache/sync-state";
 import { RefreshInProgressError } from "../../src/errors";
 import { LOCK_STALE_MS, tryAcquireLock } from "../../src/refresh/lock";
 import { fakeClock, resetCache, testDb } from "../helpers/d1";
@@ -22,7 +22,7 @@ async function seed(db: D1Database) {
   await db.batch([
     db.prepare("INSERT OR IGNORE INTO sync_state (resource_name) VALUES ('clients')"),
     db.prepare(
-      "UPDATE sync_state SET last_synced_at='2026-11-04T00:00:00Z', last_full_synced_at='2026-11-01T00:00:00Z', last_sync_status='success' WHERE resource_name='clients'",
+      `UPDATE sync_state SET last_synced_at='2026-11-04T00:00:00Z', last_full_synced_at='2026-11-01T00:00:00Z', last_sync_status='success', query_version=${CACHE_QUERY_VERSION} WHERE resource_name='clients'`,
     ),
   ]);
 }
@@ -232,10 +232,10 @@ async function seedDocumentMap(db: D1Database) {
     ),
     ...recordStatements(db, "order", [{ documentId: 20, projectId: 1 }], NOW),
     db.prepare(
-      "INSERT INTO document_scan_state (document_kind, next_page, started_at) VALUES ('estimate', 4, '2026-11-04T00:00:00Z')",
+      `INSERT INTO document_scan_state (document_kind, next_page, started_at, query_version) VALUES ('estimate', 4, '2026-11-04T00:00:00Z', ${CACHE_QUERY_VERSION})`,
     ),
     db.prepare(
-      "INSERT INTO document_scan_state (document_kind, next_page, started_at, completed_at) VALUES ('order', NULL, '2026-11-03T00:00:00Z', '2026-11-03T00:01:00Z')",
+      `INSERT INTO document_scan_state (document_kind, next_page, started_at, completed_at, query_version) VALUES ('order', NULL, '2026-11-03T00:00:00Z', '2026-11-03T00:01:00Z', ${CACHE_QUERY_VERSION})`,
     ),
   ]);
 }
@@ -270,10 +270,10 @@ describe("cache report (cache_status の元)", () => {
     const db = testDb();
     await db.batch([
       db.prepare(
-        "INSERT INTO sync_state (resource_name, last_synced_at, full_next_page) VALUES ('clients', '2026-11-04T00:00:00Z', 3)",
+        `INSERT INTO sync_state (resource_name, last_synced_at, query_version, full_next_page, full_query_version) VALUES ('clients', '2026-11-04T00:00:00Z', ${CACHE_QUERY_VERSION}, 3, ${CACHE_QUERY_VERSION})`,
       ),
       db.prepare(
-        "INSERT INTO sync_state (resource_name, last_synced_at, last_sync_status, last_error_code, consecutive_failures, full_prune_skipped) VALUES ('vendors', '2026-11-04T00:00:00Z', 'error', 'rate_limited', 2, 1)",
+        `INSERT INTO sync_state (resource_name, last_synced_at, query_version, last_sync_status, last_error_code, consecutive_failures, full_prune_skipped) VALUES ('vendors', '2026-11-04T00:00:00Z', ${CACHE_QUERY_VERSION}, 'error', 'rate_limited', 2, 1)`,
       ),
     ]);
     const { resources } = await cacheReport(db, { now: clock.now });
@@ -289,7 +289,7 @@ describe("cache report (cache_status の元)", () => {
     const db = testDb();
     await db.batch([
       db.prepare(
-        "INSERT INTO sync_state (resource_name, last_synced_at, last_sync_status, delta_next_page, delta_started_at) VALUES ('projects', '2026-11-04T00:00:00Z', 'success', 2, '2026-11-05T00:00:00Z')",
+        `INSERT INTO sync_state (resource_name, last_synced_at, query_version, last_sync_status, delta_next_page, delta_query_version, delta_started_at) VALUES ('projects', '2026-11-04T00:00:00Z', ${CACHE_QUERY_VERSION}, 'success', 2, ${CACHE_QUERY_VERSION}, '2026-11-05T00:00:00Z')`,
       ),
     ]);
     const { resources } = await cacheReport(db, { now: clock.now });

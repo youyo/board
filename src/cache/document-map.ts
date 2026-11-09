@@ -7,6 +7,7 @@
  */
 
 import { ensureSchema } from "./schema";
+import { CACHE_QUERY_VERSION } from "./sync-state";
 import { isoSeconds } from "./time";
 
 export interface ScanState {
@@ -18,6 +19,13 @@ export interface ScanState {
   completed_at: string | null;
   lock_started_at: string | null;
   lock_owner: string | null;
+  /** 進捗・完了を保存した版(v4)。CACHE_QUERY_VERSION と一致するときだけ有効。NULL は旧コードの走査。 */
+  query_version: number | null;
+}
+
+/** 現在の版で保存した走査状態か(旧コードの進捗・完了は、アーカイブ・失注の案件を飛ばしているので使わない)。 */
+export function scanVersionCurrent(scan: ScanState | null): boolean {
+  return scan?.query_version === CACHE_QUERY_VERSION;
 }
 
 export async function getProjectId(
@@ -103,10 +111,10 @@ export function saveProgressStatement(
 ): D1PreparedStatement {
   return db
     .prepare(
-      `UPDATE document_scan_state SET next_page = ?, started_at = ?, completed_at = ?
+      `UPDATE document_scan_state SET next_page = ?, started_at = ?, completed_at = ?, query_version = ?
        WHERE document_kind = ? AND lock_owner = ?`,
     )
-    .bind(p.nextPage, p.startedAt, p.completedAt, kind, owner);
+    .bind(p.nextPage, p.startedAt, p.completedAt, CACHE_QUERY_VERSION, kind, owner);
 }
 
 /** 取れたら true。待たない。 */

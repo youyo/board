@@ -8,9 +8,21 @@ import { ArgumentError, RefreshInProgressError } from "../errors";
 import { LOCK_STALE_MS, type Lock, releaseLock, tryAcquireLock } from "../refresh/lock";
 import { SCAN_LOCK_STALE_MS } from "../repository/document-index";
 import { DOCUMENT_KINDS } from "../repository/document-kinds";
-import { getScanState, releaseScanLock, tryAcquireScanLock } from "./document-map";
+import {
+  getScanState,
+  releaseScanLock,
+  scanVersionCurrent,
+  tryAcquireScanLock,
+} from "./document-map";
 import { ensureSchema } from "./schema";
-import { expireStates, listSyncStates, type SyncState } from "./sync-state";
+import {
+  deltaInProgress,
+  expireStates,
+  fullInProgress,
+  hasSynced,
+  listSyncStates,
+  type SyncState,
+} from "./sync-state";
 import { type Clock, isoSeconds, systemClock } from "./time";
 
 export const RESOURCE_NAMES: readonly string[] = RESOURCES.map((r) => r.name);
@@ -196,9 +208,10 @@ export interface DocumentScanReport {
 
 function refreshStateOf(s: SyncState | undefined): ReportRefreshState {
   // full / delta のどちらかが途中なら partial(次の同じ refresh で続きから取る)。
-  if (s?.full_next_page != null || s?.delta_next_page != null) return "partial";
+  // 旧コード(アーカイブ・失注を取らない)の進捗・同期は、版が違うので数えない(未同期として扱い、取り直す)。
+  if (fullInProgress(s ?? null) || deltaInProgress(s ?? null)) return "partial";
   if (s?.last_sync_status === "error") return "failed";
-  return s?.last_synced_at ? "complete" : "not_synced";
+  return hasSynced(s ?? null) ? "complete" : "not_synced";
 }
 
 /** cache_status の本体。読み取り専用(ロックも取らない)。 */
@@ -218,8 +231,11 @@ export async function cacheReport(
       full_prune_skipped: r.full_prune_skipped,
       locked: r.refreshing,
     };
-    if (r.last_synced_at) out.cached_at = r.last_synced_at;
-    if (r.last_full_synced_at) out.full_refreshed_at = r.last_full_synced_at;
+    // 版が違う(旧コードの同期)ときは時刻を出さない。cache_status が『未同期』と読めるようにする。
+    if (hasSynced(s ?? null)) {
+      if (r.last_synced_at) out.cached_at = r.last_synced_at;
+      if (r.last_full_synced_at) out.full_refreshed_at = r.last_full_synced_at;
+    }
     if (out.refresh_state === "failed" && r.last_error_code)
       out.last_error_code = r.last_error_code;
     return out;
@@ -231,8 +247,10 @@ export async function cacheReport(
   const mapped = new Map(counts.results.map((r) => [r.document_kind, r.c]));
   const document_scans: DocumentScanReport[] = [];
   for (const kind of DOCUMENT_KINDS) {
-    const scan = await getScanState(db, kind);
-    const lockedAt = scan?.lock_started_at ? Date.parse(scan.lock_started_at) : Number.NaN;
+    const scan0 = await getScanState(db, kind);
+    // 旧コードの進捗・完了は未開始相当(次の lookup は page 1 から走査し直す)。ロックの状態は版に関係なく出す。
+    const scan = scanVersionCurrent(scan0) ? scan0 : null;
+    const lockedAt = scan0?.lock_started_at ? Date.parse(scan0.lock_started_at) : Number.NaN;
     const report: DocumentScanReport = {
       document_kind: kind,
       scan_state: scan?.completed_at

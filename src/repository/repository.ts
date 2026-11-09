@@ -7,6 +7,7 @@
  */
 
 import { type CallContext, resolveContext } from "../board/context";
+import { LIST_FILTER_SUPPORT } from "../board/openapi-support";
 import type { CommonListOptions } from "../board/resources";
 import { assertId } from "../board/resources";
 import { type CacheInfo, cacheInfoFromState } from "../cache/info";
@@ -87,6 +88,15 @@ function createListRepository<E, F extends CommonListOptions>(
     const cacheOnly = cf?.cacheOnlyKeys?.filter((k) => !isZeroFilter({ [k]: filter[k] })) ?? [];
     const apiFilter = { ...filter } as F;
     for (const k of cacheOnly) delete apiFilter[k];
+    // 未指定ならアーカイブ済み・失注も含める(このサーバーの既定。BOARD の既定の除外とは逆)。キャッシュ(全件が入っている)と同じ集合になる。
+    // 明示の false は =0 のまま送る。仕様が受けないリソースには足さない(issue #35)。
+    if (LIST_FILTER_SUPPORT[resource]?.includeArchiveFlg) {
+      apiFilter.includeArchiveFlg ??= true;
+      if (resource === "projects") {
+        const f = apiFilter as { includeLostFlg?: boolean };
+        f.includeLostFlg ??= true;
+      }
+    }
     // match で後から絞る場合は、何件で足りるか分からないので全ページを取る。それ以外は limit に達したページで止める。
     const postFiltered = cf !== undefined && cacheOnly.length > 0;
     const limit = readOpts.limit !== undefined && readOpts.limit > 0 ? readOpts.limit : undefined;

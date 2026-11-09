@@ -293,6 +293,17 @@ mise run test:live
 4. `complete` になったら、以降は `refresh=delta`(差分)で足りる。削除されたエンティティを反映したいときだけ、ときどき `full`。ただし BOARD の一覧に `updated_at_gteq` が無いリソース(users / groups / payment_terms / project_types / purchase_types / accounting_types / document_send_channels / project_costs)は差分を取れないので、`delta` は `full` として動く(全件を取り直し、応答の `mode` は `full`。v1.5.0 以降、issue #28)。
 5. 書類(見積・受注・納品・領収)を ID で引く `find_*` は、案件との対応(逆引き)を覚えるまで、最初の 1〜2 回は `warnings` に `project_unresolved`(`reason: deadline`)が出うる。同じ呼び出しを繰り返すと続きから進む(ADR 0004)。
 
+### v1.8.0 へ上げたとき(アーカイブ・失注を含めて取り直す。issue #35)
+v1.7.0 まではアーカイブ済み(projects は失注も)のレコードをキャッシュに入れていなかった。v1.8.0 から、refresh(full / delta)は `include_archive_flg=1`(projects は `include_lost_flg=1` も)を送って、すべてを入れる。
+
+- 上げた直後、`include_archive_flg` を受ける 14 リソース(clients / client_branches / contacts / projects / vendors / vendor_branches / vendor_contacts / purchase_orders / groups / payment_terms / project_types / purchase_types / accounting_types / document_send_channels)のキャッシュは**未同期扱い**になる(スキーマ v4 の `query_version`。`cache_status` は `not_synced`、応答の `cache` は `cached_at` なし)。行は消えない(ゼロフィルタの一覧は古い行を返す)が、鮮度は『未取得』と表示される。invoices / payments / users / project_costs はクエリが変わっていないので版を見ず、影響を受けない(同期済みのまま、進捗も再開する)。
+- 書類(見積・受注・納品・領収)の逆引き走査(`document_scan_state`)も版を持つ。旧コードの走査の進捗・完了済みは使わず、次の `find_*` の書類 ID 引きで page 1 から走査し直す(アーカイブ・失注の案件の書類も拾うため。完了済みの `not_found` を 10 分間信用する仕組みも旧版には効かない)。`cache_status` の `document_scans` は旧版を `not_started` で出す。覚えた対応(`document_project_map`)は消えない(誤りではなく欠けているだけ)。
+- 移行の full で件数が BOARD の総件数に届かず旧世代を消さなかった(`full_prune_skipped`)ときは、完了しても版を進めない。そのリソースは未同期のまま(次の `refresh=full` で取り直す)。
+- 最初の `refresh=delta` は自動で full として動く(応答の `mode` は `full`)。絞り込みつきの読み取り(`find_*` の名前解決を含む)は、full が `complete` になるまで API 経由になる(API 経路も未指定ならアーカイブ・失注を含める)。
+- 下流の運用者は、使うリソースごとに `refresh=full` を **`refresh_state` が `complete` になるまで**繰り返す(上の「キャッシュの初回構築」と同じ手順。特に projects は件数が多く、数回かかる)。`cache_clear` は要らない。完了すると、旧コードで入ったが BOARD から消えた行は prune される(件数の照合に通ったときだけ)。
+- 確認: `cache_status` の projects の `row_count` が、BOARD の `include_archive_flg=1` かつ `include_lost_flg=1` の `total_count` と一致する(docs/manual-verification.md の V16)。
+- 応答の `response_group` が small(既定)の一覧には `archive_flg` が無いので、どれがアーカイブ済みかは応答から判別できない。失注は `order_status_name` で分かる。除外したいときは API 経路で `include_archive_flg=false`(projects は `include_lost_flg=false` も)を指定する(キャッシュ経由にはならない)。
+
 ### `cache_status`
 BOARD を呼ばずに D1 の状態を返す(読み取り専用)。見るところ:
 - `refresh_state`: `complete` / `partial`(full が途中。続きを `refresh=full` で)/ `failed`(`last_error_code`)/ `not_synced`(未取得)。

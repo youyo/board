@@ -5,6 +5,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createBoardClient } from "../../src/board/client";
+import { CACHE_QUERY_VERSION } from "../../src/cache/sync-state";
 import {
   COMPLETE_TTL_MS,
   createDocumentIndex,
@@ -382,7 +383,7 @@ describe("ロックを取ったあとに走査の状態を読み直す", () => {
         hook: async () => {
           await testDb()
             .prepare(
-              "INSERT OR REPLACE INTO document_scan_state (document_kind, next_page, started_at, completed_at) VALUES ('estimate', NULL, 'S', ?)",
+              `INSERT OR REPLACE INTO document_scan_state (document_kind, next_page, started_at, completed_at, query_version) VALUES ('estimate', NULL, 'S', ?, ${CACHE_QUERY_VERSION})`,
             )
             .bind(new Date(clock.now()).toISOString())
             .run();
@@ -437,7 +438,7 @@ describe("ロックを取ったあとに走査の状態を読み直す", () => {
         hook: async () => {
           await testDb()
             .prepare(
-              "INSERT OR REPLACE INTO document_scan_state (document_kind, next_page, started_at) VALUES ('estimate', 3, 'S')",
+              `INSERT OR REPLACE INTO document_scan_state (document_kind, next_page, started_at, query_version) VALUES ('estimate', 3, 'S', ${CACHE_QUERY_VERSION})`,
             )
             .run();
         },

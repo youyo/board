@@ -27,6 +27,7 @@ import {
   releaseScanLock,
   type ScanState,
   saveProgressStatement,
+  scanVersionCurrent,
   tryAcquireScanLock,
 } from "../cache/document-map";
 import { ensureSchema } from "../cache/schema";
@@ -83,6 +84,8 @@ function pairsOf(kind: DocumentKind, projects: readonly ProjectEntity[]) {
 }
 
 function isCompletedFresh(state: ScanState | null, nowMs: number): boolean {
+  // 旧コードの完了は、アーカイブ・失注の案件を飛ばしているので信用しない。
+  if (!scanVersionCurrent(state)) return false;
   const completedMs = state?.completed_at ? Date.parse(state.completed_at) : Number.NaN;
   return !Number.isNaN(completedMs) && nowMs - completedMs < COMPLETE_TTL_MS;
 }
@@ -130,7 +133,11 @@ export function createDocumentIndex(deps: DocumentIndexDeps): DocumentIndex {
       const state = await getScanState(db, kind);
       if (isCompletedFresh(state, now())) return { status: "miss", reason: "not_found" };
       // 完了済み(TTL 切れ)または未開始なら先頭から。途中なら保存した次のページから。
-      const resume = state && !state.completed_at && state.next_page ? state.next_page : 1;
+      // 旧コード(版違い)の進捗は、ページ列がずれるので使わない。
+      const resume =
+        state && scanVersionCurrent(state) && !state.completed_at && state.next_page
+          ? state.next_page
+          : 1;
       let page = resume;
       const startedAt = resume === 1 ? isoSeconds(start) : (state?.started_at ?? isoSeconds(start));
       const group = DOCUMENT_KIND_INFO[kind].group;
@@ -148,7 +155,12 @@ export function createDocumentIndex(deps: DocumentIndexDeps): DocumentIndex {
           // クライアントにも予約を残した締め切りを渡す(1 ページが長引いても予約の時間を食わない)。
           const res = await client.get(
             "/v1/projects",
-            buildProjectsQuery({ responseGroup: group }, page, perPage),
+            buildProjectsQuery(
+              // アーカイブ済み・失注の案件の書類も逆引きできるように、すべてを走査する(issue #35)。
+              { responseGroup: group, includeArchiveFlg: true, includeLostFlg: true },
+              page,
+              perPage,
+            ),
             { signal: ctx.signal, deadline: budgetEnd },
           );
           if (!Array.isArray(res.body)) {

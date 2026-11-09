@@ -29,7 +29,7 @@ describe("スキーマの適用", () => {
         "document_scan_state",
       ]),
     );
-    expect(SCHEMA_VERSION).toBe(3);
+    expect(SCHEMA_VERSION).toBe(4);
     expect(await names(db, "index")).toEqual(
       expect.arrayContaining(["idx_resource_cache_generation", "idx_resource_cache_updated"]),
     );
