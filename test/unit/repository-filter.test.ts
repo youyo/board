@@ -218,6 +218,36 @@ describe("invoices / purchase_orders / payments / vendors / users のキャッ�
     expect(isCacheableFilter({ projectClientIdEq: 1, invoiceStatusIn: [2] }, s.keys)).toBe(true);
   });
 
+  it("invoices: 案件番号(数値の完全一致)・管理番号(完全一致)・案件名(fold の部分一致)。日付は cacheable でない", () => {
+    const s = SPECS.invoices.cacheFirst;
+    const e = invoiceEntity({ project_no: 1001, management_no: "M-001", name: "Web サイト制作" });
+    expect(s.match(e, c({ projectProjectNoEq: 1001 }))).toBe(true);
+    expect(s.match(e, c({ projectProjectNoEq: 1002 }))).toBe(false);
+    expect(s.match(invoiceEntity({ project_no: null }), c({ projectProjectNoEq: 1001 }))).toBe(
+      false,
+    );
+    expect(s.match(e, c({ projectManagementNoEq: "M-001" }))).toBe(true);
+    expect(s.match(e, c({ projectManagementNoEq: "M-00" }))).toBe(false);
+    expect(s.match(invoiceEntity({ management_no: null }), c({ projectManagementNoEq: "M" }))).toBe(
+      false,
+    );
+    expect(s.match(e, c({ projectNameCont: "web" }))).toBe(true);
+    expect(s.match(e, c({ projectNameCont: "別案件" }))).toBe(false);
+    for (const k of ["projectProjectNoEq", "projectManagementNoEq", "projectNameCont"]) {
+      expect(isCacheableFilter({ [k]: k === "projectProjectNoEq" ? 1 : "x" }, s.keys), k).toBe(
+        true,
+      );
+    }
+    for (const k of [
+      "invoiceDateGteq",
+      "invoiceDateLteq",
+      "invoicePaymentLimitDateGteq",
+      "invoicePaymentLimitDateLteq",
+    ]) {
+      expect(isCacheableFilter({ [k]: "2026-01-01" }, s.keys), k).toBe(false);
+    }
+  });
+
   it("invoices: 旧キー(client_id / status)を持つ行は一致しない(実在しない項目を見ない)", () => {
     const s = SPECS.invoices.cacheFirst;
     const legacy = c({ id: 1, client_id: 3, project_id: 4, status: "paid" });

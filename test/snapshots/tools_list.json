@@ -207,7 +207,7 @@
   {
     "name": "find_invoices",
     "title": "請求書検索",
-    "description": "Search BOARD invoices by ID, client name, or status. Fields combine with AND (ID overrides others). Returns invoice entities. client_name resolves with ambiguity error on multiple matches. status is a status NAME that is converted to BOARD's numeric code (invoice_status: 1=未請求 / 2=請求済 / 3=入金済 / 4=請求OK / 5=一部入金済 / 9=回収不能); an unknown name is rejected with argument_error listing the accepted names. It narrows in the cache and in the API (no extra narrowing required). Each item has the invoice with its Client (from the invoice's client.id) and Project. project_name is not yet supported. Response: {items, cache, warnings?, limited?, total_before_limit?}. cache = freshness of the cached resources that were read (cached_at, full_refreshed_at, refresh_state); warnings = non-fatal problems (enrichment that failed and is null, a project_id that could not be resolved, a truncated list).",
+    "description": "Search BOARD invoices by ID, client name, or status. Fields combine with AND (ID overrides others). Returns invoice entities. client_name resolves with ambiguity error on multiple matches. status is a status NAME that is converted to BOARD's numeric code (invoice_status: 1=未請求 / 2=請求済 / 3=入金済 / 4=請求OK / 5=一部入金済 / 9=回収不能); an unknown name is rejected with argument_error listing the accepted names. It narrows in the cache and in the API (no extra narrowing required). Each item has the invoice with its Client (from the invoice's client.id) and Project. project_id / project_name narrow to the invoices of one project: project_id fetches that project, project_name (substring match) resolves to exactly one project (not_found if none, ambiguity error with up to 5 candidates if several; combined with client_name it searches that client's projects only). The project's project_no is sent to BOARD (project_project_no_eq) and the result is also checked against the invoice's project_id. project_id and project_name are mutually exclusive. Response: {items, cache, warnings?, limited?, total_before_limit?}. cache = freshness of the cached resources that were read (cached_at, full_refreshed_at, refresh_state); warnings = non-fatal problems (enrichment that failed and is null, a project_id that could not be resolved, a truncated list).",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -215,6 +215,10 @@
         "id": {
           "type": "number",
           "description": "Invoice ID for direct lookup (highest priority)."
+        },
+        "project_id": {
+          "type": "number",
+          "description": "Project ID to find its invoices (narrows to a single project). Mutually exclusive with project_name."
         },
         "client_name": {
           "type": "string",
@@ -224,7 +228,7 @@
         "project_name": {
           "type": "string",
           "maxLength": 1000,
-          "description": "(NOT YET SUPPORTED) Will filter invoices by project name in a future release. Currently returns an error."
+          "description": "Resolve project name (substring match) to filter invoices by that project. Returns an ambiguity error with up to 5 candidates if multiple projects match; use project_id to disambiguate. Mutually exclusive with project_id."
         },
         "status": {
           "type": "string",
@@ -1918,7 +1922,7 @@
   {
     "name": "list_invoices",
     "title": "請求書一覧取得",
-    "description": "請求書の一覧を返す。請求書。案件(project_id)と顧客(client の入れ子。顧客 ID は client.id)に紐づく。請求ステータスは数値コード(invoice_status)と名称(invoice_status_name)で返る。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta(差分)か refresh=full(全件)を指定する。件数が多いリソースでは全件を返すと応答が大きくなるので、まず limit か絞り込みを指定する。絞り込み: project_client_id_eq / invoice_status_in だけを指定した場合は、同期済みならキャッシュを絞って返す。それ以外の引数(updated_at_* / include_archive_flg / response_group などサーバー側の指定を含む)を指定したときは BOARD の API を直接呼び(このとき refresh は無視される)、キャッシュが未同期のときも API を直接呼ぶ。API から取った結果の cache は空になる。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "description": "請求書の一覧を返す。請求書。案件(project_id)と顧客(client の入れ子。顧客 ID は client.id)に紐づく。請求ステータスは数値コード(invoice_status)と名称(invoice_status_name)で返る。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta(差分)か refresh=full(全件)を指定する。件数が多いリソースでは全件を返すと応答が大きくなるので、まず limit か絞り込みを指定する。絞り込み: project_client_id_eq / invoice_status_in / project_project_no_eq / project_management_no_eq / project_name_cont だけを指定した場合は、同期済みならキャッシュを絞って返す。それ以外の引数(updated_at_* / include_archive_flg / response_group などサーバー側の指定を含む)を指定したときは BOARD の API を直接呼び(このとき refresh は無視される)、キャッシュが未同期のときも API を直接呼ぶ。API から取った結果の cache は空になる。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1934,6 +1938,40 @@
             "type": "number"
           },
           "description": "請求ステータスで絞り込む(いずれかに一致): 1=未請求 / 4=請求OK / 2=請求済 / 5=一部入金済 / 3=入金済 / 9=回収不能"
+        },
+        "project_project_no_eq": {
+          "type": "number",
+          "description": "案件番号で絞り込む(完全一致。整数。請求書の project_no)"
+        },
+        "project_management_no_eq": {
+          "type": "string",
+          "maxLength": 1000,
+          "description": "案件の管理番号で絞り込む(完全一致。請求書の management_no)"
+        },
+        "project_name_cont": {
+          "type": "string",
+          "maxLength": 1000,
+          "description": "案件名で絞り込む(部分一致。請求書の name は案件名)"
+        },
+        "invoice_date_gteq": {
+          "type": "string",
+          "maxLength": 1000,
+          "description": "請求日がこれ以降(`YYYY-MM-DD`)"
+        },
+        "invoice_date_lteq": {
+          "type": "string",
+          "maxLength": 1000,
+          "description": "請求日がこれ以前(`YYYY-MM-DD`)"
+        },
+        "invoice_payment_limit_date_gteq": {
+          "type": "string",
+          "maxLength": 1000,
+          "description": "支払期限がこれ以降(`YYYY-MM-DD`)"
+        },
+        "invoice_payment_limit_date_lteq": {
+          "type": "string",
+          "maxLength": 1000,
+          "description": "支払期限がこれ以前(`YYYY-MM-DD`)"
         },
         "response_group": {
           "type": "string",

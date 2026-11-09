@@ -167,10 +167,20 @@ export const SPECS = {
     list: listInvoices,
     get: getInvoice,
     cacheFirst: {
-      keys: ["projectClientIdEq", "invoiceStatusIn"],
+      // 請求日・支払期限(invoiceDate* / invoicePaymentLimitDate*)は含めない: サーバーに任せる(issue #31)。
+      keys: [
+        "projectClientIdEq",
+        "invoiceStatusIn",
+        "projectProjectNoEq",
+        "projectManagementNoEq",
+        "projectNameCont",
+      ],
       match: (i, f) =>
         (!f.projectClientIdEq || i.client?.id === f.projectClientIdEq) &&
-        (!f.invoiceStatusIn?.length || f.invoiceStatusIn.includes(i.invoice_status)),
+        (!f.invoiceStatusIn?.length || f.invoiceStatusIn.includes(i.invoice_status)) &&
+        (!f.projectProjectNoEq || i.project_no === f.projectProjectNoEq) &&
+        (!f.projectManagementNoEq || str(i.management_no) === f.projectManagementNoEq) &&
+        (!f.projectNameCont || foldContains(i.name, f.projectNameCont)),
     },
   }),
   purchase_orders: cacheFirst<PurchaseOrderEntity, PurchaseOrderListOptions>("purchase_orders", {

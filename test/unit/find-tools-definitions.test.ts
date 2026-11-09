@@ -13,7 +13,7 @@ const FIND_TOOLS: Record<string, string[]> = {
   find_users: ["id", "name"],
   find_projects: ["id", "client_name", "name", "status", "statuses", "contract_status"],
   find_estimates: ["id", "project_id", "client_name", "project_name"],
-  find_invoices: ["id", "client_name", "project_name", "status"],
+  find_invoices: ["id", "project_id", "client_name", "project_name", "status"],
   find_orders: ["id", "project_id", "client_name", "project_name"],
   find_deliveries: ["id", "project_id", "client_name", "project_name"],
   find_receipts: ["id", "project_id", "client_name", "project_name"],
@@ -75,7 +75,10 @@ describe("find 層のツール 11 個", () => {
       expect(d(n), n).toContain("no status filter");
     }
     const props = (n: string, k: string) => schemaOf(n).properties[k]?.description ?? "";
-    expect(props("find_invoices", "project_name")).toContain("(NOT YET SUPPORTED)");
+    expect(props("find_invoices", "project_name")).not.toContain("NOT YET SUPPORTED");
+    expect(props("find_invoices", "project_name")).toContain("up to 5 candidates");
+    expect(props("find_invoices", "project_id")).toContain("Mutually exclusive");
+    expect(d("find_invoices")).not.toContain("not yet supported");
     expect(props("find_purchase_orders", "project_name")).toContain("(NOT YET SUPPORTED)");
     expect(props("find_payments", "purchase_order_id")).toContain("(NOT YET SUPPORTED)");
     expect(props("find_estimates", "client_name")).toContain("Use project_id to narrow");
@@ -165,7 +168,8 @@ describe("引数の検証(BOARD に通信する前に拒否する)", () => {
     ["find_projects", { name: "x", contract_status: "nope" }, "unknown contract_status"],
     ["find_estimates", { status: "x" }, "status"],
     ["find_estimates", {}, "at least one field required"],
-    ["find_invoices", { project_name: "x" }, "project_name is not yet supported for invoices"],
+    ["find_invoices", { project_id: 1, project_name: "x" }, "mutually exclusive"],
+    ["find_invoices", { project_id: -1 }, "project_id"],
     [
       "find_purchase_orders",
       { project_name: "x" },

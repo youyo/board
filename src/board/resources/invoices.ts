@@ -86,6 +86,18 @@ export interface InvoiceListOptions extends CommonListOptions {
   projectClientIdEq?: number;
   /** 請求ステータス(invoice_status_in[]) */
   invoiceStatusIn?: number[];
+  /** 案件番号の完全一致(project_project_no_eq。整数) */
+  projectProjectNoEq?: number;
+  /** 管理番号の完全一致(project_management_no_eq) */
+  projectManagementNoEq?: string;
+  /** 案件名の部分一致(project_name_cont) */
+  projectNameCont?: string;
+  /** 請求日 >= / <=(YYYY-MM-DD) */
+  invoiceDateGteq?: string;
+  invoiceDateLteq?: string;
+  /** 支払期限 >= / <=(YYYY-MM-DD) */
+  invoicePaymentLimitDateGteq?: string;
+  invoicePaymentLimitDateLteq?: string;
   /** "small" / "large" */
   responseGroup?: string;
 }
@@ -98,6 +110,13 @@ export function buildInvoicesQuery(
   return baseQuery("invoices", opts, page, perPage)
     .intEq("project_client_id", opts.projectClientIdEq)
     .intIn("invoice_status", opts.invoiceStatusIn)
+    .intEq("project_project_no", opts.projectProjectNoEq)
+    .strEq("project_management_no", opts.projectManagementNoEq)
+    .strCont("project_name", opts.projectNameCont)
+    .dateGteq("invoice_date", opts.invoiceDateGteq)
+    .dateLteq("invoice_date", opts.invoiceDateLteq)
+    .dateGteq("invoice_payment_limit_date", opts.invoicePaymentLimitDateGteq)
+    .dateLteq("invoice_payment_limit_date", opts.invoicePaymentLimitDateLteq)
     .responseGroup(opts.responseGroup)
     .encode();
 }

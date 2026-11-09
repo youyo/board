@@ -282,12 +282,17 @@ const findReceiptsTool = documentTool(
 const findInvoicesTool = defineTool({
   name: "find_invoices",
   title: "請求書検索",
-  description: `Search BOARD invoices by ID, client name, or status. Fields combine with AND (ID overrides others). Returns invoice entities. client_name resolves with ambiguity error on multiple matches. status is a status NAME that is converted to BOARD's numeric code (invoice_status: ${INVOICE_STATUS_LIST}); an unknown name is rejected with argument_error listing the accepted names. It narrows in the cache and in the API (no extra narrowing required). Each item has the invoice with its Client (from the invoice's client.id) and Project. project_name is not yet supported.${RESPONSE_DESC}`,
+  description: `Search BOARD invoices by ID, client name, or status. Fields combine with AND (ID overrides others). Returns invoice entities. client_name resolves with ambiguity error on multiple matches. status is a status NAME that is converted to BOARD's numeric code (invoice_status: ${INVOICE_STATUS_LIST}); an unknown name is rejected with argument_error listing the accepted names. It narrows in the cache and in the API (no extra narrowing required). Each item has the invoice with its Client (from the invoice's client.id) and Project. project_id / project_name narrow to the invoices of one project: project_id fetches that project, project_name (substring match) resolves to exactly one project (not_found if none, ambiguity error with up to 5 candidates if several; combined with client_name it searches that client's projects only). The project's project_no is sent to BOARD (project_project_no_eq) and the result is also checked against the invoice's project_id. project_id and project_name are mutually exclusive.${RESPONSE_DESC}`,
   category: "ReadOnly",
   inputSchema: z.strictObject({
     id: optId(idDesc("Invoice")),
+    project_id: optId(
+      "Project ID to find its invoices (narrows to a single project). Mutually exclusive with project_name.",
+    ),
     client_name: optStr(disambiguateNameDesc("client", "invoice")),
-    project_name: optStr(notYetSupportedDesc("project name", "invoices")),
+    project_name: optStr(
+      "Resolve project name (substring match) to filter invoices by that project. Returns an ambiguity error with up to 5 candidates if multiple projects match; use project_id to disambiguate. Mutually exclusive with project_id.",
+    ),
     status: optStr(
       `Filter by invoice status NAME (single value): ${INVOICE_STATUS_LIST} (code=name). Pass the name (e.g. 請求済), not the code; an unknown name is rejected with argument_error. No extra narrowing required.`,
     ),
@@ -296,20 +301,18 @@ const findInvoicesTool = defineTool({
   handler: async (args, ctx) => {
     const a = args as Common & {
       id?: number;
+      project_id?: number;
       client_name?: string;
       project_name?: string;
       status?: string;
     };
-    if (given(a.project_name)) {
-      throw new ArgumentError(
-        "project_name is not yet supported for invoices (tracked for future enhancement)",
-      );
-    }
     const s = newSession(ctx, a.refresh);
     return output(
       s,
       await findInvoices(s, {
         id: idOrUndefined(a.id),
+        projectId: idOrUndefined(a.project_id),
+        projectName: a.project_name,
         partnerName: a.client_name,
         status: a.status,
         limit: a.limit,

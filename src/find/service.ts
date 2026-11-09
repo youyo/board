@@ -8,7 +8,7 @@
 import type { ClientEntity, ProjectEntity } from "../board/resources";
 import { filterProjectsByContractStatus } from "./contract-status";
 import { filterProjectsByStatus, filterProjectsByStatuses } from "./filter";
-import { resolveClientByName, resolveVendorByName } from "./resolver";
+import { resolveClientByName, resolveProjectByName, resolveVendorByName } from "./resolver";
 import type { FindSession } from "./session";
 import { invoiceStatusCodes, paymentStatusCodes, purchaseOrderStatusFilter } from "./status";
 import {
@@ -126,13 +126,29 @@ export async function findInvoices(s: FindSession, q: StatusedQuery): Promise<In
   validateInvoiceQuery(q);
   // ステータス名はコードに直して API / キャッシュの絞り込みに渡す。id 指定のときは掛けない(通信の前に検査する)。
   const statusCodes = q.id ? [] : invoiceStatusCodes(statusNames(q));
-  const clientId = q.partnerName ? await resolveClientByName(s, q.partnerName) : q.partnerId;
-  const invoices = q.id
+  const clientId = q.id
+    ? undefined
+    : q.partnerName
+      ? await resolveClientByName(s, q.partnerName)
+      : q.partnerId;
+  // 案件の指定(project_id / project_name)は案件を 1 件に解決し、その案件番号で API / キャッシュを絞る。
+  // 案件番号が無い案件は番号では絞れないので、どちらの場合も後段で project_id を突き合わせる。
+  let project: { id: number; project_no: number | null } | undefined;
+  if (!q.id) {
+    if (q.projectName) project = await resolveProjectByName(s, q.projectName, clientId);
+    else if (q.projectId) project = await s.get("projects", q.projectId);
+  }
+  let invoices = q.id
     ? [await s.get("invoices", q.id)]
     : await s.search("invoices", {
         ...(clientId ? { projectClientIdEq: clientId } : {}),
         ...(statusCodes.length ? { invoiceStatusIn: statusCodes } : {}),
+        ...(project?.project_no ? { projectProjectNoEq: project.project_no } : {}),
       });
+  if (project) {
+    const pid = project.id;
+    invoices = invoices.filter((x) => x.project_id === pid);
+  }
 
   const out: InvoiceResult[] = [];
   for (const x of s.applyLimit(invoices, q.limit)) {
