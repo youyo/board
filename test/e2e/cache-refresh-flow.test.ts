@@ -191,6 +191,37 @@ describe("E2E: delta refresh のあとに参照する", () => {
   });
 });
 
+describe("E2E: 仕様の一覧に updated_at_gteq が無いリソース(users)の delta は全件の取得になる(issue #28)", () => {
+  it("カーソルがあっても updated_at_gteq を送らず、全件を取り直して mode: full。キャッシュ(cache の鮮度)も full として進む", async () => {
+    const { clock, repos } = setup();
+    const USERS = `GET ${BASE}/v1/users`;
+    const rows = () => [
+      userEntity({ id: 1, last_name: "山田", updated_at: "2026-01-01T00:00:01.000+09:00" }),
+      userEntity({ id: 2, last_name: "鈴木", updated_at: "2026-01-01T00:00:02.000+09:00" }),
+    ];
+    mockOutboundFetch({ [USERS]: pagedHandler(rows) });
+    await repos.users.list({}, { refresh: "full" });
+    vi.restoreAllMocks();
+
+    clock.advance(3_600_000);
+    // 3 番は delta のあとに増えた。delta が全件を取り直せば新しいユーザーも入る。
+    const api = mockOutboundFetch({
+      [USERS]: pagedHandler(() => [...rows(), userEntity({ id: 3, last_name: "佐藤" })]),
+    });
+    const outcome = await repos.users.refresh("delta");
+    expect(outcome).toMatchObject({ mode: "full", state: "complete", fetched: 3 });
+    for (const c of api.calls) {
+      expect(new URL(c.url).searchParams.has("updated_at_gteq")).toBe(false);
+    }
+    const r = await repos.users.list({}, { refresh: "none" });
+    expect(r.items.map((u) => u.id).sort()).toEqual([1, 2, 3]);
+    expect(r.cache[0]).toMatchObject({
+      cached_at: "2026-11-05T01:00:00Z",
+      full_refreshed_at: "2026-11-05T01:00:00Z", // full として動いたので full の記録も進む
+    });
+  });
+});
+
 describe("E2E: delta refresh を複数回の呼び出しに分けて完了させる", () => {
   it("差分が締め切りに収まらなくても、partial → 再開(1 ページ重ねる)→ complete でカーソルが進む", async () => {
     const { clock, repos } = setup();

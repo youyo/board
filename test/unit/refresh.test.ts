@@ -12,9 +12,11 @@ import {
   type RefreshTarget,
   refreshResource,
 } from "../../src/refresh/refresher";
+import { SPECS } from "../../src/repository/resources";
 import { BASE, makeEntities, pagedHandler, testClient } from "../helpers/board-list";
 import { fakeClock, resetCache, testDb } from "../helpers/d1";
 import { jsonResponse, mockOutboundFetch } from "../helpers/mock-fetch";
+import { OPENAPI_RESOURCES, type OpenApiResourceName } from "../helpers/openapi-fields";
 
 const clients: RefreshTarget = {
   resource: "clients",
@@ -855,4 +857,61 @@ describe("stale ロックを奪われた元の保持者は、その後 sync_stat
     expect(st?.consecutive_failures).toBe(0);
     expect(st?.refresh_owner).toBe("B");
   });
+});
+
+describe("仕様の一覧に updated_at_gteq が無いリソースの delta は、full として動く(issue #28)", () => {
+  // 対象は OpenAPI から生成した定数から導く(手で表を書かない)。想定: users / groups / payment_terms / 3 つの区分 / document_send_channels / project_costs
+  const noDelta = (Object.keys(OPENAPI_RESOURCES) as OpenApiResourceName[]).filter((name) => {
+    const r = OPENAPI_RESOURCES[name];
+    return r.listPath !== null && !(r.listQuery as readonly string[]).includes("updated_at_gteq");
+  });
+
+  it("対象は想定どおり 8 リソース", () => {
+    expect([...noDelta].sort()).toEqual(
+      [
+        "accounting_types",
+        "document_send_channels",
+        "groups",
+        "payment_terms",
+        "project_costs",
+        "project_types",
+        "purchase_types",
+        "users",
+      ].sort(),
+    );
+  });
+
+  it.each(noDelta)(
+    "%s: カーソルがあっても updated_at_gteq を送らず、全件を取り直して mode: full を返す",
+    async (resource) => {
+      const spec = SPECS[resource as keyof typeof SPECS];
+      if (!("buildQuery" in spec)) throw new Error(`no buildQuery: ${resource}`);
+      const target: RefreshTarget = {
+        resource,
+        path: spec.path,
+        buildQuery: (o, page, perPage) =>
+          (spec.buildQuery as (o: object, p: number, pp: number) => string)(o, page, perPage),
+      };
+      const key = `GET ${BASE}${spec.path}`;
+      const { db, deps, clock } = setup();
+      const data = makeEntities(3);
+      mockOutboundFetch({ [key]: pagedHandler(() => data) });
+      await refreshResource(deps, target, "full");
+      // full を終えるとカーソル(updated_at の最大値)が入っている。これまでの delta はこれを updated_at_gteq にしていた
+      expect((await getSyncState(db, resource))?.cursor_updated_at).not.toBeNull();
+      vi.restoreAllMocks();
+
+      clock.advance(3_600_000);
+      const api = mockOutboundFetch({ [key]: pagedHandler(() => data) });
+      const out = await refreshResource(deps, target, "delta");
+      expect(out).toMatchObject({ mode: "full", state: "complete", fetched: 3 });
+      for (const c of api.calls) {
+        expect(new URL(c.url).searchParams.has("updated_at_gteq")).toBe(false);
+      }
+      expect(await getSyncState(db, resource)).toMatchObject({
+        last_sync_mode: "full",
+        full_generation: 2, // 全件の取り直し(新しい世代)
+      });
+    },
+  );
 });

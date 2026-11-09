@@ -19,7 +19,6 @@ export interface DeliveryEntity {
   delivery_date: string;
   disp_delivery_date: string | null;
   disp_delivery_receive_date: string | null;
-  [key: string]: unknown;
 }
 
 export function getDelivery(

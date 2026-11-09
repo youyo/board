@@ -17,7 +17,6 @@ export interface EstimateEntity {
   delivery_place: string | null;
   details: DocumentDetailEntity[];
   valid_period: string;
-  [key: string]: unknown;
 }
 
 export function getEstimate(

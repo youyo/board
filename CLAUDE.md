@@ -54,6 +54,7 @@ src/find/                 find 層(名前の解決・fanout・contract_status・
 src/mcp/                  registry(defineTool / registerTools)・server・args・response-limit・call-context
 src/mcp/tools/            index.ts の ALL_TOOLS に足す: server-info(1)・api(40)・find(11)・cache(2)= 54 個
 scripts/deploy-config/    core.ts(純粋なコア。検証・生成・補助)+ main.ts(入口)。board.config.json と wrangler.jsonc から deploy/wrangler.jsonc を生成・検査
+scripts/openapi-fields/  OpenAPI(BOARD 公式 v1.9.0。JSON はコミットしない)から test/helpers/openapi-fields.ts(22 リソースの応答キーと一覧のクエリ名)と src/board/openapi-support.ts(一覧が受ける共通フィルタ。delta → full の判定に使う)を生成。`mise run openapi:fields -- <json> [--check]`。仕様を更新したら再生成して型・クエリを合わせる
 scripts/setup.sh          mise run setup の本体(前提の確認 → D1 → deploy:config → deploy → secrets → /healthz)。scripts/deploy.sh は mise run deploy の本体
 deploy.example/           下流の CI の雛形(deploy.workflow.yml。下流が .github/workflows/deploy.yml にコピーする)
 board.config.example.json 下流の設定の雛形(<YOUR_...>)。board.config.json と deploy/ は .gitignore(下流は git add -f で追跡する)

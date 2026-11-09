@@ -18,7 +18,6 @@ export interface ReceiptEntity {
   details: DocumentDetailEntity[];
   receipt_date: string;
   disp_receipt_date: string | null;
-  [key: string]: unknown;
 }
 
 export function getReceipt(

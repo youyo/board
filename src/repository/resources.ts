@@ -139,12 +139,12 @@ export const SPECS = {
     list: listClients,
     get: getClient,
     cacheFirst: {
-      keys: ["nameCont", "nameDispCont", "invoiceSystemNumberEq", "customNoEq"],
+      // customNoEq は含めない: custom_no は response_group=small(既定)に入らず、同期済みのキャッシュでは常に 0 件になる(issue #28)。
+      keys: ["nameCont", "nameDispCont", "invoiceSystemNumberEq"],
       match: (c, f) =>
         (!f.nameCont || foldContains(c.name, f.nameCont)) &&
         (!f.nameDispCont || foldContains(c.name_disp, f.nameDispCont)) &&
-        (!f.invoiceSystemNumberEq || str(c.invoice_system_number) === f.invoiceSystemNumberEq) &&
-        (!f.customNoEq || str(c.custom_no) === f.customNoEq),
+        (!f.invoiceSystemNumberEq || str(c.invoice_system_number) === f.invoiceSystemNumberEq),
     },
   }),
   projects: cacheFirst<ProjectEntity, ProjectListOptions>("projects", {

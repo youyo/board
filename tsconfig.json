@@ -14,6 +14,12 @@
     "resolveJsonModule": true,
     "allowImportingTsExtensions": true
   },
-  "include": ["src", "test", "vitest.config.ts", "scripts/deploy-config/core.ts"],
+  "include": [
+    "src",
+    "test",
+    "vitest.config.ts",
+    "scripts/deploy-config/core.ts",
+    "scripts/openapi-fields/core.ts"
+  ],
   "exclude": ["test/node-e2e", "test/live"]
 }

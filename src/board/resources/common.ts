@@ -2,6 +2,7 @@ import { ArgumentError, BoardError } from "../../errors";
 import type { BoardClient } from "../client";
 import type { CallContext } from "../context";
 import { type ItemMeta, type ListMeta, parseItemMeta, parseListMeta } from "../meta";
+import { LIST_FILTER_SUPPORT } from "../openapi-support";
 import { fetchAllPages } from "../paging";
 import { QueryBuilder } from "../query";
 
@@ -42,13 +43,24 @@ export interface ListPaging {
   maxPages?: number;
 }
 
-/** 全 List 共通のクエリ(page / per_page と updated_at / include_archive_flg)から始める。 */
-export function baseQuery(opts: CommonListOptions, page: number, perPage: number): QueryBuilder {
-  return new QueryBuilder()
-    .page(page, perPage)
-    .dateGteq("updated_at", opts.updatedAtGteq)
-    .dateLteq("updated_at", opts.updatedAtLteq)
-    .flg01("include_archive_flg", opts.includeArchiveFlg);
+/**
+ * 全 List 共通のクエリ(page / per_page)から始め、updated_at_gteq / updated_at_lteq / include_archive_flg は
+ * そのリソースの一覧が仕様に持つものだけを付ける(`LIST_FILTER_SUPPORT`。OpenAPI から生成)。
+ * 仕様に無いクエリは BOARD にエラーにならず無視されるので、送らない(issue #28)。
+ */
+export function baseQuery(
+  resource: string,
+  opts: CommonListOptions,
+  page: number,
+  perPage: number,
+): QueryBuilder {
+  const support = LIST_FILTER_SUPPORT[resource];
+  if (!support) throw new Error(`no list filter support: ${resource}`);
+  const q = new QueryBuilder().page(page, perPage);
+  if (support.updatedAtGteq) q.dateGteq("updated_at", opts.updatedAtGteq);
+  if (support.updatedAtLteq) q.dateLteq("updated_at", opts.updatedAtLteq);
+  if (support.includeArchiveFlg) q.flg01("include_archive_flg", opts.includeArchiveFlg);
+  return q;
 }
 
 /** 全ページを順に取って 1 つの配列にする。 */

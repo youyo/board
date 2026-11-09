@@ -93,7 +93,7 @@ export function buildPaymentsQuery(
   page: number,
   perPage: number,
 ): string {
-  return baseQuery(opts, page, perPage)
+  return baseQuery("payments", opts, page, perPage)
     .intEq("expenditure_payee_id", opts.expenditurePayeeIdEq)
     .intIn("payment_status", opts.paymentStatusIn)
     .intEq("expenditure_expenditure_no", opts.expenditureExpenditureNoEq)

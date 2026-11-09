@@ -39,7 +39,7 @@ export interface UserListOptions extends CommonListOptions {
 }
 
 export function buildUsersQuery(opts: UserListOptions, page: number, perPage: number): string {
-  return baseQuery(opts, page, perPage).encode();
+  return baseQuery("users", opts, page, perPage).encode();
 }
 
 export function listUsers(

@@ -3,6 +3,7 @@ import { createBoardClient } from "../../src/board/client";
 import * as R from "../../src/board/resources";
 import { ArgumentError } from "../../src/errors";
 import { jsonResponse, mockOutboundFetch } from "../helpers/mock-fetch";
+import { OPENAPI_RESOURCES, type OpenApiResourceName } from "../helpers/openapi-fields";
 
 const BASE = "https://api.board.test";
 
@@ -51,13 +52,14 @@ const NAME_ONLY = (
   path: string,
   build: ListCase["build"],
   list: ListCase["list"],
+  extra?: { opts: Record<string, unknown>; params: Array<[string, string]> },
 ): ListCase => ({
   resource,
   path,
   build,
   list,
-  opts: { nameCont: "テスト" },
-  params: [["name_cont", "テスト"]],
+  opts: { nameCont: "テスト", ...extra?.opts },
+  params: [["name_cont", "テスト"], ...(extra?.params ?? [])],
 });
 
 const LIST_CASES: ListCase[] = [
@@ -89,23 +91,16 @@ const LIST_CASES: ListCase[] = [
     path: "/v1/client_branches",
     build: R.buildClientBranchesQuery,
     list: R.listClientBranches,
-    opts: { clientIdEq: 12345, nameCont: "東京" },
-    params: [
-      ["client_id_eq", "12345"],
-      ["name_cont", "東京"],
-    ],
+    opts: { clientIdEq: 12345 },
+    params: [["client_id_eq", "12345"]],
   },
   {
     resource: "contacts",
     path: "/v1/contacts",
     build: R.buildContactsQuery,
     list: R.listContacts,
-    opts: { clientIdEq: 12345, nameCont: "山田", emailCont: "@example.com" },
-    params: [
-      ["client_id_eq", "12345"],
-      ["name_cont", "山田"],
-      ["email_cont", "@example.com"],
-    ],
+    opts: { clientIdEq: 12345 },
+    params: [["client_id_eq", "12345"]],
   },
   {
     resource: "projects",
@@ -188,23 +183,16 @@ const LIST_CASES: ListCase[] = [
     path: "/v1/payee_branches",
     build: R.buildVendorBranchesQuery,
     list: R.listVendorBranches,
-    opts: { payeeIdEq: 77, nameCont: "大阪" },
-    params: [
-      ["payee_id_eq", "77"],
-      ["name_cont", "大阪"],
-    ],
+    opts: { payeeIdEq: 77 },
+    params: [["payee_id_eq", "77"]],
   },
   {
     resource: "vendor_contacts",
     path: "/v1/payee_contacts",
     build: R.buildVendorContactsQuery,
     list: R.listVendorContacts,
-    opts: { payeeIdEq: 77, nameCont: "佐藤", emailCont: "@v.example" },
-    params: [
-      ["payee_id_eq", "77"],
-      ["name_cont", "佐藤"],
-      ["email_cont", "@v.example"],
-    ],
+    opts: { payeeIdEq: 77 },
+    params: [["payee_id_eq", "77"]],
   },
   {
     resource: "purchase_orders",
@@ -257,18 +245,24 @@ const LIST_CASES: ListCase[] = [
   },
   NAME_ONLY("groups", "/v1/groups", R.buildGroupsQuery, R.listGroups),
   NAME_ONLY("payment_terms", "/v1/payment_terms", R.buildPaymentTermsQuery, R.listPaymentTerms),
-  NAME_ONLY("project_types", "/v1/project_types", R.buildProjectTypesQuery, R.listProjectTypes),
+  // 区分 1〜3 の選択(*_kbn_eq。未指定は 1 と同じ結果。issue #28)
+  NAME_ONLY("project_types", "/v1/project_types", R.buildProjectTypesQuery, R.listProjectTypes, {
+    opts: { projectTypeKbnEq: 2 },
+    params: [["project_type_kbn_eq", "2"]],
+  }),
   NAME_ONLY(
     "purchase_types",
     "/v1/expenditure_types",
     R.buildPurchaseTypesQuery,
     R.listPurchaseTypes,
+    { opts: { expenditureTypeKbnEq: 3 }, params: [["expenditure_type_kbn_eq", "3"]] },
   ),
   NAME_ONLY(
     "accounting_types",
     "/v1/accounting_types",
     R.buildAccountingTypesQuery,
     R.listAccountingTypes,
+    { opts: { accountingTypeKbnEq: 2 }, params: [["accounting_type_kbn_eq", "2"]] },
   ),
   NAME_ONLY(
     "document_send_channels",
@@ -329,15 +323,20 @@ describe.each(LIST_CASES)("list $resource (GET $path)", (c) => {
   it("Go の build*Query と同じパラメーターを送る", () => {
     const opts = { ...COMMON_OPTS, ...c.opts };
     const q = new URLSearchParams(c.build(opts, 2, 50));
+    // 共通フィルタは、仕様(OpenAPI)の一覧のクエリにあるものだけ送る
+    const spec = OPENAPI_RESOURCES[c.resource as OpenApiResourceName]
+      .listQuery as readonly string[];
+    const common = COMMON_PARAMS.filter(([k]) => spec.includes(k));
     expect(sorted(q.entries())).toEqual(
-      sorted([["page", "2"], ["per_page", "50"], ...COMMON_PARAMS, ...c.params]),
+      sorted([["page", "2"], ["per_page", "50"], ...common, ...c.params]),
     );
   });
 
-  it("includeArchiveFlg=true は 1、未指定は送らない", () => {
-    expect(
-      new URLSearchParams(c.build({ includeArchiveFlg: true }, 1, 10)).get("include_archive_flg"),
-    ).toBe("1");
+  it("includeArchiveFlg=true は 1(仕様に include_archive_flg があるリソースだけ)、未指定は送らない", () => {
+    const spec = OPENAPI_RESOURCES[c.resource as OpenApiResourceName]
+      .listQuery as readonly string[];
+    const q = new URLSearchParams(c.build({ includeArchiveFlg: true }, 1, 10));
+    expect(q.get("include_archive_flg")).toBe(spec.includes("include_archive_flg") ? "1" : null);
     expect(new URLSearchParams(c.build({}, 1, 10)).has("include_archive_flg")).toBe(false);
   });
 

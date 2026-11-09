@@ -49,7 +49,6 @@ export interface ClientEntity {
   note?: string | null;
   tags?: string[];
   to?: string | null;
-  [key: string]: unknown;
 }
 
 /** GET /v1/clients のクエリ(Ransack)。未指定の項目は送らない。 */
@@ -60,7 +59,7 @@ export interface ClientListOptions extends CommonListOptions {
   nameDispCont?: string;
   /** 適格請求書登録番号の完全一致(invoice_system_number_eq) */
   invoiceSystemNumberEq?: string;
-  /** 顧客番号の完全一致(custom_no_eq) */
+  /** 顧客番号の完全一致(custom_no_eq)。サーバー専用: custom_no は response_group=small に含まれず、キャッシュでは絞らない */
   customNoEq?: string;
   /** タグ(tags[]) */
   tags?: string[];
@@ -69,7 +68,7 @@ export interface ClientListOptions extends CommonListOptions {
 }
 
 export function buildClientsQuery(opts: ClientListOptions, page: number, perPage: number): string {
-  return baseQuery(opts, page, perPage)
+  return baseQuery("clients", opts, page, perPage)
     .strCont("name", opts.nameCont)
     .strCont("name_disp", opts.nameDispCont)
     .strEq("invoice_system_number", opts.invoiceSystemNumberEq)

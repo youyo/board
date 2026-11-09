@@ -10,7 +10,6 @@ import {
   type ListResult,
   listResource,
 } from "./common";
-import type { ProjectCostEntity } from "./project_costs";
 import type {
   ClientBranchRef,
   ClientRef,
@@ -20,6 +19,19 @@ import type {
   HubspotRef,
   UserRef,
 } from "./refs";
+
+/**
+ * 案件に埋め込む `project_costs` の要素(response_group に project_cost / all を指定したとき)。
+ * 案件原価の一覧(ProjectCostEntity)とは別の形で、OpenAPI(v1.9.0)の項目は下の 4 つだけ(id / project_id / created_at / updated_at は無い。issue #28)。
+ */
+export interface ProjectEmbeddedCost {
+  /** 支払い内容の説明 */
+  description: string;
+  /** 金額(整数) */
+  cost: number;
+  invoice_date: string | null;
+  payment_date: string | null;
+}
 
 /**
  * 案件。GET /v1/projects の応答 1 要素(Go の ProjectEntity)。
@@ -104,8 +116,7 @@ export interface ProjectEntity {
   deliveries?: DocumentSummary[];
   invoices?: DocumentSummary[];
   receipts?: DocumentSummary[];
-  project_costs?: ProjectCostEntity[];
-  [key: string]: unknown;
+  project_costs?: ProjectEmbeddedCost[];
 }
 
 /** GET /v1/projects のクエリ(Ransack)。未指定の項目は送らない。 */
@@ -147,7 +158,7 @@ export function buildProjectsQuery(
   page: number,
   perPage: number,
 ): string {
-  return baseQuery(opts, page, perPage)
+  return baseQuery("projects", opts, page, perPage)
     .strCont("name", opts.nameCont)
     .intEq("client_id", opts.clientIdEq)
     .strCont("client_name", opts.clientNameCont)

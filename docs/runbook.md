@@ -290,7 +290,7 @@ mise run test:live
 1. ツール(例 `list_clients`)を `refresh: "full"`(`limit` を付けると応答が小さい)で呼ぶ。
 2. 応答の `cache[].refresh_state` が `partial` なら、同じ呼び出しをもう一度。最後に取り終えたページから再開する(30 秒の締め切りのため、件数の多いリソースは数回かかる)。
 3. `refresh_in_progress`(`retry_after_seconds`)が返ったら、その秒数だけ待って再試行する(別の refresh が動いている)。
-4. `complete` になったら、以降は `refresh=delta`(差分)で足りる。削除されたエンティティを反映したいときだけ、ときどき `full`。
+4. `complete` になったら、以降は `refresh=delta`(差分)で足りる。削除されたエンティティを反映したいときだけ、ときどき `full`。ただし BOARD の一覧に `updated_at_gteq` が無いリソース(users / groups / payment_terms / project_types / purchase_types / accounting_types / document_send_channels / project_costs)は差分を取れないので、`delta` は `full` として動く(全件を取り直し、応答の `mode` は `full`。v1.5.0 以降、issue #28)。
 5. 書類(見積・受注・納品・領収)を ID で引く `find_*` は、案件との対応(逆引き)を覚えるまで、最初の 1〜2 回は `warnings` に `project_unresolved`(`reason: deadline`)が出うる。同じ呼び出しを繰り返すと続きから進む(ADR 0004)。
 
 ### `cache_status`

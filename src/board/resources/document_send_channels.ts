@@ -14,12 +14,11 @@ import {
 export interface DocumentSendChannelEntity {
   id: number;
   name: string;
-  memo: string;
+  archive_flg?: number;
   /** ISO 8601 */
   updated_at: string;
   /** ISO 8601 */
   created_at: string;
-  [key: string]: unknown;
 }
 
 /** GET /v1/document_send_channels のクエリ(Ransack)。未指定の項目は送らない。 */
@@ -33,7 +32,9 @@ export function buildDocumentSendChannelsQuery(
   page: number,
   perPage: number,
 ): string {
-  return baseQuery(opts, page, perPage).strCont("name", opts.nameCont).encode();
+  return baseQuery("document_send_channels", opts, page, perPage)
+    .strCont("name", opts.nameCont)
+    .encode();
 }
 
 export function listDocumentSendChannels(

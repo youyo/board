@@ -17,6 +17,7 @@
 | V9 | Portal 経由のツール名が `board_` 付きで見え、`tools/list` の 54 個がすべて出る | Portal 経由でツール一覧を確認 | 名前の前提(README)が違う |
 | V12 | workers.dev ホストで、`/healthz` だけを対象にした Bypass の Access アプリが、ホスト全体のアプリより優先される(未確認) | runbook の 5 の手順で作り、JWT なしで `/healthz` が 200、`/mcp` が Access に止められることを見る | `/healthz` が Access の内側のまま。ブラウザでログインして開く、または `wrangler tail` で確認する |
 | V13 | 下流の `deploy.yml` が、main への push で `ci.yml` が成功したあとに `workflow_run` で起動し、Environment `production` の secrets が渡ってデプロイが通る(未確認) | 下流で main に push し、Actions の実行を確認する。PR の CI では起動せず、`ci.yml` が失敗したときは skipped になる | 自動デプロイが動かない。手動の `mise run deploy` に戻す(docs/deploy-ci.md) |
+| V14 | 仕様(OpenAPI v1.9.0)に無い `GET /v1/{invoices,expenditure_payments,users,groups,payment_terms,project_types,expenditure_types,accounting_types,document_send_channels}/{id}` の 9 本が、実 API に存在するか(未確認。仕様には一覧しか無い) | `cache_clear` のあとに、対応する `get_*`(`get_invoice` / `get_payment` / `get_user` / `get_group` / `get_payment_term` / `get_project_type` / `get_purchase_type` / `get_accounting_type` / `get_document_send_channel`)を一覧で見えた ID で呼ぶ。キャッシュに当たると確認にならないので、必ず先に `cache_clear` する | 存在しなければ `not_found` になる(見えるエラー)。その場合は `get_*` を一覧から引く方式に変える |
 
 ## 記入欄
 
@@ -96,3 +97,18 @@
 - `ref: head_sha` で CI が検査したコミットが checkout される(push が重なっても取り違えない): [ ] はい  [ ] いいえ
 - Environment `production` の `CLOUDFLARE_API_TOKEN` が `deploy` のステップに渡り、デプロイが通る: [ ] はい  [ ] いいえ
 - 下流で `deploy/wrangler.jsonc` をコミットするときの pre-commit の gitleaks が、upstream の `.gitleaks.toml` で `ACCESS_AUD` を止めない: [ ] はい  [ ] いいえ
+
+### V14 仕様に無い `GET /v1/<リソース>/{id}` の 9 本(2026-11-09 追加。issue #28。未確認)
+- 前提: OpenAPI v1.9.0 に載っているのは一覧(`GET /v1/<リソース>`)だけで、単体取得の `/{id}` は無い(請求書の詳細は `/documents/invoices/{id}`)。コードは Go 版のまま `/{id}` を呼ぶ。存在しなければ `not_found` になる。
+- 手順: 各リソースの一覧で ID を 1 つ取り、`cache_clear` を実行してから、`get_*` をその ID で呼ぶ(`cache_clear` を挟まないと、キャッシュから返って確認にならない)。
+- 確認日 / 確認者:
+- invoices(`get_invoice`): [ ] 取れた  [ ] `not_found`
+- expenditure_payments(`get_payment`): [ ] 取れた  [ ] `not_found`
+- users(`get_user`): [ ] 取れた  [ ] `not_found`
+- groups(`get_group`): [ ] 取れた  [ ] `not_found`
+- payment_terms(`get_payment_term`): [ ] 取れた  [ ] `not_found`
+- project_types(`get_project_type`): [ ] 取れた  [ ] `not_found`
+- expenditure_types(`get_purchase_type`): [ ] 取れた  [ ] `not_found`
+- accounting_types(`get_accounting_type`): [ ] 取れた  [ ] `not_found`
+- document_send_channels(`get_document_send_channel`): [ ] 取れた  [ ] `not_found`
+- 外れたときの影響: その `get_*` が `not_found` になる。`list_*` は影響を受けない。取れないものは一覧から ID で引く方式に変える。

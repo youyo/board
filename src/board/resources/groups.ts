@@ -14,12 +14,11 @@ import {
 export interface GroupEntity {
   id: number;
   name: string;
-  memo: string;
+  archive_flg?: number;
   /** ISO 8601 */
   updated_at: string;
   /** ISO 8601 */
   created_at: string;
-  [key: string]: unknown;
 }
 
 /** GET /v1/groups のクエリ(Ransack)。未指定の項目は送らない。 */
@@ -29,7 +28,7 @@ export interface GroupListOptions extends CommonListOptions {
 }
 
 export function buildGroupsQuery(opts: GroupListOptions, page: number, perPage: number): string {
-  return baseQuery(opts, page, perPage).strCont("name", opts.nameCont).encode();
+  return baseQuery("groups", opts, page, perPage).strCont("name", opts.nameCont).encode();
 }
 
 export function listGroups(

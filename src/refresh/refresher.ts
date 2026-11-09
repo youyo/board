@@ -5,7 +5,8 @@
  *   (delta_next_page / delta_started_at / delta_max_updated_at)を保存し、締め切りで partial になったら次の delta は最後に取り終えた
  *   ページから(1 ページ重ねて)取り直す。最後まで取ったらカーソルを min(見た updated_at の最大値, 開始の 5 分前)に進める(`cursorAfterFull` と同じ)。
  *   再開できる窓は full と同じ 1 時間。
- *   カーソルがなければ全件が必要なので、再開できる full として動く。
+ *   カーソルがなければ全件が必要なので、再開できる full として動く。仕様の一覧に `updated_at_gteq` が無いリソース
+ *   (users / groups / payment_terms / 3 つの区分 / document_send_channels / project_costs)も同じ分岐で full として動く(`mode: "full"` を返す。issue #28)。
  * - full: 世代を払い出してページ単位で upsert し、締め切りが近づいたら進捗を保存して partial で返す(Go との相違点)。
  *   次の full は最後に取り終えたページから(1 ページ重ねて)再開し、最後まで取り終えたら古い世代の行を消して complete にする。
  *   消す前に BOARD の総件数(X-Total-Count)と新しい世代の件数を照合し、足りなければ消さずに `full_prune_skipped` を記録する。
@@ -20,6 +21,7 @@ import type { BoardClient } from "../board/client";
 import { type CallContext, resolveContext } from "../board/context";
 import { isDeadlineError } from "../board/errors";
 import { parseListMeta } from "../board/meta";
+import { LIST_FILTER_SUPPORT } from "../board/openapi-support";
 import { DEFAULT_PER_PAGE } from "../board/paging";
 import {
   deleteOlderGenerationsStatement,
@@ -31,6 +33,10 @@ import { ensureRowStatement, getSyncState, markError, type SyncState } from "../
 import { type Clock, isoSeconds, systemClock } from "../cache/time";
 import { BoardError, RefreshInProgressError } from "../errors";
 import { withLock } from "./lock";
+
+/** 一覧が updated_at_gteq を受けるか(OpenAPI から生成した `LIST_FILTER_SUPPORT`)。未知のリソースは受けるものとして扱う。 */
+const supportsDelta = (resource: string): boolean =>
+  LIST_FILTER_SUPPORT[resource]?.updatedAtGteq ?? true;
 
 /** 続きから再開できる partial の最長の古さ。これを過ぎたらページのずれが無視できないので、最初からやり直す。 */
 export const FULL_RESUME_WINDOW_MS = 60 * 60_000;
@@ -442,7 +448,10 @@ export async function refreshResource(
   return withLock(deps.db, target.resource, { now, owner: deps.owner }, async (lock) => {
     const owned: Run = { ...run, owner: lock.owner };
     const state = await getSyncState(deps.db, target.resource);
-    if (mode === "delta" && state?.cursor_updated_at) return runDelta(owned, state);
+    // 仕様の一覧に updated_at_gteq が無いリソースは差分を取れない(送っても無視されて毎回全件になる)ので、delta は full として動かす。
+    if (mode === "delta" && state?.cursor_updated_at && supportsDelta(target.resource)) {
+      return runDelta(owned, state);
+    }
     return runFull(owned, state);
   });
 }

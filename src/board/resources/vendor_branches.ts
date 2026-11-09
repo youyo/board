@@ -12,12 +12,14 @@ import {
 import type { VendorRef } from "./refs";
 
 /**
- * 仕入先支社(BOARD API では payee_branches)。GET /v1/payee_branches の応答 1 要素(Go の VendorBranchEntity)。
- * `vendor` のキー名は Go 版でも実データでの確認が済んでいない(0 件のため)。未知のキーは素通しされる。
+ * 仕入先支社(BOARD API では payee_branches)。GET /v1/payee_branches の応答 1 要素。
+ * 仕入先の入れ子は `payee`(Go 版の `vendor` は仕様に無い。issue #28)。`payee` の形は、仕様の schema が `{}` の箇所があり、
+ * 実データでの確認が済んでいない(id / name / name_disp / custom_no は発注先の入れ子と同じ想定)。
  */
 export interface VendorBranchEntity {
   id: number;
-  vendor: VendorRef | null;
+  payee_id?: number;
+  payee: VendorRef | null;
   name: string;
   zip: string;
   pref: string;
@@ -28,14 +30,11 @@ export interface VendorBranchEntity {
   archive_flg: number;
   created_at: string;
   updated_at: string;
-  [key: string]: unknown;
 }
 
 export interface VendorBranchListOptions extends CommonListOptions {
   /** 仕入先 ID の完全一致(payee_id_eq) */
   payeeIdEq?: number;
-  /** 支社名の部分一致(name_cont) */
-  nameCont?: string;
 }
 
 export function buildVendorBranchesQuery(
@@ -43,9 +42,8 @@ export function buildVendorBranchesQuery(
   page: number,
   perPage: number,
 ): string {
-  return baseQuery(opts, page, perPage)
+  return baseQuery("vendor_branches", opts, page, perPage)
     .intEq("payee_id", opts.payeeIdEq)
-    .strCont("name", opts.nameCont)
     .encode();
 }
 

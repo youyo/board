@@ -14,6 +14,7 @@ import type { ClientRef } from "./refs";
 /** 顧客支社。GET /v1/client_branches の応答 1 要素(Go の ClientBranchEntity)。 */
 export interface ClientBranchEntity {
   id: number;
+  client_id?: number;
   client: ClientRef | null;
   name: string;
   zip: string;
@@ -25,14 +26,11 @@ export interface ClientBranchEntity {
   archive_flg: number;
   created_at: string;
   updated_at: string;
-  [key: string]: unknown;
 }
 
 export interface ClientBranchListOptions extends CommonListOptions {
   /** 顧客 ID の完全一致(client_id_eq) */
   clientIdEq?: number;
-  /** 支社名の部分一致(name_cont) */
-  nameCont?: string;
 }
 
 export function buildClientBranchesQuery(
@@ -40,9 +38,8 @@ export function buildClientBranchesQuery(
   page: number,
   perPage: number,
 ): string {
-  return baseQuery(opts, page, perPage)
+  return baseQuery("client_branches", opts, page, perPage)
     .intEq("client_id", opts.clientIdEq)
-    .strCont("name", opts.nameCont)
     .encode();
 }
 

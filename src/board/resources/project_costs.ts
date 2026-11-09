@@ -22,7 +22,6 @@ export interface ProjectCostEntity {
   payment_date: string | null;
   updated_at: string;
   created_at: string;
-  [key: string]: unknown;
 }
 
 export interface ProjectCostListOptions extends CommonListOptions {
@@ -35,7 +34,9 @@ export function buildProjectCostsQuery(
   page: number,
   perPage: number,
 ): string {
-  return baseQuery(opts, page, perPage).intEq("project_id", opts.projectIdEq).encode();
+  return baseQuery("project_costs", opts, page, perPage)
+    .intEq("project_id", opts.projectIdEq)
+    .encode();
 }
 
 export function listProjectCosts(

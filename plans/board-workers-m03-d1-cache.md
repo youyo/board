@@ -93,7 +93,7 @@ Go の 3 テーブルを移す。profile の列は持たない(1 デプロイ = 
 | document | estimates / orders / deliveries / receipts | (一覧なし) | (一覧なし) | キャッシュ → なければ API → 保存。`refresh=full` はキャッシュを使わず取り直す。`delta` は何もしない | `estimates.go` `orders.go` `deliveries.go` `receipts.go`(`GetByDocumentID`、`ForceRefresh` で迂回) |
 
 キャッシュ側で絞れる項目(`keys`)と判定(Go の `match*Filter`):
-clients = name / name_disp(fold の部分一致)・invoice_system_number / custom_no(完全一致、null は空文字扱い)/
+clients = name / name_disp(fold の部分一致)・invoice_system_number(完全一致、null は空文字扱い)。**仕様に照らした訂正(issue #28)**: `custom_no` は small(既定)に含まれず同期済みのキャッシュでは常に 0 件になるため、`custom_no_eq` はサーバー専用に降格 /
 projects = name(fold)・client_id(`client.id`)・client_name(fold)・project_no(文字列で完全一致)・management_no(完全一致)/
 invoices = client_id / project_id / status / purchase_orders = vendor_id / project_id / status / payments = vendor_id / purchase_order_id / status /
 vendors = name(fold)/ users = name / email(fold)。複数の条件は AND。`limit` はフィルタのあとに適用する。
@@ -108,6 +108,7 @@ vendors = name(fold)/ users = name / email(fold)。複数の条件は AND。`lim
 | full refresh | `DeleteAll` + 全件取得を 1 回の呼び出しで | 世代 + ページ単位の再開。途中は新旧の和集合を返す | 30 秒の締め切りの中では件数の多いリソースの全件取得が終わらない(Go の実測で estimates は 25 ページ・約 19 秒)。**決定済み事項の表に追記** |
 | full 完了後のカーソル | `NULL` に戻す(次の delta が全件取得になる) | 見た updated_at の最大値(ただし full の開始の 5 分前を上限) | 次の delta が全件取得になると、締め切りの中で終わらず、delta は再開できない。判断として入れた。**覆すなら `cursorAfterFull` を `null` を返すだけにする(1 行)** |
 | delta のカーソルなし | 全件取得 | 再開できる full として動く | 同上 |
+| delta の `updated_at_gteq` が仕様に無いリソース | (Go は送って無視されていた) | **仕様に照らした訂正(issue #28)**: users / groups / payment_terms / 3 つの区分 / document_send_channels / project_costs は一覧に `updated_at_gteq` が無く、送っても無視されて毎回全件になる。delta は full として動かし、`mode: "full"` を返す(対象は `openapi-support.ts` の `LIST_FILTER_SUPPORT`、OpenAPI から生成) | 既存の下流では、これらの次の delta が全件の取得になる |
 | delta の再開 | (なし。1 回で取り切る) | full と同じ方式で再開(`delta_next_page` / `delta_started_at` / `delta_max_updated_at`。スキーマ v3)。完了時のカーソルは min(見た最大値, 開始の 5 分前) | 差分が 30 秒で取り切れないと、毎回先頭からやり直して `complete` にならないため |
 | partial な full の再開 | (なし) | 1 時間以内なら、最後に取り終えたページから(1 ページ重ねて)再開。過ぎたら最初から。完了時の旧世代の削除は総件数(X-Total-Count)と照合 | ページ番号での再開は、間に削除・挿入があるとページがずれて行を取りこぼす。重ね取りと件数照合で緩和(下の既知のリスク)。長く経った partial は信用しない |
 | ロック | プロセス内 mutex + `refresh_started_at` の確認(読んでから書く) | D1 の 1 つの条件付き UPDATE(`meta.changes` で判定)。解放は自分の取得者のときだけ | isolate が複数あり、読んでから書く方式は競合する |
