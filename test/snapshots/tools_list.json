@@ -35,7 +35,7 @@
   {
     "name": "cache_status",
     "title": "キャッシュ状態",
-    "description": "Show the state of the local D1 cache for all 22 BOARD resources, without calling the BOARD API. Use it to decide whether to pass refresh=delta or refresh=full to other tools, or to see how far a long refresh has progressed. resources[]: {resource, cached_at, full_refreshed_at, refresh_state, row_count, full_prune_skipped, locked}. cached_at / full_refreshed_at are absent when never fetched. refresh_state: complete = up to date as of cached_at; partial = a full refresh is unfinished (call a tool with refresh=full again until it is complete); failed = the last refresh failed (last_error_code); not_synced = never fetched (cache is empty, so tools return nothing until refreshed). full_prune_skipped=true means the last full refresh could not confirm the total count and kept old rows (run refresh=full again). locked=true means a refresh is running now (concurrent refreshes return refresh_in_progress). document_scans[]: progress of the document-to-project reverse lookup per document kind (estimate/order/delivery/receipt): scan_state (not_started/in_progress/complete), mapped_rows, next_page.",
+    "description": "Show the state of the local D1 cache for all 22 BOARD resources, without calling the BOARD API. Use it to decide whether to pass refresh=delta or refresh=full to other tools, or to see how far a long refresh has progressed. resources[]: {resource, cached_at, full_refreshed_at, refresh_state, row_count, full_prune_skipped, locked}. cached_at / full_refreshed_at are absent when never fetched. refresh_state: complete = up to date as of cached_at; partial = a full refresh is unfinished (call a tool with refresh=full again until it is complete); failed = the last refresh failed (last_error_code); not_synced = never fetched (cache is empty, so tools return nothing until refreshed). on_demand = the four document resources (estimates/orders/deliveries/receipts), which have no list and no refresh: a document is cached each time it is fetched by id, so row_count is the number of documents fetched so far and cached_at is absent. The cached_at of a document in the cache field of find_* / get_* responses is the time that document was fetched, not a sync time of the resource. full_prune_skipped=true means the last full refresh could not confirm the total count and kept old rows (run refresh=full again; after at least 6 hours since the last full completed, refresh=delta also runs as a full (at most once per 6 hours), and this repeats until the count matches — if it never does, the BOARD total count may be counted differently). locked=true means a refresh is running now (concurrent refreshes return refresh_in_progress). document_scans[]: progress of the document-to-project reverse lookup per document kind (estimate/order/delivery/receipt): scan_state (not_started/in_progress/complete), mapped_rows, next_page. mapped_rows is the number of document-to-project pairs recorded; find_* tools also record pairs whenever they search a project's documents, so it grows independently of any full scan. scan_state is the state of the full scan that runs only when a document id could not be reverse-looked-up, so it can stay not_started while mapped_rows grows.",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1138,7 +1138,7 @@
   {
     "name": "get_project",
     "title": "案件取得",
-    "description": "案件を ID で 1 件取得する。案件。見積書・受注書・納品書・請求書・領収書(書類)と案件原価はこの案件に紐づく。顧客 ID(client_id)で顧客に紐づく。キャッシュにあればそれを返し、なければ BOARD から 1 件取って保存する。refresh=delta / full を指定すると、先に案件の一覧キャッシュを更新してから読む。結果は {item, cache, _meta?}。item は BOARD の生データ。response_group(estimate / order / delivery / invoice / receipt / all)を指定すると、該当する書類を埋め込んだ案件を常に BOARD の API から直接取り(キャッシュは使わず、書き込みもしない)、このとき refresh は無視する。",
+    "description": "案件を ID で 1 件取得する。案件。見積書・受注書・納品書・請求書・領収書(書類)と案件原価はこの案件に紐づく。顧客 ID(client_id)で顧客に紐づく。キャッシュにあればそれを返し、なければ BOARD から 1 件取って保存する。refresh=delta / full を指定すると、先に案件の一覧キャッシュを更新してから読む。結果は {item, cache, _meta?}。item は BOARD の生データ。response_group を指定しないと small(キャッシュと同じ項目)。項目が要るなら response_group(estimate / order / delivery / invoice / receipt / all)を指定する(該当する書類を埋め込んだ案件になる)。指定すると BOARD の API を直接呼び(キャッシュは使わず、書き込みもしない)、このとき refresh は無視する。",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1170,7 +1170,7 @@
             "receipt",
             "all"
           ],
-          "description": "埋め込む書類のグループ: estimate / order / delivery / invoice / receipt / all。指定すると BOARD の API を直接呼び、refresh は無視する"
+          "description": "レスポンスに含める項目のグループ: estimate / order / delivery / invoice / receipt / all。指定しないと small(キャッシュと同じ項目)。指定すると BOARD の API を直接呼び、キャッシュには書かず、refresh は無視する"
         },
         "max_response_tokens": {
           "type": "number",
@@ -1276,7 +1276,7 @@
   {
     "name": "get_purchase_order",
     "title": "発注書取得",
-    "description": "発注書を ID で 1 件取得する。発注書(仕入側。BOARD の API では expenditures)。支払先(payee の入れ子。仕入先 ID は payee.id)と案件(project の入れ子)に紐づく。発注ステータスは expenditure_status、進捗状況は delivery_status(数値コードと _name の名称)で返る。キャッシュにあればそれを返し、なければ BOARD から 1 件取って保存する。refresh=delta / full を指定すると、先に発注書の一覧キャッシュを更新してから読む。結果は {item, cache, _meta?}。item は BOARD の生データ。",
+    "description": "発注書を ID で 1 件取得する。発注書(仕入側。BOARD の API では expenditures)。支払先(payee の入れ子。仕入先 ID は payee.id)と案件(project の入れ子)に紐づく。発注ステータスは expenditure_status、進捗状況は delivery_status(数値コードと _name の名称)で返る。キャッシュにあればそれを返し、なければ BOARD から 1 件取って保存する。refresh=delta / full を指定すると、先に発注書の一覧キャッシュを更新してから読む。結果は {item, cache, _meta?}。item は BOARD の生データ。response_group を指定しないと medium(キャッシュと同じ項目)。項目が要るなら response_group(small / medium / large / estimate / order / delivery / invoice / all)を指定する。指定すると BOARD の API を直接呼び(キャッシュは使わず、書き込みもしない)、このとき refresh は無視する。",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1297,6 +1297,20 @@
         "show_meta": {
           "type": "boolean",
           "description": "true で応答に _meta(BOARD の応答ヘッダー由来: total_count / etag など)を付ける。BOARD から直接取ったときだけ値が入る"
+        },
+        "response_group": {
+          "type": "string",
+          "enum": [
+            "small",
+            "medium",
+            "large",
+            "estimate",
+            "order",
+            "delivery",
+            "invoice",
+            "all"
+          ],
+          "description": "レスポンスに含める項目のグループ: small / medium / large / estimate / order / delivery / invoice / all。指定しないと medium(キャッシュと同じ項目)。指定すると BOARD の API を直接呼び、キャッシュには書かず、refresh は無視する"
         },
         "max_response_tokens": {
           "type": "number",

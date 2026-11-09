@@ -301,7 +301,8 @@ describe("list の引数は Go 版 CLI のフィルタフラグと一致する",
 describe("get の引数", () => {
   it.each(Object.entries(GET_TOOLS))("%s → %s は id / refresh / show_meta", (resource, tool) => {
     const expected = ["id", "refresh", "show_meta", "max_response_tokens"];
-    if (resource === "projects") expected.push("response_group");
+    // response_group を持つ get: projects(書類の埋め込み)と purchase_orders(issue #37)。
+    if (resource === "projects" || resource === "purchase_orders") expected.push("response_group");
     expect(props(tool)).toEqual(expected.sort());
     expect(
       (z.toJSONSchema(byName.get(tool)?.inputSchema as z.ZodObject) as { required?: string[] })
@@ -321,6 +322,18 @@ describe("get の引数", () => {
     const d = byName.get("get_project")?.description ?? "";
     expect(d).toContain("response_group");
     expect(d).toContain("refresh は無視");
+  });
+
+  it("get_project / get_purchase_order は response_group を指定しないとキャッシュと同じ項目で、指定すると API を直接呼びキャッシュに書かないことを書く", () => {
+    for (const [name, group] of [
+      ["get_project", "small"],
+      ["get_purchase_order", "medium"],
+    ] as const) {
+      const d = byName.get(name)?.description ?? "";
+      expect(d, name).toContain(`response_group を指定しないと ${group}(キャッシュと同じ項目)`);
+      expect(d, name).toContain("キャッシュは使わず、書き込みもしない");
+      expect(d, name).toContain("refresh は無視");
+    }
   });
 });
 

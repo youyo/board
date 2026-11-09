@@ -25,13 +25,7 @@ import {
 } from "../args";
 import { callContextOf } from "../call-context";
 import { defineTool, type ToolDefinition } from "../registry";
-import {
-  API_RESOURCES,
-  commonFiltersFor,
-  type FieldDef,
-  RESPONSE_GROUPS_PROJECTS_GET,
-  type ResourceDef,
-} from "./api-resources";
+import { API_RESOURCES, commonFiltersFor, type FieldDef, type ResourceDef } from "./api-resources";
 
 // --- 入力スキーマ --------------------------------------------------------------------------
 
@@ -171,10 +165,12 @@ function getDescription(def: ResourceDef): string {
   const base =
     `${head}キャッシュにあればそれを返し、なければ BOARD から 1 件取って保存する。` +
     `refresh=delta / full を指定すると、先に${def.label}の一覧キャッシュを更新してから読む。${common}`;
-  if (def.resource === "projects") {
+  if (def.getResponseGroups) {
+    const { values, cacheGroup } = def.getResponseGroups;
     return (
-      `${base}response_group(${RESPONSE_GROUPS_PROJECTS_GET.join(" / ")})を指定すると、該当する書類を埋め込んだ案件を` +
-      "常に BOARD の API から直接取り(キャッシュは使わず、書き込みもしない)、このとき refresh は無視する。"
+      `${base}response_group を指定しないと ${cacheGroup}(キャッシュと同じ項目)。項目が要るなら response_group(${values.join(" / ")})を指定する` +
+      `${def.resource === "projects" ? "(該当する書類を埋め込んだ案件になる)" : ""}。` +
+      "指定すると BOARD の API を直接呼び(キャッシュは使わず、書き込みもしない)、このとき refresh は無視する。"
     );
   }
   return base;
@@ -212,10 +208,11 @@ function getTool(def: ResourceDef): ToolDefinition {
     ),
     show_meta: optBool(SHOW_META_DESC),
   };
-  if (def.resource === "projects") {
+  if (def.getResponseGroups) {
+    const { values, cacheGroup } = def.getResponseGroups;
     shape.response_group = optEnum(
-      RESPONSE_GROUPS_PROJECTS_GET,
-      "埋め込む書類のグループ: estimate / order / delivery / invoice / receipt / all。指定すると BOARD の API を直接呼び、refresh は無視する",
+      values,
+      `レスポンスに含める項目のグループ: ${values.join(" / ")}。指定しないと ${cacheGroup}(キャッシュと同じ項目)。指定すると BOARD の API を直接呼び、キャッシュには書かず、refresh は無視する`,
     );
   }
   return defineTool({
@@ -228,11 +225,11 @@ function getTool(def: ResourceDef): ToolDefinition {
       const a = args as unknown as CommonArgs & { id: number; response_group?: string };
       const repos = ctx.repositories();
       const call = callContextOf(ctx);
-      if (def.resource === "projects" && a.response_group) {
-        return getOutput(
-          await repos.projects.getWithGroup(a.id, a.response_group, call),
-          a.show_meta,
-        );
+      if (def.getResponseGroups && a.response_group) {
+        const withGroup = repos[def.resource as keyof typeof repos] as unknown as {
+          getWithGroup(id: number, group: string, c?: CallContext): Promise<GetReadResult<unknown>>;
+        };
+        return getOutput(await withGroup.getWithGroup(a.id, a.response_group, call), a.show_meta);
       }
       const repo = repos[def.resource as keyof typeof repos] as {
         get(id: number, o?: ReadOptions, c?: CallContext): Promise<GetReadResult<unknown>>;

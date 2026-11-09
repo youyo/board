@@ -7,6 +7,7 @@
  */
 
 import { LIST_FILTER_SUPPORT } from "../../board/openapi-support";
+import { PURCHASE_ORDER_DEFAULT_RESPONSE_GROUP } from "../../board/resources/purchase_orders";
 
 export type FieldKind =
   | { type: "str" }
@@ -47,6 +48,11 @@ export interface ResourceDef {
   fields: readonly FieldDef[];
   /** list の response_group に使う列挙値(なければ未対応)。 */
   responseGroups?: readonly [string, ...string[]];
+  /**
+   * get の response_group に使う列挙値(なければ未対応)。指定すると API を直接呼び、キャッシュには書かない。
+   * `cacheGroup` は指定しないときにキャッシュへ書く get が送る値(キャッシュの行はこれで揃える。issue #37)。
+   */
+  getResponseGroups?: { values: readonly [string, ...string[]]; cacheGroup: string };
 }
 
 const str = (arg: string, opt: string, description: string, cacheable = false): FieldDef => ({
@@ -105,6 +111,18 @@ export const RESPONSE_GROUPS_PROJECTS_GET = [
   "delivery",
   "invoice",
   "receipt",
+  "all",
+] as const;
+
+/** OpenAPI v1.9.0 の GET /expenditures/{id} の response_group。 */
+export const RESPONSE_GROUPS_PURCHASE_ORDERS_GET = [
+  "small",
+  "medium",
+  "large",
+  "estimate",
+  "order",
+  "delivery",
+  "invoice",
   "all",
 ] as const;
 
@@ -209,6 +227,7 @@ export const API_RESOURCES: readonly ResourceDef[] = [
       "案件。見積書・受注書・納品書・請求書・領収書(書類)と案件原価はこの案件に紐づく。顧客 ID(client_id)で顧客に紐づく",
     goFile: "api_projects.go",
     responseGroups: RESPONSE_GROUPS_PROJECTS_LIST,
+    getResponseGroups: { values: RESPONSE_GROUPS_PROJECTS_GET, cacheGroup: "small" },
     fields: [
       nameCont("案件", true),
       int("client_id", "clientIdEq", "顧客 ID で絞り込む(完全一致)", true),
@@ -389,6 +408,10 @@ export const API_RESOURCES: readonly ResourceDef[] = [
       "発注書(仕入側。BOARD の API では expenditures)。支払先(payee の入れ子。仕入先 ID は payee.id)と案件(project の入れ子)に紐づく。発注ステータスは expenditure_status、進捗状況は delivery_status(数値コードと _name の名称)で返る",
     goFile: "api_purchase_orders.go",
     responseGroups: RESPONSE_GROUPS_PURCHASE_ORDERS,
+    getResponseGroups: {
+      values: RESPONSE_GROUPS_PURCHASE_ORDERS_GET,
+      cacheGroup: PURCHASE_ORDER_DEFAULT_RESPONSE_GROUP,
+    },
     fields: [
       int(
         "payee_id_eq",

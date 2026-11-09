@@ -19,10 +19,14 @@ export const cacheStatus = defineTool({
     "cached_at / full_refreshed_at are absent when never fetched. " +
     "refresh_state: complete = up to date as of cached_at; partial = a full refresh is unfinished (call a tool with refresh=full again until it is complete); " +
     "failed = the last refresh failed (last_error_code); not_synced = never fetched (cache is empty, so tools return nothing until refreshed). " +
-    "full_prune_skipped=true means the last full refresh could not confirm the total count and kept old rows (run refresh=full again). " +
+    "on_demand = the four document resources (estimates/orders/deliveries/receipts), which have no list and no refresh: a document is cached each time it is fetched by id, so row_count is the number of documents fetched so far and cached_at is absent. " +
+    "The cached_at of a document in the cache field of find_* / get_* responses is the time that document was fetched, not a sync time of the resource. " +
+    "full_prune_skipped=true means the last full refresh could not confirm the total count and kept old rows (run refresh=full again; after at least 6 hours since the last full completed, refresh=delta also runs as a full (at most once per 6 hours), and this repeats until the count matches — if it never does, the BOARD total count may be counted differently). " +
     "locked=true means a refresh is running now (concurrent refreshes return refresh_in_progress). " +
     "document_scans[]: progress of the document-to-project reverse lookup per document kind (estimate/order/delivery/receipt): " +
-    "scan_state (not_started/in_progress/complete), mapped_rows, next_page.",
+    "scan_state (not_started/in_progress/complete), mapped_rows, next_page. " +
+    "mapped_rows is the number of document-to-project pairs recorded; find_* tools also record pairs whenever they search a project's documents, so it grows independently of any full scan. " +
+    "scan_state is the state of the full scan that runs only when a document id could not be reverse-looked-up, so it can stay not_started while mapped_rows grows.",
   category: "ReadOnly",
   openWorld: false,
   inputSchema: z.strictObject({}),

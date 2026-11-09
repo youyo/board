@@ -39,6 +39,7 @@ See [docs/adr/](docs/adr/) for the reasons behind the design (the ADRs are writt
 - [ADR 0003: 30-second call deadline](docs/adr/0003-call-deadline.md)
 - [ADR 0004: Reverse lookup from document ID to project ID](docs/adr/0004-document-reverse-lookup.md)
 - [ADR 0005: Upstream / downstream deployment model](docs/adr/0005-upstream-downstream-deploy.md)
+- [ADR 0006: Including archived and lost records, and invalidating old caches by query version](docs/adr/0006-archive-lost-and-query-version.md)
 
 ## Tools (54 tools)
 

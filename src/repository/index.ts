@@ -1,7 +1,12 @@
 import type { CallContext } from "../board/context";
 import { resolveContext } from "../board/context";
-import type { ProjectEntity, ProjectListOptions } from "../board/resources";
-import { assertId, getProject } from "../board/resources";
+import type {
+  ProjectEntity,
+  ProjectListOptions,
+  PurchaseOrderEntity,
+  PurchaseOrderListOptions,
+} from "../board/resources";
+import { assertId, getProject, getPurchaseOrder } from "../board/resources";
 import { systemClock } from "../cache/time";
 import {
   createDocumentRepository,
@@ -30,15 +35,15 @@ type RepoOf<S> =
 
 type BaseRepositories = { [K in keyof Specs]: RepoOf<Specs[K]> };
 
-export type Repositories = Omit<BaseRepositories, "projects"> & {
-  projects: ListRepository<ProjectEntity, ProjectListOptions> & {
-    /** `response_group` 付きの 1 件取得。埋め込みをキャッシュから再構築できないので、常に API を直接呼ぶ。 */
-    getWithGroup(
-      id: number,
-      responseGroup: string,
-      ctx?: CallContext,
-    ): Promise<GetReadResult<ProjectEntity>>;
-  };
+/** `response_group` 付きの 1 件取得。キャッシュの行と項目が違うので、常に API を直接呼び、キャッシュには書かない。 */
+interface WithGroup<E> {
+  getWithGroup(id: number, responseGroup: string, ctx?: CallContext): Promise<GetReadResult<E>>;
+}
+
+export type Repositories = Omit<BaseRepositories, "projects" | "purchase_orders"> & {
+  projects: ListRepository<ProjectEntity, ProjectListOptions> & WithGroup<ProjectEntity>;
+  purchase_orders: ListRepository<PurchaseOrderEntity, PurchaseOrderListOptions> &
+    WithGroup<PurchaseOrderEntity>;
 };
 
 /** 22 リソースの repository。M04(api 層)・M05(find 層)がこれを使う。 */
@@ -50,20 +55,29 @@ export function createRepositories(deps: RepositoryDeps): Repositories {
         ? createDocumentRepository(spec as DocumentSpec<unknown>, deps)
         : createListRepository(spec as CacheFirstSpec<unknown, never>, deps);
   }
-  const projects = out.projects as ListRepository<ProjectEntity, ProjectListOptions>;
   const now = deps.now ?? systemClock;
-  out.projects = {
-    ...projects,
-    async getWithGroup(id: number, responseGroup: string, callCtx?: CallContext) {
-      assertId(id);
-      const res = await getProject(
-        deps.client,
-        id,
-        { responseGroup },
-        resolveContext(callCtx, now),
-      );
-      return { item: res.item, source: "api", cache: [], _meta: res._meta };
-    },
+  const withGroup = <E>(
+    name: string,
+    get: (
+      id: number,
+      responseGroup: string,
+      c: ReturnType<typeof resolveContext>,
+    ) => Promise<{ item: E; _meta?: unknown }>,
+  ) => {
+    out[name] = {
+      ...(out[name] as object),
+      async getWithGroup(id: number, responseGroup: string, callCtx?: CallContext) {
+        assertId(id);
+        const res = await get(id, responseGroup, resolveContext(callCtx, now));
+        return { item: res.item, source: "api", cache: [], _meta: res._meta };
+      },
+    };
   };
+  withGroup("projects", (id, responseGroup, c) =>
+    getProject(deps.client, id, { responseGroup }, c),
+  );
+  withGroup("purchase_orders", (id, responseGroup, c) =>
+    getPurchaseOrder(deps.client, id, { responseGroup }, c),
+  );
   return out as Repositories;
 }
