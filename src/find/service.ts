@@ -7,9 +7,10 @@
  */
 import type { ClientEntity, ProjectEntity } from "../board/resources";
 import { filterProjectsByContractStatus } from "./contract-status";
-import { filterByStatuses, filterProjectsByStatus, filterProjectsByStatuses } from "./filter";
+import { filterProjectsByStatus, filterProjectsByStatuses } from "./filter";
 import { resolveClientByName, resolveVendorByName } from "./resolver";
 import type { FindSession } from "./session";
+import { invoiceStatusCodes, paymentStatusCodes, purchaseOrderStatusFilter } from "./status";
 import {
   type ClientQuery,
   type ClientResult,
@@ -117,22 +118,26 @@ export async function findProjects(s: FindSession, q: ProjectQuery): Promise<Pro
 
 // --- invoices / purchase_orders / payments ----------------------------------------------------
 
+/** status(単独)と statuses(複数)は排他(validate 済み)。どちらも名称で受ける。 */
+const statusNames = (q: StatusedQuery): string[] =>
+  q.statuses?.length ? q.statuses : q.status ? [q.status] : [];
+
 export async function findInvoices(s: FindSession, q: StatusedQuery): Promise<InvoiceResult[]> {
   validateInvoiceQuery(q);
+  // ステータス名はコードに直して API / キャッシュの絞り込みに渡す。id 指定のときは掛けない(通信の前に検査する)。
+  const statusCodes = q.id ? [] : invoiceStatusCodes(statusNames(q));
   const clientId = q.partnerName ? await resolveClientByName(s, q.partnerName) : q.partnerId;
-  let invoices = q.id
+  const invoices = q.id
     ? [await s.get("invoices", q.id)]
     : await s.search("invoices", {
-        ...(clientId ? { clientIdEq: clientId } : {}),
-        ...(q.status ? { statusEq: q.status } : {}),
+        ...(clientId ? { projectClientIdEq: clientId } : {}),
+        ...(statusCodes.length ? { invoiceStatusIn: statusCodes } : {}),
       });
-  // statuses(複数)は API 側に対応する引数がないので後段で絞る。id 指定のときは掛けない。
-  if (!q.id && q.statuses?.length)
-    invoices = filterByStatuses(invoices, (i) => i.status, q.statuses);
 
   const out: InvoiceResult[] = [];
   for (const x of s.applyLimit(invoices, q.limit)) {
-    const Client = x.client_id ? await s.getOptional("clients", x.client_id) : null;
+    const cid = x.client?.id ?? 0;
+    const Client = cid ? await s.getOptional("clients", cid) : null;
     const Project = x.project_id ? await s.getOptional("projects", x.project_id) : null;
     out.push(withUrl({ Invoice: x, Project, Client }, documentUrl(s.uiBaseUrl, x.project_id)));
   }
@@ -144,43 +149,55 @@ export async function findPurchaseOrders(
   q: StatusedQuery,
 ): Promise<PurchaseOrderResult[]> {
   validatePurchaseOrderQuery(q);
-  const vendorId = q.partnerName ? await resolveVendorByName(s, q.partnerName) : q.partnerId;
+  const { expenditureStatusIn, deliveryStatusIn } = q.id
+    ? { expenditureStatusIn: [], deliveryStatusIn: [] }
+    : purchaseOrderStatusFilter(statusNames(q));
+  // 発注ステータスと進捗状況の名称が混ざったら OR にしたいが、API の引数どうしは AND になる。
+  // その場合は API には絞り込みなしで取り(相手先で絞る)、後段で OR にする。
+  const mixed = expenditureStatusIn.length > 0 && deliveryStatusIn.length > 0;
+  const payeeId = q.partnerName ? await resolveVendorByName(s, q.partnerName) : q.partnerId;
   let pos = q.id
     ? [await s.get("purchase_orders", q.id)]
     : await s.search("purchase_orders", {
-        ...(vendorId ? { vendorIdEq: vendorId } : {}),
-        ...(q.status ? { statusEq: q.status } : {}),
+        ...(payeeId ? { payeeIdEq: payeeId } : {}),
+        ...(!mixed && expenditureStatusIn.length ? { expenditureStatusIn } : {}),
+        ...(!mixed && deliveryStatusIn.length ? { deliveryStatusIn } : {}),
       });
-  if (!q.id && q.statuses?.length) pos = filterByStatuses(pos, (p) => p.status, q.statuses);
+  if (mixed) {
+    pos = pos.filter(
+      (p) =>
+        expenditureStatusIn.includes(p.expenditure_status) ||
+        deliveryStatusIn.includes(p.delivery_status),
+    );
+  }
 
   const out: PurchaseOrderResult[] = [];
   for (const x of s.applyLimit(pos, q.limit)) {
-    const Vendor = x.vendor_id ? await s.getOptional("vendors", x.vendor_id) : null;
-    const Project = x.project_id ? await s.getOptional("projects", x.project_id) : null;
-    out.push(
-      withUrl({ PurchaseOrder: x, Vendor, Project }, documentUrl(s.uiBaseUrl, x.project_id)),
-    );
+    const vid = x.payee?.id ?? 0;
+    const pid = x.project?.id ?? 0;
+    const Vendor = vid ? await s.getOptional("vendors", vid) : null;
+    const Project = pid ? await s.getOptional("projects", pid) : null;
+    out.push(withUrl({ PurchaseOrder: x, Vendor, Project }, documentUrl(s.uiBaseUrl, pid)));
   }
   return out;
 }
 
 export async function findPayments(s: FindSession, q: StatusedQuery): Promise<PaymentResult[]> {
   validatePaymentQuery(q);
-  const vendorId = q.partnerName ? await resolveVendorByName(s, q.partnerName) : q.partnerId;
-  let payments = q.id
+  const statusCodes = q.id ? [] : paymentStatusCodes(statusNames(q));
+  const payeeId = q.partnerName ? await resolveVendorByName(s, q.partnerName) : q.partnerId;
+  const payments = q.id
     ? [await s.get("payments", q.id)]
     : await s.search("payments", {
-        ...(vendorId ? { vendorIdEq: vendorId } : {}),
-        ...(q.status ? { statusEq: q.status } : {}),
+        ...(payeeId ? { expenditurePayeeIdEq: payeeId } : {}),
+        ...(statusCodes.length ? { paymentStatusIn: statusCodes } : {}),
       });
-  if (!q.id && q.statuses?.length) {
-    payments = filterByStatuses(payments, (p) => p.status, q.statuses);
-  }
 
   const out: PaymentResult[] = [];
   for (const x of s.applyLimit(payments, q.limit)) {
-    const Vendor = x.vendor_id ? await s.getOptional("vendors", x.vendor_id) : null;
-    // 支払は案件 ID を持たないので Project は常に null、URL も付けない(Go と同じ)。
+    const vid = x.payee?.id ?? 0;
+    const Vendor = vid ? await s.getOptional("vendors", vid) : null;
+    // 支払は案件を持たない(project は入っても Project は付けない)ので Project は常に null、URL も付けない(Go と同じ)。
     out.push({ Payment: x, Vendor, Project: null });
   }
   return out;

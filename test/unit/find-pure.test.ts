@@ -3,6 +3,7 @@
  * Go の `*_test.go` のケースを転記して固定する。
  */
 import { describe, expect, it } from "vitest";
+import { ArgumentError } from "../../src/errors";
 import {
   expandContractStatus,
   filterProjectsByContractStatus,
@@ -14,6 +15,11 @@ import {
   filterProjectsByStatuses,
 } from "../../src/find/filter";
 import { formatCandidates, RESOLVER_CANDIDATES_MAX } from "../../src/find/resolver";
+import {
+  invoiceStatusCodes,
+  paymentStatusCodes,
+  purchaseOrderStatusFilter,
+} from "../../src/find/status";
 import {
   validateClientQuery,
   validateDocumentQuery,
@@ -293,5 +299,54 @@ describe("resolveUiBaseUrl", () => {
     expect(resolveUiBaseUrl({ BOARD_BASE_URL: "  https://api.the-board.jp/ \r\n" })).toBe(
       "https://the-board.jp",
     );
+  });
+});
+
+describe("ステータス名 → コードの変換(issue #27)", () => {
+  it("invoices: 請求ステータスの名称をコードにする(重複は 1 つ、空は空配列)", () => {
+    expect(invoiceStatusCodes(["未請求"])).toEqual([1]);
+    expect(invoiceStatusCodes(["請求OK", "請求済", "一部入金済", "入金済", "回収不能"])).toEqual([
+      4, 2, 5, 3, 9,
+    ]);
+    expect(invoiceStatusCodes(["請求済", "請求済"])).toEqual([2]);
+    expect(invoiceStatusCodes([])).toEqual([]);
+  });
+
+  it("payments: 支払ステータスの名称をコードにする", () => {
+    expect(paymentStatusCodes(["請求書未受領", "請求書受領済", "振込予約済", "支払済"])).toEqual([
+      1, 2, 4, 3,
+    ]);
+  });
+
+  it("purchase_orders: 発注ステータスと進捗状況のどちらの名称も受け、グループ別に分ける", () => {
+    expect(purchaseOrderStatusFilter(["発注済", "見積中(高)", "見送り"])).toEqual({
+      expenditureStatusIn: [5, 1, 9],
+      deliveryStatusIn: [],
+    });
+    expect(purchaseOrderStatusFilter(["未着手", "検収済"])).toEqual({
+      expenditureStatusIn: [],
+      deliveryStatusIn: [1, 4],
+    });
+    expect(purchaseOrderStatusFilter(["発注済", "着手中"])).toEqual({
+      expenditureStatusIn: [5],
+      deliveryStatusIn: [2],
+    });
+    expect(
+      purchaseOrderStatusFilter(["見積中(中)", "見積中(低)", "見積中(除)", "発注確定"]),
+    ).toEqual({
+      expenditureStatusIn: [2, 3, 8, 4],
+      deliveryStatusIn: [],
+    });
+  });
+
+  it("知らない名称は argument_error。受け付ける名称の一覧を message に入れる", () => {
+    expect(() => invoiceStatusCodes(["sent"])).toThrow(ArgumentError);
+    expect(() => invoiceStatusCodes(["sent"])).toThrow(/"sent".*未請求.*回収不能/s);
+    expect(() => paymentStatusCodes(["paid"])).toThrow(/支払済/);
+    expect(() => purchaseOrderStatusFilter(["open"])).toThrow(/発注済.*検収済/s);
+    // 数値のコードは名称ではない
+    expect(() => invoiceStatusCodes(["2"])).toThrow(ArgumentError);
+    // 別リソースの名称も受けない(請求ステータスに『支払済』は無い)
+    expect(() => invoiceStatusCodes(["支払済"])).toThrow(ArgumentError);
   });
 });

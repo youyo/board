@@ -207,7 +207,7 @@
   {
     "name": "find_invoices",
     "title": "請求書検索",
-    "description": "Search BOARD invoices by ID, client name, or status. Fields combine with AND (ID overrides others). Returns invoice entities. client_name resolves with ambiguity error on multiple matches. status accepts a single status (API delegated; no narrowing required). project_name is not yet supported. Response: {items, cache, warnings?, limited?, total_before_limit?}. cache = freshness of the cached resources that were read (cached_at, full_refreshed_at, refresh_state); warnings = non-fatal problems (enrichment that failed and is null, a project_id that could not be resolved, a truncated list).",
+    "description": "Search BOARD invoices by ID, client name, or status. Fields combine with AND (ID overrides others). Returns invoice entities. client_name resolves with ambiguity error on multiple matches. status is a status NAME that is converted to BOARD's numeric code (invoice_status: 1=未請求 / 2=請求済 / 3=入金済 / 4=請求OK / 5=一部入金済 / 9=回収不能); an unknown name is rejected with argument_error listing the accepted names. It narrows in the cache and in the API (no extra narrowing required). Each item has the invoice with its Client (from the invoice's client.id) and Project. project_name is not yet supported. Response: {items, cache, warnings?, limited?, total_before_limit?}. cache = freshness of the cached resources that were read (cached_at, full_refreshed_at, refresh_state); warnings = non-fatal problems (enrichment that failed and is null, a project_id that could not be resolved, a truncated list).",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -229,7 +229,7 @@
         "status": {
           "type": "string",
           "maxLength": 1000,
-          "description": "Filter by invoice status (single value; API delegated, no narrowing required)."
+          "description": "Filter by invoice status NAME (single value): 1=未請求 / 2=請求済 / 3=入金済 / 4=請求OK / 5=一部入金済 / 9=回収不能 (code=name). Pass the name (e.g. 請求済), not the code; an unknown name is rejected with argument_error. No extra narrowing required."
         },
         "refresh": {
           "type": "string",
@@ -314,7 +314,7 @@
   {
     "name": "find_payments",
     "title": "支払検索",
-    "description": "Search BOARD payments by ID, vendor name, or status. Fields combine with AND (ID overrides others). Returns payment entities. vendor_name resolves with ambiguity error on multiple matches. status accepts a single status (API delegated; no narrowing required). purchase_order_id is not yet supported. Response: {items, cache, warnings?, limited?, total_before_limit?}. cache = freshness of the cached resources that were read (cached_at, full_refreshed_at, refresh_state); warnings = non-fatal problems (enrichment that failed and is null, a project_id that could not be resolved, a truncated list).",
+    "description": "Search BOARD payments by ID, vendor name, or status. Fields combine with AND (ID overrides others). Returns payment entities. vendor_name resolves with ambiguity error on multiple matches. vendor_name is matched against the payment's payee (支払先, payee.id). status is a status NAME converted to BOARD's numeric code (payment_status: 1=請求書未受領 / 2=請求書受領済 / 3=支払済 / 4=振込予約済); an unknown name is rejected with argument_error listing the accepted names. It narrows in the cache and in the API (no extra narrowing required). Each item has the payment with its Vendor (from payee.id); Project is always null. purchase_order_id is not yet supported. Response: {items, cache, warnings?, limited?, total_before_limit?}. cache = freshness of the cached resources that were read (cached_at, full_refreshed_at, refresh_state); warnings = non-fatal problems (enrichment that failed and is null, a project_id that could not be resolved, a truncated list).",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -335,7 +335,7 @@
         "status": {
           "type": "string",
           "maxLength": 1000,
-          "description": "Filter by payment status (single value; API delegated, no narrowing required)."
+          "description": "Filter by payment status NAME (single value): 1=請求書未受領 / 2=請求書受領済 / 3=支払済 / 4=振込予約済 (code=name). Pass the name (e.g. 支払済), not the code; an unknown name is rejected with argument_error. No extra narrowing required."
         },
         "refresh": {
           "type": "string",
@@ -435,7 +435,7 @@
   {
     "name": "find_purchase_orders",
     "title": "発注書検索",
-    "description": "Search BOARD purchase orders by ID, vendor name, or status. Fields combine with AND (ID overrides others). Returns purchase order entities. vendor_name resolves with ambiguity error on multiple matches. status accepts a single status (API delegated; no narrowing required). project_name is not yet supported. Response: {items, cache, warnings?, limited?, total_before_limit?}. cache = freshness of the cached resources that were read (cached_at, full_refreshed_at, refresh_state); warnings = non-fatal problems (enrichment that failed and is null, a project_id that could not be resolved, a truncated list).",
+    "description": "Search BOARD purchase orders by ID, vendor name, or status. Fields combine with AND (ID overrides others). Returns purchase order entities. vendor_name resolves with ambiguity error on multiple matches. vendor_name is matched against the purchase order's payee (支払先, payee.id). status is a status NAME converted to BOARD's numeric code; it accepts an order status (1=見積中(高) / 2=見積中(中) / 3=見積中(低) / 4=発注確定 / 5=発注済 / 8=見積中(除) / 9=見送り) or progress (1=未着手 / 2=着手中 / 3=納品済 / 4=検収済) name (code=name), and an unknown name is rejected with argument_error listing the accepted names. It narrows in the cache and in the API (no extra narrowing required). Each item has the purchase order with its Vendor (from payee.id) and Project (from project.id; the list is fetched with response_group=medium so project is included). project_name is not yet supported. Response: {items, cache, warnings?, limited?, total_before_limit?}. cache = freshness of the cached resources that were read (cached_at, full_refreshed_at, refresh_state); warnings = non-fatal problems (enrichment that failed and is null, a project_id that could not be resolved, a truncated list).",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -457,7 +457,7 @@
         "status": {
           "type": "string",
           "maxLength": 1000,
-          "description": "Filter by purchase order status (single value; API delegated, no narrowing required)."
+          "description": "Filter by purchase order status NAME (single value). Either an order status (1=見積中(高) / 2=見積中(中) / 3=見積中(低) / 4=発注確定 / 5=発注済 / 8=見積中(除) / 9=見送り) or a progress (1=未着手 / 2=着手中 / 3=納品済 / 4=検収済) (code=name). Pass the name (e.g. 発注済, 着手中), not the code; an unknown name is rejected with argument_error. No extra narrowing required."
         },
         "refresh": {
           "type": "string",
@@ -554,7 +554,7 @@
         "name": {
           "type": "string",
           "maxLength": 1000,
-          "description": "Substring match on user name."
+          "description": "Substring match on the user's last name, first name, or both combined (last/first, with or without a space; case and width are ignored). BOARD has no single name field for users."
         },
         "refresh": {
           "type": "string",
@@ -966,7 +966,7 @@
   {
     "name": "get_invoice",
     "title": "請求書取得",
-    "description": "請求書を ID で 1 件取得する。請求書。顧客 ID・案件 ID に紐づく。キャッシュにあればそれを返し、なければ BOARD から 1 件取って保存する。refresh=delta / full を指定すると、先に請求書の一覧キャッシュを更新してから読む。結果は {item, cache, _meta?}。item は BOARD の生データ。",
+    "description": "請求書を ID で 1 件取得する。請求書。案件(project_id)と顧客(client の入れ子。顧客 ID は client.id)に紐づく。請求ステータスは数値コード(invoice_status)と名称(invoice_status_name)で返る。キャッシュにあればそれを返し、なければ BOARD から 1 件取って保存する。refresh=delta / full を指定すると、先に請求書の一覧キャッシュを更新してから読む。結果は {item, cache, _meta?}。item は BOARD の生データ。",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1050,7 +1050,7 @@
   {
     "name": "get_payment",
     "title": "支払い取得",
-    "description": "支払いを ID で 1 件取得する。仕入先への支払い。仕入先 ID・発注書 ID に紐づく。キャッシュにあればそれを返し、なければ BOARD から 1 件取って保存する。refresh=delta / full を指定すると、先に支払いの一覧キャッシュを更新してから読む。結果は {item, cache, _meta?}。item は BOARD の生データ。",
+    "description": "支払いを ID で 1 件取得する。仕入先への支払い(BOARD の API では expenditure_payments)。支払先(payee の入れ子。仕入先 ID は payee.id)と発注(expenditure_id / expenditure_no)に紐づく。支払ステータスは payment_status(数値コードと payment_status_name の名称)で返る。キャッシュにあればそれを返し、なければ BOARD から 1 件取って保存する。refresh=delta / full を指定すると、先に支払いの一覧キャッシュを更新してから読む。結果は {item, cache, _meta?}。item は BOARD の生データ。",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1272,7 +1272,7 @@
   {
     "name": "get_purchase_order",
     "title": "発注書取得",
-    "description": "発注書を ID で 1 件取得する。発注書(仕入側)。仕入先 ID・案件 ID に紐づく。キャッシュにあればそれを返し、なければ BOARD から 1 件取って保存する。refresh=delta / full を指定すると、先に発注書の一覧キャッシュを更新してから読む。結果は {item, cache, _meta?}。item は BOARD の生データ。",
+    "description": "発注書を ID で 1 件取得する。発注書(仕入側。BOARD の API では expenditures)。支払先(payee の入れ子。仕入先 ID は payee.id)と案件(project の入れ子)に紐づく。発注ステータスは expenditure_status、進捗状況は delivery_status(数値コードと _name の名称)で返る。キャッシュにあればそれを返し、なければ BOARD から 1 件取って保存する。refresh=delta / full を指定すると、先に発注書の一覧キャッシュを更新してから読む。結果は {item, cache, _meta?}。item は BOARD の生データ。",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1398,7 +1398,7 @@
   {
     "name": "get_user",
     "title": "ユーザー取得",
-    "description": "ユーザーを ID で 1 件取得する。BOARD のユーザー(社内の担当者)マスタ。キャッシュにあればそれを返し、なければ BOARD から 1 件取って保存する。refresh=delta / full を指定すると、先にユーザーの一覧キャッシュを更新してから読む。結果は {item, cache, _meta?}。item は BOARD の生データ。",
+    "description": "ユーザーを ID で 1 件取得する。BOARD のユーザー(社内の担当者)マスタ。姓名は last_name / first_name に分かれていて、name という項目は無い。キャッシュにあればそれを返し、なければ BOARD から 1 件取って保存する。refresh=delta / full を指定すると、先にユーザーの一覧キャッシュを更新してから読む。結果は {item, cache, _meta?}。item は BOARD の生データ。",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1959,23 +1959,22 @@
   {
     "name": "list_invoices",
     "title": "請求書一覧取得",
-    "description": "請求書の一覧を返す。請求書。顧客 ID・案件 ID に紐づく。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta(差分)か refresh=full(全件)を指定する。件数が多いリソースでは全件を返すと応答が大きくなるので、まず limit か絞り込みを指定する。絞り込み: client_id_eq / project_id_eq / status_eq だけを指定した場合は、同期済みならキャッシュを絞って返す。それ以外の引数(updated_at_* / include_archive_flg / response_group などサーバー側の指定を含む)を指定したときは BOARD の API を直接呼び(このとき refresh は無視される)、キャッシュが未同期のときも API を直接呼ぶ。API から取った結果の cache は空になる。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "description": "請求書の一覧を返す。請求書。案件(project_id)と顧客(client の入れ子。顧客 ID は client.id)に紐づく。請求ステータスは数値コード(invoice_status)と名称(invoice_status_name)で返る。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta(差分)か refresh=full(全件)を指定する。件数が多いリソースでは全件を返すと応答が大きくなるので、まず limit か絞り込みを指定する。絞り込み: project_client_id_eq / invoice_status_in だけを指定した場合は、同期済みならキャッシュを絞って返す。それ以外の引数(updated_at_* / include_archive_flg / response_group などサーバー側の指定を含む)を指定したときは BOARD の API を直接呼び(このとき refresh は無視される)、キャッシュが未同期のときも API を直接呼ぶ。API から取った結果の cache は空になる。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
-        "client_id_eq": {
+        "project_client_id_eq": {
           "type": "number",
-          "description": "顧客 ID で絞り込む(完全一致)"
+          "description": "顧客 ID で絞り込む(完全一致。請求書の client.id)"
         },
-        "project_id_eq": {
-          "type": "number",
-          "description": "案件 ID で絞り込む(完全一致)"
-        },
-        "status_eq": {
-          "type": "string",
-          "maxLength": 1000,
-          "description": "ステータスが一致する請求書(例: sent)"
+        "invoice_status_in": {
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "description": "請求ステータスで絞り込む(いずれかに一致): 1=未請求 / 4=請求OK / 2=請求済 / 5=一部入金済 / 3=入金済 / 9=回収不能"
         },
         "response_group": {
           "type": "string",
@@ -2091,23 +2090,26 @@
   {
     "name": "list_payments",
     "title": "支払い一覧取得",
-    "description": "支払いの一覧を返す。仕入先への支払い。仕入先 ID・発注書 ID に紐づく。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta(差分)か refresh=full(全件)を指定する。件数が多いリソースでは全件を返すと応答が大きくなるので、まず limit か絞り込みを指定する。絞り込み: vendor_id_eq / purchase_order_id_eq / status_eq だけを指定した場合は、同期済みならキャッシュを絞って返す。それ以外の引数(updated_at_* / include_archive_flg / response_group などサーバー側の指定を含む)を指定したときは BOARD の API を直接呼び(このとき refresh は無視される)、キャッシュが未同期のときも API を直接呼ぶ。API から取った結果の cache は空になる。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "description": "支払いの一覧を返す。仕入先への支払い(BOARD の API では expenditure_payments)。支払先(payee の入れ子。仕入先 ID は payee.id)と発注(expenditure_id / expenditure_no)に紐づく。支払ステータスは payment_status(数値コードと payment_status_name の名称)で返る。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta(差分)か refresh=full(全件)を指定する。件数が多いリソースでは全件を返すと応答が大きくなるので、まず limit か絞り込みを指定する。絞り込み: expenditure_payee_id_eq / payment_status_in / expenditure_expenditure_no_eq だけを指定した場合は、同期済みならキャッシュを絞って返す。それ以外の引数(updated_at_* / include_archive_flg / response_group などサーバー側の指定を含む)を指定したときは BOARD の API を直接呼び(このとき refresh は無視される)、キャッシュが未同期のときも API を直接呼ぶ。API から取った結果の cache は空になる。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
-        "vendor_id_eq": {
+        "expenditure_payee_id_eq": {
           "type": "number",
-          "description": "仕入先 ID で絞り込む(完全一致)"
+          "description": "支払先(仕入先)ID で絞り込む(完全一致。支払の payee.id)"
         },
-        "purchase_order_id_eq": {
+        "payment_status_in": {
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "description": "支払ステータスで絞り込む(いずれかに一致): 1=請求書未受領 / 2=請求書受領済 / 4=振込予約済 / 3=支払済"
+        },
+        "expenditure_expenditure_no_eq": {
           "type": "number",
-          "description": "発注書 ID で絞り込む(完全一致)"
-        },
-        "status_eq": {
-          "type": "string",
-          "maxLength": 1000,
-          "description": "ステータスが一致する支払い"
+          "description": "発注 No で絞り込む(完全一致)。発注の ID ではなく、発注書の expenditure_no(支払の expenditure_no と同じ値)"
         },
         "response_group": {
           "type": "string",
@@ -2438,31 +2440,43 @@
   {
     "name": "list_purchase_orders",
     "title": "発注書一覧取得",
-    "description": "発注書の一覧を返す。発注書(仕入側)。仕入先 ID・案件 ID に紐づく。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta(差分)か refresh=full(全件)を指定する。件数が多いリソースでは全件を返すと応答が大きくなるので、まず limit か絞り込みを指定する。絞り込み: vendor_id_eq / project_id_eq / status_eq だけを指定した場合は、同期済みならキャッシュを絞って返す。それ以外の引数(updated_at_* / include_archive_flg / response_group などサーバー側の指定を含む)を指定したときは BOARD の API を直接呼び(このとき refresh は無視される)、キャッシュが未同期のときも API を直接呼ぶ。API から取った結果の cache は空になる。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "description": "発注書の一覧を返す。発注書(仕入側。BOARD の API では expenditures)。支払先(payee の入れ子。仕入先 ID は payee.id)と案件(project の入れ子)に紐づく。発注ステータスは expenditure_status、進捗状況は delivery_status(数値コードと _name の名称)で返る。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta(差分)か refresh=full(全件)を指定する。件数が多いリソースでは全件を返すと応答が大きくなるので、まず limit か絞り込みを指定する。絞り込み: payee_id_eq / expenditure_status_in / delivery_status_in だけを指定した場合は、同期済みならキャッシュを絞って返す。それ以外の引数(updated_at_* / include_archive_flg / response_group などサーバー側の指定を含む)を指定したときは BOARD の API を直接呼び(このとき refresh は無視される)、キャッシュが未同期のときも API を直接呼ぶ。API から取った結果の cache は空になる。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "properties": {
-        "vendor_id_eq": {
+        "payee_id_eq": {
           "type": "number",
-          "description": "仕入先 ID で絞り込む(完全一致)"
+          "description": "支払先(仕入先)ID で絞り込む(完全一致。発注書の payee.id)"
         },
         "project_id_eq": {
           "type": "number",
-          "description": "案件 ID で絞り込む(完全一致)"
+          "description": "案件 ID で絞り込む(完全一致)。サーバー側の指定なので、指定すると BOARD の API を直接呼ぶ(キャッシュでは絞らない)"
         },
-        "status_eq": {
-          "type": "string",
-          "maxLength": 1000,
-          "description": "ステータスが一致する発注書"
+        "expenditure_status_in": {
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "description": "発注ステータスで絞り込む(いずれかに一致): 1=見積中(高) / 2=見積中(中) / 3=見積中(低) / 8=見積中(除) / 4=発注確定 / 5=発注済 / 9=見送り"
+        },
+        "delivery_status_in": {
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "description": "進捗状況で絞り込む(いずれかに一致): 1=未着手 / 2=着手中 / 3=納品済 / 4=検収済"
         },
         "response_group": {
           "type": "string",
           "enum": [
             "small",
+            "medium",
             "large"
           ],
-          "description": "レスポンスに含める項目のグループ: small / large。サーバー側の指定なので、指定すると BOARD の API を直接呼ぶ"
+          "description": "レスポンスに含める項目のグループ: small / medium / large。未指定なら medium を送る(案件 project を含む)。small は project を含まない。サーバー側の指定なので、指定すると BOARD の API を直接呼ぶ"
         },
         "updated_at_gteq": {
           "type": "string",
@@ -2570,7 +2584,7 @@
   {
     "name": "list_users",
     "title": "ユーザー一覧取得",
-    "description": "ユーザーの一覧を返す。BOARD のユーザー(社内の担当者)マスタ。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta(差分)か refresh=full(全件)を指定する。件数が多いリソースでは全件を返すと応答が大きくなるので、まず limit か絞り込みを指定する。絞り込み: name_cont / email_cont だけを指定した場合は、同期済みならキャッシュを絞って返す。それ以外の引数(updated_at_* / include_archive_flg / response_group などサーバー側の指定を含む)を指定したときは BOARD の API を直接呼び(このとき refresh は無視される)、キャッシュが未同期のときも API を直接呼ぶ。API から取った結果の cache は空になる。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "description": "ユーザーの一覧を返す。BOARD のユーザー(社内の担当者)マスタ。姓名は last_name / first_name に分かれていて、name という項目は無い。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta(差分)か refresh=full(全件)を指定する。件数が多いリソースでは全件を返すと応答が大きくなるので、まず limit か絞り込みを指定する。絞り込み: name_cont / email_cont だけを指定した場合は、同期済みならキャッシュを絞って返す。それ以外の引数(updated_at_* / include_archive_flg / response_group などサーバー側の指定を含む)を指定したときは BOARD の API を直接呼び(このとき refresh は無視される)、キャッシュが未同期のときも API を直接呼ぶ。API から取った結果の cache は空になる。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -2578,12 +2592,12 @@
         "name_cont": {
           "type": "string",
           "maxLength": 1000,
-          "description": "ユーザーの名前で絞り込む(部分一致)"
+          "description": "ユーザーの姓・名・姓名(連結、または空白区切り)で絞り込む(部分一致。キャッシュ専用: BOARD の API に名前の絞り込みは無いので、未同期なら絞り込みなしで全件を取ってからこちらで絞る)"
         },
         "email_cont": {
           "type": "string",
           "maxLength": 1000,
-          "description": "メールアドレスで絞り込む(部分一致)"
+          "description": "メールアドレスで絞り込む(部分一致。キャッシュ専用: name_cont と同じ扱い)"
         },
         "updated_at_gteq": {
           "type": "string",

@@ -125,6 +125,13 @@ function document<E>(resource: string, get: DocumentSpec<E>["get"]): DocumentSpe
 // 完全一致の比較。null / 未設定は空文字扱い(Go の `*string` を空文字に直して比べる処理)。
 const str = (v: unknown): string => (typeof v === "string" ? v : "");
 
+/** 姓・名・姓名(連結 / 空白つき)のどれかに fold の部分一致。users に `name` は無い(issue #27)。 */
+function userNameMatches(u: UserEntity, needle: string): boolean {
+  const last = str(u.last_name);
+  const first = str(u.first_name);
+  return [last, first, `${last}${first}`, `${last} ${first}`].some((v) => foldContains(v, needle));
+}
+
 export const SPECS = {
   // --- cache-first ---------------------------------------------------------------------------
   clients: cacheFirst<ClientEntity, ClientListOptions>("clients", {
@@ -160,11 +167,10 @@ export const SPECS = {
     list: listInvoices,
     get: getInvoice,
     cacheFirst: {
-      keys: ["clientIdEq", "projectIdEq", "statusEq"],
+      keys: ["projectClientIdEq", "invoiceStatusIn"],
       match: (i, f) =>
-        (!f.clientIdEq || i.client_id === f.clientIdEq) &&
-        (!f.projectIdEq || i.project_id === f.projectIdEq) &&
-        (!f.statusEq || i.status === f.statusEq),
+        (!f.projectClientIdEq || i.client?.id === f.projectClientIdEq) &&
+        (!f.invoiceStatusIn?.length || f.invoiceStatusIn.includes(i.invoice_status)),
     },
   }),
   purchase_orders: cacheFirst<PurchaseOrderEntity, PurchaseOrderListOptions>("purchase_orders", {
@@ -172,11 +178,12 @@ export const SPECS = {
     list: listPurchaseOrders,
     get: getPurchaseOrder,
     cacheFirst: {
-      keys: ["vendorIdEq", "projectIdEq", "statusEq"],
+      // projectIdEq は含めない: 既存のキャッシュの行に案件の項目が無いので、サーバーに任せる(issue #27)。
+      keys: ["payeeIdEq", "expenditureStatusIn", "deliveryStatusIn"],
       match: (p, f) =>
-        (!f.vendorIdEq || p.vendor_id === f.vendorIdEq) &&
-        (!f.projectIdEq || p.project_id === f.projectIdEq) &&
-        (!f.statusEq || p.status === f.statusEq),
+        (!f.payeeIdEq || p.payee?.id === f.payeeIdEq) &&
+        (!f.expenditureStatusIn?.length || f.expenditureStatusIn.includes(p.expenditure_status)) &&
+        (!f.deliveryStatusIn?.length || f.deliveryStatusIn.includes(p.delivery_status)),
     },
   }),
   payments: cacheFirst<PaymentEntity, PaymentListOptions>("payments", {
@@ -184,11 +191,11 @@ export const SPECS = {
     list: listPayments,
     get: getPayment,
     cacheFirst: {
-      keys: ["vendorIdEq", "purchaseOrderIdEq", "statusEq"],
+      keys: ["expenditurePayeeIdEq", "paymentStatusIn", "expenditureExpenditureNoEq"],
       match: (p, f) =>
-        (!f.vendorIdEq || p.vendor_id === f.vendorIdEq) &&
-        (!f.purchaseOrderIdEq || p.purchase_order_id === f.purchaseOrderIdEq) &&
-        (!f.statusEq || p.status === f.statusEq),
+        (!f.expenditurePayeeIdEq || p.payee?.id === f.expenditurePayeeIdEq) &&
+        (!f.paymentStatusIn?.length || f.paymentStatusIn.includes(p.payment_status)) &&
+        (!f.expenditureExpenditureNoEq || p.expenditure_no === f.expenditureExpenditureNoEq),
     },
   }),
   users: cacheFirst<UserEntity, UserListOptions>("users", {
@@ -197,8 +204,10 @@ export const SPECS = {
     get: getUser,
     cacheFirst: {
       keys: ["nameCont", "emailCont"],
+      // BOARD の API に名前・メールの部分一致は無い(email_eq だけ)ので、どちらもキャッシュ専用。
+      cacheOnlyKeys: ["nameCont", "emailCont"],
       match: (u, f) =>
-        (!f.nameCont || foldContains(u.name, f.nameCont)) &&
+        (!f.nameCont || userNameMatches(u, f.nameCont)) &&
         (!f.emailCont || foldContains(u.email, f.emailCont)),
     },
   }),

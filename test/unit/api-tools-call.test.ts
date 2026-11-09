@@ -7,6 +7,7 @@ import { createRepositories } from "../../src/repository";
 import { BASE, callApiTool, describeApiCall } from "../helpers/api-tool";
 import { makeEntities, pagedHandler } from "../helpers/board-list";
 import { resetCache, testDb } from "../helpers/d1";
+import { userEntity } from "../helpers/entities";
 import { jsonResponse, mockOutboundFetch } from "../helpers/mock-fetch";
 
 afterEach(() => vi.restoreAllMocks());
@@ -74,33 +75,45 @@ const QUERY_CASES: { tool: string; args: Record<string, unknown>; path: string; 
   },
   {
     tool: "list_invoices",
-    args: { client_id_eq: 3, project_id_eq: 4, status_eq: "paid", response_group: "small" },
+    args: { project_client_id_eq: 3, invoice_status_in: [2, 5], response_group: "small" },
     path: "/v1/invoices",
-    call: "GET /v1/invoices?client_id_eq=3&project_id_eq=4&response_group=small&status_eq=paid",
+    call: "GET /v1/invoices?invoice_status_in[]=2&invoice_status_in[]=5&project_client_id_eq=3&response_group=small",
   },
   {
     tool: "list_purchase_orders",
-    args: { vendor_id_eq: 5, project_id_eq: 6, status_eq: "ordered" },
+    args: {
+      payee_id_eq: 5,
+      project_id_eq: 6,
+      expenditure_status_in: [5],
+      delivery_status_in: [1, 2],
+      response_group: "large",
+    },
     path: "/v1/expenditures",
-    call: "GET /v1/expenditures?project_id_eq=6&status_eq=ordered&vendor_id_eq=5",
+    call: "GET /v1/expenditures?delivery_status_in[]=1&delivery_status_in[]=2&expenditure_status_in[]=5&payee_id_eq=5&project_id_eq=6&response_group=large",
+  },
+  {
+    // response_group を指定しない発注書の一覧は medium を送る(案件 project を含めるため)。
+    tool: "list_purchase_orders",
+    args: { payee_id_eq: 5 },
+    path: "/v1/expenditures",
+    call: "GET /v1/expenditures?payee_id_eq=5&response_group=medium",
   },
   {
     tool: "list_payments",
-    args: { vendor_id_eq: 5, purchase_order_id_eq: 9, status_eq: "x", response_group: "large" },
+    args: {
+      expenditure_payee_id_eq: 5,
+      expenditure_expenditure_no_eq: 9,
+      payment_status_in: [3],
+      response_group: "large",
+    },
     path: "/v1/expenditure_payments",
-    call: "GET /v1/expenditure_payments?purchase_order_id_eq=9&response_group=large&status_eq=x&vendor_id_eq=5",
+    call: "GET /v1/expenditure_payments?expenditure_expenditure_no_eq=9&expenditure_payee_id_eq=5&payment_status_in[]=3&response_group=large",
   },
   {
     tool: "list_vendors",
     args: { name_cont: "仕入" },
     path: "/v1/payees",
     call: "GET /v1/payees?name_cont=仕入",
-  },
-  {
-    tool: "list_users",
-    args: { name_cont: "太郎", email_cont: "@example" },
-    path: "/v1/users",
-    call: "GET /v1/users?email_cont=@example&name_cont=太郎",
   },
   {
     tool: "list_client_branches",
@@ -158,6 +171,21 @@ describe("引数 → BOARD への問い合わせ(Go 版 CLI のフラグとの�
     expect(r.isError, r.text).toBe(false);
     expect(r.calls.map(describeApiCall)).toEqual([call]);
     expect(r.json.items).toEqual([{ id: 1 }]);
+  });
+
+  it("list_users の name_cont / email_cont はキャッシュ専用: 未同期なら絞り込みなしで取ってから絞る(API には送らない)", async () => {
+    const rows = [
+      userEntity({ id: 1, last_name: "山田", first_name: "太郎", email: "taro@example.com" }),
+      userEntity({ id: 2, last_name: "鈴木", first_name: "花子", email: "hanako@example.com" }),
+    ];
+    const r = await callApiTool(
+      "list_users",
+      { name_cont: "太郎", email_cont: "@example" },
+      { [`GET ${BASE}/v1/users`]: ok(rows) },
+    );
+    expect(r.isError, r.text).toBe(false);
+    expect(r.calls.map(describeApiCall)).toEqual(["GET /v1/users"]);
+    expect(r.json.items.map((u: { id: number }) => u.id)).toEqual([1]);
   });
 
   it("tags / *_in は配列。空配列は『指定なし』で、フィルタなし(ゼロフィルタ)として扱う", async () => {

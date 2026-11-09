@@ -39,6 +39,12 @@ export interface CacheFirstSpec<E, F extends CommonListOptions> extends ListBase
   cacheFirst: {
     /** キャッシュ側で絞れる項目。これ以外(page / perPage / updatedAt* / includeArchiveFlg / tags / responseGroup など)があれば API。 */
     keys: ReadonlyArray<keyof F & string>;
+    /**
+     * `keys` のうち、BOARD の API が受けない『キャッシュ専用』のキー(users の name_cont / email_cont)。
+     * 同期済みならキャッシュを `match` で絞る。未同期なら、これらを付けずに API から全ページ取り、同じ `match` で絞る
+     * (API に送ると 0 件になる、または送れない。対象は件数が少ないリソースに限る)。
+     */
+    cacheOnlyKeys?: ReadonlyArray<keyof F & string>;
     match: (entity: E, filter: F) => boolean;
   };
 }

@@ -6,6 +6,7 @@ import { RefreshInProgressError, toErrorEnvelope } from "../../src/errors";
 import { createRepositories } from "../../src/repository";
 import { BASE, makeEntities, pagedHandler } from "../helpers/board-list";
 import { fakeClock, resetCache } from "../helpers/d1";
+import { userEntity } from "../helpers/entities";
 import { jsonResponse, mockOutboundFetch } from "../helpers/mock-fetch";
 
 // 実物の D1(miniflare)と本物の BOARD クライアント(createBoardClientFromEnv)を使い、BOARD API は outbound fetch のモックにする。
@@ -311,7 +312,7 @@ describe("E2E: 2 つの refresh を同時に走らせると、一方は refresh_
           return undefined;
         },
       ),
-      [`GET ${BASE}/v1/users`]: pagedHandler(() => [{ id: 1, name: "u", email: "u@example.com" }]),
+      [`GET ${BASE}/v1/users`]: pagedHandler(() => [userEntity({ id: 1 })]),
     });
     const a = repos.clients.list({}, { refresh: "full" });
     // クライアントは直列なので users は clients の問い合わせの後ろに並ぶが、ロックでは弾かれない。

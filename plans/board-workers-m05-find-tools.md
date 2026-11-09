@@ -36,15 +36,15 @@ Go 版 MCP の `find_*` 11 個を Workers に移す。名前・引数・descript
 |---|---|---|---|
 | `find_clients` | `id` `name` | id > name(部分一致)。顧客ごとに支店(`client_id_eq`)と担当者を付ける | `Client` `Branches` `Contacts` `url`(clients/{id}/edit) |
 | `find_vendors` | `id` `name` | 同上。支店・担当者のキーは `payee_id_eq` | `Vendor` `Branches` `Contacts` `url`(payees/{id}/edit) |
-| `find_users` | `id` `name` | id > name | `User` |
+| `find_users` | `id` `name` | id > name。**仕様に照らした訂正(issue #27)**: `name` は姓・名・姓名の部分一致(users に `name` の項目は無い) | `User` |
 | `find_projects` | `id` `client_name` `name` `status` `statuses` `contract_status` | AND(id は他を無視)。`client_name` は曖昧ならエラー。status 系は後段の絞り込みで、id / client_name / name のどれかとの併用が必須・互いに排他・statuses は 10 件まで | `Project` `Client` `url`(projects/{id}/edit) |
 | `find_estimates` | `id` `project_id` `client_name` `project_name` | id > project_id > client_name(+ project_name) > project_name。名前は fanout(5 件超は拒否) | `Estimate` `ProjectID` `ClientID` `Project` `Client` `url`(documents/{project_id}/edit) |
 | `find_orders` | 同上 | 同上 | `Order` ほか同上 |
 | `find_deliveries` | 同上 | 同上(案件の `deliveries` 配列の全件) | `Delivery` ほか同上 |
 | `find_receipts` | 同上 | 同上(案件の `receipts` 配列の全件) | `Receipt` ほか同上 |
-| `find_invoices` | `id` `client_name` `project_name`(未対応) `status` | AND。`client_name` は曖昧ならエラー。`status` は `status_eq` に委譲 | `Invoice` `Project` `Client` `url`(documents/{project_id}/edit) |
-| `find_purchase_orders` | `id` `vendor_name` `project_name`(未対応) `status` | 同上(仕入先) | `PurchaseOrder` `Vendor` `Project` `url` |
-| `find_payments` | `id` `vendor_name` `purchase_order_id`(未対応) `status` | 同上(仕入先) | `Payment` `Vendor` `Project`(常に null) |
+| `find_invoices` | `id` `client_name` `project_name`(未対応) `status` | AND。`client_name` は曖昧ならエラー。**仕様に照らした訂正(issue #27)**: `status` は名称(例: 請求済)で受けて数値コードに直し、`invoice_status_in` に渡す(知らない名称は `argument_error`)。`Client` は請求書の `client.id` で取る | `Invoice` `Project` `Client` `url`(documents/{project_id}/edit) |
+| `find_purchase_orders` | `id` `vendor_name` `project_name`(未対応) `status` | 同上(仕入先)。**仕様に照らした訂正(issue #27)**: `status` は発注ステータスと進捗状況の名称を受け、`expenditure_status_in` / `delivery_status_in` に渡す。`Vendor` は `payee.id`、`Project` と url は `project.id` で取る | `PurchaseOrder` `Vendor` `Project` `url` |
+| `find_payments` | `id` `vendor_name` `purchase_order_id`(未対応) `status` | 同上(仕入先)。**仕様に照らした訂正(issue #27)**: `status` は支払ステータスの名称を `payment_status_in` に渡す。`Vendor` は `payee.id` で取る | `Payment` `Vendor` `Project`(常に null) |
 
 - 結果のキーは Go の `json.Marshal` の出力と同じ: Result 構造体には `url` 以外に JSON タグがなく、Go の MCP は Go のフィールド名(`Client` `Branches` `ProjectID` ...)で返していた(`docs/api-reference.md` の例も同じ)。中のエンティティは BOARD のキー(snake_case)のまま。`url` は空なら出さない(`omitempty`)。
 - 書類 4 種に `status` の引数はない(構造的に存在しない)。渡すと `z.strictObject` が `argument_error`(Go の handler reject と同じ結果)。
