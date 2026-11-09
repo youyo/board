@@ -6,6 +6,7 @@ import { API_RESOURCES } from "../../src/mcp/tools/api-resources";
 import { SPECS } from "../../src/repository";
 import { callApiTool } from "../helpers/api-tool";
 import { rpcTo } from "../helpers/mcp";
+import { OPENAPI_RESOURCES, type OpenApiResourceName } from "../helpers/openapi-fields";
 
 /** 40 ツールの名前(plans/board-workers-m04-api-tools.md の一覧と同じ。自動の単数化はしない)。 */
 const LIST_TOOLS: Record<string, string> = {
@@ -54,6 +55,11 @@ const GET_TOOLS: Record<string, string> = {
 };
 
 const COMMON_FILTERS = ["updated_at_gteq", "updated_at_lteq", "include_archive_flg"];
+/** 共通フィルタのうち、仕様(OpenAPI)の一覧のクエリにあるもの(issue #28)。 */
+const commonFor = (resource: string) =>
+  COMMON_FILTERS.filter((c) =>
+    (OPENAPI_RESOURCES[resource as OpenApiResourceName].listQuery as readonly string[]).includes(c),
+  );
 const COMMON_ARGS = ["refresh", "limit", "show_meta", "max_response_tokens"];
 
 /**
@@ -69,8 +75,9 @@ const GO_LIST_FLAGS: Record<string, string[]> = {
     "tags",
     "response_group",
   ],
-  client_branches: ["client_id", "name_cont"],
-  contacts: ["client_id", "name_cont", "email_cont"],
+  // client_branches / contacts / vendor_branches / vendor_contacts の name_cont / email_cont は仕様に無いので引数ごと削除した(issue #28)。
+  client_branches: ["client_id"],
+  contacts: ["client_id"],
   projects: [
     "name_cont",
     "client_id",
@@ -95,8 +102,8 @@ const GO_LIST_FLAGS: Record<string, string[]> = {
   // OpenAPI v1.9.0 に合わせて訂正した(issue #27)。
   invoices: ["project_client_id_eq", "invoice_status_in", "response_group"],
   vendors: ["name_cont"],
-  vendor_branches: ["payee_id_eq", "name_cont"],
-  vendor_contacts: ["payee_id_eq", "name_cont", "email_cont"],
+  vendor_branches: ["payee_id_eq"],
+  vendor_contacts: ["payee_id_eq"],
   purchase_orders: [
     "payee_id_eq",
     "project_id_eq",
@@ -113,9 +120,9 @@ const GO_LIST_FLAGS: Record<string, string[]> = {
   users: ["name_cont", "email_cont"],
   groups: ["name_cont"],
   payment_terms: ["name_cont"],
-  project_types: ["name_cont"],
-  purchase_types: ["name_cont"],
-  accounting_types: ["name_cont"],
+  project_types: ["name_cont", "project_type_kbn_eq"],
+  purchase_types: ["name_cont", "expenditure_type_kbn_eq"],
+  accounting_types: ["name_cont", "accounting_type_kbn_eq"],
   document_send_channels: ["name_cont"],
 };
 
@@ -170,7 +177,11 @@ describe("api 層のツール一覧", () => {
 
 describe("list の引数は Go 版 CLI のフィルタフラグと一致する", () => {
   it.each(Object.entries(LIST_TOOLS))("%s → %s", (resource, tool) => {
-    const expected = [...(GO_LIST_FLAGS[resource] ?? []), ...COMMON_FILTERS, ...COMMON_ARGS].sort();
+    const expected = [
+      ...(GO_LIST_FLAGS[resource] ?? []),
+      ...commonFor(resource),
+      ...COMMON_ARGS,
+    ].sort();
     expect(props(tool)).toEqual([...new Set(expected)].sort());
   });
 
@@ -212,6 +223,21 @@ describe("list の引数は Go 版 CLI のフィルタフラグと一致する",
     }
   });
 
+  it("更新日時の絞り込み(updated_at_gteq)が仕様に無いリソースは、refresh の description に『delta は全件を取り直す』と書く", () => {
+    for (const [resource, tool] of Object.entries(LIST_TOOLS)) {
+      const spec = OPENAPI_RESOURCES[resource as OpenApiResourceName]
+        .listQuery as readonly string[];
+      const p = (
+        z.toJSONSchema(byName.get(tool)?.inputSchema as z.ZodObject) as {
+          properties: Record<string, { description?: string }>;
+        }
+      ).properties;
+      expect(p.refresh?.description?.includes("全件を取り直す(full として動く)"), resource).toBe(
+        !spec.includes("updated_at_gteq"),
+      );
+    }
+  });
+
   it("list の limit の description に、切ったときの limited / total_before_limit を書く", () => {
     for (const tool of Object.values(LIST_TOOLS)) {
       const p = (
@@ -225,7 +251,7 @@ describe("list の引数は Go 版 CLI のフィルタフラグと一致する",
     }
   });
 
-  it("response_group の列挙値は Go に合わせる(projects は 8 種、他は small / large)", () => {
+  it("response_group の列挙値は OpenAPI に合わせる(projects は 10 種、他は small / large)", () => {
     const rg = (tool: string) =>
       (
         z.toJSONSchema(byName.get(tool)?.inputSchema as z.ZodObject) as {
@@ -234,12 +260,14 @@ describe("list の引数は Go 版 CLI のフィルタフラグと一致する",
       ).properties.response_group?.enum;
     expect(rg("list_projects")).toEqual([
       "small",
+      "medium",
       "large",
       "estimate",
       "order",
       "delivery",
       "invoice",
       "receipt",
+      "project_cost",
       "all",
     ]);
     for (const t of ["list_clients", "list_invoices", "list_payments"]) {

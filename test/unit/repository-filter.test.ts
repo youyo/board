@@ -93,16 +93,14 @@ describe("clients のキャッシュ側フィルタ", () => {
   const s = SPECS.clients.cacheFirst;
   const c = (o: Record<string, unknown>) => o as never;
 
-  it("cacheable は name / name_disp / 適格請求書番号 / 顧客番号だけ", () => {
-    for (const f of [
-      { nameCont: "a" },
-      { nameDispCont: "a" },
-      { invoiceSystemNumberEq: "T1" },
-      { customNoEq: "1" },
-    ]) {
+  it("cacheable は name / name_disp / 適格請求書番号だけ(顧客番号 custom_no_eq はサーバー専用。issue #28)", () => {
+    for (const f of [{ nameCont: "a" }, { nameDispCont: "a" }, { invoiceSystemNumberEq: "T1" }]) {
       expect(isCacheableFilter(f, s.keys)).toBe(true);
     }
     for (const f of [
+      // custom_no は response_group=small(既定)に含まれず、同期済みのキャッシュでは常に 0 件になる
+      { customNoEq: "1" },
+      { nameCont: "a", customNoEq: "1" },
       { nameCont: "a", page: 2 },
       { nameCont: "a", perPage: 10 },
       { updatedAtGteq: "2026-01-01 00:00:00" },
@@ -124,18 +122,17 @@ describe("clients のキャッシュ側フィルタ", () => {
     expect(s.match(e, c({ nameCont: "zzz" }))).toBe(false);
   });
 
-  it("適格請求書番号・顧客番号は完全一致で、null は空文字扱い", () => {
-    const e = c({ id: 1, name: "a", invoice_system_number: "T123", custom_no: null });
+  it("適格請求書番号は完全一致で、null は空文字扱い", () => {
+    const e = c({ id: 1, name: "a", invoice_system_number: "T123" });
     expect(s.match(e, c({ invoiceSystemNumberEq: "T123" }))).toBe(true);
     expect(s.match(e, c({ invoiceSystemNumberEq: "T12" }))).toBe(false);
-    expect(s.match(e, c({ customNoEq: "X" }))).toBe(false);
     expect(s.match(c({ id: 2, name: "b" }), c({ invoiceSystemNumberEq: "T123" }))).toBe(false);
   });
 
   it("複数の条件は AND", () => {
-    const e = c({ id: 1, name: "ABC", name_disp: "x", custom_no: "9" });
-    expect(s.match(e, c({ nameCont: "ab", customNoEq: "9" }))).toBe(true);
-    expect(s.match(e, c({ nameCont: "ab", customNoEq: "8" }))).toBe(false);
+    const e = c({ id: 1, name: "ABC", name_disp: "x", invoice_system_number: "T9" });
+    expect(s.match(e, c({ nameCont: "ab", invoiceSystemNumberEq: "T9" }))).toBe(true);
+    expect(s.match(e, c({ nameCont: "ab", invoiceSystemNumberEq: "T8" }))).toBe(false);
   });
 });
 

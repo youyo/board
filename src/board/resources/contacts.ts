@@ -14,6 +14,7 @@ import type { ClientRef } from "./refs";
 /** 担当者。GET /v1/contacts の応答 1 要素(Go の ContactEntity)。 */
 export interface ContactEntity {
   id: number;
+  client_id?: number;
   client: ClientRef | null;
   last_name: string;
   first_name: string;
@@ -25,16 +26,11 @@ export interface ContactEntity {
   archive_flg: number;
   created_at: string;
   updated_at: string;
-  [key: string]: unknown;
 }
 
 export interface ContactListOptions extends CommonListOptions {
   /** 顧客 ID の完全一致(client_id_eq) */
   clientIdEq?: number;
-  /** 担当者名の部分一致(name_cont) */
-  nameCont?: string;
-  /** メールアドレスの部分一致(email_cont) */
-  emailCont?: string;
 }
 
 export function buildContactsQuery(
@@ -42,11 +38,7 @@ export function buildContactsQuery(
   page: number,
   perPage: number,
 ): string {
-  return baseQuery(opts, page, perPage)
-    .intEq("client_id", opts.clientIdEq)
-    .strCont("name", opts.nameCont)
-    .strCont("email", opts.emailCont)
-    .encode();
+  return baseQuery("contacts", opts, page, perPage).intEq("client_id", opts.clientIdEq).encode();
 }
 
 export function listContacts(

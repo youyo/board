@@ -21,6 +21,10 @@ run = "pnpm exec vitest run --project e2e --project node-e2e"
 description = "tools/list のスナップショットを更新する (ツール定義を意図して変えたときだけ)"
 run = "pnpm exec vitest run --project unit --update test/unit/tools-list-snapshot.test.ts"
 
+[tasks."openapi:fields"]
+description = "BOARD の OpenAPI 仕様(JSON)から test/helpers/openapi-fields.ts と src/board/openapi-support.ts を生成する。使い方: mise run openapi:fields -- <board_openapi.json のパス> [--check]。JSON はリポジトリに置かない"
+run = "node scripts/openapi-fields/main.ts"
+
 [tasks.test]
 description = "Unit + E2E"
 depends = ["test:unit", "test:e2e"]

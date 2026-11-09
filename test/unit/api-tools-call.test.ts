@@ -117,15 +117,15 @@ const QUERY_CASES: { tool: string; args: Record<string, unknown>; path: string; 
   },
   {
     tool: "list_client_branches",
-    args: { client_id: 2, name_cont: "支店", include_archive_flg: true },
+    args: { client_id: 2, include_archive_flg: true },
     path: "/v1/client_branches",
-    call: "GET /v1/client_branches?client_id_eq=2&include_archive_flg=1&name_cont=支店",
+    call: "GET /v1/client_branches?client_id_eq=2&include_archive_flg=1",
   },
   {
     tool: "list_contacts",
-    args: { client_id: 2, name_cont: "山田", email_cont: "yamada" },
+    args: { client_id: 2 },
     path: "/v1/contacts",
-    call: "GET /v1/contacts?client_id_eq=2&email_cont=yamada&name_cont=山田",
+    call: "GET /v1/contacts?client_id_eq=2",
   },
   {
     tool: "list_project_costs",
@@ -135,15 +135,15 @@ const QUERY_CASES: { tool: string; args: Record<string, unknown>; path: string; 
   },
   {
     tool: "list_vendor_branches",
-    args: { payee_id_eq: 8, name_cont: "支店" },
+    args: { payee_id_eq: 8 },
     path: "/v1/payee_branches",
-    call: "GET /v1/payee_branches?name_cont=支店&payee_id_eq=8",
+    call: "GET /v1/payee_branches?payee_id_eq=8",
   },
   {
     tool: "list_vendor_contacts",
-    args: { payee_id_eq: 8, name_cont: "担当", email_cont: "a@" },
+    args: { payee_id_eq: 8 },
     path: "/v1/payee_contacts",
-    call: "GET /v1/payee_contacts?email_cont=a@&name_cont=担当&payee_id_eq=8",
+    call: "GET /v1/payee_contacts?payee_id_eq=8",
   },
   {
     tool: "list_groups",
@@ -153,15 +153,40 @@ const QUERY_CASES: { tool: string; args: Record<string, unknown>; path: string; 
   },
   {
     tool: "list_purchase_types",
-    args: { name_cont: "外注" },
+    args: { name_cont: "外注", expenditure_type_kbn_eq: 2 },
     path: "/v1/expenditure_types",
-    call: "GET /v1/expenditure_types?name_cont=外注",
+    call: "GET /v1/expenditure_types?expenditure_type_kbn_eq=2&name_cont=外注",
   },
   {
     tool: "list_document_send_channels",
-    args: { name_cont: "メール", updated_at_gteq: "2026-01-01 00:00:00" },
+    // updated_at_* は仕様の一覧のクエリに無いので引数にも無い(issue #28)。include_archive_flg はある。
+    args: { name_cont: "メール", include_archive_flg: true },
     path: "/v1/document_send_channels",
-    call: "GET /v1/document_send_channels?name_cont=メール&updated_at_gteq=2026-01-01 00:00:00",
+    call: "GET /v1/document_send_channels?include_archive_flg=1&name_cont=メール",
+  },
+  {
+    tool: "list_project_types",
+    args: { project_type_kbn_eq: 3 },
+    path: "/v1/project_types",
+    call: "GET /v1/project_types?project_type_kbn_eq=3",
+  },
+  {
+    tool: "list_accounting_types",
+    args: { accounting_type_kbn_eq: 2 },
+    path: "/v1/accounting_types",
+    call: "GET /v1/accounting_types?accounting_type_kbn_eq=2",
+  },
+  {
+    tool: "list_projects",
+    args: { response_group: "project_cost" },
+    path: "/v1/projects",
+    call: "GET /v1/projects?response_group=project_cost",
+  },
+  {
+    tool: "list_projects",
+    args: { response_group: "medium" },
+    path: "/v1/projects",
+    call: "GET /v1/projects?response_group=medium",
   },
 ];
 
@@ -212,17 +237,17 @@ describe("list の出力", () => {
       return res;
     };
     const key = { [`GET ${BASE}/v1/contacts`]: handler };
-    const without = await callApiTool("list_contacts", { name_cont: "a" }, key);
+    const without = await callApiTool("list_contacts", { client_id: 1 }, key);
     expect(without.json).toEqual({ items: [{ id: 1 }, { id: 2 }], cache: [] });
     expect("_meta" in without.json).toBe(false);
 
-    const withMeta = await callApiTool("list_contacts", { name_cont: "a", show_meta: true }, key);
+    const withMeta = await callApiTool("list_contacts", { client_id: 1, show_meta: true }, key);
     expect(withMeta.json._meta).toMatchObject({ total_count: 2, etag: '"abc"' });
     expect(withMeta.json.items).toHaveLength(2);
 
     const explicitFalse = await callApiTool(
       "list_contacts",
-      { name_cont: "a", show_meta: false },
+      { client_id: 1, show_meta: false },
       key,
     );
     expect("_meta" in explicitFalse.json).toBe(false);
@@ -230,24 +255,24 @@ describe("list の出力", () => {
 
   it("limit は件数を絞る(0 は無制限)", async () => {
     const key = { [`GET ${BASE}/v1/contacts`]: ok(makeEntities(5)) };
-    const l2 = await callApiTool("list_contacts", { name_cont: "a", limit: 2 }, key);
+    const l2 = await callApiTool("list_contacts", { client_id: 1, limit: 2 }, key);
     expect(l2.json.items.map((e: { id: number }) => e.id)).toEqual([1, 2]);
-    const l0 = await callApiTool("list_contacts", { name_cont: "a", limit: 0 }, key);
+    const l0 = await callApiTool("list_contacts", { client_id: 1, limit: 0 }, key);
     expect(l0.json.items).toHaveLength(5);
   });
 
   it("limit で切ったときだけ limited:true と total_before_limit を付ける(truncated とは別)", async () => {
     const key = { [`GET ${BASE}/v1/contacts`]: ok(makeEntities(5)) };
-    const cut = await callApiTool("list_contacts", { name_cont: "a", limit: 2 }, key);
+    const cut = await callApiTool("list_contacts", { client_id: 1, limit: 2 }, key);
     expect(cut.json.limited).toBe(true);
     expect(cut.json.total_before_limit).toBe(5);
     expect("truncated" in cut.json).toBe(false);
     for (const limit of [5, 9, 0]) {
-      const r = await callApiTool("list_contacts", { name_cont: "a", limit }, key);
+      const r = await callApiTool("list_contacts", { client_id: 1, limit }, key);
       expect("limited" in r.json, `limit=${limit}`).toBe(false);
       expect("total_before_limit" in r.json, `limit=${limit}`).toBe(false);
     }
-    const unlimited = await callApiTool("list_contacts", { name_cont: "a" }, key);
+    const unlimited = await callApiTool("list_contacts", { client_id: 1 }, key);
     expect("limited" in unlimited.json).toBe(false);
   });
 
@@ -267,7 +292,7 @@ describe("list の出力", () => {
 
   it("nonzero-api: 非ゼロのフィルタがあると refresh は無視される(refresh しても API は 1 回、ロックも取らない)", async () => {
     const key = { [`GET ${BASE}/v1/contacts`]: ok([{ id: 1 }]) };
-    const r = await callApiTool("list_contacts", { name_cont: "a", refresh: "full" }, key);
+    const r = await callApiTool("list_contacts", { client_id: 1, refresh: "full" }, key);
     expect(r.calls).toHaveLength(1);
     expect(await getSyncState(testDb(), "contacts")).toBeNull();
   });
@@ -396,7 +421,7 @@ describe("呼び出しコンテキスト", () => {
     });
     const spy = api.spy;
     const controller = new AbortController();
-    const running = tool("list_contacts").handler({ name_cont: "a" }, toolCtx(controller.signal));
+    const running = tool("list_contacts").handler({ client_id: 1 }, toolCtx(controller.signal));
     const settled = running.then(
       () => "resolved",
       (e) => (e as Error).name,

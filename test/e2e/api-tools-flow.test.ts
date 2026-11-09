@@ -112,14 +112,14 @@ describe("E2E: list_contacts(非ゼロのフィルタ)", () => {
     const m = boardMocks({
       [`GET ${BASE}/v1/contacts`]: pagedHandler(() => [{ id: 1, name: "山田", client_id: 7 }]),
     });
-    const r = await tool("list_contacts", { client_id: 7, name_cont: "山田", refresh: "full" });
+    const r = await tool("list_contacts", { client_id: 7, refresh: "full" });
     expect(r.isError, r.text).toBe(false);
     expect(r.json).toEqual({ items: [{ id: 1, name: "山田", client_id: 7 }], cache: [] });
     const calls = boardCalls(m);
     expect(calls).toHaveLength(1);
     const q = new URL(calls[0]?.url ?? "").searchParams;
     expect(q.get("client_id_eq")).toBe("7");
-    expect(q.get("name_cont")).toBe("山田");
+    expect(q.has("name_cont")).toBe(false); // 担当者の一覧に name_cont は無い(issue #28)
     const row = await env.DB.prepare("SELECT COUNT(*) AS n FROM resource_cache").first<{
       n: number;
     }>();

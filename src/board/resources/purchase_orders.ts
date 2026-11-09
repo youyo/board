@@ -156,7 +156,7 @@ export function buildPurchaseOrdersQuery(
   page: number,
   perPage: number,
 ): string {
-  return baseQuery(opts, page, perPage)
+  return baseQuery("purchase_orders", opts, page, perPage)
     .intEq("payee_id", opts.payeeIdEq)
     .intEq("project_id", opts.projectIdEq)
     .intIn("expenditure_status", opts.expenditureStatusIn)

@@ -14,12 +14,11 @@ import {
 export interface PaymentTermEntity {
   id: number;
   name: string;
-  memo: string;
+  archive_flg?: number;
   /** ISO 8601 */
   updated_at: string;
   /** ISO 8601 */
   created_at: string;
-  [key: string]: unknown;
 }
 
 /** GET /v1/payment_terms のクエリ(Ransack)。未指定の項目は送らない。 */
@@ -33,7 +32,7 @@ export function buildPaymentTermsQuery(
   page: number,
   perPage: number,
 ): string {
-  return baseQuery(opts, page, perPage).strCont("name", opts.nameCont).encode();
+  return baseQuery("payment_terms", opts, page, perPage).strCont("name", opts.nameCont).encode();
 }
 
 export function listPaymentTerms(

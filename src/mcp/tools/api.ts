@@ -10,6 +10,7 @@
  */
 import { z } from "zod";
 import type { CallContext } from "../../board/context";
+import { LIST_FILTER_SUPPORT } from "../../board/openapi-support";
 import type { GetReadResult, ListReadResult, ReadOptions, RefreshChoice } from "../../repository";
 import {
   idArg,
@@ -26,7 +27,7 @@ import { callContextOf } from "../call-context";
 import { defineTool, type ToolDefinition } from "../registry";
 import {
   API_RESOURCES,
-  COMMON_FILTERS,
+  commonFiltersFor,
   type FieldDef,
   RESPONSE_GROUPS_PROJECTS_GET,
   type ResourceDef,
@@ -61,6 +62,8 @@ const REFRESH_SIDE_EFFECT_DESC =
 const REFRESH_LIST_DESC =
   "キャッシュの更新指示: none=更新しない(既定。キャッシュの cached_at を見て判断する)/ delta=差分だけ取る(前回の同期以降の更新分)/ full=全件を取り直す(件数が多く 1 回で終わらないときは refresh_state=partial で返るので、もう一度 refresh=full を呼ぶと続きから進む)。" +
   REFRESH_SIDE_EFFECT_DESC;
+const NO_DELTA_NOTE =
+  "このリソースは BOARD の一覧に更新日時の絞り込みが無いので、delta を指定しても全件を取り直す(full として動く)。";
 const LIMIT_DESC =
   "返す件数の上限(0 は無制限。絞り込みのあとに先頭から切る)。件数を切ったときだけ、応答に limited: true と total_before_limit(切る前の件数)が付く。truncated(BOARD のページ巡回の打ち切り)とは別の意味";
 const SHOW_META_DESC =
@@ -69,8 +72,13 @@ const SHOW_META_DESC =
 /** list の入力: Go 版 CLI のフィルタフラグ + refresh / limit / show_meta(max_response_tokens は defineTool が足す)。 */
 function listShape(def: ResourceDef): Record<string, z.ZodType> {
   const shape: Record<string, z.ZodType> = {};
-  for (const f of [...def.fields, ...COMMON_FILTERS]) shape[f.arg] = fieldSchema(f);
-  shape.refresh = optEnum(REFRESH_CHOICES, REFRESH_LIST_DESC);
+  for (const f of [...def.fields, ...commonFiltersFor(def.resource)]) shape[f.arg] = fieldSchema(f);
+  // BOARD の一覧に更新日時の絞り込み(updated_at_gteq)が無いリソースでは、delta は差分を取れず全件の取得(full)として動く。
+  const noDelta = LIST_FILTER_SUPPORT[def.resource]?.updatedAtGteq === false;
+  shape.refresh = optEnum(
+    REFRESH_CHOICES,
+    noDelta ? `${REFRESH_LIST_DESC}${NO_DELTA_NOTE}` : REFRESH_LIST_DESC,
+  );
   shape.limit = optNonNegativeInt(LIMIT_DESC);
   shape.show_meta = optBool(SHOW_META_DESC);
   return shape;
@@ -84,7 +92,7 @@ export function toListFilter(
   args: Record<string, unknown>,
 ): Record<string, unknown> {
   const filter: Record<string, unknown> = {};
-  for (const f of [...def.fields, ...COMMON_FILTERS]) {
+  for (const f of [...def.fields, ...commonFiltersFor(def.resource)]) {
     const v = args[f.arg];
     if (v !== undefined) filter[f.opt] = v;
   }

@@ -14,18 +14,19 @@ import {
 export interface ProjectTypeEntity {
   id: number;
   name: string;
-  memo: string;
+  archive_flg?: number;
   /** ISO 8601 */
   updated_at: string;
   /** ISO 8601 */
   created_at: string;
-  [key: string]: unknown;
 }
 
 /** GET /v1/project_types のクエリ(Ransack)。未指定の項目は送らない。 */
 export interface ProjectTypeListOptions extends CommonListOptions {
   /** 案件種別名の部分一致(name_cont) */
   nameCont?: string;
+  /** 案件区分1〜3の種類(1〜3。project_type_kbn_eq)。未指定は 1 と同じ結果。サーバー専用(キャッシュでは絞らない) */
+  projectTypeKbnEq?: number;
 }
 
 export function buildProjectTypesQuery(
@@ -33,7 +34,10 @@ export function buildProjectTypesQuery(
   page: number,
   perPage: number,
 ): string {
-  return baseQuery(opts, page, perPage).strCont("name", opts.nameCont).encode();
+  return baseQuery("project_types", opts, page, perPage)
+    .strCont("name", opts.nameCont)
+    .intEq("project_type_kbn", opts.projectTypeKbnEq)
+    .encode();
 }
 
 export function listProjectTypes(

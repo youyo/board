@@ -18,7 +18,6 @@ export interface OrderEntity {
   details: DocumentDetailEntity[];
   disp_order_date: string | null;
   disp_order_receive_date: string | null;
-  [key: string]: unknown;
 }
 
 export function getOrder(

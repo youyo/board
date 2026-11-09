@@ -95,7 +95,7 @@ export function buildInvoicesQuery(
   page: number,
   perPage: number,
 ): string {
-  return baseQuery(opts, page, perPage)
+  return baseQuery("invoices", opts, page, perPage)
     .intEq("project_client_id", opts.projectClientIdEq)
     .intIn("invoice_status", opts.invoiceStatusIn)
     .responseGroup(opts.responseGroup)

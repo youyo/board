@@ -6,6 +6,8 @@
  * 根拠は `plans/board-workers-m04-api-tools.md` の一覧表を参照。
  */
 
+import { LIST_FILTER_SUPPORT } from "../../board/openapi-support";
+
 export type FieldKind =
   | { type: "str" }
   /** ID(0 以上の整数。0 は『指定なし』、負の数は argument_error)。 */
@@ -84,14 +86,17 @@ const ints = (arg: string, opt: string, description: string, cacheable = false):
 export const RESPONSE_GROUPS_COMMON = ["small", "large"] as const;
 /** 発注書(expenditures)の一覧。medium は案件 `project` を含む。未指定なら medium を送る。 */
 export const RESPONSE_GROUPS_PURCHASE_ORDERS = ["small", "medium", "large"] as const;
+/** 案件の一覧の response_group(OpenAPI の列挙値。medium は支社・原価合計・請求条件など、project_cost は案件原価 `project_costs` を埋め込む)。 */
 export const RESPONSE_GROUPS_PROJECTS_LIST = [
   "small",
+  "medium",
   "large",
   "estimate",
   "order",
   "delivery",
   "invoice",
   "receipt",
+  "project_cost",
   "all",
 ] as const;
 export const RESPONSE_GROUPS_PROJECTS_GET = [
@@ -113,8 +118,12 @@ const responseGroup = (values: readonly [string, ...string[]], note: string): Fi
 const nameCont = (what: string, cacheable = false) =>
   str("name_cont", "nameCont", `${what}の名前で絞り込む(部分一致)`, cacheable);
 
+/** 区分(1〜3)の選択。未指定は 1 と同じ結果。サーバー側の指定(キャッシュでは絞らない)。 */
+const kbn = (arg: string, opt: string, what: string): FieldDef =>
+  int(arg, opt, `${what}の種類(1〜3: ${what}1〜${what}3)。未指定は 1 と同じ結果`);
+
 /** list の共通フィルタ(全 list ツールに付く。Go の `--updated-at-gteq` など)。 */
-export const COMMON_FILTERS: readonly FieldDef[] = [
+const COMMON_FILTERS: readonly FieldDef[] = [
   str("updated_at_gteq", "updatedAtGteq", "更新日時がこれ以降(`YYYY-MM-DD HH:MM:SS`)"),
   str("updated_at_lteq", "updatedAtLteq", "更新日時がこれ以前(`YYYY-MM-DD HH:MM:SS`)"),
   bool(
@@ -123,6 +132,27 @@ export const COMMON_FILTERS: readonly FieldDef[] = [
     "true でアーカイブ済みも含める(include_archive_flg=1)。false を明示すると 0 を送る",
   ),
 ];
+
+/**
+ * そのリソースの list ツールに付く共通フィルタ。BOARD の OpenAPI に一覧のクエリとして無いものは付けない
+ * (無視されて絞り込みが効かないため。issue #28)。どれが有るかは `LIST_FILTER_SUPPORT`(仕様から生成)から導く。
+ */
+export function commonFiltersFor(resource: string): readonly FieldDef[] {
+  const support = LIST_FILTER_SUPPORT[resource];
+  if (!support) return [];
+  return COMMON_FILTERS.filter((f) => {
+    switch (f.arg) {
+      case "updated_at_gteq":
+        return support.updatedAtGteq;
+      case "updated_at_lteq":
+        return support.updatedAtLteq;
+      case "include_archive_flg":
+        return support.includeArchiveFlg;
+      default:
+        return false;
+    }
+  });
+}
 
 export const API_RESOURCES: readonly ResourceDef[] = [
   {
@@ -143,7 +173,11 @@ export const API_RESOURCES: readonly ResourceDef[] = [
         "適格請求書発行事業者番号(インボイス登録番号)が一致する顧客",
         true,
       ),
-      str("custom_no_eq", "customNoEq", "顧客管理番号(custom_no)が一致する顧客", true),
+      str(
+        "custom_no_eq",
+        "customNoEq",
+        "顧客管理番号(custom_no)が一致する顧客。サーバー側の指定なので、指定すると BOARD の API を直接呼ぶ(custom_no は既定の response_group=small に含まれず、キャッシュでは絞らない)",
+      ),
       strs("tags", "tags", "タグで絞り込む(複数指定可)"),
       responseGroup(RESPONSE_GROUPS_COMMON, "large は get 専用の項目も含める。"),
     ],
@@ -155,7 +189,7 @@ export const API_RESOURCES: readonly ResourceDef[] = [
     label: "顧客支店",
     summary: "顧客の支店・拠点。顧客 ID(client_id)で顧客に紐づく",
     goFile: "api_client_branches.go",
-    fields: [int("client_id", "clientIdEq", "顧客 ID で絞り込む(完全一致)"), nameCont("顧客支店")],
+    fields: [int("client_id", "clientIdEq", "顧客 ID で絞り込む(完全一致)")],
   },
   {
     resource: "contacts",
@@ -164,11 +198,7 @@ export const API_RESOURCES: readonly ResourceDef[] = [
     label: "顧客担当者",
     summary: "顧客の担当者。顧客 ID(client_id)で顧客に紐づく",
     goFile: "api_contacts.go",
-    fields: [
-      int("client_id", "clientIdEq", "顧客 ID で絞り込む(完全一致)"),
-      nameCont("顧客担当者"),
-      str("email_cont", "emailCont", "メールアドレスで絞り込む(部分一致)"),
-    ],
+    fields: [int("client_id", "clientIdEq", "顧客 ID で絞り込む(完全一致)")],
   },
   {
     resource: "projects",
@@ -305,10 +335,7 @@ export const API_RESOURCES: readonly ResourceDef[] = [
     label: "仕入先支店",
     summary: "仕入先の支店・拠点。仕入先 ID(payee_id_eq)で仕入先に紐づく",
     goFile: "api_vendor_branches.go",
-    fields: [
-      int("payee_id_eq", "payeeIdEq", "仕入先 ID で絞り込む(完全一致)"),
-      nameCont("仕入先支店"),
-    ],
+    fields: [int("payee_id_eq", "payeeIdEq", "仕入先 ID で絞り込む(完全一致)")],
   },
   {
     resource: "vendor_contacts",
@@ -317,11 +344,7 @@ export const API_RESOURCES: readonly ResourceDef[] = [
     label: "仕入先担当者",
     summary: "仕入先の担当者。仕入先 ID(payee_id_eq)で仕入先に紐づく",
     goFile: "api_vendor_contacts.go",
-    fields: [
-      int("payee_id_eq", "payeeIdEq", "仕入先 ID で絞り込む(完全一致)"),
-      nameCont("仕入先担当者"),
-      str("email_cont", "emailCont", "メールアドレスで絞り込む(部分一致)"),
-    ],
+    fields: [int("payee_id_eq", "payeeIdEq", "仕入先 ID で絞り込む(完全一致)")],
   },
   {
     resource: "purchase_orders",
@@ -441,7 +464,7 @@ export const API_RESOURCES: readonly ResourceDef[] = [
     label: "案件種別",
     summary: "案件種別マスタ",
     goFile: "api_project_types.go",
-    fields: [nameCont("案件種別")],
+    fields: [nameCont("案件種別"), kbn("project_type_kbn_eq", "projectTypeKbnEq", "案件区分")],
   },
   {
     resource: "purchase_types",
@@ -450,7 +473,10 @@ export const API_RESOURCES: readonly ResourceDef[] = [
     label: "購買種別",
     summary: "購買(仕入)種別マスタ",
     goFile: "api_purchase_types.go",
-    fields: [nameCont("購買種別")],
+    fields: [
+      nameCont("購買種別"),
+      kbn("expenditure_type_kbn_eq", "expenditureTypeKbnEq", "発注区分"),
+    ],
   },
   {
     resource: "accounting_types",
@@ -459,7 +485,10 @@ export const API_RESOURCES: readonly ResourceDef[] = [
     label: "勘定科目種別",
     summary: "勘定科目の種別マスタ",
     goFile: "api_accounting_types.go",
-    fields: [nameCont("勘定科目種別")],
+    fields: [
+      nameCont("勘定科目種別"),
+      kbn("accounting_type_kbn_eq", "accountingTypeKbnEq", "会計区分"),
+    ],
   },
   {
     resource: "document_send_channels",

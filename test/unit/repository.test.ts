@@ -104,6 +104,25 @@ describe("cache-first リソース(clients)", () => {
     expect(new URL(api.calls.at(-1)?.url ?? "").searchParams.getAll("tags[]")).toEqual(["vip"]);
   });
 
+  it("custom_no_eq はサーバー専用: 同期済みでもキャッシュで絞らず API を直接呼ぶ(custom_no は small に無く、キャッシュでは 0 件になるため。issue #28)", async () => {
+    const { repos } = setup();
+    // 既定(response_group=small)の行には custom_no が無い
+    const api = mockOutboundFetch({
+      [clientsKey]: pagedHandler(
+        () => [{ id: 5, name: "hit" }],
+        (_page, q) =>
+          q.get("custom_no_eq")
+            ? Response.json([{ id: 5, name: "hit", custom_no: "C-5" }])
+            : undefined,
+      ),
+    });
+    await repos.clients.list({}, { refresh: "full" });
+    const r = await repos.clients.list({ customNoEq: "C-5" });
+    expect(r.source).toBe("api");
+    expect(r.items).toEqual([{ id: 5, name: "hit", custom_no: "C-5" }]);
+    expect(new URL(api.calls.at(-1)?.url ?? "").searchParams.get("custom_no_eq")).toBe("C-5");
+  });
+
   it("サーバー専用の項目と refresh=full を同時に指定したら、refresh を走らせず API だけを呼ぶ(M04 指摘)", async () => {
     const { repos, db } = setup();
     const api = mockOutboundFetch({
@@ -419,7 +438,7 @@ describe("nonzero-api リソース(client_branches)", () => {
     const api = mockOutboundFetch({ [key]: pagedHandler(() => [{ id: 1, name: "live" }]) });
     await repos.client_branches.list({}, { refresh: "full" });
     const calls = api.calls.length;
-    const r = await repos.client_branches.list({ nameCont: "a" }, { refresh: "delta" });
+    const r = await repos.client_branches.list({ clientIdEq: 1 }, { refresh: "delta" });
     expect(r.source).toBe("api");
     expect(r.cache).toEqual([]);
     expect(api.calls.length).toBe(calls + 1);
