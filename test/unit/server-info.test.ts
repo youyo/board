@@ -15,7 +15,7 @@ describe("server_info", () => {
       arguments: {},
     });
     expect(res.result?.isError).not.toBe(true);
-    expect(JSON.parse(firstText(res))).toEqual({ name: "board", version: "1.7.0" });
+    expect(JSON.parse(firstText(res))).toEqual({ name: "board", version: "1.8.0" });
   });
 
   it("読み取り専用の注釈と max_response_tokens 引数を持つ", async () => {

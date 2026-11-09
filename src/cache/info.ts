@@ -1,11 +1,17 @@
 /**
  * 応答に同梱するキャッシュの鮮度情報(Go 版 `internal/cache/info.go`)。
  * LLM が `cached_at` / `full_refreshed_at` を見て、次の呼び出しで refresh=delta / full を指示するための材料。
- * 未取得なら cached_at / full_refreshed_at を出さない(LLM が『未取得』と判別できる)。
+ * 未取得なら cached_at / full_refreshed_at を出さない(LLM が『未取得』と判別できる)。旧コードの同期(query_version が違う)も未取得として扱う。
  */
 
 import { ensureSchema } from "./schema";
-import { getSyncState, type SyncState } from "./sync-state";
+import {
+  deltaInProgress,
+  fullInProgress,
+  getSyncState,
+  hasSynced,
+  type SyncState,
+} from "./sync-state";
 
 export type InfoRefreshState = "complete" | "partial" | "failed";
 
@@ -32,9 +38,13 @@ export function cacheInfoFromState(
   outcome?: InfoOutcome,
 ): CacheInfo {
   const info: CacheInfo = { resource };
-  if (state?.last_synced_at) info.cached_at = state.last_synced_at;
-  if (state?.last_full_synced_at) info.full_refreshed_at = state.last_full_synced_at;
-  const refreshState = outcome?.state ?? (state?.full_next_page != null ? "partial" : undefined);
+  // 版が違う(旧コードの同期)ときは、同期済みの時刻を出さない(LLM が『未取得』と判別して refresh=full を指示できるように。issue #35)。
+  if (state && hasSynced(state)) {
+    if (state.last_synced_at) info.cached_at = state.last_synced_at;
+    if (state.last_full_synced_at) info.full_refreshed_at = state.last_full_synced_at;
+  }
+  const refreshState =
+    outcome?.state ?? (fullInProgress(state) || deltaInProgress(state) ? "partial" : undefined);
   if (refreshState) info.refresh_state = refreshState;
   if (outcome?.state === "failed" && outcome.errorCode) info.refresh_error_code = outcome.errorCode;
   return info;

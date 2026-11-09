@@ -1570,7 +1570,7 @@
   {
     "name": "list_accounting_types",
     "title": "勘定科目種別一覧取得",
-    "description": "勘定科目種別の一覧を返す。勘定科目の種別マスタ。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "description": "勘定科目種別の一覧を返す。勘定科目の種別マスタ。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。アーカイブ済みのレコードも含めて返す(BOARD の既定とは逆。API 経路で除外するには include_archive_flg=false)。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1586,7 +1586,7 @@
         },
         "include_archive_flg": {
           "type": "boolean",
-          "description": "true でアーカイブ済みも含める(include_archive_flg=1)。false を明示すると 0 を送る"
+          "description": "未指定ならアーカイブ済みも含める(このサーバーの既定。BOARD の既定とは逆)。false で除外する(include_archive_flg=0 を送る)。response_group が small(既定)の一覧応答には archive_flg が無いので、どれがアーカイブ済みかは応答から判別できない"
         },
         "refresh": {
           "type": "string",
@@ -1622,7 +1622,7 @@
   {
     "name": "list_client_branches",
     "title": "顧客支店一覧取得",
-    "description": "顧客支店の一覧を返す。顧客の支店・拠点。顧客 ID(client_id)で顧客に紐づく。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "description": "顧客支店の一覧を返す。顧客の支店・拠点。顧客 ID(client_id)で顧客に紐づく。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。アーカイブ済みのレコードも含めて返す(BOARD の既定とは逆。API 経路で除外するには include_archive_flg=false)。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1643,7 +1643,7 @@
         },
         "include_archive_flg": {
           "type": "boolean",
-          "description": "true でアーカイブ済みも含める(include_archive_flg=1)。false を明示すると 0 を送る"
+          "description": "未指定ならアーカイブ済みも含める(このサーバーの既定。BOARD の既定とは逆)。false で除外する(include_archive_flg=0 を送る)。response_group が small(既定)の一覧応答には archive_flg が無いので、どれがアーカイブ済みかは応答から判別できない"
         },
         "refresh": {
           "type": "string",
@@ -1679,7 +1679,7 @@
   {
     "name": "list_clients",
     "title": "顧客一覧取得",
-    "description": "顧客の一覧を返す。顧客(取引先)マスタ。案件・請求書・顧客支店・顧客担当者はこの顧客 ID に紐づく。名前から顧客 ID を探すのに使う。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta(差分)か refresh=full(全件)を指定する。件数が多いリソースでは全件を返すと応答が大きくなるので、まず limit か絞り込みを指定する。絞り込み: name_cont / name_disp_cont / invoice_system_number_eq だけを指定した場合は、同期済みならキャッシュを絞って返す。それ以外の引数(updated_at_* / include_archive_flg / tags / response_group などサーバー側の指定を含む)を指定したときは BOARD の API を直接呼び(このとき refresh は無視される)、キャッシュが未同期のときも API を直接呼ぶ。API から取った結果の cache は空になる。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "description": "顧客の一覧を返す。顧客(取引先)マスタ。案件・請求書・顧客支店・顧客担当者はこの顧客 ID に紐づく。名前から顧客 ID を探すのに使う。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta(差分)か refresh=full(全件)を指定する。件数が多いリソースでは全件を返すと応答が大きくなるので、まず limit か絞り込みを指定する。絞り込み: name_cont / name_disp_cont / invoice_system_number_eq だけを指定した場合は、同期済みならキャッシュを絞って返す。それ以外の引数(updated_at_* / include_archive_flg / tags / response_group などサーバー側の指定を含む)を指定したときは BOARD の API を直接呼び(このとき refresh は無視される)、キャッシュが未同期のときも API を直接呼ぶ。API から取った結果の cache は空になる。アーカイブ済みのレコードも含めて返す(BOARD の既定とは逆。API 経路で除外するには include_archive_flg=false)。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1733,7 +1733,7 @@
         },
         "include_archive_flg": {
           "type": "boolean",
-          "description": "true でアーカイブ済みも含める(include_archive_flg=1)。false を明示すると 0 を送る"
+          "description": "未指定ならアーカイブ済みも含める(このサーバーの既定。BOARD の既定とは逆)。false で除外する(include_archive_flg=0 を送る)。response_group が small(既定)の一覧応答には archive_flg が無いので、どれがアーカイブ済みかは応答から判別できない"
         },
         "refresh": {
           "type": "string",
@@ -1769,7 +1769,7 @@
   {
     "name": "list_contacts",
     "title": "顧客担当者一覧取得",
-    "description": "顧客担当者の一覧を返す。顧客の担当者。顧客 ID(client_id)で顧客に紐づく。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "description": "顧客担当者の一覧を返す。顧客の担当者。顧客 ID(client_id)で顧客に紐づく。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。アーカイブ済みのレコードも含めて返す(BOARD の既定とは逆。API 経路で除外するには include_archive_flg=false)。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1790,7 +1790,7 @@
         },
         "include_archive_flg": {
           "type": "boolean",
-          "description": "true でアーカイブ済みも含める(include_archive_flg=1)。false を明示すると 0 を送る"
+          "description": "未指定ならアーカイブ済みも含める(このサーバーの既定。BOARD の既定とは逆)。false で除外する(include_archive_flg=0 を送る)。response_group が small(既定)の一覧応答には archive_flg が無いので、どれがアーカイブ済みかは応答から判別できない"
         },
         "refresh": {
           "type": "string",
@@ -1826,7 +1826,7 @@
   {
     "name": "list_document_send_channels",
     "title": "書類送付方法一覧取得",
-    "description": "書類送付方法の一覧を返す。書類の送付方法(メール・郵送など)マスタ。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "description": "書類送付方法の一覧を返す。書類の送付方法(メール・郵送など)マスタ。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。アーカイブ済みのレコードも含めて返す(BOARD の既定とは逆。API 経路で除外するには include_archive_flg=false)。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1838,7 +1838,7 @@
         },
         "include_archive_flg": {
           "type": "boolean",
-          "description": "true でアーカイブ済みも含める(include_archive_flg=1)。false を明示すると 0 を送る"
+          "description": "未指定ならアーカイブ済みも含める(このサーバーの既定。BOARD の既定とは逆)。false で除外する(include_archive_flg=0 を送る)。response_group が small(既定)の一覧応答には archive_flg が無いので、どれがアーカイブ済みかは応答から判別できない"
         },
         "refresh": {
           "type": "string",
@@ -1874,7 +1874,7 @@
   {
     "name": "list_groups",
     "title": "グループ一覧取得",
-    "description": "グループの一覧を返す。ユーザーのグループ(部署など)マスタ。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "description": "グループの一覧を返す。ユーザーのグループ(部署など)マスタ。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。アーカイブ済みのレコードも含めて返す(BOARD の既定とは逆。API 経路で除外するには include_archive_flg=false)。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1886,7 +1886,7 @@
         },
         "include_archive_flg": {
           "type": "boolean",
-          "description": "true でアーカイブ済みも含める(include_archive_flg=1)。false を明示すると 0 を送る"
+          "description": "未指定ならアーカイブ済みも含める(このサーバーの既定。BOARD の既定とは逆)。false で除外する(include_archive_flg=0 を送る)。response_group が small(既定)の一覧応答には archive_flg が無いので、どれがアーカイブ済みかは応答から判別できない"
         },
         "refresh": {
           "type": "string",
@@ -2025,7 +2025,7 @@
   {
     "name": "list_payment_terms",
     "title": "支払条件一覧取得",
-    "description": "支払条件の一覧を返す。支払条件(締め日・支払日の定義)マスタ。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "description": "支払条件の一覧を返す。支払条件(締め日・支払日の定義)マスタ。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。アーカイブ済みのレコードも含めて返す(BOARD の既定とは逆。API 経路で除外するには include_archive_flg=false)。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -2037,7 +2037,7 @@
         },
         "include_archive_flg": {
           "type": "boolean",
-          "description": "true でアーカイブ済みも含める(include_archive_flg=1)。false を明示すると 0 を送る"
+          "description": "未指定ならアーカイブ済みも含める(このサーバーの既定。BOARD の既定とは逆)。false で除外する(include_archive_flg=0 を送る)。response_group が small(既定)の一覧応答には archive_flg が無いので、どれがアーカイブ済みかは応答から判別できない"
         },
         "refresh": {
           "type": "string",
@@ -2189,7 +2189,7 @@
   {
     "name": "list_project_types",
     "title": "案件種別一覧取得",
-    "description": "案件種別の一覧を返す。案件種別マスタ。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "description": "案件種別の一覧を返す。案件種別マスタ。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。アーカイブ済みのレコードも含めて返す(BOARD の既定とは逆。API 経路で除外するには include_archive_flg=false)。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -2205,7 +2205,7 @@
         },
         "include_archive_flg": {
           "type": "boolean",
-          "description": "true でアーカイブ済みも含める(include_archive_flg=1)。false を明示すると 0 を送る"
+          "description": "未指定ならアーカイブ済みも含める(このサーバーの既定。BOARD の既定とは逆)。false で除外する(include_archive_flg=0 を送る)。response_group が small(既定)の一覧応答には archive_flg が無いので、どれがアーカイブ済みかは応答から判別できない"
         },
         "refresh": {
           "type": "string",
@@ -2241,7 +2241,7 @@
   {
     "name": "list_projects",
     "title": "案件一覧取得",
-    "description": "案件の一覧を返す。案件。見積書・受注書・納品書・請求書・領収書(書類)と案件原価はこの案件に紐づく。顧客 ID(client_id)で顧客に紐づく。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta(差分)か refresh=full(全件)を指定する。件数が多いリソースでは全件を返すと応答が大きくなるので、まず limit か絞り込みを指定する。絞り込み: name_cont / client_id / client_name_cont / project_no_eq / management_no_eq だけを指定した場合は、同期済みならキャッシュを絞って返す。それ以外の引数(updated_at_* / include_archive_flg / tags / response_group などサーバー側の指定を含む)を指定したときは BOARD の API を直接呼び(このとき refresh は無視される)、キャッシュが未同期のときも API を直接呼ぶ。API から取った結果の cache は空になる。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "description": "案件の一覧を返す。案件。見積書・受注書・納品書・請求書・領収書(書類)と案件原価はこの案件に紐づく。顧客 ID(client_id)で顧客に紐づく。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta(差分)か refresh=full(全件)を指定する。件数が多いリソースでは全件を返すと応答が大きくなるので、まず limit か絞り込みを指定する。絞り込み: name_cont / client_id / client_name_cont / project_no_eq / management_no_eq だけを指定した場合は、同期済みならキャッシュを絞って返す。それ以外の引数(updated_at_* / include_archive_flg / tags / response_group などサーバー側の指定を含む)を指定したときは BOARD の API を直接呼び(このとき refresh は無視される)、キャッシュが未同期のときも API を直接呼ぶ。API から取った結果の cache は空になる。アーカイブ済み・失注のレコードも含めて返す(BOARD の既定とは逆。API 経路で除外するには include_archive_flg=false / include_lost_flg=false)。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -2351,7 +2351,7 @@
         },
         "include_lost_flg": {
           "type": "boolean",
-          "description": "true で失注した案件も含める(include_lost_flg=1)"
+          "description": "未指定なら失注した案件も含める(このサーバーの既定。BOARD の既定とは逆)。false で除外する(include_lost_flg=0 を送る)。失注かどうかは応答の order_status_name で分かる"
         },
         "updated_at_gteq": {
           "type": "string",
@@ -2365,7 +2365,7 @@
         },
         "include_archive_flg": {
           "type": "boolean",
-          "description": "true でアーカイブ済みも含める(include_archive_flg=1)。false を明示すると 0 を送る"
+          "description": "未指定ならアーカイブ済みも含める(このサーバーの既定。BOARD の既定とは逆)。false で除外する(include_archive_flg=0 を送る)。response_group が small(既定)の一覧応答には archive_flg が無いので、どれがアーカイブ済みかは応答から判別できない"
         },
         "refresh": {
           "type": "string",
@@ -2401,7 +2401,7 @@
   {
     "name": "list_purchase_orders",
     "title": "発注書一覧取得",
-    "description": "発注書の一覧を返す。発注書(仕入側。BOARD の API では expenditures)。支払先(payee の入れ子。仕入先 ID は payee.id)と案件(project の入れ子)に紐づく。発注ステータスは expenditure_status、進捗状況は delivery_status(数値コードと _name の名称)で返る。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta(差分)か refresh=full(全件)を指定する。件数が多いリソースでは全件を返すと応答が大きくなるので、まず limit か絞り込みを指定する。絞り込み: payee_id_eq / expenditure_status_in / delivery_status_in だけを指定した場合は、同期済みならキャッシュを絞って返す。それ以外の引数(updated_at_* / include_archive_flg / response_group などサーバー側の指定を含む)を指定したときは BOARD の API を直接呼び(このとき refresh は無視される)、キャッシュが未同期のときも API を直接呼ぶ。API から取った結果の cache は空になる。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "description": "発注書の一覧を返す。発注書(仕入側。BOARD の API では expenditures)。支払先(payee の入れ子。仕入先 ID は payee.id)と案件(project の入れ子)に紐づく。発注ステータスは expenditure_status、進捗状況は delivery_status(数値コードと _name の名称)で返る。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta(差分)か refresh=full(全件)を指定する。件数が多いリソースでは全件を返すと応答が大きくなるので、まず limit か絞り込みを指定する。絞り込み: payee_id_eq / expenditure_status_in / delivery_status_in だけを指定した場合は、同期済みならキャッシュを絞って返す。それ以外の引数(updated_at_* / include_archive_flg / response_group などサーバー側の指定を含む)を指定したときは BOARD の API を直接呼び(このとき refresh は無視される)、キャッシュが未同期のときも API を直接呼ぶ。API から取った結果の cache は空になる。アーカイブ済みのレコードも含めて返す(BOARD の既定とは逆。API 経路で除外するには include_archive_flg=false)。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -2451,7 +2451,7 @@
         },
         "include_archive_flg": {
           "type": "boolean",
-          "description": "true でアーカイブ済みも含める(include_archive_flg=1)。false を明示すると 0 を送る"
+          "description": "未指定ならアーカイブ済みも含める(このサーバーの既定。BOARD の既定とは逆)。false で除外する(include_archive_flg=0 を送る)。response_group が small(既定)の一覧応答には archive_flg が無いので、どれがアーカイブ済みかは応答から判別できない"
         },
         "refresh": {
           "type": "string",
@@ -2487,7 +2487,7 @@
   {
     "name": "list_purchase_types",
     "title": "購買種別一覧取得",
-    "description": "購買種別の一覧を返す。購買(仕入)種別マスタ。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "description": "購買種別の一覧を返す。購買(仕入)種別マスタ。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。アーカイブ済みのレコードも含めて返す(BOARD の既定とは逆。API 経路で除外するには include_archive_flg=false)。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -2503,7 +2503,7 @@
         },
         "include_archive_flg": {
           "type": "boolean",
-          "description": "true でアーカイブ済みも含める(include_archive_flg=1)。false を明示すると 0 を送る"
+          "description": "未指定ならアーカイブ済みも含める(このサーバーの既定。BOARD の既定とは逆)。false で除外する(include_archive_flg=0 を送る)。response_group が small(既定)の一覧応答には archive_flg が無いので、どれがアーカイブ済みかは応答から判別できない"
         },
         "refresh": {
           "type": "string",
@@ -2588,7 +2588,7 @@
   {
     "name": "list_vendor_branches",
     "title": "仕入先支店一覧取得",
-    "description": "仕入先支店の一覧を返す。仕入先の支店・拠点。仕入先 ID(payee_id_eq)で仕入先に紐づく。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "description": "仕入先支店の一覧を返す。仕入先の支店・拠点。仕入先 ID(payee_id_eq)で仕入先に紐づく。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。アーカイブ済みのレコードも含めて返す(BOARD の既定とは逆。API 経路で除外するには include_archive_flg=false)。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -2609,7 +2609,7 @@
         },
         "include_archive_flg": {
           "type": "boolean",
-          "description": "true でアーカイブ済みも含める(include_archive_flg=1)。false を明示すると 0 を送る"
+          "description": "未指定ならアーカイブ済みも含める(このサーバーの既定。BOARD の既定とは逆)。false で除外する(include_archive_flg=0 を送る)。response_group が small(既定)の一覧応答には archive_flg が無いので、どれがアーカイブ済みかは応答から判別できない"
         },
         "refresh": {
           "type": "string",
@@ -2645,7 +2645,7 @@
   {
     "name": "list_vendor_contacts",
     "title": "仕入先担当者一覧取得",
-    "description": "仕入先担当者の一覧を返す。仕入先の担当者。仕入先 ID(payee_id_eq)で仕入先に紐づく。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "description": "仕入先担当者の一覧を返す。仕入先の担当者。仕入先 ID(payee_id_eq)で仕入先に紐づく。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta か refresh=full を指定する。絞り込み(いずれかの引数)を 1 つでも指定すると、キャッシュも refresh も使わず BOARD の API を直接呼ぶ。このとき refresh は無視される。アーカイブ済みのレコードも含めて返す(BOARD の既定とは逆。API 経路で除外するには include_archive_flg=false)。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -2666,7 +2666,7 @@
         },
         "include_archive_flg": {
           "type": "boolean",
-          "description": "true でアーカイブ済みも含める(include_archive_flg=1)。false を明示すると 0 を送る"
+          "description": "未指定ならアーカイブ済みも含める(このサーバーの既定。BOARD の既定とは逆)。false で除外する(include_archive_flg=0 を送る)。response_group が small(既定)の一覧応答には archive_flg が無いので、どれがアーカイブ済みかは応答から判別できない"
         },
         "refresh": {
           "type": "string",
@@ -2702,7 +2702,7 @@
   {
     "name": "list_vendors",
     "title": "仕入先一覧取得",
-    "description": "仕入先の一覧を返す。仕入先(支払先)マスタ。仕入先支店・仕入先担当者・発注書・支払いはこの仕入先 ID に紐づく。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta(差分)か refresh=full(全件)を指定する。件数が多いリソースでは全件を返すと応答が大きくなるので、まず limit か絞り込みを指定する。絞り込み: name_cont だけを指定した場合は、同期済みならキャッシュを絞って返す。それ以外の引数(updated_at_* / include_archive_flg / response_group などサーバー側の指定を含む)を指定したときは BOARD の API を直接呼び(このとき refresh は無視される)、キャッシュが未同期のときも API を直接呼ぶ。API から取った結果の cache は空になる。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
+    "description": "仕入先の一覧を返す。仕入先(支払先)マスタ。仕入先支店・仕入先担当者・発注書・支払いはこの仕入先 ID に紐づく。絞り込みなしなら、キャッシュ(D1)の全件を返し、BOARD は呼ばない(未取得なら items は空)。最新が要るときは refresh=delta(差分)か refresh=full(全件)を指定する。件数が多いリソースでは全件を返すと応答が大きくなるので、まず limit か絞り込みを指定する。絞り込み: name_cont だけを指定した場合は、同期済みならキャッシュを絞って返す。それ以外の引数(updated_at_* / include_archive_flg / response_group などサーバー側の指定を含む)を指定したときは BOARD の API を直接呼び(このとき refresh は無視される)、キャッシュが未同期のときも API を直接呼ぶ。API から取った結果の cache は空になる。アーカイブ済みのレコードも含めて返す(BOARD の既定とは逆。API 経路で除外するには include_archive_flg=false)。結果は {items, cache, truncated?, limited?, total_before_limit?, _meta?} で、items は BOARD の生データ。cache は読んだキャッシュの鮮度(cached_at=最終同期、full_refreshed_at=最終の全件取得、refresh_state)で、cached_at がなければ未取得を表す。",
     "inputSchema": {
       "type": "object",
       "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -2724,7 +2724,7 @@
         },
         "include_archive_flg": {
           "type": "boolean",
-          "description": "true でアーカイブ済みも含める(include_archive_flg=1)。false を明示すると 0 を送る"
+          "description": "未指定ならアーカイブ済みも含める(このサーバーの既定。BOARD の既定とは逆)。false で除外する(include_archive_flg=0 を送る)。response_group が small(既定)の一覧応答には archive_flg が無いので、どれがアーカイブ済みかは応答から判別できない"
         },
         "refresh": {
           "type": "string",

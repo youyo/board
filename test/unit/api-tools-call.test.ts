@@ -21,6 +21,8 @@ const ok = (rows: unknown[] = []) => pagedHandler(() => rows);
  * 引数 → BOARD への問い合わせ(Go 版 CLI のフラグ → クエリ)の突き合わせ。
  * 期待値は Go の `internal/cli/api_*.go` のフラグと `internal/boardapi/*.go` のクエリ名から作った。
  * 非ゼロのフィルタなので、キャッシュが空でも API を直接呼ぶ(nonzero-api、または cache-first の API フォールバック)。
+ * include_archive_flg(projects は include_lost_flg も)を指定しないと、このサーバーの既定で =1 を足す(issue #35。BOARD の既定の除外とは逆)。
+ * 仕様が受けないリソース(invoices / payments / project_costs / users)には足さない。
  */
 const QUERY_CASES: { tool: string; args: Record<string, unknown>; path: string; call: string }[] = [
   {
@@ -89,14 +91,14 @@ const QUERY_CASES: { tool: string; args: Record<string, unknown>; path: string; 
       response_group: "large",
     },
     path: "/v1/expenditures",
-    call: "GET /v1/expenditures?delivery_status_in[]=1&delivery_status_in[]=2&expenditure_status_in[]=5&payee_id_eq=5&project_id_eq=6&response_group=large",
+    call: "GET /v1/expenditures?delivery_status_in[]=1&delivery_status_in[]=2&expenditure_status_in[]=5&include_archive_flg=1&payee_id_eq=5&project_id_eq=6&response_group=large",
   },
   {
     // response_group を指定しない発注書の一覧は medium を送る(案件 project を含めるため)。
     tool: "list_purchase_orders",
     args: { payee_id_eq: 5 },
     path: "/v1/expenditures",
-    call: "GET /v1/expenditures?payee_id_eq=5&response_group=medium",
+    call: "GET /v1/expenditures?include_archive_flg=1&payee_id_eq=5&response_group=medium",
   },
   {
     tool: "list_payments",
@@ -113,7 +115,7 @@ const QUERY_CASES: { tool: string; args: Record<string, unknown>; path: string; 
     tool: "list_vendors",
     args: { name_cont: "仕入" },
     path: "/v1/payees",
-    call: "GET /v1/payees?name_cont=仕入",
+    call: "GET /v1/payees?include_archive_flg=1&name_cont=仕入",
   },
   {
     tool: "list_client_branches",
@@ -125,7 +127,7 @@ const QUERY_CASES: { tool: string; args: Record<string, unknown>; path: string; 
     tool: "list_contacts",
     args: { client_id: 2 },
     path: "/v1/contacts",
-    call: "GET /v1/contacts?client_id_eq=2",
+    call: "GET /v1/contacts?client_id_eq=2&include_archive_flg=1",
   },
   {
     tool: "list_project_costs",
@@ -137,25 +139,25 @@ const QUERY_CASES: { tool: string; args: Record<string, unknown>; path: string; 
     tool: "list_vendor_branches",
     args: { payee_id_eq: 8 },
     path: "/v1/payee_branches",
-    call: "GET /v1/payee_branches?payee_id_eq=8",
+    call: "GET /v1/payee_branches?include_archive_flg=1&payee_id_eq=8",
   },
   {
     tool: "list_vendor_contacts",
     args: { payee_id_eq: 8 },
     path: "/v1/payee_contacts",
-    call: "GET /v1/payee_contacts?payee_id_eq=8",
+    call: "GET /v1/payee_contacts?include_archive_flg=1&payee_id_eq=8",
   },
   {
     tool: "list_groups",
     args: { name_cont: "営業" },
     path: "/v1/groups",
-    call: "GET /v1/groups?name_cont=営業",
+    call: "GET /v1/groups?include_archive_flg=1&name_cont=営業",
   },
   {
     tool: "list_purchase_types",
     args: { name_cont: "外注", expenditure_type_kbn_eq: 2 },
     path: "/v1/expenditure_types",
-    call: "GET /v1/expenditure_types?expenditure_type_kbn_eq=2&name_cont=外注",
+    call: "GET /v1/expenditure_types?expenditure_type_kbn_eq=2&include_archive_flg=1&name_cont=外注",
   },
   {
     tool: "list_document_send_channels",
@@ -168,25 +170,25 @@ const QUERY_CASES: { tool: string; args: Record<string, unknown>; path: string; 
     tool: "list_project_types",
     args: { project_type_kbn_eq: 3 },
     path: "/v1/project_types",
-    call: "GET /v1/project_types?project_type_kbn_eq=3",
+    call: "GET /v1/project_types?include_archive_flg=1&project_type_kbn_eq=3",
   },
   {
     tool: "list_accounting_types",
     args: { accounting_type_kbn_eq: 2 },
     path: "/v1/accounting_types",
-    call: "GET /v1/accounting_types?accounting_type_kbn_eq=2",
+    call: "GET /v1/accounting_types?accounting_type_kbn_eq=2&include_archive_flg=1",
   },
   {
     tool: "list_projects",
     args: { response_group: "project_cost" },
     path: "/v1/projects",
-    call: "GET /v1/projects?response_group=project_cost",
+    call: "GET /v1/projects?include_archive_flg=1&include_lost_flg=1&response_group=project_cost",
   },
   {
     tool: "list_projects",
     args: { response_group: "medium" },
     path: "/v1/projects",
-    call: "GET /v1/projects?response_group=medium",
+    call: "GET /v1/projects?include_archive_flg=1&include_lost_flg=1&response_group=medium",
   },
 ];
 

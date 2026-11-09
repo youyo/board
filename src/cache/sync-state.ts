@@ -1,10 +1,18 @@
 /**
  * sync_state(Go 版 `internal/cache/sync_state.go`)。リソースごとの同期状態・ロック・full の進捗。
  * Go から外した列: profile_name / last_daily_refresh_date(daily auto-refresh の廃止)/ cache_version / schema_version。
- * 足した列: full_generation / full_next_page / full_started_at / full_max_updated_at(full の再開)、delta_next_page / delta_started_at / delta_max_updated_at(delta の再開。v3)。
+ * 足した列: full_generation / full_next_page / full_started_at / full_max_updated_at(full の再開)、delta_next_page / delta_started_at / delta_max_updated_at(delta の再開。v3)、query_version / full_query_version / delta_query_version(クエリの版。v4)。
  */
 
+import { LIST_FILTER_SUPPORT } from "../board/openapi-support";
 import { ensureSchema } from "./schema";
+
+/**
+ * キャッシュを作ったクエリの版。refresh の一覧クエリの内容(どのレコードを取るか)を変えたら上げる。
+ * 版 1 = アーカイブ済み・失注を含めて取る(include_archive_flg=1 / include_lost_flg=1。issue #35)。
+ * 版が違う(または NULL=旧コード)の同期は『未同期』として扱い、次の refresh は最初から取り直す。
+ */
+export const CACHE_QUERY_VERSION = 1;
 
 export interface SyncState {
   resource_name: string;
@@ -37,6 +45,11 @@ export interface SyncState {
   delta_started_at: string | null;
   /** 進行中の delta で見た updated_at の最大値(完了時のカーソルの元)。 */
   delta_max_updated_at: string | null;
+  /** 完了した同期のクエリの版(v4)。CACHE_QUERY_VERSION と一致しなければ未同期。NULL は旧コードの同期。 */
+  query_version: number | null;
+  /** 進行中の full の進捗を保存した版。CACHE_QUERY_VERSION と一致するときだけ再開する。 */
+  full_query_version: number | null;
+  delta_query_version: number | null;
 }
 
 export async function getSyncState(db: D1Database, resource: string): Promise<SyncState | null> {
@@ -54,12 +67,44 @@ export async function listSyncStates(db: D1Database): Promise<SyncState[]> {
 }
 
 /**
+ * 版(query_version など)を要求するリソースか。一覧が include_archive_flg を受けるリソースだけ(クエリが変わったため。issue #35)。
+ * 受けないリソース(invoices / payments / users / project_costs)はクエリが変わっていないので、旧コードの同期・進捗もそのまま有効。
+ */
+export function requiresQueryVersion(resource: string): boolean {
+  return LIST_FILTER_SUPPORT[resource]?.includeArchiveFlg === true;
+}
+
+/** 保存された版が、現在のクエリで作られたものとみなせるか(版を要求しないリソースは常に true)。 */
+export function queryVersionCurrent(resource: string, stored: number | null | undefined): boolean {
+  return !requiresQueryVersion(resource) || stored === CACHE_QUERY_VERSION;
+}
+
+/**
  * キャッシュを読んでよい状態か(Go の `tryCacheFilter` の `state != nil` に相当)。
  * Go はロックを取っただけでも状態が作られるが、ここでは実際に同期した記録(last_synced_at)があることを条件にする。
  * full が途中(partial)のときは last_synced_at を進めないので、新規のリソースは未同期扱いになる。
+ * 版を要求するリソースで query_version が CACHE_QUERY_VERSION と違う(旧コードの同期)ときも未同期扱い(アーカイブ・失注が欠けているため。issue #35)。
  */
 export function hasSynced(state: SyncState | null): boolean {
-  return state?.last_synced_at != null;
+  return (
+    state?.last_synced_at != null && queryVersionCurrent(state.resource_name, state.query_version)
+  );
+}
+
+/** 現在の版で保存した full の進捗があるか(版を要求するリソースの旧コードの進捗は再開せず、表示にも出さない)。 */
+export function fullInProgress(state: SyncState | null): boolean {
+  return (
+    state?.full_next_page != null &&
+    queryVersionCurrent(state.resource_name, state.full_query_version)
+  );
+}
+
+/** 現在の版で保存した delta の進捗があるか。 */
+export function deltaInProgress(state: SyncState | null): boolean {
+  return (
+    state?.delta_next_page != null &&
+    queryVersionCurrent(state.resource_name, state.delta_query_version)
+  );
 }
 
 /** 行がなければ作る(UPDATE の前提)。 */

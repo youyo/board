@@ -29,7 +29,16 @@ import {
   upsertStatements,
 } from "../cache/resource-cache";
 import { ensureSchema } from "../cache/schema";
-import { ensureRowStatement, getSyncState, markError, type SyncState } from "../cache/sync-state";
+import {
+  CACHE_QUERY_VERSION,
+  deltaInProgress,
+  ensureRowStatement,
+  fullInProgress,
+  getSyncState,
+  markError,
+  queryVersionCurrent,
+  type SyncState,
+} from "../cache/sync-state";
 import { type Clock, isoSeconds, systemClock } from "../cache/time";
 import { BoardError, RefreshInProgressError } from "../errors";
 import { withLock } from "./lock";
@@ -49,8 +58,15 @@ export interface RefreshTarget {
   resource: string;
   /** `/v1/clients` など。 */
   path: string;
-  /** リソースの `build*Query` と同じ形。refresh は `updatedAtGteq` だけを渡す。 */
-  buildQuery: (opts: { updatedAtGteq?: string }, page: number, perPage: number) => string;
+  /**
+   * リソースの `build*Query` と同じ形。refresh は `updatedAtGteq` と、アーカイブ・失注を含めるフラグ(REFRESH_INCLUDE_OPTS)を渡す。
+   * フラグを受けないリソースには `baseQuery` が送らない。`includeLostFlg` は projects の `buildProjectsQuery` だけが読む。
+   */
+  buildQuery: (
+    opts: { updatedAtGteq?: string; includeArchiveFlg?: boolean; includeLostFlg?: boolean },
+    page: number,
+    perPage: number,
+  ) => string;
 }
 
 export type RefreshMode = "delta" | "full";
@@ -82,6 +98,13 @@ export interface RefreshDeps {
   pageBudgetFloorMs?: number;
   perPage?: number;
 }
+
+/**
+ * refresh は BOARD の既定(アーカイブ済み・失注を除外)ではなく、すべてを取ってキャッシュに入れる(issue #35)。
+ * full でも delta でも送る(送らないと、前回の同期のあとにアーカイブ・失注になったレコードの更新を取りこぼす)。
+ * 一覧の X-Total-Count も同じ条件の件数になるので、full の prune の照合はそのまま成り立つ。
+ */
+export const REFRESH_INCLUDE_OPTS = { includeArchiveFlg: true, includeLostFlg: true } as const;
 
 const OFFSET_RE = /^(\d{4}-\d{2}-\d{2})([T ])(\d{2}:\d{2}:\d{2})(\.\d+)?(Z|[+-]\d{2}:?\d{2})?$/;
 
@@ -222,10 +245,9 @@ async function runFull(run: Run, state: SyncState | null): Promise<RefreshOutcom
   const nowMs = run.now();
 
   const startedMs = state?.full_started_at ? Date.parse(state.full_started_at) : Number.NaN;
+  // 旧コード(アーカイブ・失注を取らない)で保存した進捗は再開しない(版が違えば最初から)。
   const resumable =
-    state?.full_next_page != null &&
-    !Number.isNaN(startedMs) &&
-    nowMs - startedMs <= FULL_RESUME_WINDOW_MS;
+    fullInProgress(state) && !Number.isNaN(startedMs) && nowMs - startedMs <= FULL_RESUME_WINDOW_MS;
 
   let generation: number;
   let page: number;
@@ -249,10 +271,10 @@ async function runFull(run: Run, state: SyncState | null): Promise<RefreshOutcom
       db
         .prepare(
           `UPDATE sync_state SET full_generation = ?, full_next_page = 1, full_started_at = ?,
-           full_max_updated_at = NULL, last_sync_mode = 'full', last_sync_status = 'partial'
+           full_max_updated_at = NULL, full_query_version = ?, last_sync_mode = 'full', last_sync_status = 'partial'
            WHERE resource_name = ? AND refresh_owner = ?`,
         )
-        .bind(generation, startedAt, resource, run.owner),
+        .bind(generation, startedAt, CACHE_QUERY_VERSION, resource, run.owner),
     ]);
     assertOwned(run, started[1]);
   }
@@ -268,7 +290,10 @@ async function runFull(run: Run, state: SyncState | null): Promise<RefreshOutcom
     let items: unknown[];
     let total: number | null;
     try {
-      ({ items, total } = await fetchPage(run, run.target.buildQuery({}, page, run.perPage)));
+      ({ items, total } = await fetchPage(
+        run,
+        run.target.buildQuery({ ...REFRESH_INCLUDE_OPTS }, page, run.perPage),
+      ));
     } catch (e) {
       if (isOutOfTime(run, e)) {
         return { resource, mode: "full", state: "partial", fetched, pages, nextPage: page };
@@ -297,6 +322,8 @@ async function runFull(run: Run, state: SyncState | null): Promise<RefreshOutcom
                last_sync_status = 'success', cursor_updated_at = ?, must_full_resync = 0,
                consecutive_failures = 0, full_next_page = NULL, full_max_updated_at = NULL,
                delta_next_page = NULL, delta_started_at = NULL, delta_max_updated_at = NULL,
+               query_version = CASE WHEN ${PRUNE_OK_SQL} THEN ${CACHE_QUERY_VERSION} ELSE query_version END,
+               full_query_version = NULL, delta_query_version = NULL,
                full_prune_skipped = CASE WHEN ${PRUNE_OK_SQL} THEN 0 ELSE 1 END
                WHERE resource_name = ? AND refresh_owner = ?`,
             )
@@ -304,6 +331,12 @@ async function runFull(run: Run, state: SyncState | null): Promise<RefreshOutcom
               isoSeconds(at),
               isoSeconds(at),
               cursorAfterFull(maxSeen, startedAt),
+              // query_version の PRUNE_OK_SQL
+              total,
+              resource,
+              generation,
+              total,
+              // full_prune_skipped の PRUNE_OK_SQL
               total,
               resource,
               generation,
@@ -316,9 +349,9 @@ async function runFull(run: Run, state: SyncState | null): Promise<RefreshOutcom
         statements.push(
           db
             .prepare(
-              "UPDATE sync_state SET full_next_page = ?, full_max_updated_at = ? WHERE resource_name = ? AND refresh_owner = ?",
+              "UPDATE sync_state SET full_next_page = ?, full_max_updated_at = ?, full_query_version = ? WHERE resource_name = ? AND refresh_owner = ?",
             )
-            .bind(page + 1, maxSeen, resource, guardOwner),
+            .bind(page + 1, maxSeen, CACHE_QUERY_VERSION, resource, guardOwner),
         );
       }
       const results = await db.batch(statements);
@@ -356,7 +389,7 @@ async function runDelta(run: Run, state: SyncState): Promise<RefreshOutcome> {
   const nowMs = run.now();
   const savedStartMs = state.delta_started_at ? Date.parse(state.delta_started_at) : Number.NaN;
   const resumable =
-    state.delta_next_page != null &&
+    deltaInProgress(state) &&
     !Number.isNaN(savedStartMs) &&
     nowMs - savedStartMs <= FULL_RESUME_WINDOW_MS;
   // 最後に取り終えたページから取り直す(1 ページ重ねる)。理由は full と同じ。
@@ -377,7 +410,7 @@ async function runDelta(run: Run, state: SyncState): Promise<RefreshOutcome> {
     try {
       ({ items } = await fetchPage(
         run,
-        run.target.buildQuery({ updatedAtGteq: gteq }, page, run.perPage),
+        run.target.buildQuery({ updatedAtGteq: gteq, ...REFRESH_INCLUDE_OPTS }, page, run.perPage),
       ));
       maxSeen = maxString(maxSeen, maxUpdatedAt(items));
       const at = run.now();
@@ -390,16 +423,17 @@ async function runDelta(run: Run, state: SyncState): Promise<RefreshOutcome> {
               .prepare(
                 `UPDATE sync_state SET last_synced_at = ?, last_sync_mode = 'delta', last_sync_status = 'success',
                  cursor_updated_at = COALESCE(?, cursor_updated_at), consecutive_failures = 0,
-                 delta_next_page = NULL, delta_started_at = NULL, delta_max_updated_at = NULL
+                 delta_next_page = NULL, delta_started_at = NULL, delta_max_updated_at = NULL,
+                 query_version = ${CACHE_QUERY_VERSION}, delta_query_version = NULL
                  WHERE resource_name = ? AND refresh_owner = ?`,
               )
               .bind(isoSeconds(at), cursorAfterFull(maxSeen, startedAt), resource, guardOwner)
           : db
               .prepare(
-                `UPDATE sync_state SET delta_next_page = ?, delta_started_at = ?, delta_max_updated_at = ?
+                `UPDATE sync_state SET delta_next_page = ?, delta_started_at = ?, delta_max_updated_at = ?, delta_query_version = ?
                  WHERE resource_name = ? AND refresh_owner = ?`,
               )
-              .bind(page + 1, startedAt, maxSeen, resource, guardOwner),
+              .bind(page + 1, startedAt, maxSeen, CACHE_QUERY_VERSION, resource, guardOwner),
       );
       const results = await db.batch(statements);
       assertOwned(run, results[results.length - 1]);
@@ -449,7 +483,13 @@ export async function refreshResource(
     const owned: Run = { ...run, owner: lock.owner };
     const state = await getSyncState(deps.db, target.resource);
     // 仕様の一覧に updated_at_gteq が無いリソースは差分を取れない(送っても無視されて毎回全件になる)ので、delta は full として動かす。
-    if (mode === "delta" && state?.cursor_updated_at && supportsDelta(target.resource)) {
+    // 版が違う(旧コードのキャッシュ。アーカイブ・失注が欠けている)ときも、カーソルがないのと同じで全件が必要。
+    if (
+      mode === "delta" &&
+      state?.cursor_updated_at &&
+      queryVersionCurrent(state.resource_name, state.query_version) &&
+      supportsDelta(target.resource)
+    ) {
       return runDelta(owned, state);
     }
     return runFull(owned, state);
