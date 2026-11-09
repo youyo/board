@@ -367,7 +367,7 @@ describe.each(LIST_CASES)("list $resource (GET $path)", (c) => {
     });
     const r = await c.list(client(), c.opts);
     expect(r.items).toEqual([{ id: 1, extra_unknown: { deep: true } }]);
-    expect(r._meta).toEqual({ total_count: 1, rate_limit_remaining: 2999 });
+    expect(r._meta).toEqual({ total_count: 1 });
     expect(r.truncated).toBe(false);
     expect(m.calls).toHaveLength(1);
     const url = new URL(m.calls[0]?.url ?? "");
@@ -481,7 +481,7 @@ describe.each(GET_CASES)("get $resource (GET $path/{id})", (c) => {
     });
     const r = await c.get(client(), 42);
     expect(r.item).toEqual({ id: 42, brand_new_field: [1, 2] });
-    expect(r._meta).toEqual({ etag: '"v1"', rate_limit_limit: 3000 });
+    expect(r._meta).toEqual({ etag: '"v1"' });
     expect(m.calls).toHaveLength(1);
     expect(m.calls[0]?.url).toBe(`${BASE}${c.path}/42`);
   });

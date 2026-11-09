@@ -4,10 +4,6 @@
  */
 
 export interface ItemMeta {
-  rate_limit_remaining?: number;
-  rate_limit_limit?: number;
-  /** ISO 8601 (UTC、秒まで)。 */
-  rate_limit_reset?: string;
   etag?: string;
   last_modified?: string;
 }
@@ -26,23 +22,12 @@ function atoi(h: Headers, name: string): number {
   return v && /^[+-]?\d+$/.test(v) ? Number(v) : 0;
 }
 
-function resetIso(h: Headers): string | undefined {
-  const v = h.get("X-Ratelimit-Reset")?.trim();
-  if (!v || !/^[+-]?\d+$/.test(v)) return undefined;
-  const d = new Date(Number(v) * 1000);
-  if (Number.isNaN(d.getTime())) return undefined;
-  return d.toISOString().replace(/\.\d{3}Z$/, "Z");
-}
-
 function put<K extends keyof ListMeta>(meta: ListMeta, key: K, value: ListMeta[K]): void {
   if (value !== undefined && value !== 0 && value !== "") meta[key] = value;
 }
 
-/** ヘッダー名の大文字小文字の揺れ(X-Ratelimit-* / X-RateLimit-*)は Headers が吸収する。 */
+/** X-Ratelimit-* は BOARD の OpenAPI(v1.9.0)に記載が無く、実 API も返さないので読まない(issue #33)。 */
 function common(h: Headers, meta: ListMeta): void {
-  put(meta, "rate_limit_remaining", atoi(h, "X-Ratelimit-Remaining"));
-  put(meta, "rate_limit_limit", atoi(h, "X-Ratelimit-Limit"));
-  put(meta, "rate_limit_reset", resetIso(h));
   put(meta, "etag", h.get("ETag") ?? undefined);
   put(meta, "last_modified", h.get("Last-Modified") ?? undefined);
 }

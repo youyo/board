@@ -262,7 +262,12 @@ describe("list の出力", () => {
   });
 
   it("limit で切ったときだけ limited:true と total_before_limit を付ける(truncated とは別)", async () => {
-    const key = { [`GET ${BASE}/v1/contacts`]: ok(makeEntities(5)) };
+    // 実際の BOARD は X-Total-Count を付ける。API 経路は limit に達したページで止めるので、全件数はこのヘッダーから分かる。
+    const key = {
+      [`GET ${BASE}/v1/contacts`]: pagedHandler(() => makeEntities(5), undefined, {
+        totalHeader: true,
+      }),
+    };
     const cut = await callApiTool("list_contacts", { client_id: 1, limit: 2 }, key);
     expect(cut.json.limited).toBe(true);
     expect(cut.json.total_before_limit).toBe(5);

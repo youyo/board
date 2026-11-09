@@ -22,28 +22,20 @@ describe("parseListMeta", () => {
     });
   });
 
-  it("レート制限ヘッダーは X-Ratelimit-* でも X-RateLimit-* でも読める", () => {
-    expect(
-      parseListMeta(new Headers({ "X-Ratelimit-Remaining": "99", "X-Ratelimit-Limit": "3000" })),
-    ).toEqual({ rate_limit_remaining: 99, rate_limit_limit: 3000 });
-    expect(
-      parseListMeta(new Headers({ "X-RateLimit-Remaining": "42", "X-RateLimit-Limit": "1000" })),
-    ).toEqual({ rate_limit_remaining: 42, rate_limit_limit: 1000 });
-  });
-
-  it("rate_limit_reset は epoch 秒を ISO 8601 (UTC・秒まで) にする", () => {
-    expect(parseListMeta(new Headers({ "X-Ratelimit-Reset": "1776643200" }))).toEqual({
-      rate_limit_reset: "2026-04-20T00:00:00Z",
+  it("X-Ratelimit-* ヘッダーがあっても rate_limit_* は出さない(BOARD の OpenAPI に記載が無い。issue #33)", () => {
+    const h = new Headers({
+      "X-Ratelimit-Remaining": "99",
+      "X-Ratelimit-Limit": "3000",
+      "X-Ratelimit-Reset": "1776643200",
+      "X-RateLimit-Remaining": "42",
+      "X-Total-Count": "5",
     });
+    expect(parseListMeta(h)).toEqual({ total_count: 5 });
   });
 
   it("空のヘッダーは {}、数値でない値は 0 扱いで出さない", () => {
     expect(parseListMeta(new Headers())).toEqual({});
-    expect(
-      parseListMeta(
-        new Headers({ "X-Total-Count": "abc", "X-Ratelimit-Reset": "soon", "X-Page": "0" }),
-      ),
-    ).toEqual({});
+    expect(parseListMeta(new Headers({ "X-Total-Count": "abc", "X-Page": "0" }))).toEqual({});
   });
 
   it("undefined のヘッダー(1 ページも取らなかった)は {}", () => {
@@ -52,7 +44,7 @@ describe("parseListMeta", () => {
 });
 
 describe("parseItemMeta", () => {
-  it("レート制限・ETag・Last-Modified だけ(ページング関係は含めない)", () => {
+  it("ETag・Last-Modified だけ(ページング関係は含めない)", () => {
     const h = new Headers({
       "X-Ratelimit-Remaining": "7",
       "X-Ratelimit-Limit": "3000",
@@ -63,9 +55,6 @@ describe("parseItemMeta", () => {
       "Retry-After": "3",
     });
     expect(parseItemMeta(h)).toEqual({
-      rate_limit_remaining: 7,
-      rate_limit_limit: 3000,
-      rate_limit_reset: "2026-04-20T00:00:00Z",
       etag: '"e"',
       last_modified: "Wed, 01 Apr 2026 12:00:00 GMT",
     });

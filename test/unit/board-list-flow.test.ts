@@ -70,8 +70,6 @@ describe("list → ページング → 全件(モック fetch)", () => {
       total_count: 230,
       page: 3,
       per_page: 100,
-      rate_limit_remaining: 2997,
-      rate_limit_limit: 3000,
     });
     expect(m.calls.map((c) => c.url)).toEqual(
       [1, 2, 3].map(
