@@ -1,5 +1,6 @@
 import type { BoardClient } from "../client";
 import type { CallContext } from "../context";
+import { QueryBuilder } from "../query";
 import {
   baseQuery,
   type CommonListOptions,
@@ -181,10 +182,24 @@ export function listPurchaseOrders(
   );
 }
 
+export interface GetPurchaseOrderOptions {
+  /** "small"(BOARD の既定)/ "medium" / "large" / "estimate" / "order" / "delivery" / "invoice" / "all"。空なら付けない。 */
+  responseGroup?: string;
+}
+
 export function getPurchaseOrder(
   client: BoardClient,
   id: number,
+  opts: GetPurchaseOrderOptions = {},
   ctx?: CallContext,
 ): Promise<ItemResult<PurchaseOrderEntity>> {
-  return getResource<PurchaseOrderEntity>(client, "/v1/expenditures", id, undefined, "id", ctx);
+  const query = new QueryBuilder().responseGroup(opts.responseGroup).encode();
+  return getResource<PurchaseOrderEntity>(
+    client,
+    "/v1/expenditures",
+    id,
+    query || undefined,
+    "id",
+    ctx,
+  );
 }

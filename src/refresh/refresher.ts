@@ -49,6 +49,11 @@ const supportsDelta = (resource: string): boolean =>
 
 /** 続きから再開できる partial の最長の古さ。これを過ぎたらページのずれが無視できないので、最初からやり直す。 */
 export const FULL_RESUME_WINDOW_MS = 60 * 60_000;
+/**
+ * must_full_resync=1 を理由に refresh=delta を full へ切り替える最短の間隔(前回の full の完了から)。
+ * BOARD の X-Total-Count が恒常的に多いと毎回 full になり、日次の rate limit を使い切るため(issue #40)。
+ */
+export const MUST_FULL_RESYNC_MIN_INTERVAL_MS = 6 * 60 * 60_000;
 /** full の開始時刻からこの分だけ巻き戻した時刻を、完了後のカーソルの上限にする(BOARD との時計のずれ・full 中の更新の保険)。 */
 export const CURSOR_SAFETY_MARGIN_MS = 5 * 60_000;
 /** 次のページを取りに行くのに最低限必要な残り時間の既定。直前のページの所要時間の 1.5 倍とのうち大きいほう。 */
@@ -239,6 +244,14 @@ async function recordFailure(run: Run, e: unknown): Promise<void> {
   );
 }
 
+/** must_full_resync による delta → full の切り替え。前回の full の完了から間隔が空いているときだけ(完了時刻が無い・読めないときは切り替える)。 */
+function mustSwitchToFull(state: SyncState, nowMs: number): boolean {
+  if (!state.must_full_resync) return false;
+  const lastFullMs = state.last_full_synced_at ? Date.parse(state.last_full_synced_at) : Number.NaN;
+  if (Number.isNaN(lastFullMs)) return true;
+  return nowMs - lastFullMs >= MUST_FULL_RESYNC_MIN_INTERVAL_MS;
+}
+
 async function runFull(run: Run, state: SyncState | null): Promise<RefreshOutcome> {
   const { db } = run.deps;
   const resource = run.target.resource;
@@ -319,7 +332,8 @@ async function runFull(run: Run, state: SyncState | null): Promise<RefreshOutcom
           db
             .prepare(
               `UPDATE sync_state SET last_synced_at = ?, last_full_synced_at = ?, last_sync_mode = 'full',
-               last_sync_status = 'success', cursor_updated_at = ?, must_full_resync = 0,
+               last_sync_status = 'success', cursor_updated_at = ?,
+               must_full_resync = CASE WHEN ${PRUNE_OK_SQL} THEN 0 ELSE 1 END,
                consecutive_failures = 0, full_next_page = NULL, full_max_updated_at = NULL,
                delta_next_page = NULL, delta_started_at = NULL, delta_max_updated_at = NULL,
                query_version = CASE WHEN ${PRUNE_OK_SQL} THEN ${CACHE_QUERY_VERSION} ELSE query_version END,
@@ -331,6 +345,13 @@ async function runFull(run: Run, state: SyncState | null): Promise<RefreshOutcom
               isoSeconds(at),
               isoSeconds(at),
               cursorAfterFull(maxSeen, startedAt),
+              // プレースホルダは SQL の出現順に、先頭の ? 3 個(last_synced_at / last_full_synced_at / cursor)のあと
+              // PRUNE_OK_SQL(? 4 個: total, resource, generation, total)が 3 回、最後に WHERE の 2 個(resource, owner)で、計 17 個。
+              // must_full_resync の PRUNE_OK_SQL
+              total,
+              resource,
+              generation,
+              total,
               // query_version の PRUNE_OK_SQL
               total,
               resource,
@@ -484,9 +505,11 @@ export async function refreshResource(
     const state = await getSyncState(deps.db, target.resource);
     // 仕様の一覧に updated_at_gteq が無いリソースは差分を取れない(送っても無視されて毎回全件になる)ので、delta は full として動かす。
     // 版が違う(旧コードのキャッシュ。アーカイブ・失注が欠けている)ときも、カーソルがないのと同じで全件が必要。
+    // prune を見送った full のあと(must_full_resync=1)も同じ。取りこぼしが旧キャッシュにも無いので、delta では補えない(issue #40)。
     if (
       mode === "delta" &&
       state?.cursor_updated_at &&
+      !mustSwitchToFull(state, now()) &&
       queryVersionCurrent(state.resource_name, state.query_version) &&
       supportsDelta(target.resource)
     ) {

@@ -43,7 +43,7 @@ describe("E2E: /mcp (Access の JWT つき)", () => {
       await mcpCall(jwt, "tools/call", { name: "server_info", arguments: {} }, 3),
     );
     expect(call.result?.isError).not.toBe(true);
-    expect(JSON.parse(firstText(call))).toEqual({ name: "board", version: "1.8.0" });
+    expect(JSON.parse(firstText(call))).toEqual({ name: "board", version: "1.9.0" });
   });
 
   it("server_info の応答に API キー・トークン・JWT を含めない", async () => {

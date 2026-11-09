@@ -76,6 +76,31 @@ describe("E2E: cache_status / cache_clear", () => {
     ).toMatchObject({ row_count: 0, refresh_state: "not_synced" });
   });
 
+  it("書類の単体取得 → cache_status で on_demand と件数。get_purchase_order は response_group=medium でキャッシュ、指定すれば API 直接(issue #37・#38)", async () => {
+    const m = mockOutboundFetch({
+      [CERTS]: () => jwksResponse(key),
+      [`GET ${BASE}/v1/documents/estimates/4`]: () => Response.json({ id: 4 }),
+      [`GET ${BASE}/v1/expenditures/6`]: () => Response.json({ id: 6 }),
+    });
+    expect((await tool("get_estimate", { id: 4 })).isError).toBe(false);
+    expect((await tool("get_purchase_order", { id: 6 }, 2)).isError).toBe(false);
+    const withGroup = await tool("get_purchase_order", { id: 6, response_group: "large" }, 3);
+    expect(withGroup.json.cache).toEqual([]);
+    const urls = m.calls.map((c) => c.url).filter((u) => u.includes("/expenditures/"));
+    expect(urls).toEqual([
+      `${BASE}/v1/expenditures/6?response_group=medium`,
+      `${BASE}/v1/expenditures/6?response_group=large`,
+    ]);
+
+    const status = await tool("cache_status", {}, 4);
+    const by = (n: string) =>
+      status.json.resources.find((r: { resource: string }) => r.resource === n);
+    expect(by("estimates")).toMatchObject({ refresh_state: "on_demand", row_count: 1 });
+    expect(by("orders")).toMatchObject({ refresh_state: "on_demand", row_count: 0 });
+    expect(by("purchase_orders").row_count).toBe(1);
+    expect(by("users").refresh_state).toBe("not_synced");
+  });
+
   it("refresh 中のリソースがあると cache_clear は refresh_in_progress(retry_after_seconds 30)", async () => {
     mockOutboundFetch({ [CERTS]: () => jwksResponse(key) });
     await tryAcquireLock(env.DB, "clients", { owner: "other" });

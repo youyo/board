@@ -8,6 +8,7 @@ import { ArgumentError, RefreshInProgressError } from "../errors";
 import { LOCK_STALE_MS, type Lock, releaseLock, tryAcquireLock } from "../refresh/lock";
 import { SCAN_LOCK_STALE_MS } from "../repository/document-index";
 import { DOCUMENT_KINDS } from "../repository/document-kinds";
+import { SPECS } from "../repository/resources";
 import {
   getScanState,
   releaseScanLock,
@@ -178,7 +179,14 @@ export async function clearCache(
 
 // --- cache_status / cache_clear(M06) --------------------------------------------------------
 
-export type ReportRefreshState = "complete" | "partial" | "failed" | "not_synced";
+export type ReportRefreshState = "complete" | "partial" | "failed" | "not_synced" | "on_demand";
+
+/** 一覧も refresh も持たず、単体取得のたびにキャッシュへ入る書類のリソース(estimates / orders / deliveries / receipts)。 */
+const ON_DEMAND_RESOURCES: ReadonlySet<string> = new Set(
+  Object.values(SPECS)
+    .filter((s) => s.kind === "document")
+    .map((s) => s.resource),
+);
 
 export interface CacheReportResource {
   resource: string;
@@ -186,7 +194,7 @@ export interface CacheReportResource {
   cached_at?: string;
   /** 最終 full refresh の完了。未取得なら無い。 */
   full_refreshed_at?: string;
-  /** complete / partial(full が途中)/ failed(直近の refresh が失敗)/ not_synced(一度も同期していない)。 */
+  /** complete / partial(full が途中)/ failed(直近の refresh が失敗)/ not_synced(一度も同期していない)/ on_demand(書類。一覧も refresh も無く、単体取得のたびにキャッシュに入る)。 */
   refresh_state: ReportRefreshState;
   row_count: number;
   full_prune_skipped: boolean;
@@ -206,7 +214,8 @@ export interface DocumentScanReport {
   locked: boolean;
 }
 
-function refreshStateOf(s: SyncState | undefined): ReportRefreshState {
+function refreshStateOf(resource: string, s: SyncState | undefined): ReportRefreshState {
+  if (ON_DEMAND_RESOURCES.has(resource)) return "on_demand";
   // full / delta のどちらかが途中なら partial(次の同じ refresh で続きから取る)。
   // 旧コード(アーカイブ・失注を取らない)の進捗・同期は、版が違うので数えない(未同期として扱い、取り直す)。
   if (fullInProgress(s ?? null) || deltaInProgress(s ?? null)) return "partial";
@@ -226,7 +235,7 @@ export async function cacheReport(
     const s = states.get(r.resource);
     const out: CacheReportResource = {
       resource: r.resource,
-      refresh_state: refreshStateOf(s),
+      refresh_state: refreshStateOf(r.resource, s),
       row_count: r.cached_rows,
       full_prune_skipped: r.full_prune_skipped,
       locked: r.refreshing,

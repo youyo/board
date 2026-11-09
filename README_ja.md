@@ -39,6 +39,7 @@ MCP クライアント(Claude など)
 - [ADR 0003: 呼び出しの締め切り 30 秒](docs/adr/0003-call-deadline.md)
 - [ADR 0004: 書類 ID から案件 ID への逆引き](docs/adr/0004-document-reverse-lookup.md)
 - [ADR 0005: upstream / 下流モデルのデプロイ](docs/adr/0005-upstream-downstream-deploy.md)
+- [ADR 0006: アーカイブ・失注を含めたキャッシュと、クエリの版による旧キャッシュの無効化](docs/adr/0006-archive-lost-and-query-version.md)
 
 ## ツール一覧(54 個)
 

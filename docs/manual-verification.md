@@ -11,7 +11,7 @@
 | V3 | D1 の `meta.changes` が条件付き UPDATE(ロックの取得・所有者条件つきの batch)で期待どおりの値を返す | `refresh=full` を 2 つ同時に送る。片方が `refresh_in_progress` になること。`cache_clear` を refresh 中に送ると何も消えず `refresh_in_progress` | ロックが効かず refresh が二重に走る、または所有者条件の書き込みが空振りしない |
 | V4 | 実 API の 1 ページ(100 件)あたりの時間が見積もり(0.7〜1.3 秒)の範囲 | `test:live` の `refresh=full` の出力(1 ページあたり) | 30 秒の締め切りに収まるページ数が変わる。full の呼び出し回数と逆引きの走査の回数に影響 |
 | V5 | 応答サイズ(`find_projects` の `limit` 付き、`list_*`)が `max_response_tokens` の既定(50000)に収まる | `test:live` の出力(応答 KiB)。`response_too_large` が出ないこと | 既定の上限を超えて `limit` が必須になる |
-| V6 | `X-Total-Count` が返る(full refresh の件数照合に使う) | `list_*` を `show_meta: true` で呼び、`_meta` に総件数があること。`cache_status` の `full_prune_skipped` が false のままであること | 件数の照合ができず旧世代の行を消さない(`full_prune_skipped` が立ち続ける) |
+| V6 | `X-Total-Count` が返る(full refresh の件数照合に使う) | `list_*` を `show_meta: true` で呼び、`_meta` に総件数があること。`cache_status` の `full_prune_skipped` が false のままであること。`full_prune_skipped` が立つと `must_full_resync` も立ち、前回の full の完了から 6 時間以上たっていれば、次の `refresh=delta` は full になる(v1.9.0。6 時間未満は delta のまま)。full を繰り返しても `full_prune_skipped` が true のままなら、BOARD の総件数の数え方を疑う | 件数の照合ができず旧世代の行を消さない(`full_prune_skipped` が立ち続ける) |
 | V7 | Workers Paid プランで full refresh と逆引きの走査が 1 回の呼び出しの D1 クエリ上限に収まる | `test:live` が最後まで通ること。D1 のエラー(`generic_error`)が出ないこと | Free プランでは収まらない(runbook 9) |
 | V8 | 書類(見積・受注・納品・領収)の逆引きが 1〜2 回の呼び出しで覚え切る | 書類の ID を `find_estimates` などで引き、`cache_status` の `document_scans` が `complete` に進むのを見る | 初回のみ `project_unresolved` の警告が続く |
 | V9 | Portal 経由のツール名が `board_` 付きで見え、`tools/list` の 54 個がすべて出る | Portal 経由でツール一覧を確認 | 名前の前提(README)が違う |
@@ -20,6 +20,7 @@
 | V14 | 仕様(OpenAPI v1.9.0)に無い `GET /v1/{invoices,expenditure_payments,users,groups,payment_terms,project_types,expenditure_types,accounting_types,document_send_channels}/{id}` の 9 本が、実 API に存在するか(未確認。仕様には一覧しか無い) | `cache_clear` のあとに、対応する `get_*`(`get_invoice` / `get_payment` / `get_user` / `get_group` / `get_payment_term` / `get_project_type` / `get_purchase_type` / `get_accounting_type` / `get_document_send_channel`)を一覧で見えた ID で呼ぶ。キャッシュに当たると確認にならないので、必ず先に `cache_clear` する | 存在しなければ `not_found` になる(見えるエラー)。その場合は `get_*` を一覧から引く方式に変える |
 | V15 | 請求書を案件で絞る(issue #31。未確認): `list_invoices` の `project_project_no_eq` / `project_name_cont` / `project_management_no_eq` と、`find_invoices` の `project_name` / `project_id` が、その案件の請求書だけを返す。実 API が `project_project_no_eq` を効かせるか | `find_invoices project_name=<案件名>` と `list_invoices project_project_no_eq=<案件番号>` を、請求書を持つ案件で呼ぶ。キャッシュに当たると API の確認にならないので、`cache_clear` のあとに呼ぶ | 他の案件の請求書が混ざる(`find_invoices` は後段で `project_id` を突き合わせるので混ざらないが、`list_invoices` は混ざる)。その場合は API が無視している |
 | V16 | アーカイブ・失注を含めて取る(issue #35。未確認): (a) `list_projects refresh=full` を complete まで実行したあと、`cache_status` の projects の `row_count` が、BOARD の `include_archive_flg=1` かつ `include_lost_flg=1` の `total_count` と一致する。(b) `include_archive_flg=1` だけ、`include_lost_flg=1` だけの組み合わせの意味(失注・アーカイブのどちらが増えるか、両方が要るか)。(c) 案件をアーカイブ(または失注)にする操作で `updated_at` が更新され、`refresh=delta` で拾える | (a) `list_projects`(API 直接。`show_meta: true`)の `total_count` を、(指定なし / `include_archive_flg=1` / `include_lost_flg=1` / 両方)で比べる。次に `refresh=full` を complete まで回して `cache_status` の `row_count` を見る。(c) テスト用の案件をアーカイブして `refresh=delta` し、その案件の行が `archive_flg=1`(`response_group=large` の `get_project`)になるか見る | (a) 一致しなければ、どちらかのフラグの意味が想定と違う。refresh の既定のクエリを見直す。(c) アーカイブで `updated_at` が動かなければ、delta ではアーカイブへの変更を拾えない(次の `refresh=full` で入れ替わる。それまでは古い行のまま) |
+| V17 | 単体取得の項目(issue #37。未確認): (a) `GET /v1/projects/{id}` と `/v1/expenditures/{id}` が `response_group` を送らないときに small を返すか(仕様の既定)。(b) `GET /v1/clients/{id}` と `/v1/payees/{id}`(仕様に `response_group` が無い)が、一覧の small より多い項目を返すか | `cache_clear` のあとに `get_client` / `get_vendor` を呼び、`list_clients` / `list_vendors` の同じ行と項目を比べる | (b) 多ければ、clients / vendors のキャッシュは get で入った行と refresh の行で項目数が違う(読み取りの誤りではない。#37 で既知として残した) |
 
 ## 記入欄
 
@@ -134,3 +135,10 @@
 - 案件をアーカイブすると `updated_at` が更新される(`refresh=delta` で拾える): [ ] はい  [ ] いいえ
 - 同名の案件の片方がアーカイブ済みのとき、`find_invoices project_name=<案件名>` が曖昧エラー(候補 2 件)になる: [ ] はい  [ ] いいえ
 - 外れたときの影響: `row_count` が合わなければ、キャッシュに欠け(または余り)がある。アーカイブで `updated_at` が動かなければ、`delta` は変更を拾えない(`full` で入れ替える)。
+
+### V17 単体取得の項目(2026-11-10 追加。issue #37。未確認)
+- 前提: OpenAPI v1.9.0 では `GET /v1/projects/{id}` と `/v1/expenditures/{id}` の `response_group` の既定は small。`/v1/clients/{id}` と `/v1/payees/{id}` には `response_group` が無い。v1.9.0 は、キャッシュに書く get で projects に small、purchase_orders に medium(一覧の既定と同じ)を送り、clients / vendors には送らない。
+- 手順: `cache_clear` のあとに `get_client` / `get_vendor` を呼び、`list_clients` / `list_vendors` の同じ行と項目を比べる。
+- 確認日 / 確認者:
+- `get_client` / `get_vendor` が一覧(small)より多い項目を返す: [ ] はい(項目: ____)  [ ] いいえ
+- 外れたときの影響: 多ければ、clients / vendors のキャッシュは get で入った行と refresh の行で項目数が違う(読み取りの誤りではない。既知として残した)。

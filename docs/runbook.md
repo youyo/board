@@ -304,9 +304,16 @@ v1.7.0 まではアーカイブ済み(projects は失注も)のレコードを�
 - 確認: `cache_status` の projects の `row_count` が、BOARD の `include_archive_flg=1` かつ `include_lost_flg=1` の `total_count` と一致する(docs/manual-verification.md の V16)。
 - 応答の `response_group` が small(既定)の一覧には `archive_flg` が無いので、どれがアーカイブ済みかは応答から判別できない。失注は `order_status_name` で分かる。除外したいときは API 経路で `include_archive_flg=false`(projects は `include_lost_flg=false` も)を指定する(キャッシュ経由にはならない)。
 
+### v1.9.0 へ上げたとき(キャッシュの行の項目数・prune を見送った full。issue #37〜#40)
+- `get_*` の既定は small 相当。キャッシュに書く get(`get_project` / `get_purchase_order`)は `response_group` を明示して送り、行の項目を refresh の行と揃える(projects は small、purchase_orders は一覧の既定と同じ medium)。項目が要るときは `response_group` を指定する(API を直接呼び、キャッシュには書かない)。v1.8.0 までに get で入った項目の多い行は、次の `refresh=full` で揃った行に上書きされる。`get_client` / `get_vendor` は BOARD の単体取得に `response_group` が無いので送らず、get で入った行が一覧の行より項目が多いことがある(docs/manual-verification.md の V17)。
+- `cache_status` の書類リソース(estimates / orders / deliveries / receipts)は `refresh_state: on_demand`(一覧も refresh も無く、単体取得のたびにキャッシュに入る)。`row_count` はその件数。find などの応答の `cache` に出る書類の `cached_at` は、その書類を取った時刻。
+- `document_scans` の `mapped_rows` は、find が案件を検索したときにも記録される書類 → 案件の対応の件数(全走査とは無関係に増える)。`scan_state` は、書類 ID から逆引きできなかったときの全走査の状態。
+- full が件数の照合に通らず旧世代を消さなかったとき(`full_prune_skipped: true`)、`must_full_resync` が立つ。この間の `refresh=delta` は、前回の full の完了から 6 時間以上たっていれば full として動く(応答の `mode` は `full`。6 時間未満は delta のまま。切り替えで始めた full が partial で終わったら、次の `refresh=delta` も full の経路で保存した進捗から再開する。`refresh=full` は間隔に関係なく常に full)。カーソルは full の完了で従来どおり進む(次が full なので取りこぼしには影響しない)。次の full で照合が通れば `must_full_resync` と `full_prune_skipped` が戻り、delta が delta に戻る。読み取りは止まらない(欠けは一部)。
+- **BOARD の X-Total-Count が常に取得した件数より多い場合、`refresh=delta` による full への自動の切り替えは 6 時間に 1 回までで(rate limit の保護)、`full_prune_skipped` が true のままになる。** その状態が続くときは、BOARD の総件数の数え方(アーカイブ・失注・削除済みの扱い)を疑う(docs/manual-verification.md の V6)。
+
 ### `cache_status`
 BOARD を呼ばずに D1 の状態を返す(読み取り専用)。見るところ:
-- `refresh_state`: `complete` / `partial`(full が途中。続きを `refresh=full` で)/ `failed`(`last_error_code`)/ `not_synced`(未取得)。
+- `refresh_state`: `complete` / `partial`(full が途中。続きを `refresh=full` で)/ `failed`(`last_error_code`)/ `not_synced`(未取得)/ `on_demand`(書類 4 リソース。単体取得のたびにキャッシュに入る)。
 - `row_count`、`cached_at`、`full_refreshed_at`、`full_prune_skipped`(true なら次の full で取り直す)、`locked`(refresh 中)。
 - `document_scans`: 書類種別ごとの逆引きの走査状態。
 

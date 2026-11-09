@@ -87,6 +87,7 @@ import {
   type ProjectListOptions,
   type ProjectTypeEntity,
   type ProjectTypeListOptions,
+  PURCHASE_ORDER_DEFAULT_RESPONSE_GROUP,
   type PurchaseOrderEntity,
   type PurchaseOrderListOptions,
   type PurchaseTypeEntity,
@@ -150,7 +151,8 @@ export const SPECS = {
   projects: cacheFirst<ProjectEntity, ProjectListOptions>("projects", {
     buildQuery: buildProjectsQuery,
     list: listProjects,
-    get: (client, id, ctx) => getProject(client, id, {}, ctx),
+    // キャッシュに書く get は response_group=small を明示する(一覧の refresh と同じ項目に揃える。issue #37)。
+    get: (client, id, ctx) => getProject(client, id, { responseGroup: "small" }, ctx),
     cacheFirst: {
       keys: ["nameCont", "clientIdEq", "clientNameCont", "projectNoEq", "managementNoEq"],
       match: (p, f) =>
@@ -186,7 +188,9 @@ export const SPECS = {
   purchase_orders: cacheFirst<PurchaseOrderEntity, PurchaseOrderListOptions>("purchase_orders", {
     buildQuery: buildPurchaseOrdersQuery,
     list: listPurchaseOrders,
-    get: getPurchaseOrder,
+    // 一覧の refresh は response_group を送らないと medium(案件 project を含む)なので、get も同じ値にして行の項目を揃える(issue #37)。
+    get: (client, id, ctx) =>
+      getPurchaseOrder(client, id, { responseGroup: PURCHASE_ORDER_DEFAULT_RESPONSE_GROUP }, ctx),
     cacheFirst: {
       // projectIdEq は含めない: 既存のキャッシュの行に案件の項目が無いので、サーバーに任せる(issue #27)。
       keys: ["payeeIdEq", "expenditureStatusIn", "deliveryStatusIn"],

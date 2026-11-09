@@ -1,7 +1,7 @@
 # ADR 0002: D1 キャッシュと再開できる refresh
 
 - 状態: 採用(M03、2026-11-05。M06 で文書化)
-- 関連: ADR 0003(締め切り)、ADR 0004(逆引き)、`plans/board-workers-m03-d1-cache.md`
+- 関連: ADR 0003(締め切り)、ADR 0004(逆引き)、ADR 0006(アーカイブ・失注と版)、`plans/board-workers-m03-d1-cache.md`
 
 ## 背景
 
@@ -18,6 +18,7 @@ Go の full refresh は 1 回の呼び出しで全件を取っていたが、Wor
 - **full refresh は再開できる**: 世代番号 + ページ単位で進め、30 秒の締め切りが近づいたら進捗(`full_next_page`)を保存して `refresh_state: "partial"` で返す。
   次の `refresh=full` が最後に取り終えたページから(1 ページ重ねて)再開する。完了で古い世代の行を削除する。
   BOARD の総件数と照合し、足りなければ旧世代を消さず `full_prune_skipped` を立てる(次の full で取り直す)。
+  (2026-11-10 更新、v1.9.0: 足りなかった full は `must_full_resync` も立て、前回の full の完了から 6 時間以上たっていれば次の `refresh=delta` が自動で full として動く。読み取りは続ける。ADR 0006)
 - **ロックは D1 の条件付き UPDATE**(TryLock)。取れなければ待たずに `refresh_in_progress`(`retry_after_seconds` 30)。stale は 10 分。
   Durable Objects は使わない。
 - **ロックで守る書き込みは、必ず所有者条件つきの 1 つの batch で行う**: 確認から書き込みまでの間に stale なロックを別の呼び出しに奪われても、
