@@ -80,12 +80,14 @@ function createListRepository<E, F extends CommonListOptions>(
     filter: F,
     readOpts: ReadOptions,
     ctx: CallContext,
+    outcome?: RefreshOutcome,
   ): Promise<ListReadResult<E>> {
     const r = await spec.list(deps.client, filter, undefined, ctx);
     return {
       ...limitResult(r.items, readOpts.limit),
       source: "api",
-      cache: [],
+      // refresh を走らせたうえで API にフォールバックしたときは、その結果(partial / failed)を落とさない。
+      cache: outcome ? [await info(outcome)] : [],
       truncated: r.truncated,
       _meta: r._meta,
     };
@@ -123,7 +125,7 @@ function createListRepository<E, F extends CommonListOptions>(
           // 壊れた行がある: 安全側に倒して API に任せる(Go の tryCacheFilter と同じ)。
         }
       }
-      return viaApi(filter, readOpts, ctx);
+      return viaApi(filter, readOpts, ctx, outcome);
     }
 
     // ゼロフィルタ: キャッシュ全件。空なら空(未取得は cache の cached_at が無いことで分かる。API は呼ばない)。
@@ -166,7 +168,8 @@ function createListRepository<E, F extends CommonListOptions>(
     return {
       item: res.item,
       source: "api",
-      cache: [],
+      // refresh を走らせたあとのキャッシュミスは、その結果を落とさない。
+      cache: outcome ? [await info(outcome)] : [],
       _meta: res._meta,
     } satisfies GetReadResult<E>;
   }

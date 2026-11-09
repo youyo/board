@@ -342,6 +342,43 @@ describe("E2E: 名前の曖昧さと fanout", () => {
   });
 });
 
+describe("E2E: refresh=full が partial のまま API にフォールバックしても、cache に refresh の結果が載る(issue #25)", () => {
+  it("find_projects に client_name と refresh=full: projects が partial なら、応答の cache に projects の partial が載る", async () => {
+    // Date だけを偽装する。全件取得(絞り込みなし)の 1 ページごとに 10 秒進め、full を 1 回で終わらせない。
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const allProjects = Array.from({ length: 300 }, (_, i) => ({
+      id: i + 1,
+      name: `案件${i + 1}`,
+      client: { id: 7 },
+      updated_at: "2026-01-01T00:00:00.000+09:00",
+    }));
+    const m = boardMocks({
+      [get("/v1/clients")]: list([{ id: 7, name: "顧客" }]),
+      [get("/v1/clients/7")]: one({ id: 7, name: "顧客" }),
+      [get("/v1/projects")]: pagedHandler(
+        () => allProjects,
+        (_page, q) => {
+          // client_id_eq 付きは API へのフォールバック。時間は進めない。
+          if (!q.has("client_id_eq")) vi.setSystemTime(Date.now() + 10_000);
+          return undefined;
+        },
+      ),
+    });
+    const r = await tool("find_projects", { client_name: "顧客", refresh: "full" });
+    expect(r.isError, r.text).toBe(false);
+    expect(r.json.items.length).toBeGreaterThan(0);
+    const fallback = boardCalls(m).filter(
+      (c) => c.url.includes("/v1/projects") && c.url.includes("client_id_eq=7"),
+    );
+    expect(fallback.length).toBeGreaterThanOrEqual(1); // API にフォールバックした
+    const projectsInfo = r.json.cache.find((c: { resource: string }) => c.resource === "projects");
+    expect(projectsInfo, JSON.stringify(r.json.cache)).toMatchObject({
+      resource: "projects",
+      refresh_state: "partial",
+    });
+  });
+});
+
 describe("E2E: 逆引き(書類 ID → 案件 ID)の縮退", () => {
   /** 案件 n 件。案件 i の見積 ID = 1000 + i。 */
   const projects = (n: number) =>

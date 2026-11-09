@@ -236,6 +236,140 @@ describe("cache-first リソース(clients)", () => {
     expect(again.cache[0]?.refresh_state).toBe("partial");
   });
 
+  it("非ゼロ・キャッシュ可能なフィルタ + refresh=full が partial で未同期なら API にフォールバックし、cache に partial を載せる", async () => {
+    const { repos, clock } = setup();
+    const data = makeEntities(250);
+    mockOutboundFetch({
+      [clientsKey]: pagedHandler(
+        () => data,
+        (_page, q) => {
+          // 絞り込み付きの API フォールバックでは時間を進めない(refresh のページ取得だけが遅い)。
+          if (!q.has("name_cont")) clock.advance(9_000);
+          return undefined;
+        },
+      ),
+    });
+    const r = await repos.clients.list(
+      { nameCont: "顧客1" },
+      { refresh: "full" },
+      { deadline: clock.now() + 10_000 },
+    );
+    expect(r.source).toBe("api");
+    expect(r.cache).toHaveLength(1);
+    expect(r.cache[0]).toMatchObject({ resource: "clients", refresh_state: "partial" });
+  });
+
+  it("refresh=delta が失敗し、キャッシュに壊れた行があって API にフォールバックした場合も、cache に failed とエラーコードを載せる", async () => {
+    const { repos, db, clock } = setup();
+    mockOutboundFetch({ [clientsKey]: pagedHandler(clientRows) });
+    await repos.clients.list({}, { refresh: "full" });
+    vi.restoreAllMocks();
+    await db
+      .prepare(
+        "INSERT INTO resource_cache (resource_name, entity_id, payload_json, updated_at, fetched_at, generation) VALUES ('clients', 9999, '{broken', '9999-01-01T00:00:00Z', '2026-11-05T00:00:00Z', 1)",
+      )
+      .run();
+    clock.advance(1000);
+    mockOutboundFetch({
+      [clientsKey]: (call) =>
+        new URL(call.url).searchParams.has("name_cont")
+          ? jsonResponse([{ id: 9, name: "API から" }])
+          : jsonResponse({ message: "secret detail" }, 500),
+    });
+    const r = await repos.clients.list({ nameCont: "api" }, { refresh: "delta" });
+    expect(r.source).toBe("api");
+    expect(r.items).toEqual([{ id: 9, name: "API から" }]);
+    expect(r.cache[0]).toMatchObject({
+      resource: "clients",
+      refresh_state: "failed",
+      refresh_error_code: "api_error",
+    });
+    expect(JSON.stringify(r.cache)).not.toContain("secret detail");
+  });
+
+  it("get: refresh のあとキャッシュミスで API から取った場合、cache に refresh の結果を載せる", async () => {
+    const { repos } = setup();
+    mockOutboundFetch({
+      [clientsKey]: pagedHandler(clientRows),
+      [`GET ${BASE}/v1/clients/*`]: () =>
+        jsonResponse({ id: 77, name: "単体取得", updated_at: "2026-02-01T00:00:00.000+09:00" }),
+    });
+    const r = await repos.clients.get(77, { refresh: "full" });
+    expect(r.source).toBe("api");
+    expect(r.cache).toHaveLength(1);
+    expect(r.cache[0]).toMatchObject({ resource: "clients", refresh_state: "complete" });
+  });
+
+  it("get: refresh=delta が失敗し、キャッシュミスで API から取った場合、cache に failed とエラーコード(メッセージは載せない)", async () => {
+    const { repos, clock } = setup();
+    mockOutboundFetch({ [clientsKey]: pagedHandler(clientRows) });
+    await repos.clients.list({}, { refresh: "full" });
+    vi.restoreAllMocks();
+    clock.advance(1000);
+    mockOutboundFetch({
+      [clientsKey]: () => jsonResponse({ message: "secret detail" }, 500),
+      [`GET ${BASE}/v1/clients/*`]: () =>
+        jsonResponse({ id: 77, name: "単体取得", updated_at: "2026-02-01T00:00:00.000+09:00" }),
+    });
+    const r = await repos.clients.get(77, { refresh: "delta" });
+    expect(r.source).toBe("api");
+    expect(r.cache).toHaveLength(1);
+    expect(r.cache[0]).toMatchObject({
+      resource: "clients",
+      refresh_state: "failed",
+      refresh_error_code: "api_error",
+    });
+    expect(JSON.stringify(r.cache)).not.toContain("secret detail");
+  });
+
+  it("get: refresh=full が partial で、キャッシュミスで API から取った場合、cache に partial を載せる", async () => {
+    const { repos, clock } = setup();
+    const data = makeEntities(250);
+    mockOutboundFetch({
+      [clientsKey]: pagedHandler(
+        () => data,
+        () => {
+          clock.advance(9_000);
+          return undefined;
+        },
+      ),
+      [`GET ${BASE}/v1/clients/*`]: () =>
+        jsonResponse({ id: 9999, name: "単体取得", updated_at: "2026-02-01T00:00:00.000+09:00" }),
+    });
+    const r = await repos.clients.get(
+      9999,
+      { refresh: "full" },
+      { deadline: clock.now() + 10_000 },
+    );
+    expect(r.source).toBe("api");
+    expect(r.cache).toHaveLength(1);
+    expect(r.cache[0]).toMatchObject({ resource: "clients", refresh_state: "partial" });
+  });
+
+  it("list: full が partial で未同期でも、refresh=none(既定)で API にフォールバックしたときは cache を載せない", async () => {
+    const { repos, clock } = setup();
+    const data = makeEntities(250);
+    mockOutboundFetch({
+      [clientsKey]: pagedHandler(
+        () => data,
+        (_page, q) => {
+          if (!q.has("name_cont")) clock.advance(9_000);
+          return undefined;
+        },
+      ),
+    });
+    const first = await repos.clients.list(
+      {},
+      { refresh: "full" },
+      { deadline: clock.now() + 10_000 },
+    );
+    // 前提: full が途中で止まり、未同期のまま。
+    expect(first.cache[0]).toMatchObject({ resource: "clients", refresh_state: "partial" });
+    const r = await repos.clients.list({ nameCont: "顧客1" });
+    expect(r.source).toBe("api");
+    expect(r.cache).toEqual([]);
+  });
+
   it("get: キャッシュにあれば API を呼ばない / なければ API から取って保存し、次はキャッシュから返す", async () => {
     const { repos, db } = setup();
     const api = mockOutboundFetch({
