@@ -100,7 +100,19 @@ const GO_LIST_FLAGS: Record<string, string[]> = {
   project_costs: ["project_id"],
   // invoices / purchase_orders / payments / users の引数は、Go 版の写しが BOARD に実在しない項目だったため
   // OpenAPI v1.9.0 に合わせて訂正した(issue #27)。
-  invoices: ["project_client_id_eq", "invoice_status_in", "response_group"],
+  // 案件での絞り込みと日付は issue #31 で追加(OpenAPI v1.9.0 の GET /v1/invoices のクエリ名のまま)。
+  invoices: [
+    "project_client_id_eq",
+    "invoice_status_in",
+    "project_project_no_eq",
+    "project_management_no_eq",
+    "project_name_cont",
+    "invoice_date_gteq",
+    "invoice_date_lteq",
+    "invoice_payment_limit_date_gteq",
+    "invoice_payment_limit_date_lteq",
+    "response_group",
+  ],
   vendors: ["name_cont"],
   vendor_branches: ["payee_id_eq"],
   vendor_contacts: ["payee_id_eq"],

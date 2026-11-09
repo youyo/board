@@ -66,6 +66,10 @@ export interface StatusedQuery extends CommonQuery {
   partnerName?: string;
   status?: string;
   statuses?: string[];
+  /** 請求書だけ: 案件 ID(project_name と排他)。 */
+  projectId?: number;
+  /** 請求書だけ: 案件名(部分一致で 1 件に解決する。project_id と排他)。 */
+  projectName?: string;
 }
 
 // --- 検証(Go の validate) -----------------------------------------------------------------
@@ -119,26 +123,40 @@ export function validateDocumentQuery(q: DocumentQuery): void {
 }
 
 /** 請求書・発注書・支払の共通の検証。`narrow` はエラー文に使う相手先の名前(ID / ClientID / VendorID)。 */
-export function validateStatusedQuery(q: StatusedQuery, narrow: string): void {
+export function validateStatusedQuery(q: StatusedQuery, narrow: string, extraNarrow = false): void {
   validateCommon(q);
   validateStatusGroup(q.status, q.statuses);
   if (
     !set(q.id) &&
     !set(q.partnerId) &&
     !set(q.partnerName) &&
+    !extraNarrow &&
     !set(q.status) &&
     !q.statuses?.length
   ) {
     throw atLeastOne();
   }
   // statuses(複数)だけでは API に委譲できず全件走査になる。単独の status は status_eq で委譲できる。
-  if ((q.statuses?.length ?? 0) > 0 && !set(q.id) && !set(q.partnerId) && !set(q.partnerName)) {
+  if (
+    (q.statuses?.length ?? 0) > 0 &&
+    !set(q.id) &&
+    !set(q.partnerId) &&
+    !set(q.partnerName) &&
+    !extraNarrow
+  ) {
     throw new ArgumentError(
       `invalid query: Statuses requires one of ID or ${narrow} to narrow results`,
     );
   }
 }
-export const validateInvoiceQuery = (q: StatusedQuery) => validateStatusedQuery(q, "ClientID");
+export function validateInvoiceQuery(q: StatusedQuery): void {
+  if (set(q.projectId) && set(q.projectName)) {
+    throw new ArgumentError("invalid query: project_id / project_name are mutually exclusive");
+  }
+  if ((q.projectId ?? 0) < 0) throw new ArgumentError("project_id must be >= 0");
+  // 案件の指定は絞り込みとして数える(案件だけ・案件 + statuses でも検索できる)。
+  validateStatusedQuery(q, "ClientID", set(q.projectId) || set(q.projectName));
+}
 export const validatePurchaseOrderQuery = (q: StatusedQuery) =>
   validateStatusedQuery(q, "VendorID");
 export const validatePaymentQuery = (q: StatusedQuery) => validateStatusedQuery(q, "VendorID");

@@ -3,6 +3,7 @@
  * 部分一致が 0 件ならエラー、1 件ならその ID、複数なら候補(最大 5 件)を載せたエラー。先頭を黙って採用しない。
  * 解決の読み取りには refresh を付けない(Go が `ReadOptions{}` を渡しているのと同じ)。
  */
+import type { ProjectEntity } from "../board/resources";
 import { ArgumentError, BoardError } from "../errors";
 import type { FindSession } from "./session";
 
@@ -10,7 +11,7 @@ import type { FindSession } from "./session";
 export const RESOLVER_CANDIDATES_MAX = 5;
 
 export function formatCandidates(
-  kind: "client" | "vendor",
+  kind: "client" | "vendor" | "project",
   name: string,
   list: ReadonlyArray<{ id: number; name: string }>,
 ): string {
@@ -39,3 +40,26 @@ async function resolve(s: FindSession, kind: "client" | "vendor", name: string):
 
 export const resolveClientByName = (s: FindSession, name: string) => resolve(s, "client", name);
 export const resolveVendorByName = (s: FindSession, name: string) => resolve(s, "vendor", name);
+
+/**
+ * 案件名 → 案件(部分一致)。顧客の絞り込み(clientId)があれば AND で掛ける。
+ * 0 件は not_found、複数は候補つきの argument_error。請求書の絞り込みには案件番号も要るので、ID ではなくエンティティを返す。
+ */
+export async function resolveProjectByName(
+  s: FindSession,
+  name: string,
+  clientId?: number,
+): Promise<ProjectEntity> {
+  if (name === "") throw new ArgumentError("project name is empty");
+  const list = await s.search(
+    "projects",
+    { nameCont: name, ...(clientId ? { clientIdEq: clientId } : {}) },
+    { noRefresh: true },
+  );
+  const first = list[0];
+  if (!first) {
+    throw new BoardError("not_found", `no project matches name ${JSON.stringify(name)}`, false);
+  }
+  if (list.length === 1) return first;
+  throw new ArgumentError(formatCandidates("project", name, list));
+}

@@ -18,6 +18,7 @@
 | V12 | workers.dev ホストで、`/healthz` だけを対象にした Bypass の Access アプリが、ホスト全体のアプリより優先される(未確認) | runbook の 5 の手順で作り、JWT なしで `/healthz` が 200、`/mcp` が Access に止められることを見る | `/healthz` が Access の内側のまま。ブラウザでログインして開く、または `wrangler tail` で確認する |
 | V13 | 下流の `deploy.yml` が、main への push で `ci.yml` が成功したあとに `workflow_run` で起動し、Environment `production` の secrets が渡ってデプロイが通る(未確認) | 下流で main に push し、Actions の実行を確認する。PR の CI では起動せず、`ci.yml` が失敗したときは skipped になる | 自動デプロイが動かない。手動の `mise run deploy` に戻す(docs/deploy-ci.md) |
 | V14 | 仕様(OpenAPI v1.9.0)に無い `GET /v1/{invoices,expenditure_payments,users,groups,payment_terms,project_types,expenditure_types,accounting_types,document_send_channels}/{id}` の 9 本が、実 API に存在するか(未確認。仕様には一覧しか無い) | `cache_clear` のあとに、対応する `get_*`(`get_invoice` / `get_payment` / `get_user` / `get_group` / `get_payment_term` / `get_project_type` / `get_purchase_type` / `get_accounting_type` / `get_document_send_channel`)を一覧で見えた ID で呼ぶ。キャッシュに当たると確認にならないので、必ず先に `cache_clear` する | 存在しなければ `not_found` になる(見えるエラー)。その場合は `get_*` を一覧から引く方式に変える |
+| V15 | 請求書を案件で絞る(issue #31。未確認): `list_invoices` の `project_project_no_eq` / `project_name_cont` / `project_management_no_eq` と、`find_invoices` の `project_name` / `project_id` が、その案件の請求書だけを返す。実 API が `project_project_no_eq` を効かせるか | `find_invoices project_name=<案件名>` と `list_invoices project_project_no_eq=<案件番号>` を、請求書を持つ案件で呼ぶ。キャッシュに当たると API の確認にならないので、`cache_clear` のあとに呼ぶ | 他の案件の請求書が混ざる(`find_invoices` は後段で `project_id` を突き合わせるので混ざらないが、`list_invoices` は混ざる)。その場合は API が無視している |
 
 ## 記入欄
 
@@ -112,3 +113,12 @@
 - accounting_types(`get_accounting_type`): [ ] 取れた  [ ] `not_found`
 - document_send_channels(`get_document_send_channel`): [ ] 取れた  [ ] `not_found`
 - 外れたときの影響: その `get_*` が `not_found` になる。`list_*` は影響を受けない。取れないものは一覧から ID で引く方式に変える。
+
+### V15 請求書を案件で絞る(2026-11-09 追加。issue #31。未確認)
+- 前提: `GET /v1/invoices` が受ける `project_project_no_eq` / `project_management_no_eq` / `project_name_cont` を送る(OpenAPI v1.9.0 に載っている)。`find_invoices` は案件番号で絞った結果を `project_id` でも突き合わせる。
+- 手順: 請求書を持つ案件を 1 つ選び、`cache_clear` のあとに `find_invoices project_name=<案件名>` と `list_invoices project_project_no_eq=<案件番号>` を呼ぶ。
+- 確認日 / 確認者:
+- `find_invoices project_name=<案件名>` がその案件の請求書だけを返す: [ ] はい  [ ] いいえ
+- `list_invoices project_project_no_eq=<案件番号>` がその案件の請求書だけを返す(キャッシュを空にして API 経由で): [ ] はい  [ ] いいえ
+- `list_invoices project_name_cont=<案件名の一部>` / `project_management_no_eq=<管理番号>` が同様に効く: [ ] はい  [ ] いいえ
+- 外れたときの影響: `list_invoices` が他の案件の請求書を返す。`find_invoices` は後段の `project_id` で除くので正しいが、取得件数が増える。

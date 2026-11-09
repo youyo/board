@@ -472,6 +472,135 @@ describe("find_invoices(Go: find_invoice_test.go + issue #27)", () => {
     const f = fakeFind({ invoices: { get: () => Promise.reject(notFound()) } });
     expect((await rejects(findInvoices(f.session(), { id: 1 })))?.code).toBe("not_found");
   });
+
+  describe("案件で絞る(issue #31)", () => {
+    const proj = (id: number, project_no: number | null, name = `案件${id}`) => ({
+      id,
+      name,
+      project_no,
+    });
+
+    it("project_id: 案件を get して project_no を projectProjectNoEq に渡し、project_id が違う請求書は除く", async () => {
+      const f = fakeFind({
+        ...base,
+        projects: { get: (id: number) => proj(id, 1001) },
+        invoices: {
+          list: () => [inv(1, { project_id: 42 }), inv(2, { project_id: 43 })],
+        },
+      });
+      const r = await findInvoices(f.session(), { projectId: 42 });
+      expect(r.map((x) => x.Invoice.id)).toEqual([1]);
+      expect(f.calls("projects.get")[0]).toContain("projects.get 42");
+      expect(f.calls("invoices.list")[0]).toContain('{"projectProjectNoEq":1001}');
+    });
+
+    it("project_id: project_no が null の案件は projectProjectNoEq を掛けず、後段の project_id だけで絞る", async () => {
+      const f = fakeFind({
+        ...base,
+        projects: { get: (id: number) => proj(id, null) },
+        invoices: {
+          list: () => [inv(1, { project_id: 42 }), inv(2, { project_id: 43 })],
+        },
+      });
+      const r = await findInvoices(f.session(), { projectId: 42 });
+      expect(r.map((x) => x.Invoice.id)).toEqual([1]);
+      expect(f.calls("invoices.list")[0]).toContain("invoices.list {} ");
+    });
+
+    it("project_name: 1 件に解決して案件番号で絞る(client_name と併用すると clientIdEq も掛け、請求書も顧客で絞る)", async () => {
+      const f = fakeFind({
+        clients: { list: () => [{ id: 7, name: "A" }], get: (id: number) => ({ id }) },
+        projects: {
+          list: () => [proj(42, 1001, "Web サイト")],
+          get: (id: number) => proj(id, 1001),
+        },
+        invoices: {
+          list: () => [inv(1, { project_id: 42 }), inv(2, { project_id: 99 })],
+        },
+      });
+      const r = await findInvoices(f.session(), { projectName: "Web", partnerName: "A" });
+      expect(r.map((x) => x.Invoice.id)).toEqual([1]);
+      expect(f.calls("projects.list")[0]).toContain('{"nameCont":"Web","clientIdEq":7}');
+      expect(f.calls("invoices.list")[0]).toContain(
+        '{"projectClientIdEq":7,"projectProjectNoEq":1001}',
+      );
+    });
+
+    it("project_name: 0 件は not_found、複数は候補つき argument_error(請求書は引かない)", async () => {
+      const none = fakeFind({ ...base, projects: { list: () => [] } });
+      expect((await rejects(findInvoices(none.session(), { projectName: "x" })))?.code).toBe(
+        "not_found",
+      );
+      expect(none.calls("invoices.list")).toHaveLength(0);
+
+      const many = fakeFind({
+        ...base,
+        projects: { list: () => [proj(1, 1, "案件A"), proj(2, 2, "案件B")] },
+      });
+      const e = await rejects(findInvoices(many.session(), { projectName: "案件" }));
+      expect(e?.code).toBe("argument_error");
+      expect(e?.message).toContain("multiple projects match");
+      expect(e?.message).toContain("id=1");
+      expect(e?.message).toContain("id=2");
+      expect(many.calls("invoices.list")).toHaveLength(0);
+    });
+
+    it("project_name: project_no が null の案件は後段の project_id だけで絞る", async () => {
+      const f = fakeFind({
+        ...base,
+        projects: { list: () => [proj(42, null)], get: (id: number) => proj(id, null) },
+        invoices: { list: () => [inv(1, { project_id: 42 }), inv(2, { project_id: 43 })] },
+      });
+      const r = await findInvoices(f.session(), { projectName: "案件" });
+      expect(r.map((x) => x.Invoice.id)).toEqual([1]);
+      expect(f.calls("invoices.list")[0]).toContain("invoices.list {} ");
+    });
+
+    it("project_id と project_name は排他(argument_error。通信しない)", async () => {
+      const f = fakeFind(base);
+      const e = await rejects(findInvoices(f.session(), { projectId: 1, projectName: "x" }));
+      expect(e?.code).toBe("argument_error");
+      expect(e?.message).toContain("mutually exclusive");
+      expect(f.log).toEqual([]);
+    });
+
+    it("id 指定のときは project_id / project_name を無視する", async () => {
+      const f = fakeFind({
+        ...base,
+        invoices: { get: (id: number) => inv(id, { project_id: 42 }) },
+      });
+      const r = await findInvoices(f.session(), { id: 9, projectId: 1 });
+      expect(r.map((x) => x.Invoice.id)).toEqual([9]);
+      expect(f.calls("projects.list")).toHaveLength(0);
+      expect(f.calls("invoices.list")).toHaveLength(0);
+    });
+
+    it("id と client_name の併用: 顧客を検索せず(clients.list を呼ばない)、id の請求書だけ返す", async () => {
+      // clients.list / invoices.list のハンドラは定義しない(呼ぶと fake が例外にする)。
+      const f = fakeFind({
+        ...base,
+        clients: { get: (id: number) => ({ id }) },
+        invoices: { get: (id: number) => inv(id) },
+      });
+      const r = await findInvoices(f.session(), { id: 9, partnerName: "A" });
+      expect(r.map((x) => x.Invoice.id)).toEqual([9]);
+      expect(f.calls("clients.list")).toHaveLength(0);
+      expect(f.calls("invoices.list")).toHaveLength(0);
+      expect(f.calls("invoices.get")).toHaveLength(1);
+    });
+
+    it("存在しない project_id は not_found(請求書は引かない)", async () => {
+      const f = fakeFind({
+        ...base,
+        projects: { get: () => Promise.reject(notFound()) },
+      });
+      expect((await rejects(findInvoices(f.session(), { projectId: 999 })))?.code).toBe(
+        "not_found",
+      );
+      expect(f.calls("projects.get")[0]).toContain("projects.get 999");
+      expect(f.calls("invoices.list")).toHaveLength(0);
+    });
+  });
 });
 
 describe("find_purchase_orders(Go: find_purchase_order_test.go + issue #27)", () => {

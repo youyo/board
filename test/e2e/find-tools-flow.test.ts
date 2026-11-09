@@ -275,6 +275,66 @@ describe("E2E: 11 ツールの代表的な成功パス", () => {
     expect(boardCalls(m).filter((c) => c.url.includes("/v1/invoices"))).toHaveLength(before);
   });
 
+  it("find_invoices: project_name を案件に解決し、その案件の請求書だけを返す(API に project_project_no_eq を送る。issue #31)", async () => {
+    const mine = invoiceEntity({ id: 1, project_id: 42, project_no: 1001, client: ref(7, "A") });
+    const other = invoiceEntity({ id: 2, project_id: 43, project_no: 1002, client: ref(7, "A") });
+    const m = boardMocks({
+      [get("/v1/projects")]: list([{ id: 42, name: "Web サイト制作", project_no: 1001 }]),
+      [get("/v1/projects/42")]: one({ id: 42, name: "Web サイト制作", project_no: 1001 }),
+      [get("/v1/clients/7")]: one({ id: 7, name: "A" }),
+      // 実 API は project_project_no_eq で絞るが、モックは全件を返す。後段の project_id 絞り込みが効くことも見る。
+      [get("/v1/invoices")]: list([mine, other]),
+    });
+    const r = await tool("find_invoices", { project_name: "Web サイト" });
+    expect(r.isError, r.text).toBe(false);
+    expect(r.json.items.map((x: { Invoice: { id: number } }) => x.Invoice.id)).toEqual([1]);
+    const q = new URL(boardCalls(m).find((c) => c.url.includes("/v1/invoices"))?.url ?? "")
+      .searchParams;
+    expect(q.get("project_project_no_eq")).toBe("1001");
+  });
+
+  it("list_invoices: project_project_no_eq / project_name_cont / project_management_no_eq はキャッシュ同期済みならキャッシュで絞る", async () => {
+    const rows = [
+      invoiceEntity({
+        id: 1,
+        project_id: 42,
+        project_no: 1001,
+        management_no: "M-1",
+        name: "Web サイト",
+      }),
+      invoiceEntity({
+        id: 2,
+        project_id: 43,
+        project_no: 1002,
+        management_no: "M-2",
+        name: "アプリ",
+      }),
+    ];
+    const m = boardMocks({ [get("/v1/invoices")]: list(rows) });
+    const byNo = await tool("list_invoices", { project_project_no_eq: 1001, refresh: "full" });
+    expect(byNo.isError, byNo.text).toBe(false);
+    expect(byNo.json.items.map((x: { id: number }) => x.id)).toEqual([1]);
+    const before = boardCalls(m).length;
+    const byName = await tool("list_invoices", { project_name_cont: "アプリ" }, 2);
+    expect(byName.json.items.map((x: { id: number }) => x.id)).toEqual([2]);
+    const byMgmt = await tool("list_invoices", { project_management_no_eq: "M-1" }, 3);
+    expect(byMgmt.json.items.map((x: { id: number }) => x.id)).toEqual([1]);
+    expect(boardCalls(m)).toHaveLength(before);
+  });
+
+  it("list_invoices: invoice_date_gteq などはキャッシュを使わず API に送る", async () => {
+    const m = boardMocks({ [get("/v1/invoices")]: list([invoiceEntity({ id: 1 })]) });
+    const r = await tool("list_invoices", {
+      invoice_date_gteq: "2026-01-01",
+      invoice_payment_limit_date_lteq: "2026-02-28",
+    });
+    expect(r.isError, r.text).toBe(false);
+    const q = new URL(boardCalls(m).find((c) => c.url.includes("/v1/invoices"))?.url ?? "")
+      .searchParams;
+    expect(q.get("invoice_date_gteq")).toBe("2026-01-01");
+    expect(q.get("invoice_payment_limit_date_lteq")).toBe("2026-02-28");
+  });
+
   it("find_invoices: ID 指定で Client が付く(請求書の client.id から取る)", async () => {
     const m = boardMocks({
       [get("/v1/invoices/9")]: one(invoiceEntity({ id: 9, project_id: 42, client: ref(7, "A") })),
