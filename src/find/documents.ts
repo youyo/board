@@ -52,6 +52,25 @@ interface Candidate {
   client?: ClientEntity;
 }
 
+/** response_group=<種別> 付きの案件で、その種別の書類が埋め込まれるキー(案件のキーは deliveries / receipts と複数形)。 */
+const EMBED_KEY: Record<DocumentKind, "estimate" | "order" | "deliveries" | "receipts"> = {
+  estimate: "estimate",
+  order: "order",
+  delivery: "deliveries",
+  receipt: "receipts",
+};
+
+/**
+ * 結果の Project に入れる案件。response_group で埋め込まれた書類本体は、結果の書類側(Estimate など)と
+ * 二重になって応答が倍になるので落とす。元の案件(逆引きの記録などが読む)は書き換えない。
+ */
+function projectForResult(kind: DocumentKind, p: ProjectEntity): ProjectEntity {
+  const key = EMBED_KEY[kind];
+  if (!(key in p)) return p;
+  const { [key]: _embedded, ...rest } = p;
+  return rest as ProjectEntity;
+}
+
 const isNotFound = (e: unknown) => e instanceof BoardError && e.code === "not_found";
 
 function build(
@@ -141,7 +160,7 @@ async function fetchAll(
       build(kind, s, doc, {
         ProjectID: c.project.id,
         ClientID: c.clientId,
-        Project: c.project,
+        Project: projectForResult(kind, c.project),
         Client,
       }),
     );
