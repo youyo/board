@@ -14,7 +14,7 @@
 | V6 | `X-Total-Count` が返る(full refresh の件数照合に使う) | `list_*` を `show_meta: true` で呼び、`_meta` に総件数があること。`cache_status` の `full_prune_skipped` が false のままであること。`full_prune_skipped` が立つと `must_full_resync` も立ち、前回の full の完了から 6 時間以上たっていれば、次の `refresh=delta` は full になる(v1.9.0。6 時間未満は delta のまま)。full を繰り返しても `full_prune_skipped` が true のままなら、BOARD の総件数の数え方を疑う | 件数の照合ができず旧世代の行を消さない(`full_prune_skipped` が立ち続ける) |
 | V7 | Workers Paid プランで full refresh と逆引きの走査が 1 回の呼び出しの D1 クエリ上限に収まる | `test:live` が最後まで通ること。D1 のエラー(`generic_error`)が出ないこと | Free プランでは収まらない(runbook 9) |
 | V8 | 書類(見積・受注・納品・領収)の逆引きが 1〜2 回の呼び出しで覚え切る | 書類の ID を `find_estimates` などで引き、`cache_status` の `document_scans` が `complete` に進むのを見る | 初回のみ `project_unresolved` の警告が続く |
-| V9 | Portal 経由のツール名が `board_` 付きで見え、`tools/list` の 54 個がすべて出る | Portal 経由でツール一覧を確認 | 名前の前提(README)が違う |
+| V9 | Portal 経由のツール名が `board_` 付きで見え、`tools/list` の 55 個がすべて出る | Portal 経由でツール一覧を確認 | 名前の前提(README)が違う |
 | V12 | workers.dev ホストで、`/healthz` だけを対象にした Bypass の Access アプリが、ホスト全体のアプリより優先される(未確認) | runbook の 5 の手順で作り、JWT なしで `/healthz` が 200、`/mcp` が Access に止められることを見る | `/healthz` が Access の内側のまま。ブラウザでログインして開く、または `wrangler tail` で確認する |
 | V13 | 下流の `deploy.yml` が、main への push で `ci.yml` が成功したあとに `workflow_run` で起動し、Environment `production` の secrets が渡ってデプロイが通る(未確認) | 下流で main に push し、Actions の実行を確認する。PR の CI では起動せず、`ci.yml` が失敗したときは skipped になる | 自動デプロイが動かない。手動の `mise run deploy` に戻す(docs/deploy-ci.md) |
 | V14 | 仕様(OpenAPI v1.9.0)に無い `GET /v1/{invoices,expenditure_payments,users,groups,payment_terms,project_types,expenditure_types,accounting_types,document_send_channels}/{id}` の 9 本が、実 API に存在するか(未確認。仕様には一覧しか無い) | `cache_clear` のあとに、対応する `get_*`(`get_invoice` / `get_payment` / `get_user` / `get_group` / `get_payment_term` / `get_project_type` / `get_purchase_type` / `get_accounting_type` / `get_document_send_channel`)を一覧で見えた ID で呼ぶ。キャッシュに当たると確認にならないので、必ず先に `cache_clear` する | 存在しなければ `not_found` になる(見えるエラー)。その場合は `get_*` を一覧から引く方式に変える |
@@ -69,7 +69,7 @@
 
 ### V9 Portal のツール名
 - 確認日 / 確認者:
-- 結果: [ ] `board_` 付きで 54 個  / メモ:
+- 結果: [ ] `board_` 付きで 55 個  / メモ:
 
 ### V10 workers.dev での Access と Managed OAuth(`customDomain` が空のとき。2026-11-06 追加)
 - 確認日 / 確認者:

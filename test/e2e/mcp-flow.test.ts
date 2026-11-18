@@ -37,13 +37,13 @@ describe("E2E: /mcp (Access の JWT つき)", () => {
     const list = await readRpc(await mcpCall(jwt, "tools/list", {}, 2));
     const names = list.result?.tools?.map((t) => t.name) ?? [];
     expect(names).toContain("server_info");
-    expect(names).toHaveLength(54); // server_info + api 層 40 個(M04)+ find 層 11 個(M05)+ cache 系 2 個(M06)
+    expect(names).toHaveLength(55); // server_info + api 層 40 個(M04)+ find 層 11 個(M05)+ cache 系 2 個(M06)+ board_feedback(ADR 0007)
 
     const call = await readRpc(
       await mcpCall(jwt, "tools/call", { name: "server_info", arguments: {} }, 3),
     );
     expect(call.result?.isError).not.toBe(true);
-    expect(JSON.parse(firstText(call))).toEqual({ name: "board", version: "1.9.0" });
+    expect(JSON.parse(firstText(call))).toEqual({ name: "board", version: "1.10.0" });
   });
 
   it("server_info の応答に API キー・トークン・JWT を含めない", async () => {

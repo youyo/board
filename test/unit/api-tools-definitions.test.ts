@@ -167,10 +167,11 @@ describe("api 層のツール一覧", () => {
   it("api 層は list 18 + get 22(server_info と find 層は別)", () => {
     expect(Object.keys(LIST_TOOLS)).toHaveLength(18);
     expect(Object.keys(GET_TOOLS)).toHaveLength(22);
-    // 全体は server_info + api 層 40 個 + find 層 11 個(find-tools-definitions.test.ts)+ cache 系 2 個(cache-tools.test.ts)。
+    // 全体は server_info + api 層 40 個 + find 層 11 個(find-tools-definitions.test.ts)+ cache 系 2 個(cache-tools.test.ts)
+    // + board_feedback(feedback.test.ts。ADR 0007)。
     expect(
       ALL_TOOLS.map((t) => t.name)
-        .filter((n) => !n.startsWith("find_") && !n.startsWith("cache_"))
+        .filter((n) => !n.startsWith("find_") && !n.startsWith("cache_") && n !== "board_feedback")
         .sort(),
     ).toEqual(["server_info", ...Object.values(LIST_TOOLS), ...Object.values(GET_TOOLS)].sort());
   });

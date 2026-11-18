@@ -2,7 +2,7 @@
 
 > **下流リポジトリ**(upstream の board を取り込んだ自分の private リポジトリ)のセットアップ・デプロイでは、以下の「デプロイしない」等の規約は適用しない(upstream の開発時の規約)。秘密値の扱い(API キー・トークン・JWT を会話・ファイル・ログに出さない)と、コミットや push はユーザーの指示があるときだけ、は下流でも変わらない。`.claude/skills/board-setup/SKILL.md` に従う(Codex も同じパス。`.agents/skills/` からの symlink)。
 
-board(BOARD API 向け Remote MCP サーバー。Cloudflare Workers + Hono + D1。ツール 54 個)の作業規約。
+board(BOARD API 向け Remote MCP サーバー。Cloudflare Workers + Hono + D1。ツール 55 個)の作業規約。
 計画は `plans/`(ロードマップ `plans/board-workers-roadmap.md` と各マイルストーン `plans/board-workers-m*.md`)。使い方は `README.md`(英語)と `README_ja.md`(日本語。内容は同じ)、デプロイと運用は `docs/runbook.md`、設計の理由は `docs/adr/`、実機でしか確かめられない前提は `docs/manual-verification.md`。
 構成と規約は姉妹リポジトリ `../logbutler` に揃えている。決定済み事項はロードマップが正で、勝手に覆さない。
 Go 版は `archive/go-cli` ブランチと `go-cli-final` タグにある(このブランチには無い)。
@@ -31,9 +31,9 @@ Go 版は `archive/go-cli` ブランチと `go-cli-final` タグにある(この
 
 - MCP ツールの出力は JSON を text content で返す(structuredContent は使わない)。BOARD の生データは BOARD のキー(snake_case)のまま。
 - エラーは `{"schema_version":"1","error":{"code":"...","message":"...","retryable":false}}` を `isError: true` で返す(`src/errors.ts`)。想定外の例外は `generic_error` にして message を応答に出さない。
-- 読み取りツールには引数 `max_response_tokens`(応答サイズの安全網。既定 50000、0 で無効)が `defineTool` で自動的に付く。超過は切り詰めず `response_too_large`(logbutler の ADR 0007 と同じ。`src/mcp/response-limit.ts`)。書き込み系は対象外、巨大な応答を返すテストは `max_response_tokens: 0` を付ける。
+- 読み取りツール(`board_feedback` を除く。ADR 0007)には引数 `max_response_tokens`(応答サイズの安全網。既定 50000、0 で無効)が `defineTool` で自動的に付く。超過は切り詰めず `response_too_large`(logbutler の ADR 0007 と同じ。`src/mcp/response-limit.ts`)。書き込み系は対象外、巨大な応答を返すテストは `max_response_tokens: 0` を付ける。
 - 文字列の引数は 1000 文字、配列は 100 件まで。超えると `argument_error`(`src/mcp/args.ts`)。
-- ツール名に接頭辞は付けない(MCP Server Portal が `board_` を前置する)。snake_case。
+- ツール名に接頭辞は付けない(MCP Server Portal が `board_` を前置する)。snake_case。**例外は feedback の `board_feedback`**(共通仕様 `<製品>_feedback`。複数の MCP を同時に接続しても衝突しないよう製品名を持つ。ADR 0007。名前の検査 `TOOL_NAME` は変更不要)。
 - **起動時の設定チェック**(`src/config-check.ts`。logbutler の ADR 0010 と同じ): 必須の vars / secrets / D1(`DB` / `ACCESS_TEAM_DOMAIN` / `ACCESS_AUD` / `BOARD_BASE_URL` / `BOARD_API_KEY` / `BOARD_API_TOKEN`)が欠けている・プレースホルダ(`<...>`)のままなら、`/healthz` は 503、それ以外は 500 で項目名だけを返す。ログにも応答にも**値は出さない**。必須の設定を足したら `checkConfig` と unit / E2E を更新する。
 - GitHub Actions は**コミット SHA で固定**する(`.github/workflows/ci.yml`)。更新時は `gh api repos/<owner>/<repo>/git/ref/tags/<tag>` で実在を確かめる。
 
@@ -52,7 +52,8 @@ src/refresh/              lock(D1 の条件付き UPDATE)と refresher(delta / f
 src/repository/           cache → refresh → API の統一窓口(22 リソースの表 resources.ts)と書類 → 案件の逆引き(document-index.ts)
 src/find/                 find 層(名前の解決・fanout・contract_status・url。resolveUiBaseUrl)
 src/mcp/                  registry(defineTool / registerTools)・server・args・response-limit・call-context
-src/mcp/tools/            index.ts の ALL_TOOLS に足す: server-info(1)・api(40)・find(11)・cache(2)= 54 個
+src/mcp/tools/            index.ts の ALL_TOOLS に足す: server-info(1)・api(40)・find(11)・cache(2)・feedback(1)= 55 個
+src/feedback/             feedback ツール(ADR 0007。共通仕様は logbutler の ADR 0019)。guide.ts(kind だけを取る純関数 buildFeedbackGuide。import してよいのは info.ts・errors.ts と feedback/ 内だけ。env・ToolContext・repository・board クライアントは import しない)・board.ts(board 固有の匿名化ルール・プレースホルダ)。応答は kind だけで決まり、issue は作らず外部へ通信しない
 scripts/deploy-config/    core.ts(純粋なコア。検証・生成・補助)+ main.ts(入口)。board.config.json と wrangler.jsonc から deploy/wrangler.jsonc を生成・検査
 scripts/openapi-fields/  OpenAPI(BOARD 公式 v1.9.0。JSON はコミットしない)から test/helpers/openapi-fields.ts(22 リソースの応答キーと一覧のクエリ名)と src/board/openapi-support.ts(一覧が受ける共通フィルタ。delta → full の判定に使う)を生成。`mise run openapi:fields -- <json> [--check]`。仕様を更新したら再生成して型・クエリを合わせる
 scripts/setup.sh          mise run setup の本体(前提の確認 → D1 → deploy:config → deploy → secrets → /healthz)。scripts/deploy.sh は mise run deploy の本体

@@ -81,7 +81,10 @@ export interface ToolContext {
 }
 
 export interface ToolDefinitionInput<S extends z.ZodObject> {
-  /** snake_case。接頭辞は付けない(MCP Server Portal が前置する)。 */
+  /**
+   * snake_case。接頭辞は付けない(MCP Server Portal が前置する)。
+   * 例外は feedback(<製品>_feedback = board_feedback。複数の MCP を同時に接続しても衝突しないよう製品名を持つ。ADR 0007)。
+   */
   name: string;
   /** annotation の title(日本語)。 */
   title: string;

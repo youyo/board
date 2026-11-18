@@ -3,7 +3,7 @@
 [English](README.md) | 日本語
 
 **BOARD (https://the-board.jp) を AI エージェントから使うための Remote MCP サーバー。**
-BOARD API(`https://api.the-board.jp/v1/`)の 22 リソースを、**54 個**のツールで読み取れる。
+BOARD API(`https://api.the-board.jp/v1/`)の 22 リソースを、**55 個**のツールで読み取れる。
 Cloudflare Workers + D1 + Hono で動き、Cloudflare Access(MCP Server Portal + Managed OAuth)の背後に置く。
 
 > Go 製の CLI + ローカル MCP(v0.11.1)を書き直したもの。Go 版は `archive/go-cli` ブランチと、注釈付きタグ `go-cli-final`(= v0.11.1)に残してある。
@@ -26,7 +26,7 @@ MCP クライアント(Claude など)
 │   │ Cf-Access-Jwt-Assertion                                                  │
 │   ▼                                                                          │
 │ board(Worker)  /healthz(認証なし)  /mcp(JWT 検証 → ツール)                │
-│   │  ツール 54 個                                                             │
+│   │  ツール 55 個                                                             │
 │   ├─▶ D1: resource_cache / sync_state / 書類→案件の逆引き                    │
 │   └─▶ BOARD API(x-api-key + Bearer。直列・再試行・締め切り 30 秒)           │
 └──────────────────────────────────────────────────────────────────────────────┘
@@ -40,23 +40,25 @@ MCP クライアント(Claude など)
 - [ADR 0004: 書類 ID から案件 ID への逆引き](docs/adr/0004-document-reverse-lookup.md)
 - [ADR 0005: upstream / 下流モデルのデプロイ](docs/adr/0005-upstream-downstream-deploy.md)
 - [ADR 0006: アーカイブ・失注を含めたキャッシュと、クエリの版による旧キャッシュの無効化](docs/adr/0006-archive-lost-and-query-version.md)
+- [ADR 0007: feedback ツール(`board_feedback`)](docs/adr/0007-feedback-tool.md)
 
-## ツール一覧(54 個)
+## ツール一覧(55 個)
 
-ツール名に接頭辞は付けていない。MCP Server Portal 経由だと `board_` が前置される(例 `board_list_clients`)。
+ツール名に接頭辞は付けていない(例外は製品名を持つ `board_feedback`。[ADR 0007](docs/adr/0007-feedback-tool.md))。MCP Server Portal 経由だと `board_` が前置される(例 `board_list_clients`)。
 
 | グループ | 個数 | ツール |
 |---|---|---|
-| `server` | 1 | `server_info` |
+| `server` | 2 | `board_feedback`, `server_info` |
 | `list` | 18 | `list_accounting_types`, `list_client_branches`, `list_clients`, `list_contacts`, `list_document_send_channels`, `list_groups`, `list_invoices`, `list_payment_terms`, `list_payments`, `list_project_costs`, `list_project_types`, `list_projects`, `list_purchase_orders`, `list_purchase_types`, `list_users`, `list_vendor_branches`, `list_vendor_contacts`, `list_vendors` |
 | `get` | 22 | `get_accounting_type`, `get_client`, `get_client_branch`, `get_contact`, `get_delivery`, `get_document_send_channel`, `get_estimate`, `get_group`, `get_invoice`, `get_order`, `get_payment`, `get_payment_term`, `get_project`, `get_project_cost`, `get_project_type`, `get_purchase_order`, `get_purchase_type`, `get_receipt`, `get_user`, `get_vendor`, `get_vendor_branch`, `get_vendor_contact` |
 | `find` | 11 | `find_clients`, `find_deliveries`, `find_estimates`, `find_invoices`, `find_orders`, `find_payments`, `find_projects`, `find_purchase_orders`, `find_receipts`, `find_users`, `find_vendors` |
 | `cache` | 2 | `cache_clear`, `cache_status` |
 
+- **feedback(`board_feedback`)**: 不具合・要望・質問を、公開の GitHub issue([youyo/board](https://github.com/youyo/board/issues))として起票するための案内(日本語)を返すだけ。issue は作らず、BOARD にも GitHub にも通信しない。入力は `kind`(`bug` / `feature` / `question` / `other`)だけ。
 - **api 層(`list_*` / `get_*`)**: BOARD API に準拠した低レベルの読み取り。BOARD の生データを snake_case のまま返す。`show_meta` で `_meta`(総件数・ページ情報)も返す。
 - **find 層(`find_*`)**: 名前から ID を解決し、関連するエンティティ(顧客・支店・担当者・案件)を付けて返す高レベルの検索。LLM 向け。
 - **cache 層**: `cache_status` は D1 の状態の確認(読み取り専用)、`cache_clear` はキャッシュの削除(破壊的)。`cache_expire` は作っていない(読み取りに影響しないため。[計画書](plans/board-workers-m06-finish.md)参照)。
-- 読み取りツールには引数 `max_response_tokens`(応答サイズの安全網。既定 50000、0 で無効)が付く。超過は切り詰めず `response_too_large`。
+- 読み取りツール(`board_feedback` を除く。[ADR 0007](docs/adr/0007-feedback-tool.md))には引数 `max_response_tokens`(応答サイズの安全網。既定 50000、0 で無効)が付く。超過は切り詰めず `response_too_large`。
 - エラーは `{"schema_version":"1","error":{"code","message","retryable"}}` を `isError: true` で返す。
 
 ## 自分の環境にデプロイする

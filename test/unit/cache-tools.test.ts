@@ -39,6 +39,8 @@ describe("ツール定義", () => {
 
   it("cache 系は D1 だけを扱うので openWorldHint=false、ほかの全ツールは true", () => {
     for (const t of ALL_TOOLS) {
+      // board_feedback は外部と通信しないので openWorldHint=false(意図した例外。ADR 0007。test/unit/feedback.test.ts)。
+      if (t.name === "board_feedback") continue;
       const isCache = t.name === "cache_status" || t.name === "cache_clear";
       expect(t.annotations.openWorldHint, t.name).toBe(!isCache);
     }
