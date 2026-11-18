@@ -1,6 +1,7 @@
 import type { ToolDefinition } from "../registry";
 import { API_TOOLS } from "./api";
 import { CACHE_TOOLS } from "./cache";
+import { feedback } from "./feedback";
 import { FIND_TOOLS } from "./find";
 import { serverInfo } from "./server-info";
 
@@ -10,4 +11,5 @@ export const ALL_TOOLS: readonly ToolDefinition[] = [
   ...API_TOOLS,
   ...FIND_TOOLS,
   ...CACHE_TOOLS,
+  feedback,
 ];

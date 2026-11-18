@@ -3,7 +3,7 @@
 English | [日本語](README_ja.md)
 
 **A Remote MCP server for using BOARD (https://the-board.jp) from AI agents.**
-It reads the 22 resources of the BOARD API (`https://api.the-board.jp/v1/`) through **54 tools**.
+It reads the 22 resources of the BOARD API (`https://api.the-board.jp/v1/`) through **55 tools**.
 It runs on Cloudflare Workers + D1 + Hono, and sits behind Cloudflare Access (MCP Server Portal + Managed OAuth).
 
 > A rewrite of the Go CLI + local MCP (v0.11.1). The Go version is kept on the `archive/go-cli` branch and the annotated tag `go-cli-final` (= v0.11.1).
@@ -26,7 +26,7 @@ MCP client (Claude, etc.)
 │   │ Cf-Access-Jwt-Assertion                                                  │
 │   ▼                                                                          │
 │ board (Worker)  /healthz (no auth)  /mcp (JWT check → tools)                 │
-│   │  54 tools                                                                │
+│   │  55 tools                                                                │
 │   ├─▶ D1: resource_cache / sync_state / document → project reverse lookup    │
 │   └─▶ BOARD API (x-api-key + Bearer. serial, retries, 30 s deadline)         │
 └──────────────────────────────────────────────────────────────────────────────┘
@@ -40,23 +40,25 @@ See [docs/adr/](docs/adr/) for the reasons behind the design (the ADRs are writt
 - [ADR 0004: Reverse lookup from document ID to project ID](docs/adr/0004-document-reverse-lookup.md)
 - [ADR 0005: Upstream / downstream deployment model](docs/adr/0005-upstream-downstream-deploy.md)
 - [ADR 0006: Including archived and lost records, and invalidating old caches by query version](docs/adr/0006-archive-lost-and-query-version.md)
+- [ADR 0007: The feedback tool (`board_feedback`)](docs/adr/0007-feedback-tool.md)
 
-## Tools (54 tools)
+## Tools (55 tools)
 
-Tool names have no prefix. Through an MCP Server Portal, `board_` is prepended (for example `board_list_clients`).
+Tool names have no prefix, except `board_feedback`, which keeps the product name ([ADR 0007](docs/adr/0007-feedback-tool.md)). Through an MCP Server Portal, `board_` is prepended (for example `board_list_clients`).
 
 | Group | Count | Tools |
 |---|---|---|
-| `server` | 1 | `server_info` |
+| `server` | 2 | `board_feedback`, `server_info` |
 | `list` | 18 | `list_accounting_types`, `list_client_branches`, `list_clients`, `list_contacts`, `list_document_send_channels`, `list_groups`, `list_invoices`, `list_payment_terms`, `list_payments`, `list_project_costs`, `list_project_types`, `list_projects`, `list_purchase_orders`, `list_purchase_types`, `list_users`, `list_vendor_branches`, `list_vendor_contacts`, `list_vendors` |
 | `get` | 22 | `get_accounting_type`, `get_client`, `get_client_branch`, `get_contact`, `get_delivery`, `get_document_send_channel`, `get_estimate`, `get_group`, `get_invoice`, `get_order`, `get_payment`, `get_payment_term`, `get_project`, `get_project_cost`, `get_project_type`, `get_purchase_order`, `get_purchase_type`, `get_receipt`, `get_user`, `get_vendor`, `get_vendor_branch`, `get_vendor_contact` |
 | `find` | 11 | `find_clients`, `find_deliveries`, `find_estimates`, `find_invoices`, `find_orders`, `find_payments`, `find_projects`, `find_purchase_orders`, `find_receipts`, `find_users`, `find_vendors` |
 | `cache` | 2 | `cache_clear`, `cache_status` |
 
+- **feedback (`board_feedback`)**: returns only a guide (in Japanese) for filing a bug, feature request or question as a public GitHub issue of [youyo/board](https://github.com/youyo/board/issues). It does not create an issue and does not call BOARD or GitHub. The input is only `kind` (`bug` / `feature` / `question` / `other`).
 - **api layer (`list_*` / `get_*`)**: low-level reads that follow the BOARD API. They return BOARD's raw data in snake_case. `show_meta` also returns `_meta` (total count and paging info).
 - **find layer (`find_*`)**: high-level search that resolves IDs from names and returns related entities (client, branch, contact, project) alongside. Meant for LLMs.
 - **cache layer**: `cache_status` inspects the D1 state (read-only); `cache_clear` deletes the cache (destructive). `cache_expire` was not created (it does not affect reads; see the [plan](plans/board-workers-m06-finish.md), in Japanese).
-- Read tools take a `max_response_tokens` argument (a safety net for response size; default 50000, 0 disables it). An oversized response is not truncated; it returns `response_too_large`.
+- Read tools (except `board_feedback`, [ADR 0007](docs/adr/0007-feedback-tool.md)) take a `max_response_tokens` argument (a safety net for response size; default 50000, 0 disables it). An oversized response is not truncated; it returns `response_too_large`.
 - Errors are returned as `{"schema_version":"1","error":{"code","message","retryable"}}` with `isError: true`.
 
 ## Deploy to your own environment

@@ -311,6 +311,12 @@ v1.7.0 まではアーカイブ済み(projects は失注も)のレコードを�
 - full が件数の照合に通らず旧世代を消さなかったとき(`full_prune_skipped: true`)、`must_full_resync` が立つ。この間の `refresh=delta` は、前回の full の完了から 6 時間以上たっていれば full として動く(応答の `mode` は `full`。6 時間未満は delta のまま。切り替えで始めた full が partial で終わったら、次の `refresh=delta` も full の経路で保存した進捗から再開する。`refresh=full` は間隔に関係なく常に full)。カーソルは full の完了で従来どおり進む(次が full なので取りこぼしには影響しない)。次の full で照合が通れば `must_full_resync` と `full_prune_skipped` が戻り、delta が delta に戻る。読み取りは止まらない(欠けは一部)。
 - **BOARD の X-Total-Count が常に取得した件数より多い場合、`refresh=delta` による full への自動の切り替えは 6 時間に 1 回までで(rate limit の保護)、`full_prune_skipped` が true のままになる。** その状態が続くときは、BOARD の総件数の数え方(アーカイブ・失注・削除済みの扱い)を疑う(docs/manual-verification.md の V6)。
 
+### v1.10.0 へ上げたとき(feedback ツール `board_feedback` の追加。ADR 0007)
+- 追加されるのは `board_feedback` の 1 ツール(55 個)。GitHub の issue を起票するための案内(手順・本文テンプレート・匿名化のルール)を返すだけで、issue は作らず、外部との通信もしない。作成先は upstream の `youyo/board` 固定(下流から呼んでも変わらない)。
+- D1 のスキーマ・設定(`board.config.json`・vars)・secret の変更はない。**デプロイ後の追加作業もない**(cache の取り直しも要らない)。
+- 下流の取り込みは「4. upstream の更新の取り込み」のとおり(取り込んで `mise run deploy:config:check` を通し、デプロイ)。Portal の一覧にツールが出るまで再同期が要ることがある。Portal 経由では `board_board_feedback` に見える(feedback だけ接頭辞つきの名前。ADR 0007)。
+- `feedback` ラベルは upstream(`youyo/board`)の管理者が別途作る。下流の作業ではない。案内はラベルを URL にも gh にも入れない(識別はタイトルの接頭辞 `[feedback]`)ので、ラベルが無くても起票できる。
+
 ### `cache_status`
 BOARD を呼ばずに D1 の状態を返す(読み取り専用)。見るところ:
 - `refresh_state`: `complete` / `partial`(full が途中。続きを `refresh=full` で)/ `failed`(`last_error_code`)/ `not_synced`(未取得)/ `on_demand`(書類 4 リソース。単体取得のたびにキャッシュに入る)。

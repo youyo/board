@@ -59,6 +59,8 @@ describe("defineTool", () => {
     expect(() => defineTool({ ...base, name: "server info" })).toThrow();
     expect(() => defineTool({ ...base, name: "" })).toThrow();
     expect(defineTool({ ...base, name: "find_projects" }).name).toBe("find_projects");
+    // feedback だけは製品名の接頭辞つき(<製品>_feedback。ADR 0007)。snake_case の検査をそのまま通る。
+    expect(defineTool({ ...base, name: "board_feedback" }).name).toBe("board_feedback");
   });
 });
 
